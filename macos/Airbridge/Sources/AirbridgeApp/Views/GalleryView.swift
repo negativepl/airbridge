@@ -191,10 +191,14 @@ struct PhotoDetailView: View {
                     Button {
                         galleryService.downloadPhoto(photoId: photo.id)
                         downloaded = true
+                        Task {
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            downloaded = false
+                        }
                     } label: {
                         Label(
                             downloaded
-                                ? (L10n.isPL ? "Pobieranie..." : "Downloading...")
+                                ? (L10n.isPL ? "Pobrano do Downloads" : "Saved to Downloads")
                                 : (L10n.isPL ? "Pobierz oryginał" : "Download Original"),
                             systemImage: downloaded ? "checkmark.circle" : "arrow.down.circle.fill"
                         )
@@ -202,7 +206,6 @@ struct PhotoDetailView: View {
                     }
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
-                    .disabled(downloaded)
                 }
             }
             .padding(20)

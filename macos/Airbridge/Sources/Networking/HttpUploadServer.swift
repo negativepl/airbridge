@@ -346,7 +346,6 @@ public actor HttpUploadServer {
             }
         }
 
-        NSLog("[HttpUploadServer] finalizeUpload: %@ (%d bytes), calling onFileReceived (nil? %@)", filename, data.count, onFileReceived == nil ? "YES" : "NO")
         onFileReceived?(filename, mimeType, computedChecksum, data)
 
         let json = "{\"status\":\"ok\",\"bytes_received\":\(data.count)}"

@@ -131,7 +131,7 @@ struct AboutView: View {
 
                 Spacer().frame(height: 8)
 
-                Text("v1.0.0")
+                Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0")")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 

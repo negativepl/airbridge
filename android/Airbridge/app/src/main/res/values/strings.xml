@@ -83,6 +83,9 @@
     <string name="send_confirm_size">Size: %s</string>
 
     <!-- Transfer progress -->
+    <string name="notification_running_background">Running in background</string>
+    <string name="notification_file_sent">%s — sent</string>
+    <string name="notification_file_error">%s — send failed</string>
     <string name="transfer_sending">Sending…</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Tap to collapse</string>

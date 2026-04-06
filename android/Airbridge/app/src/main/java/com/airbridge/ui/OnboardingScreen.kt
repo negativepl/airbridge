@@ -5,11 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -60,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -597,80 +591,6 @@ private fun NumberedRow(number: String, text: String) {
 }
 
 @Composable
-private fun BridgeSymbol() {
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-
-    val infiniteTransition = rememberInfiniteTransition(label = "bridgePulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bridgeScale"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(180.dp)
-            .scale(scale)
-            .clip(CircleShape)
-            .background(primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(100.dp)) {
-            val w = size.width
-            val h = size.height
-            val thick = 7f
-            val thin = 3f
-
-            // Bridge arch
-            val archPath = Path().apply {
-                moveTo(w * 0.05f, h * 0.58f)
-                quadraticBezierTo(w * 0.5f, h * 0.08f, w * 0.95f, h * 0.58f)
-            }
-            drawPath(archPath, color = primary, style = Stroke(width = thick, cap = StrokeCap.Round))
-
-            // Road (horizontal line)
-            drawLine(
-                color = primary,
-                start = Offset(w * 0.0f, h * 0.70f),
-                end = Offset(w * 1.0f, h * 0.70f),
-                strokeWidth = thick,
-                cap = StrokeCap.Round
-            )
-
-            // Center pillar (tallest)
-            drawLine(
-                color = primary,
-                start = Offset(w * 0.5f, h * 0.16f),
-                end = Offset(w * 0.5f, h * 0.70f),
-                strokeWidth = thick,
-                cap = StrokeCap.Round
-            )
-
-            // Left pillar
-            drawLine(
-                color = primary,
-                start = Offset(w * 0.25f, h * 0.38f),
-                end = Offset(w * 0.25f, h * 0.70f),
-                strokeWidth = thick,
-                cap = StrokeCap.Round
-            )
-
-            // Cable lines (suspension cables from center pillar)
-            val cableColor = primary.copy(alpha = 0.4f)
-            drawLine(cableColor, Offset(w * 0.5f, h * 0.16f), Offset(w * 0.18f, h * 0.70f), thin, StrokeCap.Round)
-            drawLine(cableColor, Offset(w * 0.5f, h * 0.16f), Offset(w * 0.36f, h * 0.70f), thin, StrokeCap.Round)
-            drawLine(cableColor, Offset(w * 0.5f, h * 0.16f), Offset(w * 0.64f, h * 0.70f), thin, StrokeCap.Round)
-            drawLine(cableColor, Offset(w * 0.5f, h * 0.16f), Offset(w * 0.82f, h * 0.70f), thin, StrokeCap.Round)
-        }
-    }
-}
-
-@Composable
 private fun WifiSymbol() {
     val primary = MaterialTheme.colorScheme.primary
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
@@ -737,41 +657,6 @@ private fun QrSymbol() {
             drawLine(primary, Offset(w * 0.65f, h * 0.9f), Offset(w * 0.9f, h * 0.9f), strokeW, StrokeCap.Round)
             drawLine(primary, Offset(w * 0.9f, h * 0.65f), Offset(w * 0.9f, h * 0.9f), strokeW, StrokeCap.Round)
             drawCircle(primary, radius = w * 0.06f, center = Offset(w * 0.5f, h * 0.5f))
-        }
-    }
-}
-
-@Composable
-private fun CheckmarkSymbol() {
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-
-    // Scale-in animation
-    val scale by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 200f),
-        label = "checkScale"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(140.dp)
-            .scale(scale)
-            .clip(CircleShape)
-            .background(primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(56.dp)) {
-            val path = Path().apply {
-                moveTo(size.width * 0.2f, size.height * 0.5f)
-                lineTo(size.width * 0.42f, size.height * 0.72f)
-                lineTo(size.width * 0.8f, size.height * 0.28f)
-            }
-            drawPath(
-                path = path,
-                color = primary,
-                style = Stroke(width = 6f, cap = StrokeCap.Round)
-            )
         }
     }
 }

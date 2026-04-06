@@ -83,6 +83,9 @@
     <string name="send_confirm_size">Rozmiar: %s</string>
 
     <!-- Transfer progress -->
+    <string name="notification_running_background">Działa w tle</string>
+    <string name="notification_file_sent">%s — wysłano</string>
+    <string name="notification_file_error">%s — błąd wysyłania</string>
     <string name="transfer_sending">Wysyłanie…</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Dotknij, aby zwinąć</string>

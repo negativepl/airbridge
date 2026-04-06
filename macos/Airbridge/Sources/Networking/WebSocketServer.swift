@@ -217,7 +217,9 @@ public actor WebSocketServer {
             let cont = readyContinuation
             readyContinuation = nil
             cont?.resume(throwing: error)
+            #if DEBUG
             print("[WebSocketServer] Listener failed: \(error)")
+            #endif
 
         default:
             break

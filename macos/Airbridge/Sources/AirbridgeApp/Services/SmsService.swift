@@ -75,7 +75,8 @@ final class SmsService: MessageHandler {
         case .smsSendResponse(let success, let error):
             sendResult = (success, error)
             if success, let threadId = currentThreadId {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
                     self?.loadMessages(threadId: threadId)
                 }
             }

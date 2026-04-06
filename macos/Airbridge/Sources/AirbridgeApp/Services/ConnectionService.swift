@@ -155,7 +155,9 @@ final class ConnectionService {
                 )
                 try await server.sendTo(response, connectionId: connectionId)
             } catch {
+                #if DEBUG
                 print("[ConnectionService] Failed to send pair response: \(error)")
+                #endif
             }
         }
     }
@@ -216,7 +218,6 @@ final class ConnectionService {
     }
 
     private func routeAuthenticatedMessage(_ message: Message) {
-        NSLog("[ConnectionService] routeAuthenticatedMessage: \(String(describing: message).prefix(100))")
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
@@ -249,9 +250,7 @@ final class ConnectionService {
                 }
             }
         }
-        let onConnect: (String) -> Void = { endpoint in
-            NSLog("[Airbridge] Client connected: \(endpoint) — awaiting auth")
-        }
+        let onConnect: (String) -> Void = { _ in }
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
                 let stillConnected = await self?.server.isConnected ?? false

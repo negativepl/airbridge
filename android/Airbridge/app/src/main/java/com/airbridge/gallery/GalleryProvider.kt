@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
-import android.util.Size
 import com.airbridge.protocol.PhotoMeta
 import java.io.ByteArrayOutputStream
 
@@ -91,9 +90,6 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
         val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
         return try {
-            // Read the full image and subsample it down to ~800px
-            val inputStream = contentResolver.openInputStream(uri) ?: return null
-
             // First pass: get dimensions only
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             val tempStream = contentResolver.openInputStream(uri) ?: return null
@@ -129,10 +125,8 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
                 bitmap
             }
 
-            Log.d("GalleryProvider", "Thumbnail for $photoId: ${scaledBitmap.width}x${scaledBitmap.height}")
-
             val out = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
             scaledBitmap.recycle()
 
             Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)

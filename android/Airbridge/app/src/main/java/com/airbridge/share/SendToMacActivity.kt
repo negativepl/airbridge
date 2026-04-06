@@ -35,7 +35,7 @@ class SendToMacActivity : ComponentActivity() {
         val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
         cm.setPrimaryClip(android.content.ClipData.newPlainText("Airbridge", text))
 
-        Toast.makeText(this, "Sent to Mac", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(com.airbridge.R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
         finish()
     }
 }

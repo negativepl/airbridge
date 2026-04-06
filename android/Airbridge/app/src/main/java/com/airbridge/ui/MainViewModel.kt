@@ -50,10 +50,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _showQrScanner.value = false
     }
 
-    fun onPaired(deviceName: String) {
-        hideQrScanner()
-    }
-
     fun disconnect() {
         stopService()
     }

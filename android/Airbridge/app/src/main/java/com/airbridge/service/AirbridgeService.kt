@@ -98,7 +98,6 @@ class AirbridgeService : Service() {
     private lateinit var webSocketClient: WebSocketClient
     private lateinit var clipboardSync: ClipboardSync
     private lateinit var nsdDiscovery: NsdDiscovery
-    private var localDeviceName: String? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val httpFileUploader = HttpFileUploader()
     private lateinit var galleryProvider: GalleryProvider
@@ -111,7 +110,7 @@ class AirbridgeService : Service() {
         instance = this
 
         createNotificationChannel()
-        startForegroundWithNotification("Airbridge", "Działa w tle")
+        startForegroundWithNotification("Airbridge", getString(com.airbridge.R.string.notification_running_background))
 
         webSocketClient = WebSocketClient()
         clipboardSync = ClipboardSync(this)
@@ -241,7 +240,6 @@ class AirbridgeService : Service() {
             connectedHost.value = host
             connectedDeviceName.value = deviceName
             Companion.httpPort.value = httpPort
-            localDeviceName = deviceName
             nsdDiscovery.stopDiscovery()
             webSocketClient.shouldReconnect = true
             webSocketClient.connect(host, port)
@@ -272,7 +270,6 @@ class AirbridgeService : Service() {
                     clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
-                    val name = localDeviceName ?: "device"
                     // connection status tracked via StateFlow
                 } else {
                     Log.w(TAG, "Auth rejected: ${message.reason}")
@@ -283,7 +280,6 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.PairResponse -> {
-                localDeviceName = message.deviceName
                 connectedDeviceName.value = message.deviceName
                 if (message.accepted) {
                     // Update stored device name with Mac's actual name
@@ -434,7 +430,7 @@ class AirbridgeService : Service() {
         fun updateTransferNotification(progress: Int, speed: String) {
             val notif = Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Airbridge — $filename")
-                .setContentText(if (speed.isNotEmpty()) speed else "Wysyłanie…")
+                .setContentText(if (speed.isNotEmpty()) speed else getString(com.airbridge.R.string.transfer_sending))
                 .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                 .setProgress(100, progress, false)
                 .setOngoing(true)
@@ -501,7 +497,7 @@ class AirbridgeService : Service() {
                 // Complete notification
                 val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
                     .setContentTitle("Airbridge")
-                    .setContentText("$filename — wysłano")
+                    .setContentText(getString(com.airbridge.R.string.notification_file_sent, filename))
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                     .setOngoing(false)
                     .setContentIntent(openIntent)
@@ -512,7 +508,7 @@ class AirbridgeService : Service() {
                 Log.e(TAG, "HTTP transfer failed: $filename")
                 val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
                     .setContentTitle("Airbridge")
-                    .setContentText("$filename — błąd wysyłania")
+                    .setContentText(getString(com.airbridge.R.string.notification_file_error, filename))
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                     .setOngoing(false)
                     .setContentIntent(openIntent)
@@ -586,9 +582,4 @@ class AirbridgeService : Service() {
         }
     }
 
-    private fun updateNotification(title: String, text: String) {
-        val notification = buildNotification(title, text)
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, notification)
-    }
 }

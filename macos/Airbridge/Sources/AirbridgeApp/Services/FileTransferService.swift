@@ -72,7 +72,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
     func sendFile(url: URL) {
         guard let connectionService else { return }
-        guard let data = try? Data(contentsOf: url) else { return }
 
         let filename = url.lastPathComponent
         let mime = Self.mimeType(for: url)
@@ -84,14 +83,17 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             return
         }
 
-        let chunked = fileChunker.prepare(
-            filename: filename,
-            mimeType: mime,
-            data: data,
-            sourceId: identity.deviceId
-        )
+        Task.detached { [weak self] in
+            guard let data = try? Data(contentsOf: url) else { return }
 
-        Task {
+            let chunked = await self?.fileChunker.prepare(
+                filename: filename,
+                mimeType: mime,
+                data: data,
+                sourceId: identity.deviceId
+            )
+            guard let chunked else { return }
+
             do {
                 try await connectionService.broadcast(chunked.startMessage)
 
@@ -102,7 +104,9 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                         data: chunk.base64Data
                     )
                     try await connectionService.broadcast(msg)
-                    self.fileTransferProgress = Double(chunk.chunkIndex + 1) / Double(chunked.totalChunks)
+                    await MainActor.run {
+                        self?.fileTransferProgress = Double(chunk.chunkIndex + 1) / Double(chunked.totalChunks)
+                    }
                 }
 
                 let completeMsg = Message.fileTransferComplete(
@@ -111,10 +115,12 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 )
                 try await connectionService.broadcast(completeMsg)
 
-                self.fileTransferProgress = 0
-                historyService?.add(type: .file, direction: .sent, description: filename)
+                await MainActor.run {
+                    self?.fileTransferProgress = 0
+                    self?.historyService?.add(type: .file, direction: .sent, description: filename)
+                }
             } catch {
-                self.fileTransferProgress = 0
+                await MainActor.run { self?.fileTransferProgress = 0 }
             }
         }
     }
@@ -158,31 +164,31 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         guard let connectionService else { return }
 
         let onFileReceived: @Sendable (String, String, String, Data) -> Void = { [weak self] filename, _, _, data in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 guard let self else { return }
                 self.fileTransferProgress = 1.0
                 self.isReceivingFile = false
 
                 do {
-                    let fileURL = try self.saveToDownloads(filename: filename, data: data)
+                    let _ = try self.saveToDownloads(filename: filename, data: data)
                     self.playReceiveSound()
                     self.historyService?.add(type: .file, direction: .received, description: filename)
-                    print("[FileTransferService] HTTP file saved: \(fileURL.path)")
                 } catch {
+                    #if DEBUG
                     print("[FileTransferService] HTTP file save failed: \(error)")
+                    #endif
                 }
 
                 TransferPopup.shared.hide()
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    self.fileTransferProgress = 0
-                    self.fileTransferFileName = ""
-                }
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                self.fileTransferProgress = 0
+                self.fileTransferFileName = ""
             }
         }
 
         let onProgress: @Sendable (String, Int, Int) -> Void = { [weak self] filename, bytesReceived, totalBytes in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 guard let self else { return }
                 self.fileTransferFileName = filename
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
@@ -218,10 +224,8 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             fileTransferProgress = 0
             playReceiveSound()
             historyService?.add(type: .file, direction: .received, description: assembler.filename)
-            print("[FileTransferService] File saved: \(fileURL.path)")
         } catch {
             fileTransferProgress = 0
-            print("[FileTransferService] File assembly failed: \(error)")
         }
     }
 

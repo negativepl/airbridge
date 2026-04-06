@@ -3,7 +3,6 @@ package com.airbridge.ui
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
-import androidx.compose.ui.draw.alpha
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -142,7 +141,7 @@ class MainActivity : ComponentActivity() {
 
                     val pagerState = rememberPagerState(pageCount = { 4 })
                     val coroutineScope = rememberCoroutineScope()
-                    val hasPairedDevices = remember {
+                    val hasPairedDevices = remember(onboardingCompleted) {
                         com.airbridge.security.PairedDeviceStore(this@MainActivity).getAll().isNotEmpty()
                     }
                     var showSendSheet by remember { mutableStateOf(false) }

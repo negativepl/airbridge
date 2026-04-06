@@ -280,7 +280,7 @@ fun AboutScreen() {
 
         // Version in bottom right
         Text(
-            text = "v1.0.0",
+            text = "v${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier

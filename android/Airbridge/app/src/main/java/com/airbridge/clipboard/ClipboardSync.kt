@@ -5,16 +5,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
 import com.airbridge.protocol.ContentType
-import kotlinx.coroutines.flow.MutableSharedFlow
 import java.security.MessageDigest
 
 class ClipboardSync(private val context: Context) {
 
     companion object {
         private const val TAG = "ClipboardSync"
-
-        // Shared outgoing clipboard flow — Activity writes, Service reads
-        val outgoingClipboard = MutableSharedFlow<Pair<ContentType, String>>(extraBufferCapacity = 1)
     }
 
     var onClipboardChanged: ((contentType: ContentType, data: String) -> Unit)? = null
