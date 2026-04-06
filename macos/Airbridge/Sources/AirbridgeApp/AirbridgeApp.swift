@@ -1,8 +1,15 @@
 import SwiftUI
 import AppKit
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+}
+
 @main
 struct AirbridgeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var connectionService: ConnectionService
     @State private var clipboardService: ClipboardService
     @State private var fileTransferService: FileTransferService

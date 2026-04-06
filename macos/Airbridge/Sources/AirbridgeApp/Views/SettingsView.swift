@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 import AirbridgeSecurity
 
 struct SettingsView: View {
@@ -37,7 +38,21 @@ struct SettingsView: View {
                     }
                 }
                 Section(L10n.general) {
-                    Toggle(L10n.launchAtLogin, isOn: $launchAtLogin)
+                    Toggle(L10n.launchAtLogin, isOn: Binding(
+                        get: { launchAtLogin },
+                        set: { newValue in
+                            launchAtLogin = newValue
+                            do {
+                                if newValue {
+                                    try SMAppService.mainApp.register()
+                                } else {
+                                    try SMAppService.mainApp.unregister()
+                                }
+                            } catch {
+                                launchAtLogin = !newValue
+                            }
+                        }
+                    ))
                     Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
                 }
                 Section(L10n.fileTransfer) {

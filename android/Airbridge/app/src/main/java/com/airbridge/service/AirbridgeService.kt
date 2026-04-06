@@ -116,7 +116,7 @@ class AirbridgeService : Service() {
         clipboardSync = ClipboardSync(this)
         nsdDiscovery = NsdDiscovery(this)
         galleryProvider = GalleryProvider(contentResolver)
-        smsProvider = SmsProvider(contentResolver)
+        smsProvider = SmsProvider(applicationContext)
         keyManager = com.airbridge.security.KeyManager(this)
         pairedDeviceStore = com.airbridge.security.PairedDeviceStore(this)
 
@@ -144,9 +144,13 @@ class AirbridgeService : Service() {
             }
             ACTION_SEND_FILE -> {
                 val uri: Uri? = intent.data
+                val text: String? = intent.getStringExtra(Intent.EXTRA_TEXT)
                 if (uri != null) {
                     Log.d(TAG, "File transfer requested: $uri")
                     handleSendFile(uri)
+                } else if (!text.isNullOrEmpty()) {
+                    Log.d(TAG, "Text share requested: '${text.take(50)}'")
+                    sendClipboardToMac(ContentType.PLAIN_TEXT, text)
                 }
             }
             ACTION_DISCONNECT -> {

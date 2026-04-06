@@ -1,7 +1,9 @@
 package com.airbridge.sms
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.provider.Telephony
@@ -10,7 +12,9 @@ import android.util.Log
 import com.airbridge.protocol.SmsConversation
 import com.airbridge.protocol.SmsMessage
 
-class SmsProvider(private val contentResolver: ContentResolver) {
+class SmsProvider(private val context: Context) {
+
+    private val contentResolver: ContentResolver = context.contentResolver
 
     fun getConversations(page: Int, pageSize: Int): Pair<List<SmsConversation>, Int> {
         val conversations = mutableListOf<SmsConversation>()
@@ -102,7 +106,12 @@ class SmsProvider(private val contentResolver: ContentResolver) {
 
     fun sendSms(address: String, body: String): Pair<Boolean, String?> {
         return try {
-            val smsManager = SmsManager.getDefault()
+            @Suppress("DEPRECATION")
+            val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(SmsManager::class.java)
+            } else {
+                SmsManager.getDefault()
+            }
             val parts = smsManager.divideMessage(body)
             if (parts.size == 1) {
                 smsManager.sendTextMessage(address, null, body, null, null)

@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbridge.R
 
-private val CardShape = RoundedCornerShape(24.dp)
+
 
 @Composable
 fun AboutScreen() {

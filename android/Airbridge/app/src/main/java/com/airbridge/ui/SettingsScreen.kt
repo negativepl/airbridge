@@ -37,8 +37,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 
-private val CardShape = RoundedCornerShape(24.dp)
-
 @Composable
 fun SettingsScreen(
     prefs: SharedPreferences,
