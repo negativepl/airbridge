@@ -22,12 +22,13 @@ struct OnboardingView: View {
 
             // Bottom controls
             HStack {
-                // Dots
-                HStack(spacing: 6) {
+                // Page indicators
+                HStack(spacing: 8) {
                     ForEach(0..<3, id: \.self) { i in
-                        Circle()
-                            .fill(i == page ? Color.accentColor : Color.secondary.opacity(0.3))
-                            .frame(width: 7, height: 7)
+                        Capsule()
+                            .fill(i == page ? Color.accentColor : Color.primary.opacity(0.25))
+                            .frame(width: i == page ? 24 : 10, height: 10)
+                            .animation(.easeInOut(duration: 0.2), value: page)
                     }
                 }
 
