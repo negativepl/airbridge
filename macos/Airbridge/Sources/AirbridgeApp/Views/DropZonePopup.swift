@@ -9,6 +9,22 @@ final class DropZonePopup {
     private var panel: NSWindow?
     private var isVisible = false
     private var escapeMonitor: Any?
+    private var autoHideTimer: Timer?
+    private let autoHideDelay: TimeInterval = 5.0
+
+    func resetAutoHideTimer() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = Timer.scheduledTimer(withTimeInterval: autoHideDelay, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.hide()
+            }
+        }
+    }
+
+    func cancelAutoHideTimer() {
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
+    }
 
     private init() {}
 
@@ -45,12 +61,14 @@ final class DropZonePopup {
             defer: false
         )
         window.contentView = hostingView
-        window.level = .screenSaver
+        window.level = NSWindow.Level(Int(CGWindowLevelForKey(.popUpMenuWindow)))
         window.hasShadow = false
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.isMovableByWindowBackground = true
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.isMovableByWindowBackground = false
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        window.acceptsMouseMovedEvents = true
+        window.ignoresMouseEvents = false
 
         // Register drag types on the window's content view
         hostingView.registerForDraggedTypes([.fileURL])
@@ -58,6 +76,8 @@ final class DropZonePopup {
         let startY = y + height + 10
         window.setFrame(NSRect(x: x, y: startY, width: width, height: height), display: true)
         window.orderFrontRegardless()
+        window.makeKey()
+        resetAutoHideTimer()
 
         // Slide in
         let duration = 0.35
@@ -89,6 +109,9 @@ final class DropZonePopup {
 
     func hide() {
         guard isVisible, let panel else { return }
+
+        autoHideTimer?.invalidate()
+        autoHideTimer = nil
 
         if let monitor = escapeMonitor {
             NSEvent.removeMonitor(monitor)

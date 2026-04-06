@@ -17,6 +17,8 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     private(set) var isReceivingFile: Bool = false
     private(set) var transferSpeed: Double = 0
     private(set) var transferEta: Int = 0
+    private(set) var isWaitingForAccept: Bool = false
+    private(set) var isRejected: Bool = false
 
     // MARK: - Private
 
@@ -100,11 +102,30 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             return
         }
 
-        guard let host = connectionService.getConnectedClientIP() else {
+        guard let rawHost = connectionService.getConnectedClientIP() else {
             isSendingFromQueue = false
             processQueue()
             return
         }
+        // Sanitize host: strip Network.framework prefixes like "IPv4#abcd1234"
+        // and extract a clean dotted-decimal IPv4 if possible.
+        let host: String = {
+            // If contains "#", assume "IPv4#hex" and decode
+            if let hashIdx = rawHost.firstIndex(of: "#") {
+                let hexPart = String(rawHost[rawHost.index(after: hashIdx)...])
+                if let intVal = UInt32(hexPart, radix: 16) {
+                    let a = (intVal >> 24) & 0xff
+                    let b = (intVal >> 16) & 0xff
+                    let c = (intVal >> 8) & 0xff
+                    let d = intVal & 0xff
+                    return "\(a).\(b).\(c).\(d)"
+                }
+            }
+            return rawHost
+        }()
+        #if DEBUG
+        print("[FileTransferService] Upload host: \(host) (raw: \(rawHost))")
+        #endif
 
         let filename = url.lastPathComponent
         let mime = Self.mimeType(for: url)
@@ -113,6 +134,12 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
         self.fileTransferFileName = filename
         self.fileTransferProgress = 0
+        self.isWaitingForAccept = true
+        self.isRejected = false
+        self.isReceivingFile = false
+
+        // Show the popup immediately in waiting state
+        TransferPopup.shared.show(fileTransferService: self)
 
         Task {
             // 1. Set up response stream before sending offer
@@ -132,7 +159,14 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             }
 
             guard accepted else {
-                // Rejected
+                // Rejected — animate rejection in popup, then hide (no extra delay)
+                self.isWaitingForAccept = false
+                self.isRejected = true
+                // Show rejection for 2s then slide up
+                TransferPopup.shared.hide(delay: 2.0)
+                // Wait for slide-up animation to finish before clearing state
+                try? await Task.sleep(nanoseconds: 2_400_000_000)
+                self.isRejected = false
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
                 self.isSendingFromQueue = false
@@ -140,8 +174,8 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 return
             }
 
-            // 3. Accepted — upload via HTTP
-            TransferPopup.shared.show(fileTransferService: self)
+            // 4. Accepted — switch state, popup is already showing
+            self.isWaitingForAccept = false
 
             let success = await Self.httpUpload(
                 fileURL: url,

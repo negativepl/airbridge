@@ -41,7 +41,49 @@ struct TransferPopupView: View {
 
     var body: some View {
         ZStack {
-            if showComplete {
+            if fileTransferService.isRejected {
+                HStack(spacing: 16) {
+                    Spacer()
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundColor(.red)
+                        .symbolEffect(.bounce, value: fileTransferService.isRejected)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                        Text(fileTransferService.fileTransferFileName)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.55))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 10)
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            } else if fileTransferService.isWaitingForAccept {
+                HStack(spacing: 16) {
+                    Spacer()
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.regular)
+                        .tint(.white)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                        Text(fileTransferService.fileTransferFileName)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.55))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 10)
+                .transition(.scale(scale: 0.95).combined(with: .opacity))
+            } else if showComplete {
                 HStack(spacing: 14) {
                     Spacer()
                     Image(systemName: "checkmark.circle.fill")
@@ -121,6 +163,8 @@ struct TransferPopupView: View {
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showComplete)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isWaitingForAccept)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isRejected)
         .onChange(of: fileTransferService.fileTransferProgress) { _, new in
             if new >= 1.0 {
                 withAnimation { showComplete = true }
@@ -288,10 +332,10 @@ final class TransferPopup {
         self.panel = window
     }
 
-    func hide() {
+    func hide(delay: TimeInterval = 2.5) {
         guard isVisible, let panel else { return }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, let panel = self.panel else { return }
             let frame = panel.frame
             let targetY = frame.origin.y + frame.height + 10

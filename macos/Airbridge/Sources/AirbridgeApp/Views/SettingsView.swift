@@ -94,6 +94,37 @@ struct SettingsView: View {
                             .font(.system(size: 15, weight: .semibold))
 
                         HStack {
+                            Text(L10n.isPL ? "Dostępność:" : "Accessibility:")
+                                .font(.system(size: 14))
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(AXIsProcessTrusted() ? Color.green : Color.orange)
+                                    .frame(width: 10, height: 10)
+                                Text(AXIsProcessTrusted()
+                                    ? (L10n.isPL ? "Nadane" : "Granted")
+                                    : (L10n.isPL ? "Brak uprawnień" : "Not granted"))
+                                    .font(.system(size: 14))
+                            }
+                            if !AXIsProcessTrusted() {
+                                Button(L10n.isPL ? "Nadaj" : "Grant") {
+                                    let key = "AXTrustedCheckOptionPrompt" as CFString
+                                    let options = [key: true] as CFDictionary
+                                    AXIsProcessTrustedWithOptions(options)
+                                }
+                                .controlSize(.large)
+                            }
+                        }
+
+                        Text(L10n.isPL
+                            ? "Skrót działa globalnie tylko z uprawnieniami Dostępności. Po nadaniu uprawnień zrestartuj aplikację."
+                            : "The shortcut works globally only with Accessibility permission. Restart the app after granting.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        HStack {
                             Text(L10n.isPL ? "Skrót:" : "Shortcut:")
                                 .font(.system(size: 14))
                             Spacer()

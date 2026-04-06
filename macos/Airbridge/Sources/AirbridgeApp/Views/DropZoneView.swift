@@ -13,45 +13,53 @@ struct DropZoneView: View {
     @State private var isTargeted = false
 
     var body: some View {
-        Group {
+        ZStack {
+            // Black background filling whole window
+            BottomRoundedShape(radius: islandCornerRadius)
+                .fill(Color.black)
+
             if connectionService.isConnected {
                 connectedContent
             } else {
                 disconnectedContent
             }
         }
-        .padding(.top, 20)
-        .padding(.bottom, 10)
         .frame(width: islandWidth, height: islandHeight, alignment: .center)
         .clipShape(BottomRoundedShape(radius: islandCornerRadius))
-        .background(
-            BottomRoundedShape(radius: islandCornerRadius)
-                .fill(Color.black)
-        )
+        .contentShape(Rectangle())
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
+        }
+        .onHover { _ in
+            DropZonePopup.shared.resetAutoHideTimer()
+        }
+        .onChange(of: isTargeted) { _, _ in
+            DropZonePopup.shared.resetAutoHideTimer()
         }
     }
 
     private var connectedContent: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                .foregroundStyle(isTargeted ? Color.accentColor : Color.white.opacity(0.2))
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
+            UShape(cornerRadius: islandCornerRadius)
+                .stroke(style: StrokeStyle(lineWidth: isTargeted ? 2.5 : 2, dash: [8, 4]))
+                .foregroundStyle(isTargeted ? Color.accentColor : Color.white.opacity(0.25))
+                .padding(.horizontal, 8)
                 .padding(.bottom, 4)
+                .scaleEffect(isTargeted ? 1.015 : 1.0)
+                .allowsHitTesting(false)
 
             HStack(spacing: 14) {
                 Image(systemName: "arrow.down.doc")
                     .font(.system(size: 28, weight: .medium))
-                    .foregroundColor(isTargeted ? Color.accentColor : .white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.65))
                 Text(L10n.dropFileHere)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(isTargeted ? .white : .white.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.8))
             }
+            .padding(.top, 18)
+            .allowsHitTesting(false)
         }
-        .animation(.easeInOut(duration: 0.15), value: isTargeted)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isTargeted)
     }
 
     private var disconnectedContent: some View {
@@ -78,5 +86,30 @@ struct DropZoneView: View {
             }
         }
         return true
+    }
+}
+
+// MARK: - UShape
+
+/// Open-top rounded shape — left side, rounded bottom, right side. No top edge.
+struct UShape: Shape {
+    var cornerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let r = min(cornerRadius, min(rect.width, rect.height) / 2)
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - r))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + r, y: rect.maxY),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.maxY - r),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return path
     }
 }

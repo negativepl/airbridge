@@ -24,5 +24,11 @@
 	<false/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Airbridge needs access to your local network to discover and communicate with paired devices over Wi-Fi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_airbridge._tcp</string>
+	</array>
 </dict>
 </plist>
