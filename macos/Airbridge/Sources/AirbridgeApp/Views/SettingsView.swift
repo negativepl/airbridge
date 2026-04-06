@@ -155,6 +155,10 @@ struct SettingsView: View {
                     pairingService: pairingService
                 )
             }
+            pairingService.refreshPairedDevices()
+        }
+        .onChange(of: connectionService.isConnected) { _, _ in
+            pairingService.refreshPairedDevices()
         }
         .sheet(isPresented: $showPairing) {
             PairingView(pairingService: pairingService, connectionService: connectionService, isPresented: $showPairing)

@@ -134,9 +134,7 @@ class AirbridgeService : Service() {
         instance = this
 
         createNotificationChannel()
-        // Start as foreground briefly, then detach notification
         startForegroundWithNotification("Airbridge", getString(com.airbridge.R.string.notification_running_background))
-        stopForeground(STOP_FOREGROUND_DETACH)
 
         webSocketClient = WebSocketClient()
         clipboardSync = ClipboardSync(this)
@@ -163,6 +161,7 @@ class AirbridgeService : Service() {
                 val port = intent.getIntExtra(EXTRA_PORT, 0)
                 if (host != null && port != 0) {
                     Log.d(TAG, "Connecting directly to $host:$port")
+                    connectedHost.value = host
                     webSocketClient.shouldReconnect = true
                     webSocketClient.connect(host, port)
                 } else {
@@ -202,7 +201,7 @@ class AirbridgeService : Service() {
                     if (offer != null) {
                         Log.d(TAG, "File rejected: ${offer.filename}")
                         webSocketClient.send(Message.FileTransferReject(transferId))
-                        val notif = Notification.Builder(this, CHANNEL_ID)
+                        val notif = Notification.Builder(this, CHANNEL_FILES_ID)
                             .setContentTitle("Airbridge")
                             .setContentText(getString(com.airbridge.R.string.notification_file_rejected, offer.filename))
                             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -325,24 +324,31 @@ class AirbridgeService : Service() {
             if (now - lastProgressNotifUpdate >= 300 || bytesReceived >= totalBytes) {
                 lastProgressNotifUpdate = now
                 val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val progressStyle = Notification.ProgressStyle()
-                    .setProgress((progress * 100).toInt())
-                    .setStyledByProgress(true)
                 val sender = connectedDeviceName.value ?: "Mac"
                 val sizeText = when {
                     totalBytes > 1024 * 1024 -> String.format("%.1f MB", totalBytes / (1024.0 * 1024.0))
                     totalBytes > 1024 -> String.format("%.0f KB", totalBytes / 1024.0)
                     else -> "$totalBytes B"
                 }
-                val notif = Notification.Builder(this, CHANNEL_ID)
+                val progressPercent = (progress * 100).toInt()
+                val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
                     .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
-                    .setContentText("$filename — $sizeText — ${(progress * 100).toInt()}%")
+                    .setContentText("$filename — $sizeText — $progressPercent%")
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setStyle(progressStyle)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
-                    .build()
-                manager.notify(4, notif)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    val accentColor = android.graphics.Color.parseColor("#4285F4")
+                    val grayColor = android.graphics.Color.parseColor("#444444")
+                    notifBuilder.style = Notification.ProgressStyle().apply {
+                        this.progress = progressPercent
+                        this.progressSegments = listOf(
+                            Notification.ProgressStyle.Segment(progressPercent).setColor(accentColor),
+                            Notification.ProgressStyle.Segment(100 - progressPercent).setColor(grayColor)
+                        )
+                    }
+                }
+                manager.notify(4, notifBuilder.build())
             }
         }
         httpFileServer.onFileReceived = { filename, _, tempFile ->
@@ -365,7 +371,7 @@ class AirbridgeService : Service() {
                     transferProgress.value = null
                     transferFileName.value = null
 
-                    val notif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
+                    val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                         .setContentTitle("Airbridge")
                         .setContentText(getString(com.airbridge.R.string.notification_file_received, filename))
                         .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -508,7 +514,7 @@ class AirbridgeService : Service() {
                 }
                 val sender = connectedDeviceName.value ?: "Mac"
                 val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val notif = Notification.Builder(this, CHANNEL_ID)
+                val notif = Notification.Builder(this, CHANNEL_FILES_ID)
                     .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
                     .setContentText(getString(com.airbridge.R.string.notification_receiving_size, message.filename, sizeText))
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -529,7 +535,7 @@ class AirbridgeService : Service() {
                 val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val progress = (transfer.progress * 100).toInt()
                 val sender = connectedDeviceName.value ?: "Mac"
-                val notif = Notification.Builder(this, CHANNEL_ID)
+                val notif = Notification.Builder(this, CHANNEL_FILES_ID)
                     .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
                     .setContentText(transfer.filename)
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -561,7 +567,7 @@ class AirbridgeService : Service() {
                         // Cancel progress notification, show completion
                         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(4)
-                        val notif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
+                        val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                             .setContentTitle("Airbridge")
                             .setContentText(getString(com.airbridge.R.string.notification_file_received, transfer.filename))
                             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -665,11 +671,13 @@ class AirbridgeService : Service() {
     private fun handleSendFile(uri: Uri) {
         if (!webSocketClient.isConnected) {
             Log.w(TAG, "handleSendFile: not connected")
+            android.widget.Toast.makeText(this, getString(com.airbridge.R.string.not_connected), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
 
         val host = connectedHost.value ?: run {
             Log.w(TAG, "handleSendFile: no host")
+            android.widget.Toast.makeText(this, getString(com.airbridge.R.string.not_connected), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         val port = httpPort.value
@@ -700,19 +708,25 @@ class AirbridgeService : Service() {
             android.app.PendingIntent.FLAG_IMMUTABLE
         )
         fun updateTransferNotification(progress: Int, speed: String) {
-            val progressStyle = Notification.ProgressStyle()
-                .setProgress(progress)
-                .setStyledByProgress(true)
-            val notif = Notification.Builder(this, CHANNEL_ID)
+            val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
                 .setContentTitle("Airbridge — $filename")
                 .setContentText(if (speed.isNotEmpty()) speed else getString(com.airbridge.R.string.transfer_sending))
                 .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                .setStyle(progressStyle)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(openIntent)
-                .build()
-            manager.notify(transferNotifId, notif)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                val accentColor = android.graphics.Color.parseColor("#4285F4")
+                val grayColor = android.graphics.Color.parseColor("#444444")
+                notifBuilder.style = Notification.ProgressStyle().apply {
+                    this.progress = progress
+                    this.progressSegments = listOf(
+                        Notification.ProgressStyle.Segment(maxOf(progress, 1)).setColor(accentColor),
+                        Notification.ProgressStyle.Segment(maxOf(100 - progress, 1)).setColor(grayColor)
+                    )
+                }
+            }
+            manager.notify(transferNotifId, notifBuilder.build())
         }
         updateTransferNotification(0, "")
 
@@ -770,7 +784,7 @@ class AirbridgeService : Service() {
                 Log.d(TAG, "HTTP transfer complete: $filename in ${elapsed}ms (%.2f MB/s)".format(speedMBs))
                 addActivity(ActivityItem("file_sent", filename, System.currentTimeMillis()))
                 // Complete notification
-                val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
+                val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                     .setContentTitle("Airbridge")
                     .setContentText(getString(com.airbridge.R.string.notification_file_sent, filename))
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -781,7 +795,7 @@ class AirbridgeService : Service() {
                 manager.notify(transferNotifId, doneNotif)
             } else {
                 Log.e(TAG, "HTTP transfer failed: $filename")
-                val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_ID)
+                val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                     .setContentTitle("Airbridge")
                     .setContentText(getString(com.airbridge.R.string.notification_file_error, filename))
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
@@ -828,18 +842,18 @@ class AirbridgeService : Service() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val serviceChannel = NotificationChannel(
             CHANNEL_ID,
-            "Airbridge Service",
+            getString(com.airbridge.R.string.channel_service_name),
             NotificationManager.IMPORTANCE_MIN
         ).apply {
-            description = "Airbridge background service"
+            description = getString(com.airbridge.R.string.channel_service_desc)
             setShowBadge(false)
         }
         val fileChannel = NotificationChannel(
             CHANNEL_FILES_ID,
-            "File Transfers",
+            getString(com.airbridge.R.string.channel_files_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Incoming file transfer notifications"
+            description = getString(com.airbridge.R.string.channel_files_desc)
         }
         manager.createNotificationChannel(serviceChannel)
         manager.createNotificationChannel(fileChannel)

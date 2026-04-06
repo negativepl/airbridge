@@ -1,5 +1,12 @@
 package com.airbridge.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -17,6 +24,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material.icons.Icons
@@ -102,10 +112,11 @@ fun OnboardingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 48.dp),
+                    .padding(horizontal = 32.dp)
+                    .padding(top = 16.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Animated dot indicators — pill for selected, circle for unselected
+                // Animated dot indicators
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -137,45 +148,45 @@ fun OnboardingScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                if (pagerState.currentPage == 3) {
-                    // Scan QR button (page 3)
-                    var pressed by remember { mutableStateOf(false) }
-                    val buttonScale by animateFloatAsState(
-                        targetValue = if (pressed) 0.95f else 1f,
-                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-                        label = "btnScale"
-                    )
-                    FilledTonalButton(
-                        onClick = { onScanQr() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .scale(buttonScale)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        pressed = true
-                                        tryAwaitRelease()
-                                        pressed = false
-                                    }
-                                )
-                            },
-                        shape = PillShape
+                AnimatedContent(
+                    targetState = pagerState.currentPage == 3,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.95f, animationSpec = tween(300)))
+                            .togetherWith(fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.95f, animationSpec = tween(200)))
+                    },
+                    label = "buttonTransition"
+                ) { isScanPage ->
+                if (isScanPage) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.pairing_scan_title),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { onSkipPairing() }) {
-                        Text(
-                            text = stringResource(R.string.pairing_skip),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        TextButton(
+                            onClick = { onSkipPairing() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = PillShape
+                        ) {
+                            Text(
+                                text = stringResource(R.string.pairing_skip),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = { onScanQr() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = PillShape
+                        ) {
+                            Text(
+                                text = stringResource(R.string.pairing_scan_title),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                 } else {
                     // "Next" — FilledTonalButton with pill shape and press feedback
@@ -212,6 +223,7 @@ fun OnboardingScreen(
                         )
                     }
                 }
+                }
             }
         }
     }
@@ -232,20 +244,21 @@ private fun WelcomePage() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
         Image(
             painter = painterResource(R.drawable.logo_airbridge),
             contentDescription = "Airbridge",
             modifier = Modifier
-                .size(220.dp)
-                .clip(RoundedCornerShape(44.dp)),
+                .size(140.dp)
+                .clip(RoundedCornerShape(28.dp)),
             contentScale = ContentScale.Crop
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = stringResource(R.string.onboarding_welcome_title),
@@ -279,13 +292,14 @@ private fun HowItWorksPage() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
         WifiSymbol()
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = stringResource(R.string.onboarding_connect_title),
@@ -342,10 +356,11 @@ private fun PermissionsPage() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
         Box(
             modifier = Modifier
                 .size(140.dp)
@@ -386,6 +401,7 @@ private fun PermissionsPage() {
         PermissionRow(
             icon = Icons.Rounded.Notifications,
             description = stringResource(R.string.onboarding_perm_notifications_desc),
+            why = stringResource(R.string.onboarding_perm_notifications_why),
             granted = notificationsGranted,
             onRequest = {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -397,6 +413,7 @@ private fun PermissionsPage() {
         PermissionRow(
             icon = Icons.Rounded.ChatBubble,
             description = stringResource(R.string.onboarding_perm_sms_desc),
+            why = stringResource(R.string.onboarding_perm_sms_why),
             granted = smsGranted,
             onRequest = {
                 smsLauncher.launch(arrayOf(
@@ -409,6 +426,7 @@ private fun PermissionsPage() {
         PermissionRow(
             icon = Icons.Rounded.Photo,
             description = stringResource(R.string.onboarding_perm_photos_desc),
+            why = stringResource(R.string.onboarding_perm_photos_why),
             granted = photosGranted,
             onRequest = {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -420,6 +438,7 @@ private fun PermissionsPage() {
         PermissionRow(
             icon = Icons.Rounded.Contacts,
             description = stringResource(R.string.onboarding_perm_contacts_desc),
+            why = stringResource(R.string.onboarding_perm_contacts_why),
             granted = contactsGranted,
             onRequest = { contactsLauncher.launch(android.Manifest.permission.READ_CONTACTS) }
         )
@@ -453,42 +472,56 @@ private fun PermissionsPage() {
 private fun PermissionRow(
     icon: ImageVector,
     description: String,
+    why: String = "",
     granted: Boolean,
     onRequest: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = if (granted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (granted) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = Icons.Rounded.Check,
+                imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF4CAF50),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp),
+                tint = if (granted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
             )
-        } else {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (granted) {
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        if (why.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = why,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 36.dp)
+            )
+        }
+        if (!granted) {
+            Spacer(modifier = Modifier.height(10.dp))
             FilledTonalButton(
                 onClick = onRequest,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                modifier = Modifier.height(32.dp)
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                shape = RoundedCornerShape(50)
             ) {
                 Text(
                     text = stringResource(R.string.onboarding_perm_allow_btn),
@@ -504,13 +537,14 @@ private fun ScanPage() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
         QrSymbol()
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = stringResource(R.string.pairing_scan_title),
