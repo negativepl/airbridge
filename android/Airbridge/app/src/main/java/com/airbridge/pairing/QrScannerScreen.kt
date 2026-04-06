@@ -11,6 +11,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -170,7 +172,11 @@ fun QrScannerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Text(stringResource(R.string.pairing_camera_required))
+                Text(
+                    stringResource(R.string.pairing_camera_required),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+                )
             }
         }
     }
