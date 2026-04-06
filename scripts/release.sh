@@ -43,10 +43,15 @@ if [ -d "$APP_BUNDLE" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$PLIST"
 fi
 
-# Create DMG
+# Create DMG with Applications symlink
 DMG_PATH="$ROOT/Airbridge.dmg"
-rm -f "$DMG_PATH"
-hdiutil create -volname "Airbridge" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG_PATH" > /dev/null 2>&1
+DMG_STAGE="$ROOT/.dmg-stage"
+rm -rf "$DMG_STAGE" "$DMG_PATH"
+mkdir -p "$DMG_STAGE"
+cp -R "$APP_BUNDLE" "$DMG_STAGE/Airbridge.app"
+ln -s /Applications "$DMG_STAGE/Applications"
+hdiutil create -volname "Airbridge" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_PATH" > /dev/null 2>&1
+rm -rf "$DMG_STAGE"
 echo "  DMG: $DMG_PATH"
 
 # 2. Build Android
