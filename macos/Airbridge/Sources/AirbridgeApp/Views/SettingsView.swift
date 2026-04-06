@@ -94,7 +94,7 @@ struct SettingsView: View {
                             .font(.system(size: 15, weight: .semibold))
 
                         HStack {
-                            Text(L10n.quickDropShortcut)
+                            Text(L10n.isPL ? "Skrót:" : "Shortcut:")
                                 .font(.system(size: 14))
                             Spacer()
 
