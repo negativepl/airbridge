@@ -76,11 +76,11 @@ tell application "Finder"
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set bounds of container window to {200, 200, 660, 460}
+        set bounds of container window to {300, 200, 750, 470}
         set theViewOptions to icon view options of container window
         set arrangement of theViewOptions to not arranged
-        set icon size of theViewOptions to 96
-        set position of item "Airbridge.app" of container window to {120, 120}
+        set icon size of theViewOptions to 128
+        set position of item "Airbridge.app" of container window to {110, 120}
         set position of item "Applications" of container window to {340, 120}
         close
     end tell

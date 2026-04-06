@@ -50,6 +50,8 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 if vm.isConnected {
                     Circle().fill(Color.green).frame(width: 10, height: 10)
+                } else if !vm.hasPairedDevices {
+                    Circle().fill(Color.gray).frame(width: 10, height: 10)
                 } else if vm.statusMessage.contains("Starting") || vm.statusMessage.contains("Waiting") {
                     ProgressView().controlSize(.small)
                 } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Failed") {
@@ -60,12 +62,18 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if vm.isConnected {
                         Text(vm.deviceName).font(.headline)
+                    } else if !vm.hasPairedDevices {
+                        Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
+                            .font(.headline)
                     } else {
                         Text(vm.statusMessage).font(.headline)
                     }
                     if vm.isConnected, let ip = vm.localIP {
                         Text(ip).font(.caption).foregroundStyle(.secondary)
-                    } else if !vm.isConnected && vm.hasPairedDevices {
+                    } else if !vm.hasPairedDevices {
+                        Text(L10n.isPL ? "Sparuj telefon aby rozpocząć" : "Pair your phone to get started")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if !vm.isConnected {
                         Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -73,6 +81,9 @@ struct HomeView: View {
                 Spacer()
                 if vm.isConnected {
                     Button(L10n.disconnect) { vm.disconnect() }
+                } else if !vm.hasPairedDevices {
+                    Button(L10n.pairDevice) { showPairing = true }
+                        .controlSize(.large)
                 } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Stopped") {
                     Button(L10n.reconnect) { vm.reconnect() }
                         .controlSize(.large)
