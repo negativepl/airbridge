@@ -99,7 +99,10 @@ Get the latest release from the [Releases](https://github.com/negativepl/airbrid
 | **macOS** | `Airbridge.dmg` | Drag to Applications. Requires macOS 26+. |
 | **Android** | `Airbridge.apk` | Install manually. Enable "Install from unknown sources". |
 
-The APK is signed with a debug key — it won't update from Google Play, but it works on any Android 10+ device.
+The APK is signed with a debug key and works on any Android 10+ device.
+
+> **Why not on Google Play?**
+> Airbridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background. Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync) doesn't fit into any of the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — Airbridge works reliably in the background, which is more important than being on Google Play.
 
 ---
 
