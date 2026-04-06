@@ -18,38 +18,45 @@ struct HistoryView: View {
                 Text(L10n.isPL
                     ? "Ostatnio brak aktywności.\nHistoria synchronizacji i przesłanych plików pojawi się tutaj."
                     : "No recent activity.\nSync and transfer history will appear here.")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: 6) {
                     ForEach(historyService.records) { record in
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             Image(systemName: record.type == .clipboard ? "doc.on.clipboard" : "doc.fill")
-                                .foregroundStyle(record.direction == .sent ? Color.primary : Color.accentColor)
-                                .frame(width: 24)
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .glassEffect(
+                                    record.direction == .sent
+                                        ? .regular.tint(.blue)
+                                        : .regular.tint(.green),
+                                    in: .rect(cornerRadius: 8)
+                                )
+
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(record.description).font(.body).lineLimit(1)
+                                Text(record.description).font(.system(size: 15)).lineLimit(1)
                                 Text(record.direction == .sent
                                      ? (L10n.isPL ? "Wysłano" : "Sent")
                                      : (L10n.isPL ? "Odebrano" : "Received"))
-                                    .font(.caption)
-                                    .foregroundStyle(record.direction == .sent ? Color.secondary : Color.accentColor)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Text(record.timestamp, style: .relative)
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.system(size: 13)).foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-
-                        Divider().padding(.leading, 44)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .glassEffect(in: .rect(cornerRadius: 12))
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

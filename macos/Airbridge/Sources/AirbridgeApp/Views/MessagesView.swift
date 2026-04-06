@@ -9,27 +9,30 @@ struct MessagesView: View {
     @State private var messageText: String = ""
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             conversationList
-                .frame(minWidth: 250, maxWidth: 300)
+                .frame(width: 340)
+
+            Divider()
 
             if let convo = selectedConversation {
                 messageDetail(convo)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !connectionService.isConnected {
                 VStack(spacing: 12) {
                     Image(systemName: "message")
                         .font(.system(size: 40)).foregroundStyle(.tertiary)
                     Text(L10n.isPL ? "Wiadomości" : "Messages")
-                        .font(.title3).fontWeight(.semibold).foregroundStyle(.secondary)
+                        .font(.system(size: 20, weight: .semibold)).foregroundStyle(.secondary)
                     Text(L10n.isPL
                         ? "Połącz się z telefonem, aby przeglądać wiadomości."
                         : "Connect to your phone to browse messages.")
-                        .font(.subheadline).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                        .font(.system(size: 14)).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text(L10n.isPL ? "Wybierz konwersację" : "Select a conversation")
-                    .font(.title3)
+                    .font(.system(size: 18))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -52,34 +55,49 @@ struct MessagesView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                conversationListContent
-            }
-        }
-    }
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(smsService.conversations) { convo in
+                            Button {
+                                selectedConversation = convo
+                                smsService.loadMessages(threadId: convo.threadId)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.secondary)
 
-    private var conversationListContent: some View {
-        List(smsService.conversations, selection: $selectedConversation) { convo in
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(convo.displayName)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Spacer()
-                    Text(formatDate(convo.date))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        HStack {
+                                            Text(convo.displayName)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text(formatDate(convo.date))
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Text(convo.snippet)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .glassEffect(
+                                selectedConversation?.id == convo.id
+                                    ? .regular.tint(.accentColor)
+                                    : .regular,
+                                in: .rect(cornerRadius: 12)
+                            )
+                        }
+                    }
+                    .padding(10)
                 }
-                Text(convo.snippet)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            .padding(.vertical, 4)
-            .tag(convo)
-        }
-        .onChange(of: selectedConversation) { _, newConvo in
-            if let convo = newConvo {
-                smsService.loadMessages(threadId: convo.threadId)
             }
         }
     }
@@ -88,16 +106,17 @@ struct MessagesView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                VStack(alignment: .leading) {
-                    Text(convo.displayName).font(.headline)
-                    Text(convo.address).font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(convo.displayName).font(.system(size: 16, weight: .semibold))
+                    Text(convo.address).font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            .padding(12)
-            .background(.bar)
-
-            Divider()
+            .padding(16)
+            .glassEffect(in: .rect)
 
             // Messages
             if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
@@ -112,7 +131,7 @@ struct MessagesView: View {
                                     .id(msg.id)
                             }
                         }
-                        .padding(12)
+                        .padding(16)
                         .onChange(of: smsService.currentMessages.count) { _, _ in
                             if let last = smsService.currentMessages.reversed().last {
                                 proxy.scrollTo(last.id, anchor: .bottom)
@@ -130,37 +149,39 @@ struct MessagesView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                     Text(L10n.isPL
-                        ? "Nie możesz odpowiedzieć na ten krótki kod. Krótkie kody to numery używane do wysyłania automatycznych wiadomości — odpowiadanie na nie nie jest możliwe."
-                        : "You can't reply to this short code. Short codes are numbers used to send automated messages — replying is not supported.")
-                        .font(.caption)
+                        ? "Nie możesz odpowiedzieć na ten krótki kod."
+                        : "You can't reply to this short code.")
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
-                .padding(12)
+                .padding(14)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
                         .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 14))
                         .onSubmit { sendMessage(to: convo) }
 
                     Button {
                         sendMessage(to: convo)
                     } label: {
                         Image(systemName: "paperplane.fill")
+                            .font(.system(size: 14))
+                            .frame(width: 32, height: 32)
                     }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
                     .disabled(messageText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                .padding(12)
+                .padding(14)
             }
         }
     }
 
-    /// Short codes contain letters (like "msg007") or are very short non-numeric numbers.
-    /// Pure digit numbers (even short ones like "5555") are allowed.
     private func isShortCode(_ address: String) -> Bool {
         let cleaned = address.replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "-", with: "")
             .replacingOccurrences(of: "+", with: "")
-        // Contains letters → definitely a short code
         if cleaned.contains(where: { $0.isLetter }) { return true }
         return false
     }
@@ -170,16 +191,18 @@ struct MessagesView: View {
         return HStack {
             if isSent { Spacer(minLength: 60) }
 
-            VStack(alignment: isSent ? .trailing : .leading, spacing: 2) {
+            VStack(alignment: isSent ? .trailing : .leading, spacing: 3) {
                 Text(msg.body)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(isSent ? Color.accentColor : Color.gray.opacity(0.2))
-                    .foregroundStyle(isSent ? .white : .primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .glassEffect(
+                        isSent ? .regular.tint(.accentColor) : .regular,
+                        in: .rect(cornerRadius: 18)
+                    )
 
                 Text(formatTime(msg.date))
-                    .font(.caption2)
+                    .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
 

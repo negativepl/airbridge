@@ -29,7 +29,9 @@ final class ConnectionService {
 
     private(set) var isConnected: Bool = false
     private(set) var connectedDeviceName: String = ""
+    private(set) var connectedClientIP: String?
     private(set) var statusMessage: String = "Idle"
+    private var manuallyDisconnected: Bool = false
 
     // MARK: - Dependencies
 
@@ -85,9 +87,9 @@ final class ConnectionService {
 
                 keyManager.migrateFromSingleDevice()
 
-                statusMessage = "Waiting for connection"
+                statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
             } catch {
-                statusMessage = "Server failed: \(error.localizedDescription)"
+                statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
                 serverStarted = false
             }
         }
@@ -105,6 +107,7 @@ final class ConnectionService {
     }
 
     func reconnect() {
+        manuallyDisconnected = false
         stopServer()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startServer()
@@ -112,12 +115,13 @@ final class ConnectionService {
     }
 
     func disconnect() {
+        manuallyDisconnected = true
         Task {
             await server.disconnectAllClients()
         }
         isConnected = false
         connectedDeviceName = ""
-        statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+        statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
     }
 
     // MARK: - Broadcasting
@@ -140,6 +144,7 @@ final class ConnectionService {
 
         pairingManager.completePairing(deviceName: deviceName, publicKey: publicKey)
         connectedDeviceName = deviceName
+        connectedClientIP = connectionId.components(separatedBy: ":").first
         statusMessage = "Paired with \(deviceName)"
         isConnected = true
 
@@ -191,6 +196,7 @@ final class ConnectionService {
 
             let device = keyManager.getPairedDevices().first { $0.publicKeyBase64 == publicKey }
             self.connectedDeviceName = device?.deviceName ?? "Device"
+            self.connectedClientIP = connectionId.components(separatedBy: ":").first
             self.isConnected = true
             self.statusMessage = "Connected to \(self.connectedDeviceName)"
         }
@@ -221,7 +227,8 @@ final class ConnectionService {
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
-        case .fileTransferStart, .fileChunk, .fileChunkAck, .fileTransferComplete:
+        case .fileTransferStart, .fileChunk, .fileChunkAck, .fileTransferComplete,
+             .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
             fileTransferHandler?.handleMessage(message)
         case .galleryResponse, .galleryThumbnailResponse:
             galleryHandler?.handleMessage(message)
@@ -253,11 +260,12 @@ final class ConnectionService {
         let onConnect: @Sendable (String) -> Void = { _ in }
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
-                let stillConnected = await self?.server.isConnected ?? false
-                self?.isConnected = stillConnected
-                if !stillConnected {
-                    self?.connectedDeviceName = ""
-                    self?.statusMessage = "Waiting for connection"
+                guard let self else { return }
+                let stillConnected = await self.server.isConnected
+                self.isConnected = stillConnected
+                if !stillConnected && !self.manuallyDisconnected {
+                    self.connectedDeviceName = ""
+                    self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                 }
             }
         }
@@ -270,6 +278,10 @@ final class ConnectionService {
     }
 
     // MARK: - Helpers
+
+    func getConnectedClientIP() -> String? {
+        connectedClientIP
+    }
 
     func getLocalIPAddress() -> String? {
         var address: String?

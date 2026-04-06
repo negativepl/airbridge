@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.airbridge"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.airbridge"
         minSdk = 29

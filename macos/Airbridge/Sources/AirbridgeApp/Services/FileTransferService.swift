@@ -27,6 +27,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     @ObservationIgnored private weak var historyService: HistoryService?
     @ObservationIgnored private var sendQueue: [URL] = []
     @ObservationIgnored private var isSendingFromQueue = false
+    @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
 
     func configure(connectionService: ConnectionService, historyService: HistoryService) {
         self.connectionService = connectionService
@@ -46,6 +47,14 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             handleFileChunk(transferId: transferId, chunkIndex: chunkIndex, data: data)
         case .fileTransferComplete(let transferId, let checksumSHA256):
             handleFileTransferComplete(transferId: transferId, checksum: checksumSHA256)
+        case .fileTransferAccept:
+            offerResponseStream?.yield(true)
+            offerResponseStream?.finish()
+            offerResponseStream = nil
+        case .fileTransferReject:
+            offerResponseStream?.yield(false)
+            offerResponseStream?.finish()
+            offerResponseStream = nil
         default:
             break
         }
@@ -91,64 +100,108 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             return
         }
 
-        let filename = url.lastPathComponent
-        let mime = Self.mimeType(for: url)
-
-        let identity: DeviceIdentity
-        do {
-            identity = try connectionService.keyManager.getOrCreateIdentity()
-        } catch {
+        guard let host = connectionService.getConnectedClientIP() else {
             isSendingFromQueue = false
             processQueue()
             return
         }
 
-        let chunker = self.fileChunker
+        let filename = url.lastPathComponent
+        let mime = Self.mimeType(for: url)
+        let fileSize: Int64 = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        let transferId = UUID().uuidString
+
+        self.fileTransferFileName = filename
+        self.fileTransferProgress = 0
+
         Task {
-            // Read file off main thread
-            let data: Data? = await Task.detached { try? Data(contentsOf: url) }.value
-            guard let data else {
+            // 1. Set up response stream before sending offer
+            let stream = AsyncStream<Bool> { continuation in
+                self.offerResponseStream = continuation
+            }
+
+            // 2. Send offer
+            let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize)
+            try? await connectionService.broadcast(offer)
+
+            // 3. Wait for accept/reject (non-blocking for MainActor)
+            var accepted = false
+            for await response in stream {
+                accepted = response
+                break
+            }
+
+            guard accepted else {
+                // Rejected
+                self.fileTransferProgress = 0
+                self.fileTransferFileName = ""
                 self.isSendingFromQueue = false
                 self.processQueue()
                 return
             }
 
-            let chunked = chunker.prepare(
+            // 3. Accepted — upload via HTTP
+            TransferPopup.shared.show(fileTransferService: self)
+
+            let success = await Self.httpUpload(
+                fileURL: url,
                 filename: filename,
                 mimeType: mime,
-                data: data,
-                sourceId: identity.deviceId
-            )
-
-            do {
-                self.fileTransferFileName = filename
-                try await connectionService.broadcast(chunked.startMessage)
-
-                for chunk in chunked.chunks {
-                    let msg = Message.fileChunk(
-                        transferId: chunked.transferId,
-                        chunkIndex: chunk.chunkIndex,
-                        data: chunk.base64Data
-                    )
-                    try await connectionService.broadcast(msg)
-                    self.fileTransferProgress = Double(chunk.chunkIndex + 1) / Double(chunked.totalChunks)
+                host: host,
+                port: 8767
+            ) { progress in
+                Task { @MainActor in
+                    self.fileTransferProgress = progress
                 }
-
-                let completeMsg = Message.fileTransferComplete(
-                    transferId: chunked.transferId,
-                    checksumSHA256: chunked.checksumSHA256
-                )
-                try await connectionService.broadcast(completeMsg)
-
-                self.fileTransferProgress = 0
-                self.historyService?.add(type: .file, direction: .sent, description: filename)
-                self.isSendingFromQueue = false
-                self.processQueue()
-            } catch {
-                self.fileTransferProgress = 0
-                self.isSendingFromQueue = false
-                self.processQueue()
             }
+
+            if success {
+                self.fileTransferProgress = 1.0
+                self.historyService?.add(type: .file, direction: .sent, description: filename)
+                self.playReceiveSound()
+                TransferPopup.shared.hide()
+            } else {
+                self.fileTransferProgress = 0
+                TransferPopup.shared.hide()
+            }
+
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            self.fileTransferProgress = 0
+            self.fileTransferFileName = ""
+            self.isSendingFromQueue = false
+            self.processQueue()
+        }
+    }
+
+    private static func httpUpload(
+        fileURL: URL,
+        filename: String,
+        mimeType: String,
+        host: String,
+        port: Int,
+        onProgress: @Sendable @escaping (Double) -> Void
+    ) async -> Bool {
+        guard let data = try? Data(contentsOf: fileURL) else { return false }
+        let encodedFilename = filename.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? filename
+
+        guard let url = URL(string: "http://\(host):\(port)/upload") else { return false }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(encodedFilename, forHTTPHeaderField: "X-Filename")
+        request.setValue(mimeType, forHTTPHeaderField: "X-Mime-Type")
+        request.setValue("\(data.count)", forHTTPHeaderField: "Content-Length")
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+
+        let delegate = UploadProgressDelegate(onProgress: onProgress)
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        do {
+            let (_, response) = try await session.upload(for: request, from: data, delegate: delegate)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return false }
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -291,5 +344,18 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         case "doc", "docx": return "application/msword"
         default: return "application/octet-stream"
         }
+    }
+}
+
+private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    let onProgress: @Sendable (Double) -> Void
+
+    init(onProgress: @Sendable @escaping (Double) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
+        onProgress(progress)
     }
 }

@@ -47,7 +47,9 @@ struct TransferPopupView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 28, weight: .medium))
                         .foregroundColor(.green)
-                    Text(L10n.isPL ? "Plik odebrany!" : "File received!")
+                    Text(fileTransferService.isReceivingFile
+                        ? (L10n.isPL ? "Plik odebrany!" : "File received!")
+                        : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                     Spacer()
@@ -56,12 +58,18 @@ struct TransferPopupView: View {
                 .transition(.scale(scale: 0.9).combined(with: .opacity))
             } else {
                 HStack(spacing: 16) {
-                    Image(systemName: "arrow.down.circle.fill")
+                    Image(systemName: fileTransferService.isReceivingFile ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                         .font(.system(size: 26, weight: .medium))
                         .foregroundColor(accentLight)
                         .padding(.leading, 24)
 
                     VStack(alignment: .leading, spacing: 6) {
+                        Text(fileTransferService.isReceivingFile
+                            ? (L10n.isPL ? "Odbieram:" : "Receiving:")
+                            : (L10n.isPL ? "Wysyłam:" : "Sending:"))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+
                         MarqueeText(
                             text: fileTransferService.fileTransferFileName.isEmpty
                                 ? "file" : fileTransferService.fileTransferFileName
@@ -113,10 +121,10 @@ struct TransferPopupView: View {
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showComplete)
-        .onChange(of: fileTransferService.isReceivingFile) { _, receiving in
-            if !receiving {
+        .onChange(of: fileTransferService.fileTransferProgress) { _, new in
+            if new >= 1.0 {
                 withAnimation { showComplete = true }
-            } else {
+            } else if new == 0 {
                 showComplete = false
             }
         }

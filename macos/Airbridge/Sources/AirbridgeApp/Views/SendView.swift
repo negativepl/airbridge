@@ -14,49 +14,53 @@ struct SendView: View {
         VStack(spacing: 20) {
             if let vm = viewModel, !vm.isConnected {
                 Label(L10n.isPL ? "Połącz się z urządzeniem aby wysłać" : "Connect to a device to send", systemImage: "wifi.slash")
-                    .font(.subheadline).foregroundStyle(.orange).padding(.top, 8)
+                    .font(.system(size: 14)).foregroundStyle(.orange).padding(.top, 8)
             }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                    .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.4))
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(isTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
-                    )
-                VStack(spacing: 12) {
+                    .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.3))
+                VStack(spacing: 14) {
                     Image(systemName: "arrow.down.doc")
-                        .font(.system(size: 40))
+                        .font(.system(size: 44))
                         .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
                     Text(L10n.dropFilesHere)
-                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
             }
-            .frame(minHeight: 200)
+            .frame(minHeight: 220)
+            .contentShape(Rectangle())
+            .onTapGesture { openFilePicker() }
+            .glassEffect(isTargeted ? .regular.tint(.accentColor) : .regular, in: .rect(cornerRadius: 20))
             .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
                 handleDrop(providers)
             }
 
             if let vm = viewModel, vm.isSending {
-                VStack(spacing: 6) {
-                    Text(vm.fileName).font(.subheadline).lineLimit(1)
+                VStack(spacing: 8) {
+                    Text(vm.fileName).font(.system(size: 14)).lineLimit(1)
                     ProgressView(value: vm.progress)
                     Text("\(Int(vm.progress * 100))%")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.system(size: 13)).foregroundStyle(.secondary)
                 }
+                .padding(16)
+                .glassEffect(in: .rect(cornerRadius: 12))
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Button { openFilePicker() } label: {
                     Label(L10n.selectFiles, systemImage: "folder")
+                        .font(.system(size: 14))
                 }
-                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.extraLarge)
 
                 Button { sendClipboard() } label: {
                     Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
+                        .font(.system(size: 14))
                 }
-                .controlSize(.large)
+                .controlSize(.extraLarge)
                 .disabled(viewModel.map { !$0.isConnected } ?? true)
             }
         }

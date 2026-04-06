@@ -87,6 +87,15 @@
     <string name="notification_file_sent">%s — wysłano</string>
     <string name="notification_file_error">%s — błąd wysyłania</string>
     <string name="transfer_sending">Wysyłanie…</string>
+    <string name="transfer_receiving">Odbieranie…</string>
+    <string name="notification_file_received">%s — odebrano</string>
+    <string name="notification_receiving_from">Odbieranie od %s</string>
+    <string name="notification_receiving_size">%s — %s</string>
+    <string name="notification_accept_file">%s chce wysłać Ci plik</string>
+    <string name="notification_accept_file_detail">%s (%s)</string>
+    <string name="notification_accept">Akceptuj</string>
+    <string name="notification_reject">Odrzuć</string>
+    <string name="notification_file_rejected">%s — odrzucono</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Dotknij, aby zwinąć</string>
 
@@ -120,6 +129,9 @@
     <string name="settings_about">Informacje</string>
     <string name="settings_version">Wersja</string>
     <string name="settings_licenses">Licencje open source</string>
+    <string name="settings_download_folder">Folder pobierania</string>
+    <string name="settings_download_folder_desc">Odebrane pliki będą zapisywane tutaj</string>
+    <string name="settings_download_folder_default">Downloads/Airbridge</string>
 
     <!-- About -->
     <string name="about_title">O aplikacji</string>

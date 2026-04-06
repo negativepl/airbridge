@@ -46,6 +46,9 @@ public enum Message: Equatable, Sendable {
     case smsMessagesResponse(threadId: String, messages: [SmsMessageMeta], totalCount: Int, page: Int)
     case smsSendRequest(address: String, body: String)
     case smsSendResponse(success: Bool, error: String?)
+    case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64)
+    case fileTransferAccept(transferId: String)
+    case fileTransferReject(transferId: String)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -161,6 +164,9 @@ extension Message: Codable {
         case smsMessagesResponse      = "sms_messages_response"
         case smsSendRequest           = "sms_send_request"
         case smsSendResponse          = "sms_send_response"
+        case fileTransferOffer        = "file_transfer_offer"
+        case fileTransferAccept       = "file_transfer_accept"
+        case fileTransferReject       = "file_transfer_reject"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -194,6 +200,7 @@ extension Message: Codable {
         case body
         case success
         case error
+        case fileSize           = "file_size"
     }
 
     // MARK: Encode
@@ -325,6 +332,21 @@ extension Message: Codable {
             try container.encode(TypeKey.smsSendResponse.rawValue, forKey: .type)
             try container.encode(success, forKey: .success)
             try container.encodeIfPresent(error, forKey: .error)
+
+        case .fileTransferOffer(let transferId, let filename, let mimeType, let fileSize):
+            try container.encode(TypeKey.fileTransferOffer.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
+            try container.encode(filename, forKey: .filename)
+            try container.encode(mimeType, forKey: .mimeType)
+            try container.encode(fileSize, forKey: .fileSize)
+
+        case .fileTransferAccept(let transferId):
+            try container.encode(TypeKey.fileTransferAccept.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
+
+        case .fileTransferReject(let transferId):
+            try container.encode(TypeKey.fileTransferReject.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
         }
     }
 
@@ -470,6 +492,21 @@ extension Message: Codable {
             let success = try container.decode(Bool.self, forKey: .success)
             let error = try container.decodeIfPresent(String.self, forKey: .error)
             self = .smsSendResponse(success: success, error: error)
+
+        case .fileTransferOffer:
+            let transferId = try container.decode(String.self, forKey: .transferId)
+            let filename = try container.decode(String.self, forKey: .filename)
+            let mimeType = try container.decode(String.self, forKey: .mimeType)
+            let fileSize = try container.decode(Int64.self, forKey: .fileSize)
+            self = .fileTransferOffer(transferId: transferId, filename: filename, mimeType: mimeType, fileSize: fileSize)
+
+        case .fileTransferAccept:
+            let transferId = try container.decode(String.self, forKey: .transferId)
+            self = .fileTransferAccept(transferId: transferId)
+
+        case .fileTransferReject:
+            let transferId = try container.decode(String.self, forKey: .transferId)
+            self = .fileTransferReject(transferId: transferId)
         }
     }
 

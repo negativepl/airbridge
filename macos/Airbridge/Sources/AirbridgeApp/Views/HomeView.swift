@@ -45,123 +45,159 @@ struct HomeView: View {
         }
     }
 
+    private var isDisconnected: Bool {
+        viewModel?.statusMessage.contains("Rozłączono") == true || viewModel?.statusMessage.contains("Disconnected") == true
+    }
+
     private func connectionCard(_ vm: HomeViewModel) -> some View {
-        GroupBox {
-            HStack(spacing: 12) {
+        HStack(spacing: 14) {
+            Group {
                 if vm.isConnected {
-                    Circle().fill(Color.green).frame(width: 10, height: 10)
+                    Circle().fill(.green).frame(width: 12, height: 12)
+                        .shadow(color: .green.opacity(0.6), radius: 6)
+                        .shadow(color: .green.opacity(0.3), radius: 12)
                 } else if !vm.hasPairedDevices {
-                    Circle().fill(Color.gray).frame(width: 10, height: 10)
-                } else if vm.statusMessage.contains("Starting") || vm.statusMessage.contains("Waiting") {
-                    ProgressView().controlSize(.small)
-                } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Failed") {
-                    Circle().fill(Color.red).frame(width: 10, height: 10)
+                    Image(systemName: "iphone.slash")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                } else if isDisconnected {
+                    Circle().fill(.gray).frame(width: 12, height: 12)
+                } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Failed") || vm.statusMessage.contains("Błąd") {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.red)
                 } else {
-                    Circle().fill(Color.orange).frame(width: 10, height: 10)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    if vm.isConnected {
-                        Text(vm.deviceName).font(.headline)
-                    } else if !vm.hasPairedDevices {
-                        Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
-                            .font(.headline)
-                    } else {
-                        Text(vm.statusMessage).font(.headline)
-                    }
-                    if vm.isConnected, let ip = vm.localIP {
-                        Text(ip).font(.caption).foregroundStyle(.secondary)
-                    } else if !vm.hasPairedDevices {
-                        Text(L10n.isPL ? "Sparuj telefon aby rozpocząć" : "Pair your phone to get started")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else if !vm.isConnected {
-                        Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                if vm.isConnected {
-                    Button(L10n.disconnect) { vm.disconnect() }
-                } else if !vm.hasPairedDevices {
-                    Button(L10n.pairDevice) { showPairing = true }
-                        .controlSize(.large)
-                } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Stopped") {
-                    Button(L10n.reconnect) { vm.reconnect() }
-                        .controlSize(.large)
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
-            .padding(4)
-        } label: {
-            Label(L10n.connection, systemImage: "antenna.radiowaves.left.and.right")
+            .frame(width: 28, height: 28)
+            .animation(.easeInOut(duration: 0.3), value: vm.isConnected)
+            .animation(.easeInOut(duration: 0.3), value: vm.statusMessage)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Group {
+                    if vm.isConnected {
+                        Text(vm.deviceName)
+                    } else if !vm.hasPairedDevices {
+                        Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
+                    } else if isDisconnected {
+                        Text(L10n.isPL ? "Rozłączono" : "Disconnected")
+                    } else {
+                        Text(vm.statusMessage)
+                    }
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .animation(.easeInOut(duration: 0.3), value: vm.isConnected)
+
+                Group {
+                    if vm.isConnected, let ip = vm.localIP {
+                        Text(ip)
+                    } else if !vm.hasPairedDevices {
+                        Text(L10n.isPL ? "Sparuj telefon aby rozpocząć" : "Pair your phone to get started")
+                    } else if isDisconnected {
+                        Text(L10n.isPL ? "Kliknij Połącz ponownie aby wznowić" : "Click Reconnect to resume")
+                    } else if !vm.isConnected {
+                        Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
+                    }
+                }
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if vm.isConnected {
+                Button(L10n.disconnect) {
+                    vm.disconnect()
+                }
+                .controlSize(.large)
+            } else if isDisconnected {
+                Button(L10n.reconnect) {
+                    vm.reconnect()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            } else if !vm.hasPairedDevices {
+                Button(L10n.pairDevice) {
+                    showPairing = true
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Błąd") {
+                Button(L10n.reconnect) {
+                    vm.reconnect()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.large)
+            }
         }
+        .padding(16)
+        .glassEffect(in: .rect(cornerRadius: 16))
     }
 
     private func transferCard(_ vm: HomeViewModel) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(vm.transferFileName)
-                    .font(.subheadline).lineLimit(1)
-                ProgressView(value: vm.transferProgress)
-                HStack {
-                    Text(formatSpeed(vm.transferSpeed))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(formatEta(vm.transferEta))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .padding(4)
-        } label: {
+        VStack(alignment: .leading, spacing: 10) {
             Label(L10n.fileTransfer, systemImage: "arrow.down.circle")
+                .font(.system(size: 14)).fontWeight(.semibold)
+            Text(vm.transferFileName)
+                .font(.system(size: 14)).lineLimit(1)
+            ProgressView(value: vm.transferProgress)
+            HStack {
+                Text(formatSpeed(vm.transferSpeed))
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                Spacer()
+                Text(formatEta(vm.transferEta))
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+            }
         }
+        .padding(16)
+        .glassEffect(in: .rect(cornerRadius: 16))
     }
 
     private func recentActivityCard(_ vm: HomeViewModel) -> some View {
-        GroupBox {
-            recentActivityContent(vm)
-        } label: {
+        VStack(alignment: .leading, spacing: 8) {
             Label(L10n.isPL ? "Ostatnia aktywność" : "Recent Activity", systemImage: "clock")
-        }
-    }
+                .font(.system(size: 14)).fontWeight(.semibold)
+                .padding(.bottom, 4)
 
-    @ViewBuilder
-    private func recentActivityContent(_ vm: HomeViewModel) -> some View {
-        let items = vm.recentActivity
-        if items.isEmpty {
-            Text(L10n.isPL ? "Brak aktywności" : "No activity yet")
-                .font(.subheadline).foregroundStyle(.secondary).padding(4)
-        } else {
-            VStack(spacing: 0) {
+            let items = vm.recentActivity
+            if items.isEmpty {
+                Text(L10n.isPL ? "Brak aktywności" : "No activity yet")
+                    .font(.system(size: 14)).foregroundStyle(.secondary)
+            } else {
                 ForEach(items) { record in
-                    recentActivityRow(record)
+                    HStack(spacing: 8) {
+                        Image(systemName: record.type == .clipboard ? "doc.on.clipboard" : "doc")
+                            .foregroundStyle(record.direction == .sent ? Color.primary : Color.accentColor)
+                        Text(record.description).font(.system(size: 14)).lineLimit(1)
+                        Spacer()
+                        Text(record.timestamp, style: .relative)
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
                 }
             }
         }
-    }
-
-    private func recentActivityRow(_ record: TransferRecord) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: record.type == .clipboard ? "doc.on.clipboard" : "doc")
-                .foregroundStyle(record.direction == .sent ? Color.primary : Color.accentColor)
-            Text(record.description).font(.subheadline).lineLimit(1)
-            Spacer()
-            Text(record.timestamp, style: .relative)
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 6).padding(.horizontal, 4)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(in: .rect(cornerRadius: 16))
     }
 
     private var noPairedDevicesCard: some View {
-        GroupBox {
-            VStack(spacing: 12) {
-                Image(systemName: "iphone.and.arrow.forward")
-                    .font(.system(size: 32)).foregroundStyle(.secondary)
-                Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                Button(L10n.pairDevice) { showPairing = true }
-                    .controlSize(.large)
+        VStack(spacing: 14) {
+            Image(systemName: "iphone.and.arrow.forward")
+                .font(.system(size: 36)).foregroundStyle(.secondary)
+            Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
+                .font(.system(size: 14)).foregroundStyle(.secondary)
+            Button(L10n.pairDevice) {
+                showPairing = true
             }
-            .padding(12).frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .glassEffect(in: .rect(cornerRadius: 16))
     }
 
     private func formatSpeed(_ speed: Double) -> String {

@@ -7,7 +7,6 @@ struct AboutView: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 32)
 
-                // App icon
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
                     .frame(width: 120, height: 120)
@@ -30,110 +29,90 @@ struct AboutView: View {
 
                 Spacer().frame(height: 28)
 
-                // Credits card
-                GroupBox {
-                    VStack(spacing: 16) {
-                        // Author
-                        HStack(spacing: 12) {
-                            if let img = loadBundledImage("logo_negative") {
-                                Image(nsImage: img)
-                                    .resizable()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                            } else {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.system(size: 36))
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(L10n.isPL ? "Autor" : "Author")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("Marcin Baszewski")
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                            }
-
-                            Spacer()
-
-                            linkButton(url: "https://github.com/negativepl")
+                // Credits
+                VStack(spacing: 16) {
+                    HStack(spacing: 12) {
+                        if let img = loadBundledImage("logo_negative") {
+                            Image(nsImage: img)
+                                .resizable()
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 36))
+                                .foregroundStyle(.secondary)
                         }
-
-                        Divider()
-
-                        // AI
-                        HStack(spacing: 12) {
-                            if let img = loadBundledImage("logo_claude") {
-                                Image(nsImage: img)
-                                    .resizable()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                            } else {
-                                Image(systemName: "brain")
-                                    .font(.system(size: 36))
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Powered by Claude Opus 4.6")
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                Text("Anthropic")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.isPL ? "Autor" : "Author")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Marcin Baszewski")
+                                .font(.body).fontWeight(.semibold)
                         }
+                        Spacer()
+                        linkButton(url: "https://github.com/negativepl")
                     }
-                    .padding(4)
-                } label: {
-                    Label(L10n.isPL ? "Twórcy" : "Credits", systemImage: "heart")
+
+                    Divider()
+
+                    HStack(spacing: 12) {
+                        if let img = loadBundledImage("logo_claude") {
+                            Image(nsImage: img)
+                                .resizable()
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "brain")
+                                .font(.system(size: 36))
+                                .foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Powered by Claude Opus 4.6")
+                                .font(.body).fontWeight(.semibold)
+                            Text("Anthropic")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
                 }
+                .padding(16)
                 .frame(maxWidth: 440)
+                .glassEffect(in: .rect(cornerRadius: 16))
                 .padding(.horizontal, 24)
 
                 Spacer().frame(height: 16)
 
-                // Links card
-                GroupBox {
+                // Links
+                GlassEffectContainer(spacing: 8) {
                     VStack(spacing: 0) {
                         linkRow(
                             icon: "curlybraces",
                             title: L10n.isPL ? "Kod źródłowy na GitHub" : "Source code on GitHub",
                             url: "https://github.com/negativepl/airbridge"
                         )
-
                         Divider().padding(.horizontal, 4)
-
                         linkRow(
                             icon: "ladybug",
                             title: L10n.isPL ? "Zgłoś problem" : "Report an issue",
                             url: "https://github.com/negativepl/airbridge/issues"
                         )
                     }
-                } label: {
-                    Label(L10n.isPL ? "Linki" : "Links", systemImage: "link")
+                    .padding(4)
                 }
                 .frame(maxWidth: 440)
+                .glassEffect(in: .rect(cornerRadius: 16))
                 .padding(.horizontal, 24)
 
                 Spacer().frame(height: 20)
 
-                // License
                 Text(L10n.isPL ? "Airbridge jest open source" : "Airbridge is open source")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(L10n.isPL ? "Licencja MIT" : "MIT License")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(.tertiary)
 
                 Spacer().frame(height: 8)
 
                 Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0")")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(.tertiary)
 
                 Spacer(minLength: 32)
             }
@@ -146,10 +125,10 @@ struct AboutView: View {
             if let u = URL(string: url) { NSWorkspace.shared.open(u) }
         } label: {
             Image(systemName: "arrow.up.right")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
         }
         .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
     }
 
     private func linkRow(icon: String, title: String, url: String) -> some View {
@@ -161,15 +140,10 @@ struct AboutView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 22)
-
-                Text(title)
-                    .font(.body)
-
+                Text(title).font(.body)
                 Spacer()
-
                 Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 4)

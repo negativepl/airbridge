@@ -119,6 +119,39 @@ sealed class Message {
         }.toString()
     }
 
+    data class FileTransferOffer(
+        val transferId: String,
+        val filename: String,
+        val mimeType: String,
+        val fileSize: Long
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_transfer_offer")
+            put("transfer_id", transferId)
+            put("filename", filename)
+            put("mime_type", mimeType)
+            put("file_size", fileSize)
+        }.toString()
+    }
+
+    data class FileTransferAccept(
+        val transferId: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_transfer_accept")
+            put("transfer_id", transferId)
+        }.toString()
+    }
+
+    data class FileTransferReject(
+        val transferId: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_transfer_reject")
+            put("transfer_id", transferId)
+        }.toString()
+    }
+
     data class PairRequest(
         val deviceName: String,
         val publicKey: String,
@@ -380,6 +413,18 @@ sealed class Message {
                 "file_transfer_complete" -> FileTransferComplete(
                     transferId = obj.getString("transfer_id"),
                     checksumSha256 = obj.getString("checksum_sha256")
+                )
+                "file_transfer_offer" -> FileTransferOffer(
+                    transferId = obj.getString("transfer_id"),
+                    filename = obj.getString("filename"),
+                    mimeType = obj.getString("mime_type"),
+                    fileSize = obj.getLong("file_size")
+                )
+                "file_transfer_accept" -> FileTransferAccept(
+                    transferId = obj.getString("transfer_id")
+                )
+                "file_transfer_reject" -> FileTransferReject(
+                    transferId = obj.getString("transfer_id")
                 )
                 "pair_request" -> PairRequest(
                     deviceName = obj.getString("device_name"),
