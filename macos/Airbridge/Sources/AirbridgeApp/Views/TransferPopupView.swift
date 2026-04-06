@@ -39,9 +39,63 @@ struct TransferPopupView: View {
         return ""
     }
 
+    private func formatBytes(_ size: Int64) -> String {
+        if size > 1024 * 1024 { return String(format: "%.1f MB", Double(size) / (1024.0 * 1024.0)) }
+        if size > 1024 { return String(format: "%.0f KB", Double(size) / 1024.0) }
+        return "\(size) B"
+    }
+
     var body: some View {
         ZStack {
-            if fileTransferService.isRejected {
+            if fileTransferService.hasIncomingOffer {
+                HStack(spacing: 16) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(accentLight)
+                        .padding(.leading, 24)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                        Text(fileTransferService.fileTransferFileName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(formatBytes(fileTransferService.incomingOfferFileSize))
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Button {
+                            fileTransferService.rejectIncomingOffer()
+                        } label: {
+                            Text(L10n.isPL ? "Odrzuć" : "Reject")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(Color.white.opacity(0.15)))
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            fileTransferService.acceptIncomingOffer()
+                        } label: {
+                            Text(L10n.isPL ? "Akceptuj" : "Accept")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(Color.accentColor))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.trailing, 24)
+                }
+                .padding(.top, 10)
+                .transition(.opacity)
+            } else if fileTransferService.isRejected {
                 HStack(spacing: 16) {
                     Spacer()
                     Image(systemName: "xmark.circle.fill")
@@ -61,14 +115,14 @@ struct TransferPopupView: View {
                     Spacer()
                 }
                 .padding(.top, 10)
-                .transition(.scale(scale: 0.92).combined(with: .opacity))
+                .transition(.opacity)
             } else if fileTransferService.isWaitingForAccept {
                 HStack(spacing: 16) {
-                    Spacer()
                     ProgressView()
                         .progressViewStyle(.circular)
                         .controlSize(.regular)
                         .tint(.white)
+                        .padding(.leading, 24)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
                             .font(.system(size: 16, weight: .semibold))
@@ -80,9 +134,23 @@ struct TransferPopupView: View {
                             .truncationMode(.middle)
                     }
                     Spacer()
+                    Button {
+                        fileTransferService.cancelPendingTransfer()
+                    } label: {
+                        Text(L10n.isPL ? "Anuluj" : "Cancel")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(Color.white.opacity(0.15))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 24)
                 }
                 .padding(.top, 10)
-                .transition(.scale(scale: 0.95).combined(with: .opacity))
+                .transition(.opacity)
             } else if showComplete {
                 HStack(spacing: 14) {
                     Spacer()
@@ -97,7 +165,7 @@ struct TransferPopupView: View {
                     Spacer()
                 }
                 .padding(.top, 10)
-                .transition(.scale(scale: 0.9).combined(with: .opacity))
+                .transition(.opacity)
             } else {
                 HStack(spacing: 16) {
                     Image(systemName: fileTransferService.isReceivingFile ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
@@ -159,12 +227,13 @@ struct TransferPopupView: View {
                         .animation(.easeInOut(duration: 0.2), value: Int(fileTransferService.fileTransferProgress * 100))
                         .padding(.trailing, 24)
                 }
-                .transition(.scale(scale: 0.95).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showComplete)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isWaitingForAccept)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isRejected)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.hasIncomingOffer)
         .onChange(of: fileTransferService.fileTransferProgress) { _, new in
             if new >= 1.0 {
                 withAnimation { showComplete = true }

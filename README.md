@@ -65,8 +65,10 @@ You can also send selected text directly from any Android app:
 > After that, "Send to Mac" will appear in the text selection menu.
 
 ### File Transfer
-- **Android → Mac**: Use the Share Sheet or the in-app Send button. Files are uploaded via HTTP directly to your Mac.
-- **Mac → Android**: Drag & drop files onto the Send tab, or click to select. Mac asks for permission first — Android shows an accept/reject prompt before any file is transferred.
+- **Android → Mac**: Use the Share Sheet or the in-app Send button. Mac shows an accept/reject prompt with file name and size before the transfer starts.
+- **Mac → Android**: Drag & drop files onto the Send tab, or click to select. Android shows an accept/reject notification before any file is transferred.
+- **Quick Drop (macOS)**: Press `Cmd+Shift+D` from anywhere — a drop zone slides down from the top of the screen. Drop a file or folder onto it and it's instantly sent to your phone. Requires Accessibility permission for the global hotkey (configurable in Settings).
+- **Unified transfer popup**: A single floating "island" at the top of the screen handles every state — waiting for acceptance, sending, complete, or rejected — with smooth in-place transitions. You can cancel a pending transfer with one click while waiting.
 - **Speed**: Direct HTTP transfer over your local network. No chunking, no base64, no cloud relay. Limited only by your Wi-Fi speed.
 
 ### Photo Gallery
@@ -92,14 +94,14 @@ Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing
 
 ## Download
 
-Get the latest release from the [Releases](https://github.com/negativepl/airbridge/releases/latest) page:
+> **Pre-release status:** No published binaries are currently available. Build from source — see [Building from Source](#building-from-source) below. Pre-built releases will return once the next round of UX polish is done.
 
-| Platform | File | Notes |
-|---|---|---|
-| **macOS** | `Airbridge.dmg` | Drag to Applications. Requires macOS 26+. |
-| **Android** | `Airbridge.apk` | Install manually. Enable "Install from unknown sources". |
+Supported platforms:
 
-The APK is signed with a debug key and works on any Android 10+ device.
+| Platform | Requirement |
+|---|---|
+| **macOS** | macOS 26 (Tahoe) or newer, Apple Silicon |
+| **Android** | Android 10 (API 29) or newer |
 
 > **Why not on Google Play?**
 > Airbridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background. Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync) doesn't fit into any of the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — Airbridge works reliably in the background, which is more important than being on Google Play.
@@ -308,9 +310,7 @@ Features we're planning to add:
 
 - **Cellular file transfer** — Send files over mobile data when devices aren't on the same Wi-Fi (relay server or direct connection via WebRTC)
 - **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS. Prevent a paired device from accessing features you don't want to expose
-- **Quick Share-style window (macOS)** — A compact sharing window (similar to Apple's AirDrop or Google's Quick Share) that lets you pick a target device and drag files to send, without opening the full app
 - **Device picker on Send screen** — When multiple devices are paired, show a device selector on the Send tab instead of sending to all
-- **Receive file confirmation (macOS)** — Currently Mac auto-accepts files from paired devices. Add an accept/reject prompt matching the Android behavior
 - **Transfer history persistence** — Save transfer history across app restarts
 - **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
 - **Auto-update notifications** — Both apps will check for new versions on GitHub and notify you when an update is available, with a direct link to download

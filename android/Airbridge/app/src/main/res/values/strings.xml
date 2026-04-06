@@ -88,6 +88,12 @@
 
     <!-- Transfer progress -->
     <string name="notification_running_background">Running in background</string>
+    <string name="notification_title_file_sent">File sent</string>
+    <string name="notification_title_file_error">Send failed</string>
+    <string name="notification_title_file_received">File received</string>
+    <string name="notification_title_file_rejected">File rejected</string>
+    <string name="notification_title_receiving">Receiving file from %s</string>
+    <string name="notification_title_sending">Sending to %s</string>
     <string name="notification_file_sent">%s — sent</string>
     <string name="notification_file_error">%s — send failed</string>
     <string name="transfer_sending">Sending…</string>

@@ -202,9 +202,10 @@ class AirbridgeService : Service() {
                         Log.d(TAG, "File rejected: ${offer.filename}")
                         webSocketClient.send(Message.FileTransferReject(transferId))
                         val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-                            .setContentTitle("Airbridge")
-                            .setContentText(getString(com.airbridge.R.string.notification_file_rejected, offer.filename))
+                            .setContentTitle(getString(com.airbridge.R.string.notification_title_file_rejected))
+                            .setContentText(offer.filename)
                             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                            .setContentIntent(openAppPendingIntent())
                             .setAutoCancel(true)
                             .build()
                         manager.notify(3, notif)
@@ -310,6 +311,7 @@ class AirbridgeService : Service() {
     }
 
     private val pendingOffers = mutableMapOf<String, Message.FileTransferOffer>() // transferId -> offer
+    private val pendingOutgoingOffers = mutableMapOf<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
     private var lastProgressNotifUpdate = 0L
 
     private fun setupHttpFileServer() {
@@ -332,9 +334,10 @@ class AirbridgeService : Service() {
                 }
                 val progressPercent = (progress * 100).toInt()
                 val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
-                    .setContentText("$filename — $sizeText — $progressPercent%")
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
+                    .setContentText("$filename · $sizeText · $progressPercent%")
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(openAppPendingIntent())
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -372,9 +375,10 @@ class AirbridgeService : Service() {
                     transferFileName.value = null
 
                     val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                        .setContentTitle("Airbridge")
-                        .setContentText(getString(com.airbridge.R.string.notification_file_received, filename))
+                        .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
+                        .setContentText(filename)
                         .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                        .setContentIntent(openAppPendingIntent())
                         .setAutoCancel(true)
                         .build()
                     manager.notify(3, notif)
@@ -421,6 +425,7 @@ class AirbridgeService : Service() {
             .setContentTitle(getString(com.airbridge.R.string.notification_accept_file, sender))
             .setContentText(getString(com.airbridge.R.string.notification_accept_file_detail, offer.filename, sizeText))
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+            .setContentIntent(openAppPendingIntent())
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_reject), rejectIntent).build())
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_accept), acceptIntent).build())
             .setAutoCancel(false)
@@ -491,8 +496,11 @@ class AirbridgeService : Service() {
             is Message.FileTransferOffer -> {
                 handleFileTransferOffer(message)
             }
-            is Message.FileTransferAccept, is Message.FileTransferReject -> {
-                // These are sent by Android, not received
+            is Message.FileTransferAccept -> {
+                pendingOutgoingOffers.remove(message.transferId)?.complete(true)
+            }
+            is Message.FileTransferReject -> {
+                pendingOutgoingOffers.remove(message.transferId)?.complete(false)
             }
             is Message.FileTransferStart -> {
                 Log.d(TAG, "FileTransferStart: ${message.filename} (${message.totalChunks} chunks)")
@@ -515,9 +523,10 @@ class AirbridgeService : Service() {
                 val sender = connectedDeviceName.value ?: "Mac"
                 val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
-                    .setContentText(getString(com.airbridge.R.string.notification_receiving_size, message.filename, sizeText))
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
+                    .setContentText("${message.filename} · $sizeText")
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(openAppPendingIntent())
                     .setProgress(100, 0, false)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -536,9 +545,10 @@ class AirbridgeService : Service() {
                 val progress = (transfer.progress * 100).toInt()
                 val sender = connectedDeviceName.value ?: "Mac"
                 val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_receiving_from, sender))
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
                     .setContentText(transfer.filename)
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(openAppPendingIntent())
                     .setProgress(100, progress, false)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -568,9 +578,10 @@ class AirbridgeService : Service() {
                         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(4)
                         val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                            .setContentTitle("Airbridge")
-                            .setContentText(getString(com.airbridge.R.string.notification_file_received, transfer.filename))
+                            .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
+                            .setContentText(transfer.filename)
                             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                            .setContentIntent(openAppPendingIntent())
                             .setAutoCancel(true)
                             .build()
                         manager.notify(3, notif)
@@ -682,13 +693,17 @@ class AirbridgeService : Service() {
         }
         val port = httpPort.value
 
-        // Resolve filename for UI
-        val filename = applicationContext.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        // Resolve filename + size for UI
+        var filename = "file"
+        var fileSize = 0L
+        applicationContext.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) {
-                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                if (idx >= 0) cursor.getString(idx) else null
-            } else null
-        } ?: "file"
+                val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIdx >= 0) cursor.getString(nameIdx)?.let { filename = it }
+                val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIdx >= 0) fileSize = cursor.getLong(sizeIdx)
+            }
+        }
 
         transferFileName.value = filename
         transferIsSending.value = true
@@ -707,10 +722,11 @@ class AirbridgeService : Service() {
             },
             android.app.PendingIntent.FLAG_IMMUTABLE
         )
+        val targetName = connectedDeviceName.value ?: "Mac"
         fun updateTransferNotification(progress: Int, speed: String) {
             val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
-                .setContentTitle("Airbridge — $filename")
-                .setContentText(if (speed.isNotEmpty()) speed else getString(com.airbridge.R.string.transfer_sending))
+                .setContentTitle(getString(com.airbridge.R.string.notification_title_sending, targetName))
+                .setContentText(if (speed.isNotEmpty()) "$filename · $speed" else filename)
                 .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
@@ -731,6 +747,34 @@ class AirbridgeService : Service() {
         updateTransferNotification(0, "")
 
         serviceScope.launch {
+            // 1. Send offer and wait for accept/reject
+            val transferId = java.util.UUID.randomUUID().toString()
+            val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            pendingOutgoingOffers[transferId] = deferred
+            val mime = applicationContext.contentResolver.getType(uri) ?: "application/octet-stream"
+            webSocketClient.send(Message.FileTransferOffer(transferId, filename, mime, fileSize))
+
+            val accepted = try {
+                kotlinx.coroutines.withTimeoutOrNull(60_000) { deferred.await() } ?: false
+            } catch (_: Exception) { false }
+
+            if (!accepted) {
+                pendingOutgoingOffers.remove(transferId)
+                Log.d(TAG, "Offer rejected or timed out for $filename")
+                transferIsSending.value = false
+                transferProgress.value = null
+                transferFileName.value = null
+                val rejNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_rejected))
+                    .setContentText(filename)
+                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(openAppPendingIntent())
+                    .setAutoCancel(true)
+                    .build()
+                manager.notify(transferNotifId, rejNotif)
+                return@launch
+            }
+
             val startTime = System.currentTimeMillis()
             var lastFileSize = 0L
             var peakSpeed = 1L
@@ -785,8 +829,8 @@ class AirbridgeService : Service() {
                 addActivity(ActivityItem("file_sent", filename, System.currentTimeMillis()))
                 // Complete notification
                 val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                    .setContentTitle("Airbridge")
-                    .setContentText(getString(com.airbridge.R.string.notification_file_sent, filename))
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_sent))
+                    .setContentText(filename)
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                     .setOngoing(false)
                     .setContentIntent(openIntent)
@@ -796,8 +840,8 @@ class AirbridgeService : Service() {
             } else {
                 Log.e(TAG, "HTTP transfer failed: $filename")
                 val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                    .setContentTitle("Airbridge")
-                    .setContentText(getString(com.airbridge.R.string.notification_file_error, filename))
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_error))
+                    .setContentText(filename)
                     .setSmallIcon(com.airbridge.R.drawable.ic_notification)
                     .setOngoing(false)
                     .setContentIntent(openIntent)
@@ -843,10 +887,12 @@ class AirbridgeService : Service() {
         val serviceChannel = NotificationChannel(
             CHANNEL_ID,
             getString(com.airbridge.R.string.channel_service_name),
-            NotificationManager.IMPORTANCE_MIN
+            NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = getString(com.airbridge.R.string.channel_service_desc)
             setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
         }
         val fileChannel = NotificationChannel(
             CHANNEL_FILES_ID,
@@ -859,11 +905,23 @@ class AirbridgeService : Service() {
         manager.createNotificationChannel(fileChannel)
     }
 
+    private fun openAppPendingIntent(): android.app.PendingIntent =
+        android.app.PendingIntent.getActivity(
+            this, 0,
+            android.content.Intent(this, com.airbridge.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
     private fun buildNotification(title: String, text: String): Notification =
         Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
             .setOngoing(true)
             .setVisibility(Notification.VISIBILITY_SECRET)
+            .setContentIntent(openAppPendingIntent())
             .build()
 
     private fun startForegroundWithNotification(title: String, text: String) {
