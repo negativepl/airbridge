@@ -47,4 +47,9 @@ enum L10n {
     static var sendFiles: String { isPL ? "Wyślij pliki" : "Send Files" }
     static var openAirbridge: String { isPL ? "Otwórz Airbridge" : "Open Airbridge" }
     static var connectedToDevice: String { isPL ? "Połączono z" : "Connected to" }
+    static var dropFileHere: String { isPL ? "Upuść plik tutaj" : "Drop file here" }
+    static var noDeviceConnected: String { isPL ? "Brak połączenia z urządzeniem" : "No device connected" }
+    static var quickDropShortcut: String { isPL ? "Skrót Quick Drop" : "Quick Drop shortcut" }
+    static var pressNewShortcut: String { isPL ? "Naciśnij nowy skrót..." : "Press new shortcut..." }
+    static var resetToDefault: String { isPL ? "Przywróć domyślny" : "Reset to default" }
 }
