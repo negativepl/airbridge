@@ -54,6 +54,16 @@ This is an open-source alternative to apps like AirDrop, KDE Connect, or Intel U
 ### Clipboard Sync
 Copy text on your phone, paste on your Mac — and vice versa. Works automatically in the background. Supports plain text and HTML.
 
+You can also send selected text directly from any Android app:
+
+1. **Select text** in any app (browser, notes, messages...)
+2. Tap **"Send to Mac"** in the text selection menu (the floating toolbar that appears)
+3. The text is instantly sent to your Mac's clipboard
+
+> **Note:** Some apps may not show "Send to Mac" by default. If you don't see it:
+> Long-press selected text → tap **⋮ More** → **Manage apps** → enable **Airbridge**.
+> After that, "Send to Mac" will appear in the text selection menu.
+
 ### File Transfer
 - **Android → Mac**: Use the Share Sheet or the in-app Send button. Files are uploaded via HTTP directly to your Mac.
 - **Mac → Android**: Drag & drop files onto the Send tab, or click to select. Mac asks for permission first — Android shows an accept/reject prompt before any file is transferred.
@@ -212,7 +222,7 @@ UI (Jetpack Compose + Material 3)
 
 ### Protocol
 
-22 message types over JSON-encoded WebSocket:
+25 message types over JSON-encoded WebSocket:
 
 | Category | Messages |
 |---|---|

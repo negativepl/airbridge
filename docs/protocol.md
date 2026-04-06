@@ -9,7 +9,8 @@ Airbridge uses a JSON-over-WebSocket protocol for communication between the macO
 - **Protocol**: WebSocket (RFC 6455)
 - **Port**: 8765 (default)
 - **Discovery**: Bonjour/mDNS service type `_airbridge._tcp`
-- **Security**: TLS with mutual authentication after pairing
+- **File Transfer**: HTTP POST (port 8766 Mac→Android, port 8767 Android→Mac)
+- **Security**: Ed25519 signature authentication (no TLS — local network only)
 
 ## Message Format
 
@@ -310,7 +311,35 @@ Device A                         Device B
    |                               | [applies to clipboard]
 ```
 
-### File Transfer Flow
+### File Transfer Flow (Mac → Android, consent-based)
+
+```
+Mac (Sender)                     Android (Receiver)
+   |                               |
+   |--- file_transfer_offer ------>|  [shows accept/reject notification]
+   |                               |
+   |<-- file_transfer_accept ------|  [user taps Accept]
+   |                               |
+   |=== HTTP POST /upload ========>|  [direct file upload over HTTP]
+   |                               |  [saves to Downloads/Airbridge]
+```
+
+If rejected:
+```
+   |<-- file_transfer_reject ------|  [user taps Reject]
+   |   [transfer cancelled]        |
+```
+
+### File Transfer Flow (Android → Mac, HTTP upload)
+
+```
+Android (Sender)                 Mac (Receiver)
+   |                               |
+   |=== HTTP POST /upload ========>|  [direct file upload, port 8766]
+   |                               |  [saves to Downloads/Airbridge]
+```
+
+### File Transfer Flow (Legacy WebSocket chunks)
 
 ```
 Sender                           Receiver
@@ -324,3 +353,11 @@ Sender                           Receiver
    |--- file_transfer_complete --->|
    |                               | [verifies checksum]
 ```
+
+### Message Types Added in v1.2.0
+
+| Type | Fields | Description |
+|---|---|---|
+| `file_transfer_offer` | `transfer_id`, `filename`, `mime_type`, `file_size` | Mac asks Android for permission to send a file |
+| `file_transfer_accept` | `transfer_id` | Android accepts the file transfer |
+| `file_transfer_reject` | `transfer_id` | Android rejects the file transfer |
