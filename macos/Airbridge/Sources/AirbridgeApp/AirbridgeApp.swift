@@ -17,6 +17,7 @@ struct AirbridgeApp: App {
     @State private var historyService: HistoryService
     @State private var galleryService: GalleryService
     @State private var smsService: SmsService
+    @State private var hotkeyService: GlobalHotkeyService
 
     init() {
         UserDefaults.standard.register(defaults: ["playSound": true])
@@ -28,12 +29,14 @@ struct AirbridgeApp: App {
         let history = HistoryService()
         let gallery = GalleryService()
         let sms = SmsService()
+        let hotkey = GlobalHotkeyService()
 
         clipboard.configure(connectionService: connection, historyService: history)
         fileTransfer.configure(connectionService: connection, historyService: history)
         pairing.configure(connectionService: connection)
         gallery.configure(connectionService: connection)
         sms.configure(connectionService: connection)
+        hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms)
 
         _connectionService = State(initialValue: connection)
@@ -43,9 +46,11 @@ struct AirbridgeApp: App {
         _historyService = State(initialValue: history)
         _galleryService = State(initialValue: gallery)
         _smsService = State(initialValue: sms)
+        _hotkeyService = State(initialValue: hotkey)
 
         connection.startServer()
         clipboard.startMonitoring()
+        hotkey.start()
 
         // Set app icon from bundled icns
         if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
