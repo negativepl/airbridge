@@ -100,7 +100,7 @@ echo "--- Building Android ---"
 cd "$ROOT/android/Airbridge"
 ./gradlew assembleRelease 2>&1 | tail -3
 
-APK_RELEASE="$ROOT/android/Airbridge/app/build/outputs/apk/release/app-release-unsigned.apk"
+APK_RELEASE="$ROOT/android/Airbridge/app/build/outputs/apk/release/app-release.apk"
 APK_DEBUG="$ROOT/android/Airbridge/app/build/outputs/apk/debug/app-debug.apk"
 
 # Use release APK if available, otherwise debug

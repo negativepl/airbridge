@@ -25,23 +25,23 @@ public actor WebSocketServer {
     // MARK: - Callbacks
 
     /// Called whenever a new `Message` arrives from any client. Includes connectionId.
-    public var onMessage: ((Message, String) -> Void)?
+    public var onMessage: (@Sendable (Message, String) -> Void)?
 
     /// Called whenever a binary frame arrives (used for raw file chunks).
-    public var onBinaryMessage: ((Data) -> Void)?
+    public var onBinaryMessage: (@Sendable (Data) -> Void)?
 
     /// Called when a client connects. Passes the connection endpoint description.
-    public var onClientConnected: ((String) -> Void)?
+    public var onClientConnected: (@Sendable (String) -> Void)?
 
     /// Called when a client disconnects. Passes the connection endpoint description.
-    public var onClientDisconnected: ((String) -> Void)?
+    public var onClientDisconnected: (@Sendable (String) -> Void)?
 
     /// Convenience method to set all callbacks at once from outside the actor.
     public func setCallbacks(
-        onMessage: ((Message, String) -> Void)?,
-        onBinaryMessage: ((Data) -> Void)? = nil,
-        onClientConnected: ((String) -> Void)?,
-        onClientDisconnected: ((String) -> Void)?
+        onMessage: (@Sendable (Message, String) -> Void)?,
+        onBinaryMessage: (@Sendable (Data) -> Void)? = nil,
+        onClientConnected: (@Sendable (String) -> Void)?,
+        onClientDisconnected: (@Sendable (String) -> Void)?
     ) {
         self.onMessage = onMessage
         self.onBinaryMessage = onBinaryMessage

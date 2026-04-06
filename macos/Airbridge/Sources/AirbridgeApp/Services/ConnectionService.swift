@@ -237,12 +237,12 @@ final class ConnectionService {
     // MARK: - Server Callbacks
 
     private func configureServerCallbacks() async {
-        let onMessage: (Message, String) -> Void = { [weak self] message, connectionId in
+        let onMessage: @Sendable (Message, String) -> Void = { [weak self] message, connectionId in
             Task { @MainActor in
                 self?.handleMessage(message, from: connectionId)
             }
         }
-        let onBinaryMessage: (Data) -> Void = { [weak self] data in
+        let onBinaryMessage: @Sendable (Data) -> Void = { [weak self] data in
             Task { @MainActor in
                 guard let self else { return }
                 if let handler = self.fileTransferHandler {
@@ -250,7 +250,7 @@ final class ConnectionService {
                 }
             }
         }
-        let onConnect: (String) -> Void = { _ in }
+        let onConnect: @Sendable (String) -> Void = { _ in }
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
                 let stillConnected = await self?.server.isConnected ?? false

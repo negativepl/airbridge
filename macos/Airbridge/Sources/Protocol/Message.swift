@@ -3,7 +3,7 @@ import Foundation
 // MARK: - ContentType
 
 /// MIME types supported for clipboard content.
-public enum ContentType: String, Codable, Equatable {
+public enum ContentType: String, Codable, Equatable, Sendable {
     case plainText = "text/plain"
     case html = "text/html"
     case png = "image/png"
@@ -16,7 +16,7 @@ public enum ContentType: String, Codable, Equatable {
 /// Encoding produces snake_case JSON matching the protocol specification.
 /// `clipboardUpdate` and `fileTransferStart` automatically inject a
 /// millisecond-precision Unix `timestamp` on encode.
-public enum Message: Equatable {
+public enum Message: Equatable, Sendable {
     case clipboardUpdate(sourceId: String, contentType: ContentType, data: String)
     case fileTransferStart(
         sourceId: String,
@@ -50,7 +50,7 @@ public enum Message: Equatable {
 
 // MARK: - GalleryPhotoMeta
 
-public struct GalleryPhotoMeta: Codable, Equatable, Identifiable {
+public struct GalleryPhotoMeta: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let filename: String
     public let dateTaken: Int64
@@ -78,7 +78,7 @@ public struct GalleryPhotoMeta: Codable, Equatable, Identifiable {
 
 // MARK: - SmsConversationMeta
 
-public struct SmsConversationMeta: Codable, Equatable, Hashable, Identifiable {
+public struct SmsConversationMeta: Codable, Equatable, Hashable, Identifiable, Sendable {
     public let threadId: String
     public let address: String
     public let displayName: String
@@ -110,7 +110,7 @@ public struct SmsConversationMeta: Codable, Equatable, Hashable, Identifiable {
 
 // MARK: - SmsMessageMeta
 
-public struct SmsMessageMeta: Codable, Equatable, Identifiable {
+public struct SmsMessageMeta: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let address: String
     public let body: String
@@ -483,7 +483,7 @@ extension Message: Codable {
 // MARK: - QRPayload
 
 /// The payload encoded in the pairing QR code displayed on the macOS device.
-public struct QRPayload: Codable, Equatable {
+public struct QRPayload: Codable, Equatable, Sendable {
     public let host: String
     public let port: Int
     public let publicKey: String

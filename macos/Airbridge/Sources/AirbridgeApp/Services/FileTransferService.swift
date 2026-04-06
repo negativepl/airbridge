@@ -103,31 +103,25 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             return
         }
 
-        Task.detached { [weak self] in
-            guard let data = try? Data(contentsOf: url) else {
-                await MainActor.run {
-                    self?.isSendingFromQueue = false
-                    self?.processQueue()
-                }
+        let chunker = self.fileChunker
+        Task {
+            // Read file off main thread
+            let data: Data? = await Task.detached { try? Data(contentsOf: url) }.value
+            guard let data else {
+                self.isSendingFromQueue = false
+                self.processQueue()
                 return
             }
 
-            let chunked = await self?.fileChunker.prepare(
+            let chunked = chunker.prepare(
                 filename: filename,
                 mimeType: mime,
                 data: data,
                 sourceId: identity.deviceId
             )
-            guard let chunked else {
-                await MainActor.run {
-                    self?.isSendingFromQueue = false
-                    self?.processQueue()
-                }
-                return
-            }
 
             do {
-                await MainActor.run { self?.fileTransferFileName = filename }
+                self.fileTransferFileName = filename
                 try await connectionService.broadcast(chunked.startMessage)
 
                 for chunk in chunked.chunks {
@@ -137,9 +131,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                         data: chunk.base64Data
                     )
                     try await connectionService.broadcast(msg)
-                    await MainActor.run {
-                        self?.fileTransferProgress = Double(chunk.chunkIndex + 1) / Double(chunked.totalChunks)
-                    }
+                    self.fileTransferProgress = Double(chunk.chunkIndex + 1) / Double(chunked.totalChunks)
                 }
 
                 let completeMsg = Message.fileTransferComplete(
@@ -148,18 +140,14 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 )
                 try await connectionService.broadcast(completeMsg)
 
-                await MainActor.run {
-                    self?.fileTransferProgress = 0
-                    self?.historyService?.add(type: .file, direction: .sent, description: filename)
-                    self?.isSendingFromQueue = false
-                    self?.processQueue()
-                }
+                self.fileTransferProgress = 0
+                self.historyService?.add(type: .file, direction: .sent, description: filename)
+                self.isSendingFromQueue = false
+                self.processQueue()
             } catch {
-                await MainActor.run {
-                    self?.fileTransferProgress = 0
-                    self?.isSendingFromQueue = false
-                    self?.processQueue()
-                }
+                self.fileTransferProgress = 0
+                self.isSendingFromQueue = false
+                self.processQueue()
             }
         }
     }

@@ -1,10 +1,10 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "Airbridge",
     platforms: [
-        .macOS(.v14)
+        .macOS("26.0")
     ],
     products: [
         .executable(name: "AirbridgeApp", targets: ["AirbridgeApp"]),
@@ -124,5 +124,6 @@ let package = Package(
             dependencies: ["AirbridgeApp"],
             path: "Tests/AirbridgeAppTests"
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

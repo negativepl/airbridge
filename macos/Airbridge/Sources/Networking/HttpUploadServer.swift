@@ -19,7 +19,7 @@ public actor HttpUploadServer {
     // MARK: - Callbacks
 
     /// Called when a complete file has been received (on actor context).
-    public var onFileReceived: ((String, String, String, Data) -> Void)?
+    public var onFileReceived: (@Sendable (String, String, String, Data) -> Void)?
 
     /// Called periodically as body bytes arrive.
     /// Marked nonisolated(unsafe) so it can be called from receive callbacks
@@ -28,7 +28,7 @@ public actor HttpUploadServer {
 
     /// Sets both callbacks at once.
     public func setCallbacks(
-        onFileReceived: ((String, String, String, Data) -> Void)?,
+        onFileReceived: (@Sendable (String, String, String, Data) -> Void)?,
         onProgress: (@Sendable (String, Int, Int) -> Void)?
     ) {
         self.onFileReceived = onFileReceived
@@ -129,9 +129,9 @@ public actor HttpUploadServer {
     private func handleNewConnection(_ connection: NWConnection) {
         let id = ObjectIdentifier(connection)
         connections[id] = connection
-        connection.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { Task { await self?.removeConnection(id: id) } }
-            if case .cancelled = state { Task { await self?.removeConnection(id: id) } }
+        connection.stateUpdateHandler = { @Sendable [weak self] state in
+            if case .failed = state { Task { [weak self] in guard let self else { return }; await self.removeConnection(id: id) } }
+            if case .cancelled = state { Task { [weak self] in guard let self else { return }; await self.removeConnection(id: id) } }
         }
         connection.start(queue: .global(qos: .userInitiated))
         receiveHTTPRequest(on: connection, buffer: Data())

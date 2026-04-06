@@ -50,12 +50,22 @@ struct PairingView: View {
                     }
                     Text(isPL ? "Czekam na połączenie…" : "Waiting for connection…")
                         .font(.caption).foregroundStyle(.secondary)
-                    Button(L10n.close) { isPresented = false }.keyboardShortcut(.cancelAction)
+                    Spacer().frame(height: 16)
+                    Button {
+                        isPresented = false
+                    } label: {
+                        Text(L10n.close)
+                            .font(.system(size: 15))
+                            .frame(minWidth: 100, minHeight: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .keyboardShortcut(.cancelAction)
                 }
             }
         }
-        .padding(24)
-        .frame(width: 380, height: 480)
+        .padding(32)
+        .frame(width: 420, height: 540)
         .onAppear {
             if viewModel == nil {
                 let vm = PairingViewModel(

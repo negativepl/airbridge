@@ -5,7 +5,7 @@ import Protocol
 // MARK: - ChunkData
 
 /// A single chunk of a file transfer, carrying its index and base64-encoded bytes.
-public struct ChunkData: Equatable {
+public struct ChunkData: Equatable, Sendable {
     public let chunkIndex: Int
     public let base64Data: String
 
@@ -18,7 +18,7 @@ public struct ChunkData: Equatable {
 // MARK: - ChunkedFile
 
 /// The result of splitting a file into chunks, ready for transmission.
-public struct ChunkedFile {
+public struct ChunkedFile: Sendable {
     public let transferId: String
     public let filename: String
     public let mimeType: String
@@ -52,7 +52,7 @@ public struct ChunkedFile {
 // MARK: - FileChunker
 
 /// Splits raw `Data` into fixed-size chunks for transmission.
-public struct FileChunker {
+public struct FileChunker: Sendable {
 
     /// The maximum number of bytes per chunk (default 64 KiB).
     public let chunkSize: Int
