@@ -25,6 +25,10 @@ struct OnboardingView: View {
                     insertion: .move(edge: direction == .forward ? .trailing : .leading),
                     removal: .move(edge: direction == .forward ? .leading : .trailing)
                 ))
+                case 2: permissionsPage.transition(.asymmetric(
+                    insertion: .move(edge: direction == .forward ? .trailing : .leading),
+                    removal: .move(edge: direction == .forward ? .leading : .trailing)
+                ))
                 default: connectPage.transition(.asymmetric(
                     insertion: .move(edge: .trailing),
                     removal: .move(edge: .trailing)
@@ -55,7 +59,7 @@ struct OnboardingView: View {
                     Spacer()
 
                     HStack(spacing: 10) {
-                        ForEach(0..<3, id: \.self) { i in
+                        ForEach(0..<4, id: \.self) { i in
                             Capsule()
                                 .fill(i == page ? Color.accentColor : Color.primary.opacity(0.25))
                                 .frame(width: i == page ? 28 : 10, height: 10)
@@ -65,7 +69,7 @@ struct OnboardingView: View {
 
                     Spacer()
 
-                    if page < 2 {
+                    if page < 3 {
                         Button {
                             direction = .forward
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -231,7 +235,69 @@ struct OnboardingView: View {
         .padding(36)
     }
 
-    // MARK: - Page 3: Connect
+    // MARK: - Page 3: Permissions
+
+    private var permissionsPage: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.primary)
+
+            Spacer().frame(height: 28)
+
+            Text(isPL ? "Uprawnienia" : "Permissions")
+                .font(.system(size: 32, weight: .bold))
+
+            Spacer().frame(height: 10)
+
+            Text(isPL
+                ? "Airbridge potrzebuje dostępu do Dostępności, aby globalny skrót Quick Drop (⌘⇧D) działał nawet gdy aplikacja jest w tle."
+                : "Airbridge needs Accessibility access so the global Quick Drop shortcut (⌘⇧D) works even when the app is in the background.")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 48)
+
+            Spacer().frame(height: 36)
+
+            Button {
+                let key = "AXTrustedCheckOptionPrompt" as CFString
+                let options = [key: true] as CFDictionary
+                AXIsProcessTrustedWithOptions(options)
+            } label: {
+                Text(isPL ? "Nadaj uprawnienia Dostępności" : "Grant Accessibility Access")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(minWidth: 240, minHeight: 40)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+
+            Spacer().frame(height: 16)
+
+            if AXIsProcessTrusted() {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text(isPL ? "Uprawnienia nadane!" : "Access granted!")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.green)
+                }
+            } else {
+                Text(isPL
+                    ? "Możesz to też zrobić później w Ustawieniach systemu."
+                    : "You can also do this later in System Settings.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+        }
+        .padding(36)
+    }
+
+    // MARK: - Page 4: Connect
 
     private var connectPage: some View {
         VStack(spacing: 0) {

@@ -19,9 +19,45 @@ final class GlobalHotkeyService {
         self.fileTransferService = fileTransferService
     }
 
+    var isAccessibilityGranted: Bool {
+        AXIsProcessTrusted()
+    }
+
+    func requestAccessibilityIfNeeded() {
+        if !AXIsProcessTrusted() {
+            let key = "AXTrustedCheckOptionPrompt" as CFString
+            let options = [key: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(options)
+        }
+    }
+
     func start() {
         stop()
 
+        // Request accessibility permissions if not granted
+        if !AXIsProcessTrusted() {
+            requestAccessibilityIfNeeded()
+            // Poll until granted, then register monitors
+            pollForAccessibility()
+            return
+        }
+
+        registerMonitors()
+    }
+
+    private func pollForAccessibility() {
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] t in
+            if AXIsProcessTrusted() {
+                t.invalidate()
+                DispatchQueue.main.async {
+                    self?.registerMonitors()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func registerMonitors() {
         // Global monitor — fires when app is NOT focused
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             Task { @MainActor in

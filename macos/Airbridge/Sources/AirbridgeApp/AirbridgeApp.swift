@@ -50,7 +50,7 @@ struct AirbridgeApp: App {
 
         connection.startServer()
         clipboard.startMonitoring()
-        hotkey.start()
+        // hotkey.start() is called from body .onAppear to avoid blocking init
 
         // Set app icon from bundled icns
         if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
@@ -73,6 +73,7 @@ struct AirbridgeApp: App {
                     galleryService: galleryService,
                     smsService: smsService
                 )
+                .onAppear { hotkeyService.start() }
             } else {
                 OnboardingView(
                     pairingService: pairingService,
