@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Two arrows forming a sync circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,4 L12,1 L8,5 L12,9 L12,6 A6,6 0 0,1 18,12 L20,12 A8,8 0 0,0 12,4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,20 L12,23 L16,19 L12,15 L12,18 A6,6 0 0,1 6,12 L4,12 A8,8 0 0,0 12,20 Z" />
+</vector>

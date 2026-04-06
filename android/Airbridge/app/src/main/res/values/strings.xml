@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Airbridge</string>
+    <string name="accessibility_description">Airbridge uses this permission to read clipboard changes in the background and sync them with your Mac. No other data is accessed.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Airbridge</string>
+    <string name="onboarding_welcome_desc">Your phone and Mac, finally on the same team.</string>
+    <string name="onboarding_feature_clipboard">Instantly copy text between your phone and Mac</string>
+    <string name="onboarding_feature_files">Send photos and files — no cables, no cloud</string>
+    <string name="onboarding_feature_local">Private — your data never leaves your home network</string>
+    <string name="onboarding_connect_title">How it works</string>
+    <string name="onboarding_connect_desc">Three things you should know:</string>
+    <string name="onboarding_how_wifi">Both devices need to be on the same WiFi network</string>
+    <string name="onboarding_how_auto">Airbridge finds your Mac automatically — no IP addresses, no configuration</string>
+    <string name="onboarding_how_bg">Runs quietly in the background — just select text and tap \"Send to Mac\"</string>
+    <string name="onboarding_ready_title">You\'re all set!</string>
+    <string name="onboarding_ready_desc">Select any text in any app — a menu will appear with \'Send to Mac\' option. Tap it to transfer instantly.</string>
+    <string name="onboarding_permissions_title">Permissions</string>
+    <string name="onboarding_permissions_desc">Airbridge needs a few permissions to fully work.</string>
+    <string name="onboarding_perm_notifications">Notifications — to show transfer progress</string>
+    <string name="onboarding_perm_nearby">Local network — to find your Mac nearby</string>
+    <string name="onboarding_perm_allow">Allow notifications</string>
+    <string name="onboarding_perm_granted">Permissions granted</string>
+    <string name="onboarding_perm_notifications_desc">File transfer progress</string>
+    <string name="onboarding_perm_sms_desc">Browse and send SMS</string>
+    <string name="onboarding_perm_photos_desc">Browse photo gallery</string>
+    <string name="onboarding_perm_contacts_desc">Contact names in messages</string>
+    <string name="onboarding_perm_allow_btn">Allow</string>
+    <string name="onboarding_perm_all_granted">All permissions granted</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Main screen -->
+    <string name="connected">Connected</string>
+    <string name="not_connected">Not connected</string>
+    <string name="connected_to">Connected to %s</string>
+    <string name="searching">Looking for Mac on your network…</string>
+    <string name="connecting">Connecting…</string>
+    <string name="disconnecting">Disconnecting…</string>
+    <string name="clipboard_active">Clipboard sync is active</string>
+    <string name="send_to_mac">Send to Mac</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="reconnect">Reconnect</string>
+    <string name="hint_title">How to use</string>
+    <string name="hint_select_text">Select text in any app and choose \'Send to Mac\' from the menu</string>
+
+    <!-- Quick actions -->
+    <string name="quick_actions">Quick actions</string>
+    <string name="action_send_file">Send file</string>
+    <string name="action_send_photo">Send photo</string>
+    <string name="action_send_clipboard">Send clipboard</string>
+    <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="action_ping">Ping</string>
+
+    <!-- Activity -->
+    <string name="recent_activity">Recent activity</string>
+    <string name="no_activity">No activity yet</string>
+    <string name="connected_for">Connected for %s</string>
+    <string name="minutes_ago">%d min ago</string>
+    <string name="hours_ago">%d h ago</string>
+    <string name="just_now">Just now</string>
+    <string name="clipboard_sent_to_mac">Copied text to Mac</string>
+    <string name="clipboard_received_from">Copied text from %s</string>
+    <string name="file_sent_to_mac">File sent to Mac</string>
+    <string name="file_received_from">File received from %s</string>
+    <string name="ping_sent">Ping sent</string>
+    <string name="pong_received">Pong!</string>
+    <string name="time_now">now</string>
+    <string name="time_minutes">%dm</string>
+    <string name="time_hours">%dh</string>
+    <string name="time_days">%dd</string>
+
+    <!-- Permissions -->
+    <string name="permission_overlay_title">Permission needed</string>
+    <string name="permission_overlay_desc">To sync clipboard in the background, allow displaying over other apps.</string>
+    <string name="grant_permission">Grant Permission</string>
+
+    <!-- Send confirmation -->
+    <string name="send_confirm_title">Ready to send</string>
+    <string name="send_confirm_button">Send to Mac</string>
+    <string name="send_confirm_cancel">Cancel</string>
+    <string name="send_confirm_size">Size: %s</string>
+
+    <!-- Transfer progress -->
+    <string name="transfer_sending">Sending…</string>
+    <string name="transfer_progress">%d%%</string>
+    <string name="transfer_tap_collapse">Tap to collapse</string>
+
+    <!-- Feedback -->
+    <string name="sent_to_mac">Sent to Mac</string>
+    <string name="share_sending">Sending to Mac via Airbridge…</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_history">History</string>
+    <string name="nav_send">Send</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_about">About</string>
+    <string name="history_title">History</string>
+    <string name="history_empty">No transfers yet</string>
+    <string name="history_empty_desc">Your clipboard syncs and file transfers will appear here</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_connection">Connection</string>
+    <string name="settings_auto_connect">Auto-connect on startup</string>
+    <string name="settings_auto_connect_desc">Automatically search for Mac when app starts</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_vibrate">Vibrate on sync</string>
+    <string name="settings_vibrate_desc">Short vibration when clipboard is synced</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_licenses">Open source licenses</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_description">Bridge the gap between your Android phone and Mac. Clipboard sync, file transfers, zero cloud — everything stays on your local network.</string>
+    <string name="about_created_by">Created by</string>
+    <string name="about_author">Marcin Baszewski</string>
+    <string name="about_powered_by">Powered by Claude Opus 4.6</string>
+    <string name="about_source_code">Source code on GitHub</string>
+    <string name="about_report_issue">Report an issue</string>
+    <string name="about_open_source">Airbridge is open source</string>
+    <string name="about_license">MIT License</string>
+    <!-- Pairing -->
+    <string name="pairing_scan_title">Scan QR Code</string>
+    <string name="pairing_scan_desc">Open Airbridge on your Mac and click \"Pair Device\"</string>
+    <string name="pairing_camera_required">Camera permission is required to scan QR codes.</string>
+    <string name="pairing_skip">Skip for now</string>
+    <string name="pairing_success">Paired with %s</string>
+    <string name="pairing_no_devices">No paired devices</string>
+    <string name="pairing_add_mac">Pair with Mac</string>
+    <string name="pairing_paired_devices">Paired devices</string>
+    <string name="pairing_remove">Remove</string>
+    <string name="pairing_remove_confirm">Remove pairing with %s?</string>
+    <string name="pairing_in_progress">Pairing…</string>
+    <string name="pairing_in_progress_desc">Connecting to your Mac</string>
+    <string name="pairing_success_title">Paired!</string>
+    <string name="pairing_success_desc">Connected with %s</string>
+    <string name="pairing_success_connected">Connection active</string>
+    <string name="pairing_success_continue">Continue</string>
+</resources>

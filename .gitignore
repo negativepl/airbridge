@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+.build/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Android
+.gradle/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Claude Code / Superpowers
+.claude/
+.superpowers/
+.mcp.json
+
+# Release artifacts
+*.apk
+*.dmg
+*.hprof

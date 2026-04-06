@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Anthropic-style sparkle -->
+    <path
+        android:fillColor="#D4A27F"
+        android:pathData="M12,2 L13.5,8.5 L20,10 L13.5,11.5 L12,18 L10.5,11.5 L4,10 L10.5,8.5 Z" />
+    <path
+        android:fillColor="#D4A27F"
+        android:pathData="M18,14 L18.8,16.2 L21,17 L18.8,17.8 L18,20 L17.2,17.8 L15,17 L17.2,16.2 Z" />
+</vector>

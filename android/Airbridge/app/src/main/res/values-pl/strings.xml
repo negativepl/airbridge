@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Airbridge</string>
+    <string name="accessibility_description">Airbridge używa tego uprawnienia, by odczytywać zmiany w schowku w tle i synchronizować je z komputerem Mac. Żadne inne dane nie są pobierane.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Airbridge</string>
+    <string name="onboarding_welcome_desc">Twój telefon i komputer Mac, połączone jak nigdy dotąd.</string>
+    <string name="onboarding_feature_clipboard">Synchronizuj schowek między telefonem, a komputerem Mac</string>
+    <string name="onboarding_feature_files">Przesyłaj zdjęcia i pliki bezprzewodowo, bez chmury</string>
+    <string name="onboarding_feature_local">Wszystko zostaje w Twojej sieci — pełna prywatność</string>
+    <string name="onboarding_connect_title">Jak to działa?</string>
+    <string name="onboarding_connect_desc">Trzy rzeczy, które warto wiedzieć:</string>
+    <string name="onboarding_how_wifi">Telefon i komputer Mac muszą być w tej samej sieci Wi-Fi</string>
+    <string name="onboarding_how_auto">Komputer Mac zostanie wykryty automatycznie, jeśli jest podłączony do Twojej sieci lokalnej</string>
+    <string name="onboarding_how_bg">Schowek synchronizuje się automatycznie, a pliki przesyłasz jednym kliknięciem</string>
+    <string name="onboarding_ready_title">Gotowe!</string>
+    <string name="onboarding_ready_desc">Zaznacz dowolny tekst w dowolnej aplikacji — pojawi się opcja „Wyślij do komputera Mac". Kliknij, by przesłać tekst natychmiast.</string>
+    <string name="onboarding_permissions_title">Uprawnienia</string>
+    <string name="onboarding_permissions_desc">Airbridge potrzebuje kilku uprawnień, aby w pełni działać.</string>
+    <string name="onboarding_perm_notifications">Powiadomienia o postępie przesyłania</string>
+    <string name="onboarding_perm_nearby">Sieć lokalna — aby znaleźć komputer Mac w pobliżu</string>
+    <string name="onboarding_perm_allow">Zezwól na powiadomienia</string>
+    <string name="onboarding_perm_granted">Gotowe — uprawnienia nadane</string>
+    <string name="onboarding_perm_notifications_desc">Postęp przesyłania plików</string>
+    <string name="onboarding_perm_sms_desc">Przeglądanie i wysyłanie SMS</string>
+    <string name="onboarding_perm_photos_desc">Przeglądanie galerii zdjęć</string>
+    <string name="onboarding_perm_contacts_desc">Nazwy kontaktów w wiadomościach</string>
+    <string name="onboarding_perm_allow_btn">Zezwól</string>
+    <string name="onboarding_perm_all_granted">Wszystkie uprawnienia nadane</string>
+    <string name="onboarding_next">Dalej</string>
+    <string name="onboarding_get_started">Zaczynamy</string>
+
+    <!-- Main screen -->
+    <string name="connected">Połączono</string>
+    <string name="not_connected">Brak połączenia</string>
+    <string name="connected_to">Połączono z %s</string>
+    <string name="searching">Szukam komputera Mac w Twojej sieci…</string>
+    <string name="connecting">Łączenie…</string>
+    <string name="disconnecting">Rozłączanie…</string>
+    <string name="clipboard_active">Synchronizacja schowka aktywna</string>
+    <string name="send_to_mac">Wyślij do komputera Mac</string>
+    <string name="disconnect">Rozłącz</string>
+    <string name="hint_title">Jak używać?</string>
+    <string name="hint_select_text">Zaznacz tekst w dowolnej aplikacji i wybierz „Wyślij do komputera Mac"</string>
+    <string name="reconnect">Połącz ponownie</string>
+
+    <!-- Quick actions -->
+    <string name="quick_actions">Szybkie akcje</string>
+    <string name="action_send_file">Wyślij plik</string>
+    <string name="action_send_photo">Wyślij zdjęcie</string>
+    <string name="action_send_clipboard">Wyślij schowek</string>
+    <string name="clipboard_empty">Schowek jest pusty</string>
+    <string name="action_ping">Ping</string>
+
+    <!-- Activity -->
+    <string name="recent_activity">Ostatnia aktywność</string>
+    <string name="no_activity">Brak aktywności</string>
+    <string name="connected_for">Połączono od %s</string>
+    <string name="minutes_ago">%d min temu</string>
+    <string name="hours_ago">%d godz. temu</string>
+    <string name="just_now">Przed chwilą</string>
+    <string name="clipboard_sent_to_mac">Tekst wysłany do komputera Mac</string>
+    <string name="clipboard_received_from">Tekst odebrany z %s</string>
+    <string name="file_sent_to_mac">Plik wysłany do komputera Mac</string>
+    <string name="file_received_from">Plik odebrany z %s</string>
+    <string name="ping_sent">Ping wysłany</string>
+    <string name="pong_received">Pong!</string>
+    <string name="time_now">teraz</string>
+    <string name="time_minutes">%d min</string>
+    <string name="time_hours">%d godz.</string>
+    <string name="time_days">%d dn.</string>
+
+    <!-- Permissions -->
+    <string name="permission_overlay_title">Wymagane uprawnienie</string>
+    <string name="permission_overlay_desc">Aby synchronizować schowek w tle, zezwól na wyświetlanie nad innymi aplikacjami.</string>
+    <string name="grant_permission">Nadaj uprawnienie</string>
+
+    <!-- Send confirmation -->
+    <string name="send_confirm_title">Gotowe do wysłania</string>
+    <string name="send_confirm_button">Wyślij do komputera Mac</string>
+    <string name="send_confirm_cancel">Anuluj</string>
+    <string name="send_confirm_size">Rozmiar: %s</string>
+
+    <!-- Transfer progress -->
+    <string name="transfer_sending">Wysyłanie…</string>
+    <string name="transfer_progress">%d%%</string>
+    <string name="transfer_tap_collapse">Dotknij, aby zwinąć</string>
+
+    <!-- Feedback -->
+    <string name="sent_to_mac">Wysłano do komputera Mac</string>
+    <string name="share_sending">Wysyłanie do komputera Mac przez Airbridge…</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Główna</string>
+    <string name="nav_history">Historia</string>
+    <string name="nav_send">Wyślij</string>
+    <string name="nav_settings">Ustawienia</string>
+    <string name="nav_about">O aplikacji</string>
+    <string name="history_title">Historia</string>
+    <string name="history_empty">Brak transferów</string>
+    <string name="history_empty_desc">Historia synchronizacji i przesłanych plików pojawi się tutaj</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ustawienia</string>
+    <string name="settings_appearance">Wygląd</string>
+    <string name="settings_theme">Motyw</string>
+    <string name="settings_theme_system">Systemowy</string>
+    <string name="settings_theme_light">Jasny</string>
+    <string name="settings_theme_dark">Ciemny</string>
+    <string name="settings_connection">Połączenie</string>
+    <string name="settings_auto_connect">Łącz automatycznie</string>
+    <string name="settings_auto_connect_desc">Szukaj komputera Mac automatycznie po uruchomieniu aplikacji</string>
+    <string name="settings_notifications">Powiadomienia</string>
+    <string name="settings_vibrate">Wibracja przy synchronizacji</string>
+    <string name="settings_vibrate_desc">Krótka wibracja po zsynchronizowaniu schowka</string>
+    <string name="settings_about">Informacje</string>
+    <string name="settings_version">Wersja</string>
+    <string name="settings_licenses">Licencje open source</string>
+
+    <!-- About -->
+    <string name="about_title">O aplikacji</string>
+    <string name="about_description">Połącz telefon z komputerem Mac. Synchronizuj schowek, przesyłaj pliki — wszystko lokalnie, bez chmury.</string>
+    <string name="about_created_by">Autor</string>
+    <string name="about_author">Marcin Baszewski</string>
+    <string name="about_powered_by">Powered by Claude Opus 4.6</string>
+    <string name="about_source_code">Kod źródłowy na GitHub</string>
+    <string name="about_report_issue">Zgłoś problem</string>
+    <string name="about_open_source">Airbridge jest open source</string>
+    <string name="about_license">Licencja MIT</string>
+
+    <!-- Pairing -->
+    <string name="pairing_scan_title">Zeskanuj kod QR</string>
+    <string name="pairing_scan_desc">Otwórz Airbridge na komputerze Mac i kliknij „Sparuj urządzenie"</string>
+    <string name="pairing_camera_required">Uprawnienie do aparatu jest wymagane, aby zeskanować kod QR.</string>
+    <string name="pairing_skip">Pomiń</string>
+    <string name="pairing_success">Sparowano z %s</string>
+    <string name="pairing_no_devices">Brak sparowanych urządzeń</string>
+    <string name="pairing_add_mac">Sparuj z komputerem Mac</string>
+    <string name="pairing_paired_devices">Sparowane urządzenia</string>
+    <string name="pairing_remove">Usuń</string>
+    <string name="pairing_remove_confirm">Usunąć parowanie z %s?</string>
+    <string name="pairing_in_progress">Parowanie…</string>
+    <string name="pairing_in_progress_desc">Łączenie z komputerem Mac</string>
+    <string name="pairing_success_title">Sparowano!</string>
+    <string name="pairing_success_desc">Połączono z %s</string>
+    <string name="pairing_success_connected">Połączenie aktywne</string>
+    <string name="pairing_success_continue">Dalej</string>
+</resources>
