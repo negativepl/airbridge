@@ -313,6 +313,7 @@ Features we're planning to add:
 - **Receive file confirmation (macOS)** — Currently Mac auto-accepts files from paired devices. Add an accept/reject prompt matching the Android behavior
 - **Transfer history persistence** — Save transfer history across app restarts
 - **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
+- **Auto-update notifications** — Both apps will check for new versions on GitHub and notify you when an update is available, with a direct link to download
 - **F-Droid listing** — Publish on F-Droid as an alternative distribution channel
 
 Have an idea? [Open an issue](https://github.com/negativepl/airbridge/issues).
