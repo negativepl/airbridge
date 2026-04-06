@@ -48,21 +48,34 @@ struct HomeView: View {
     private func connectionCard(_ vm: HomeViewModel) -> some View {
         GroupBox {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(vm.isConnected ? Color.green : Color.gray)
-                    .frame(width: 10, height: 10)
+                if vm.isConnected {
+                    Circle().fill(Color.green).frame(width: 10, height: 10)
+                } else if vm.statusMessage.contains("Starting") || vm.statusMessage.contains("Waiting") {
+                    ProgressView().controlSize(.small)
+                } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Failed") {
+                    Circle().fill(Color.red).frame(width: 10, height: 10)
+                } else {
+                    Circle().fill(Color.orange).frame(width: 10, height: 10)
+                }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(vm.isConnected ? vm.deviceName : L10n.notConnected)
-                        .font(.headline)
+                    if vm.isConnected {
+                        Text(vm.deviceName).font(.headline)
+                    } else {
+                        Text(vm.statusMessage).font(.headline)
+                    }
                     if vm.isConnected, let ip = vm.localIP {
-                        Text(ip)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(ip).font(.caption).foregroundStyle(.secondary)
+                    } else if !vm.isConnected && vm.hasPairedDevices {
+                        Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
                 if vm.isConnected {
                     Button(L10n.disconnect) { vm.disconnect() }
+                } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Stopped") {
+                    Button(L10n.reconnect) { vm.reconnect() }
+                        .controlSize(.large)
                 }
             }
             .padding(4)

@@ -25,6 +25,8 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     @ObservationIgnored private var transferStartTime: Date?
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private weak var historyService: HistoryService?
+    @ObservationIgnored private var sendQueue: [URL] = []
+    @ObservationIgnored private var isSendingFromQueue = false
 
     func configure(connectionService: ConnectionService, historyService: HistoryService) {
         self.connectionService = connectionService
@@ -71,7 +73,23 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     // MARK: - Sending
 
     func sendFile(url: URL) {
-        guard let connectionService else { return }
+        sendQueue.append(url)
+        processQueue()
+    }
+
+    private func processQueue() {
+        guard !isSendingFromQueue, !sendQueue.isEmpty else { return }
+        isSendingFromQueue = true
+        let url = sendQueue.removeFirst()
+        sendSingleFile(url: url)
+    }
+
+    private func sendSingleFile(url: URL) {
+        guard let connectionService else {
+            isSendingFromQueue = false
+            processQueue()
+            return
+        }
 
         let filename = url.lastPathComponent
         let mime = Self.mimeType(for: url)
@@ -80,11 +98,19 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         do {
             identity = try connectionService.keyManager.getOrCreateIdentity()
         } catch {
+            isSendingFromQueue = false
+            processQueue()
             return
         }
 
         Task.detached { [weak self] in
-            guard let data = try? Data(contentsOf: url) else { return }
+            guard let data = try? Data(contentsOf: url) else {
+                await MainActor.run {
+                    self?.isSendingFromQueue = false
+                    self?.processQueue()
+                }
+                return
+            }
 
             let chunked = await self?.fileChunker.prepare(
                 filename: filename,
@@ -92,9 +118,16 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 data: data,
                 sourceId: identity.deviceId
             )
-            guard let chunked else { return }
+            guard let chunked else {
+                await MainActor.run {
+                    self?.isSendingFromQueue = false
+                    self?.processQueue()
+                }
+                return
+            }
 
             do {
+                await MainActor.run { self?.fileTransferFileName = filename }
                 try await connectionService.broadcast(chunked.startMessage)
 
                 for chunk in chunked.chunks {
@@ -118,9 +151,15 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 await MainActor.run {
                     self?.fileTransferProgress = 0
                     self?.historyService?.add(type: .file, direction: .sent, description: filename)
+                    self?.isSendingFromQueue = false
+                    self?.processQueue()
                 }
             } catch {
-                await MainActor.run { self?.fileTransferProgress = 0 }
+                await MainActor.run {
+                    self?.fileTransferProgress = 0
+                    self?.isSendingFromQueue = false
+                    self?.processQueue()
+                }
             }
         }
     }

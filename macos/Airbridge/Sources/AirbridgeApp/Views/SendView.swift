@@ -78,7 +78,10 @@ struct SendView: View {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                DispatchQueue.main.async { viewModel?.sendFile(url: url) }
+                let files = Self.resolveFiles(from: url)
+                Task { @MainActor in
+                    for file in files { viewModel?.sendFile(url: file) }
+                }
             }
         }
         return true
@@ -87,11 +90,29 @@ struct SendView: View {
     private func openFilePicker() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
         if panel.runModal() == .OK {
-            for url in panel.urls { viewModel?.sendFile(url: url) }
+            let files = panel.urls.flatMap { Self.resolveFiles(from: $0) }
+            for url in files { viewModel?.sendFile(url: url) }
         }
+    }
+
+    private static func resolveFiles(from url: URL) -> [URL] {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return [] }
+        if !isDir.boolValue { return [url] }
+        guard let enumerator = FileManager.default.enumerator(
+            at: url, includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var result: [URL] = []
+        for case let fileURL as URL in enumerator {
+            if (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
+                result.append(fileURL)
+            }
+        }
+        return result
     }
 
     private func sendClipboard() {

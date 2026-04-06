@@ -54,17 +54,27 @@ struct AirbridgeApp: App {
         }
     }
 
+    @AppStorage("onboardingCompleted") private var onboardingCompleted = false
+
     var body: some Scene {
         Window("Airbridge", id: "main") {
-            MainWindow(
-                connectionService: connectionService,
-                clipboardService: clipboardService,
-                fileTransferService: fileTransferService,
-                pairingService: pairingService,
-                historyService: historyService,
-                galleryService: galleryService,
-                smsService: smsService
-            )
+            if onboardingCompleted {
+                MainWindow(
+                    connectionService: connectionService,
+                    clipboardService: clipboardService,
+                    fileTransferService: fileTransferService,
+                    pairingService: pairingService,
+                    historyService: historyService,
+                    galleryService: galleryService,
+                    smsService: smsService
+                )
+            } else {
+                OnboardingView(
+                    pairingService: pairingService,
+                    connectionService: connectionService,
+                    onComplete: { onboardingCompleted = true }
+                )
+            }
         }
         .defaultSize(width: 1100, height: 850)
         .commands {
