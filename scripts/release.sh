@@ -29,7 +29,8 @@ fi
 # 1. Build macOS
 echo "--- Building macOS ---"
 cd "$ROOT/macos/Airbridge"
-swift build -c release 2>&1 | tail -3
+swift build -c release 2>&1 | grep "error:" && { echo "  macOS build FAILED"; exit 1; } || true
+echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
 # Copy to app bundle
@@ -81,7 +82,7 @@ NOTES="$(cat <<EOF
 - **Android**: Airbridge.apk
 
 ### Changes since last release
-$(git log --oneline $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "HEAD~10")..HEAD --no-decorate)
+$(git log --oneline v1.0.0..HEAD --no-decorate 2>/dev/null || git log --oneline -10 --no-decorate)
 EOF
 )"
 

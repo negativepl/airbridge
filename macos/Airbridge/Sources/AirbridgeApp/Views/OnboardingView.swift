@@ -125,7 +125,7 @@ struct OnboardingView: View {
             Text(isPL ? "Sparuj z telefonem" : "Pair with your phone")
                 .font(.title2).fontWeight(.bold)
             Text(isPL
-                ? "Oba urządzenia muszą być w tej samej sieci Wi-Fi.\nKliknij „Sparuj urządzenie" i zeskanuj kod QR telefonem."
+                ? "Oba urządzenia muszą być w tej samej sieci Wi-Fi.\nKliknij \"Sparuj urządzenie\" i zeskanuj kod QR telefonem."
                 : "Both devices must be on the same Wi-Fi network.\nClick \"Pair Device\" and scan the QR code with your phone.")
                 .font(.body).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
