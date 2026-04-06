@@ -11,6 +11,9 @@ struct SettingsView: View {
     @AppStorage("playSound") private var playSound = true
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/Airbridge"
     @State private var showPairing = false
+    @State private var isRecordingShortcut = false
+    @State private var shortcutDisplay: String = GlobalHotkeyService.currentShortcutDisplay()
+    @State private var shortcutMonitor: Any?
 
     var body: some View {
         ScrollView {
@@ -80,6 +83,53 @@ struct SettingsView: View {
 
                         Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
                             .font(.system(size: 14))
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .glassEffect(in: .rect(cornerRadius: 16))
+
+                    // Quick Drop shortcut
+                    VStack(alignment: .leading, spacing: 14) {
+                        Label(L10n.quickDropShortcut, systemImage: "keyboard")
+                            .font(.system(size: 15, weight: .semibold))
+
+                        HStack {
+                            Text(L10n.quickDropShortcut)
+                                .font(.system(size: 14))
+                            Spacer()
+
+                            if isRecordingShortcut {
+                                Text(L10n.pressNewShortcut)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.orange)
+                                    .onAppear { startRecordingShortcut() }
+                            } else {
+                                Text(shortcutDisplay)
+                                    .font(.system(size: 14, design: .monospaced))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+
+                            Button(isRecordingShortcut
+                                ? (L10n.isPL ? "Anuluj" : "Cancel")
+                                : (L10n.isPL ? "Zmień" : "Change")
+                            ) {
+                                isRecordingShortcut.toggle()
+                                if !isRecordingShortcut { stopRecordingShortcut() }
+                            }
+                            .controlSize(.large)
+
+                            if UserDefaults.standard.integer(forKey: "dropZoneShortcutKeyCode") != 0 {
+                                Button(L10n.resetToDefault) {
+                                    UserDefaults.standard.removeObject(forKey: "dropZoneShortcutKeyCode")
+                                    UserDefaults.standard.removeObject(forKey: "dropZoneShortcutModifiers")
+                                    shortcutDisplay = GlobalHotkeyService.currentShortcutDisplay()
+                                }
+                                .controlSize(.large)
+                            }
+                        }
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -171,5 +221,27 @@ struct SettingsView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url { downloadFolder = url.path }
+    }
+
+    private func startRecordingShortcut() {
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.contains(.command) || modifiers.contains(.control) else {
+                return event // Require at least Cmd or Ctrl
+            }
+            UserDefaults.standard.set(Int(event.keyCode), forKey: "dropZoneShortcutKeyCode")
+            UserDefaults.standard.set(Int(modifiers.rawValue), forKey: "dropZoneShortcutModifiers")
+            shortcutDisplay = GlobalHotkeyService.currentShortcutDisplay()
+            isRecordingShortcut = false
+            stopRecordingShortcut()
+            return nil
+        }
+    }
+
+    private func stopRecordingShortcut() {
+        if let monitor = shortcutMonitor {
+            NSEvent.removeMonitor(monitor)
+            shortcutMonitor = nil
+        }
     }
 }

@@ -69,4 +69,55 @@ final class GlobalHotkeyService {
         let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         return event.keyCode == targetKeyCode && eventModifiers == targetModifiers
     }
+
+    static func currentShortcutDisplay() -> String {
+        let defaults = UserDefaults.standard
+        let keyCode = UInt16(defaults.integer(forKey: "dropZoneShortcutKeyCode"))
+        let modifierRaw = defaults.integer(forKey: "dropZoneShortcutModifiers")
+
+        if keyCode == 0 && modifierRaw == 0 {
+            return "⌘⇧D"
+        }
+
+        let modifiers = NSEvent.ModifierFlags(rawValue: UInt(modifierRaw))
+        var parts: [String] = []
+        if modifiers.contains(.control) { parts.append("⌃") }
+        if modifiers.contains(.option) { parts.append("⌥") }
+        if modifiers.contains(.shift) { parts.append("⇧") }
+        if modifiers.contains(.command) { parts.append("⌘") }
+
+        let keyString = keyCodeToString(keyCode)
+        parts.append(keyString)
+        return parts.joined()
+    }
+
+    private static func keyCodeToString(_ keyCode: UInt16) -> String {
+        let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        guard let layoutDataRef = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+            return String(format: "0x%02X", keyCode)
+        }
+        let layoutData = unsafeBitCast(layoutDataRef, to: CFData.self) as Data
+        var deadKeyState: UInt32 = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        var length = 0
+
+        layoutData.withUnsafeBytes { rawBuffer in
+            guard let ptr = rawBuffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return }
+            UCKeyTranslate(
+                ptr,
+                keyCode,
+                UInt16(kUCKeyActionDisplay),
+                0,
+                UInt32(LMGetKbdType()),
+                UInt32(kUCKeyTranslateNoDeadKeysBit),
+                &deadKeyState,
+                chars.count,
+                &length,
+                &chars
+            )
+        }
+
+        guard length > 0 else { return String(format: "0x%02X", keyCode) }
+        return String(utf16CodeUnits: chars, count: length).uppercased()
+    }
 }
