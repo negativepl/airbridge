@@ -290,6 +290,35 @@ airbridge/
 
 ---
 
+## Design Philosophy
+
+Airbridge is built to feel native on both platforms — not like a cross-platform wrapper.
+
+**macOS** — The app is written in SwiftUI targeting **Xcode 26 and macOS Tahoe**. It uses **Liquid Glass** effects throughout the UI (glass cards, glass buttons, native sidebar via `TabView(.sidebarAdaptable)`). The file transfer notification uses a custom **floating island popup** that slides down from the notch area, inspired by Dynamic Island — showing transfer progress, speed, and ETA in real time.
+
+**Android** — The app is written in **Jetpack Compose with Material 3** (Material Expressive). It uses native notification channels, `Notification.ProgressStyle` (API 36) for transfer progress, and the Android text selection menu ("Send to Mac") for clipboard sharing. The onboarding wizard follows Material 3 patterns with animated page transitions and per-permission explanations.
+
+Both apps share the same WebSocket + HTTP protocol but have completely independent, platform-native implementations. No shared runtime, no React Native, no Flutter — just Swift and Kotlin.
+
+---
+
+## Roadmap
+
+Features we're planning to add:
+
+- **Cellular file transfer** — Send files over mobile data when devices aren't on the same Wi-Fi (relay server or direct connection via WebRTC)
+- **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS. Prevent a paired device from accessing features you don't want to expose
+- **Quick Share-style window (macOS)** — A compact sharing window (similar to Apple's AirDrop or Google's Quick Share) that lets you pick a target device and drag files to send, without opening the full app
+- **Device picker on Send screen** — When multiple devices are paired, show a device selector on the Send tab instead of sending to all
+- **Receive file confirmation (macOS)** — Currently Mac auto-accepts files from paired devices. Add an accept/reject prompt matching the Android behavior
+- **Transfer history persistence** — Save transfer history across app restarts
+- **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
+- **F-Droid listing** — Publish on F-Droid as an alternative distribution channel
+
+Have an idea? [Open an issue](https://github.com/negativepl/airbridge/issues).
+
+---
+
 ## FAQ
 
 **Does it work without internet?**
