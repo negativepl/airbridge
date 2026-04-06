@@ -33,24 +33,62 @@ swift build -c release 2>&1 | grep "error:" && { echo "  macOS build FAILED"; ex
 echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
-# Copy to app bundle
+# Build app bundle from scratch
 APP_BUNDLE="$HOME/Applications/Airbridge.app"
-if [ -d "$APP_BUNDLE" ]; then
-    cp "$MACOS_BIN" "$APP_BUNDLE/Contents/MacOS/AirbridgeApp"
-    # Update Info.plist version
-    PLIST="$APP_BUNDLE/Contents/Info.plist"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$PLIST"
-fi
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
+cp "$MACOS_BIN" "$APP_BUNDLE/Contents/MacOS/AirbridgeApp"
+cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 
-# Create DMG with Applications symlink
+# Copy icon
+ICNS="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources/AppIcon.icns"
+if [ -f "$ICNS" ]; then
+    cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+fi
+echo "  App bundle: $APP_BUNDLE"
+
+# Create DMG with Applications symlink and compact window
 DMG_PATH="$ROOT/Airbridge.dmg"
 DMG_STAGE="$ROOT/.dmg-stage"
 rm -rf "$DMG_STAGE" "$DMG_PATH"
 mkdir -p "$DMG_STAGE"
 cp -R "$APP_BUNDLE" "$DMG_STAGE/Airbridge.app"
 ln -s /Applications "$DMG_STAGE/Applications"
-hdiutil create -volname "Airbridge" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_PATH" > /dev/null 2>&1
+
+# Set Finder window size and icon layout via .DS_Store
+# Create a temporary read-write DMG first to set view options
+DMG_RW="$ROOT/.dmg-rw.dmg"
+rm -f "$DMG_RW"
+hdiutil create -volname "Airbridge" -srcfolder "$DMG_STAGE" -ov -format UDRW "$DMG_RW" > /dev/null 2>&1
+MOUNT_DIR=$(hdiutil attach "$DMG_RW" -readwrite -noverify -noautoopen 2>/dev/null | grep "/Volumes/Airbridge" | tail -1 | awk '{print $NF}')
+
+if [ -n "$MOUNT_DIR" ]; then
+    # Use AppleScript to set Finder view options
+    osascript <<APPLESCRIPT
+tell application "Finder"
+    tell disk "Airbridge"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set bounds of container window to {200, 200, 660, 460}
+        set theViewOptions to icon view options of container window
+        set arrangement of theViewOptions to not arranged
+        set icon size of theViewOptions to 96
+        set position of item "Airbridge.app" of container window to {120, 120}
+        set position of item "Applications" of container window to {340, 120}
+        close
+    end tell
+end tell
+APPLESCRIPT
+    sync
+    hdiutil detach "$MOUNT_DIR" > /dev/null 2>&1
+fi
+
+hdiutil convert "$DMG_RW" -format UDZO -o "$DMG_PATH" > /dev/null 2>&1
+rm -f "$DMG_RW"
 rm -rf "$DMG_STAGE"
 echo "  DMG: $DMG_PATH"
 
