@@ -47,6 +47,9 @@ ICNS="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources/AppIcon.icns"
 if [ -f "$ICNS" ]; then
     cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
+
+# Ad-hoc code sign so Gatekeeper doesn't show prohibition icon
+codesign --force --deep --sign - "$APP_BUNDLE"
 echo "  App bundle: $APP_BUNDLE"
 
 # Create DMG with Applications symlink and compact window

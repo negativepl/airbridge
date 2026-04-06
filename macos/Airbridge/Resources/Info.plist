@@ -5,7 +5,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>Airbridge</string>
 	<key>CFBundleExecutable</key>
-	<string>Airbridge</string>
+	<string>AirbridgeApp</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
