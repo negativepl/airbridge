@@ -42,6 +42,15 @@ cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 
+# Copy SPM resource bundle (required by Bundle.module)
+RES_BUNDLE="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/Airbridge_AirbridgeApp.bundle"
+if [ -d "$RES_BUNDLE" ]; then
+    cp -R "$RES_BUNDLE" "$APP_BUNDLE/Airbridge_AirbridgeApp.bundle"
+else
+    echo "  WARNING: Resource bundle not found at $RES_BUNDLE"
+    exit 1
+fi
+
 # Copy icon
 ICNS="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources/AppIcon.icns"
 if [ -f "$ICNS" ]; then
