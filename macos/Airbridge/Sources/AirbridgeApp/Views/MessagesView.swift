@@ -11,32 +11,26 @@ struct MessagesView: View {
     private let conversationsPageSize: Int = 30
 
     var body: some View {
-        HStack(spacing: 0) {
-            conversationList
-                .frame(width: 340)
-
-            Divider()
-
-            if let convo = selectedConversation {
-                messageDetail(convo)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !connectionService.isConnected {
-                VStack(spacing: 12) {
-                    Image(systemName: "message")
-                        .font(.system(size: 40)).foregroundStyle(.tertiary)
-                    Text(L10n.isPL ? "Wiadomości" : "Messages")
-                        .font(.system(size: 20, weight: .semibold)).foregroundStyle(.secondary)
-                    Text(L10n.isPL
-                        ? "Połącz się z telefonem, aby przeglądać wiadomości."
-                        : "Connect to your phone to browse messages.")
-                        .font(.system(size: 14)).foregroundStyle(.tertiary).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Group {
+            if !connectionService.isConnected {
+                notConnectedView
             } else {
-                Text(L10n.isPL ? "Wybierz konwersację" : "Select a conversation")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 0) {
+                    conversationList
+                        .frame(width: 340)
+
+                    Divider()
+
+                    if let convo = selectedConversation {
+                        messageDetail(convo)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        Text(L10n.isPL ? "Wybierz konwersację" : "Select a conversation")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
             }
         }
         .onAppear {
@@ -49,6 +43,24 @@ struct MessagesView: View {
                 smsService.loadConversations()
             }
         }
+    }
+
+    private var notConnectedView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "message")
+                .font(.system(size: 40))
+                .foregroundStyle(.tertiary)
+            Text(L10n.isPL ? "Wiadomości" : "Messages")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(L10n.isPL
+                ? "Połącz się z telefonem, aby przeglądać wiadomości."
+                : "Connect to your phone to browse messages.")
+                .font(.system(size: 14))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var conversationList: some View {
