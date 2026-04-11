@@ -353,7 +353,7 @@ import SwiftUI
 /// Provides:
 /// - `GlassEffectContainer` — one shared blur layer so all inner `.glassEffect`
 ///   elements merge visually (this is the cornerstone of Liquid Glass use)
-/// - `ScrollView` with `.scrollEdgeEffect(.soft)` at top and bottom so content
+/// - `ScrollView` with `.scrollEdgeEffectStyle(.soft)` at top and bottom so content
 ///   softly fades at scroll edges (Apple standard in Settings.app)
 /// - 24pt padding around the content
 ///
@@ -373,8 +373,8 @@ struct ScreenContainer<Content: View>: View {
                     .padding(24)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .scrollEdgeEffect(.soft, for: .top)
-                .scrollEdgeEffect(.soft, for: .bottom)
+                .scrollEdgeEffectStyle(.soft, for: .top)
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
             } else {
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -387,7 +387,7 @@ struct ScreenContainer<Content: View>: View {
 - [ ] **Step 2: Build**
 
 Run: `cd macos/Airbridge && swift build 2>&1 | grep -E "error:|warning:" | head`
-Expected: no `error:` lines. If `GlassEffectContainer` or `scrollEdgeEffect` gives an error about availability, verify `Package.swift` shows `platforms: [.macOS("26.0")]`.
+Expected: no `error:` lines. If `GlassEffectContainer` or `scrollEdgeEffectStyle` gives an error about availability, verify `Package.swift` shows `platforms: [.macOS("26.0")]`.
 
 - [ ] **Step 3: Commit**
 
