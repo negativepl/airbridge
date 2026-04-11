@@ -84,29 +84,17 @@ struct HistoryView: View {
     }
 
     private var paginationLoader: some View {
-        HStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.small)
-            Text(L10n.isPL ? "Wczytuję więcej…" : "Loading more…")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("\(displayedCount) / \(historyService.records.count)")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .contentTransition(.numericText())
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12, style: .continuous))
-        .onAppear {
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 250_000_000)
-                withAnimation(.airbridgeQuick) {
-                    displayedCount = min(displayedCount + pageSize, historyService.records.count)
+        ProgressView()
+            .controlSize(.regular)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .onAppear {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    withAnimation(.airbridgeQuick) {
+                        displayedCount = min(displayedCount + pageSize, historyService.records.count)
+                    }
                 }
             }
-        }
     }
 }

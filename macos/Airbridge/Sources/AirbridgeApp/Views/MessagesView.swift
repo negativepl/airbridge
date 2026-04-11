@@ -7,6 +7,8 @@ struct MessagesView: View {
 
     @State private var selectedConversation: SmsConversationMeta?
     @State private var messageText: String = ""
+    @State private var displayedConversations: Int = 30
+    private let conversationsPageSize: Int = 30
 
     var body: some View {
         HStack(spacing: 0) {
@@ -57,49 +59,76 @@ struct MessagesView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        ForEach(smsService.conversations) { convo in
-                            Button {
-                                selectedConversation = convo
-                                smsService.loadMessages(threadId: convo.threadId)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.secondary)
+                        ForEach(smsService.conversations.prefix(displayedConversations)) { convo in
+                            conversationRow(convo)
+                        }
 
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        HStack {
-                                            Text(convo.displayName)
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .lineLimit(1)
-                                            Spacer()
-                                            Text(formatDate(convo.date))
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(.secondary)
+                        if displayedConversations < smsService.conversations.count {
+                            ProgressView()
+                                .controlSize(.regular)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 24)
+                                .onAppear {
+                                    Task { @MainActor in
+                                        try? await Task.sleep(nanoseconds: 250_000_000)
+                                        withAnimation(.airbridgeQuick) {
+                                            displayedConversations = min(
+                                                displayedConversations + conversationsPageSize,
+                                                smsService.conversations.count
+                                            )
                                         }
-                                        Text(convo.snippet)
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
                                     }
                                 }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(.plain)
-                            .glassEffect(
-                                selectedConversation?.id == convo.id
-                                    ? .regular.tint(.accentColor).interactive()
-                                    : .regular.interactive(),
-                                in: .rect(cornerRadius: 12, style: .continuous)
-                            )
                         }
                     }
                     .padding(10)
                 }
+                .onChange(of: smsService.conversations.count) { _, newCount in
+                    if displayedConversations > newCount {
+                        displayedConversations = min(conversationsPageSize, newCount)
+                    }
+                }
             }
         }
+    }
+
+    private func conversationRow(_ convo: SmsConversationMeta) -> some View {
+        Button {
+            selectedConversation = convo
+            smsService.loadMessages(threadId: convo.threadId)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(convo.displayName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Text(formatDate(convo.date))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(convo.snippet)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(
+            selectedConversation?.id == convo.id
+                ? .regular.tint(.accentColor).interactive()
+                : .regular.interactive(),
+            in: .rect(cornerRadius: 12, style: .continuous)
+        )
     }
 
     private func messageDetail(_ convo: SmsConversationMeta) -> some View {
