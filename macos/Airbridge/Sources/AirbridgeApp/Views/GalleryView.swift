@@ -110,8 +110,6 @@ private struct ThumbnailCell: View {
 
     var body: some View {
         ZStack {
-            Color.gray.opacity(0.08)
-
             if let image {
                 Image(nsImage: image)
                     .resizable()
@@ -122,7 +120,8 @@ private struct ThumbnailCell: View {
             }
         }
         .frame(height: 160)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
         .onAppear { loadImage() }
