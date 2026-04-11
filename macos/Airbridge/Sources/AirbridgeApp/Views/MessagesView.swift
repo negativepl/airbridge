@@ -103,31 +103,31 @@ struct MessagesView: View {
     }
 
     private func messageDetail(_ convo: SmsConversationMeta) -> some View {
-        Group {
-            if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    ScrollViewReader { proxy in
-                        LazyVStack(spacing: 14) {
-                            ForEach(smsService.currentMessages.reversed()) { msg in
-                                messageBubble(msg)
-                                    .id(msg.id)
-                            }
-                        }
-                        .padding(16)
-                        .onChange(of: smsService.currentMessages.count) { _, _ in
-                            if let last = smsService.currentMessages.reversed().last {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+        ScrollView {
+            ScrollViewReader { proxy in
+                LazyVStack(spacing: 14) {
+                    if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 300)
+                    } else {
+                        ForEach(smsService.currentMessages.reversed()) { msg in
+                            messageBubble(msg)
+                                .id(msg.id)
                         }
                     }
                 }
-                .scrollEdgeEffectStyle(.soft, for: .top)
-                .scrollEdgeEffectStyle(.soft, for: .bottom)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+                .onChange(of: smsService.currentMessages.count) { _, _ in
+                    if let last = smsService.currentMessages.reversed().last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
             }
         }
+        .scrollContentBackground(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .safeAreaInset(edge: .top, spacing: 0) {
             messageDetailHeader(convo)
         }
@@ -153,7 +153,7 @@ struct MessagesView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial)
+        .background(.thickMaterial)
     }
 
     @ViewBuilder
@@ -173,7 +173,7 @@ struct MessagesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial)
+            .background(.thickMaterial)
         } else {
             HStack(spacing: 12) {
                 TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
@@ -199,7 +199,7 @@ struct MessagesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
-            .background(.regularMaterial)
+            .background(.thickMaterial)
         }
     }
 
