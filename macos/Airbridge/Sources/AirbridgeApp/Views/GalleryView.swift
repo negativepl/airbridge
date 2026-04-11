@@ -18,7 +18,6 @@ struct GalleryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea(.container, edges: .leading)
         .onAppear {
             if connectionService.isConnected && galleryService.photos.isEmpty {
                 galleryService.loadPhotos()
@@ -66,27 +65,33 @@ struct GalleryView: View {
     }
 
     private var groupedGallery: some View {
-        ScrollView(.horizontal, showsIndicators: true) {
-            LazyHStack(spacing: 10) {
-                ForEach(galleryService.photos) { photo in
-                    ThumbnailCell(photo: photo, galleryService: galleryService) {
-                        selectedPhoto = photo
-                    }
-                    .onAppear {
-                        if photo.id == galleryService.photos.last?.id {
-                            galleryService.loadNextPage()
+        GeometryReader { geo in
+            let rowHeight = max(200, geo.size.height - 56)
+            ScrollView(.horizontal, showsIndicators: true) {
+                LazyHStack(spacing: 12) {
+                    ForEach(galleryService.photos) { photo in
+                        ThumbnailCell(
+                            photo: photo,
+                            galleryService: galleryService,
+                            height: rowHeight
+                        ) {
+                            selectedPhoto = photo
+                        }
+                        .onAppear {
+                            if photo.id == galleryService.photos.last?.id {
+                                galleryService.loadNextPage()
+                            }
                         }
                     }
-                }
 
-                if galleryService.isLoading {
-                    ProgressView()
-                        .frame(width: 80)
-                        .padding(.horizontal, 20)
+                    if galleryService.isLoading {
+                        ProgressView()
+                            .frame(width: 80, height: rowHeight)
+                    }
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 28)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 28)
         }
         .toolbar {
             ToolbarItem {
@@ -106,11 +111,10 @@ struct GalleryView: View {
 private struct ThumbnailCell: View {
     let photo: GalleryPhotoMeta
     let galleryService: GalleryService
+    let height: CGFloat
     let onTap: () -> Void
 
     @State private var image: NSImage?
-
-    private let rowHeight: CGFloat = 220
 
     private var aspect: CGFloat {
         guard photo.height > 0 else { return 1 }
@@ -118,7 +122,7 @@ private struct ThumbnailCell: View {
     }
 
     private var width: CGFloat {
-        max(140, min(420, rowHeight * aspect))
+        max(180, min(720, height * aspect))
     }
 
     var body: some View {
@@ -134,8 +138,8 @@ private struct ThumbnailCell: View {
                     .controlSize(.small)
             }
         }
-        .frame(width: width, height: rowHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
         .onAppear { loadImage() }
