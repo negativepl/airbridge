@@ -3,21 +3,15 @@ import AppKit
 
 struct AboutView: View {
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Spacer(minLength: 32)
-
+        GlassSection(padding: 28) {
+            VStack(spacing: 16) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
                     .frame(width: 120, height: 120)
 
-                Spacer().frame(height: 16)
-
                 Text("Airbridge")
                     .font(.system(size: 28, weight: .bold, design: .serif))
                     .tracking(1)
-
-                Spacer().frame(height: 12)
 
                 Text(L10n.isPL
                     ? "Połącz telefon z komputerem Mac.\nSynchronizuj schowek, przesyłaj pliki — wszystko lokalnie, bez chmury."
@@ -25,9 +19,7 @@ struct AboutView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-
-                Spacer().frame(height: 28)
+                    .padding(.horizontal, 8)
 
                 // Credits
                 VStack(spacing: 16) {
@@ -77,9 +69,6 @@ struct AboutView: View {
                 .padding(16)
                 .frame(maxWidth: 440)
                 .glassEffect(in: .rect(cornerRadius: 16))
-                .padding(.horizontal, 24)
-
-                Spacer().frame(height: 16)
 
                 // Links
                 GlassEffectContainer(spacing: 8) {
@@ -100,21 +89,14 @@ struct AboutView: View {
                 }
                 .frame(maxWidth: 440)
                 .glassEffect(in: .rect(cornerRadius: 16))
-                .padding(.horizontal, 24)
-
-                Spacer().frame(height: 20)
 
                 Text(L10n.isPL ? "Airbridge jest open source" : "Airbridge is open source")
                     .font(.caption).foregroundStyle(.secondary)
                 Text(L10n.isPL ? "Licencja MIT" : "MIT License")
                     .font(.caption).foregroundStyle(.tertiary)
 
-                Spacer().frame(height: 8)
-
                 Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0")")
                     .font(.caption).foregroundStyle(.tertiary)
-
-                Spacer(minLength: 32)
             }
             .frame(maxWidth: .infinity)
         }
