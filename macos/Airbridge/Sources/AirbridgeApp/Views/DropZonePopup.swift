@@ -79,21 +79,12 @@ final class DropZonePopup {
         window.makeKey()
         resetAutoHideTimer()
 
-        // Slide in
-        let duration = 0.35
-        let startTime = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { timer in
-            let elapsed = CACurrentMediaTime() - startTime
-            let t = min(elapsed / duration, 1.0)
-            let eased = 1.0 - pow(1.0 - t, 3.0)
-            let currentY = startY + (y - startY) * eased
-            window.setFrameOrigin(NSPoint(x: x, y: currentY))
-            if t >= 1.0 {
-                timer.invalidate()
-                window.setFrameOrigin(NSPoint(x: x, y: y))
-            }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.allowsImplicitAnimation = true
+            window.animator().setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         }
-        RunLoop.main.add(timer, forMode: .common)
 
         self.panel = window
 
@@ -120,24 +111,21 @@ final class DropZonePopup {
 
         let frame = panel.frame
         let targetY = frame.origin.y + frame.height + 10
-        let startY = frame.origin.y
-        let duration = 0.3
-        let startTime = CACurrentMediaTime()
 
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
-            let elapsed = CACurrentMediaTime() - startTime
-            let t = min(elapsed / duration, 1.0)
-            let eased = t * t * t
-            let currentY = startY + (targetY - startY) * eased
-            panel.setFrameOrigin(NSPoint(x: frame.origin.x, y: currentY))
-            if t >= 1.0 {
-                timer.invalidate()
-                panel.orderOut(nil)
-                self?.panel = nil
-                self?.isVisible = false
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.30
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            ctx.allowsImplicitAnimation = true
+            panel.animator().setFrameOrigin(NSPoint(x: frame.origin.x, y: targetY))
+        }, completionHandler: { [weak self] in
+            if let monitor = self?.escapeMonitor {
+                NSEvent.removeMonitor(monitor)
+                self?.escapeMonitor = nil
             }
-        }
-        RunLoop.main.add(timer, forMode: .common)
+            panel.orderOut(nil)
+            self?.panel = nil
+            self?.isVisible = false
+        })
     }
 
     private func computeLayout(screen: NSScreen) -> (x: Double, y: Double, width: Double, height: Double) {
