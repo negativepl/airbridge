@@ -25,7 +25,7 @@ struct HistoryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            LazyVStack(spacing: 6) {
+            LazyVStack(spacing: 10) {
                 ForEach(historyService.records) { record in
                     GlassRow {
                         HStack(spacing: 12) {
