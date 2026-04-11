@@ -196,8 +196,9 @@ struct MessagesView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial)
+            .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 14)
         } else {
             HStack(spacing: 12) {
                 TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
@@ -221,9 +222,8 @@ struct MessagesView: View {
                 .disabled(messageText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.bottom, 14)
             .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial)
         }
     }
 
