@@ -7,12 +7,14 @@ import Protocol
 final class GalleryService: MessageHandler {
 
     private(set) var photos: [GalleryPhotoMeta] = []
-    private(set) var thumbnailImages: [String: NSImage] = [:]  // photoId -> cached NSImage
+    private(set) var thumbnailImages: [String: NSImage] = [:]  // photoId -> cached small thumb
+    private(set) var previewImages: [String: NSImage] = [:]    // photoId -> cached larger preview
     private(set) var totalCount: Int = 0
     private(set) var currentPage: Int = 0
     private(set) var isLoading: Bool = false
 
     private var requestedThumbnails: Set<String> = []
+    private var requestedPreviews: Set<String> = []
     private let pageSize = 50
     private weak var connectionService: ConnectionService?
 
@@ -39,7 +41,9 @@ final class GalleryService: MessageHandler {
     func clearAndReload() {
         photos = []
         thumbnailImages = [:]
+        previewImages = [:]
         requestedThumbnails = []
+        requestedPreviews = []
         isLoading = false
         currentPage = 0
         totalCount = 0
@@ -59,6 +63,17 @@ final class GalleryService: MessageHandler {
               let connectionService else { return }
         requestedThumbnails.insert(photoId)
         let message = Message.galleryThumbnailRequest(photoId: photoId)
+        Task {
+            try? await connectionService.broadcast(message)
+        }
+    }
+
+    func requestPreview(photoId: String, maxSize: Int = 1920) {
+        guard previewImages[photoId] == nil,
+              !requestedPreviews.contains(photoId),
+              let connectionService else { return }
+        requestedPreviews.insert(photoId)
+        let message = Message.galleryPreviewRequest(photoId: photoId, maxSize: maxSize)
         Task {
             try? await connectionService.broadcast(message)
         }
@@ -95,6 +110,13 @@ final class GalleryService: MessageHandler {
                let image = NSImage(data: imageData) {
                 thumbnailImages[photoId] = image
             }
+
+        case .galleryPreviewResponse(let photoId, let data):
+            if let imageData = Data(base64Encoded: data),
+               let image = NSImage(data: imageData) {
+                previewImages[photoId] = image
+            }
+            requestedPreviews.remove(photoId)
 
         default:
             break

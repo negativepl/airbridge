@@ -622,6 +622,15 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            is Message.GalleryPreviewRequest -> {
+                serviceScope.launch {
+                    val data = galleryProvider.getPreview(message.photoId, message.maxSize)
+                    if (data != null) {
+                        val response = Message.GalleryPreviewResponse(message.photoId, data)
+                        webSocketClient.send(response)
+                    }
+                }
+            }
             is Message.GalleryDownloadRequest -> {
                 serviceScope.launch {
                     val uri = galleryProvider.getPhotoUri(message.photoId)

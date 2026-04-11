@@ -187,11 +187,16 @@ struct PhotoDetailView: View {
 
     // MARK: - Photo with zoom / pan / rotation
 
+    private var displayedImage: NSImage? {
+        galleryService.previewImages[photo.id] ?? galleryService.thumbnailImages[photo.id]
+    }
+
     private var photoLayer: some View {
         Group {
-            if let nsImage = galleryService.thumbnailImages[photo.id] {
+            if let nsImage = displayedImage {
                 Image(nsImage: nsImage)
                     .resizable()
+                    .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
                     .rotationEffect(rotation)
                     .scaleEffect(scale)
@@ -208,6 +213,9 @@ struct PhotoDetailView: View {
         }
         .padding(.horizontal, 40)
         .padding(.vertical, 80)
+        .onAppear {
+            galleryService.requestPreview(photoId: photo.id, maxSize: 1920)
+        }
     }
 
     private var zoomGesture: some Gesture {

@@ -85,7 +85,14 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
         return Pair(photos, totalCount)
     }
 
-    fun getThumbnail(photoId: String): String? {
+    fun getThumbnail(photoId: String): String? = decodeScaled(photoId, targetSize = 400, quality = 75)
+
+    fun getPreview(photoId: String, maxSize: Int): String? {
+        val clamped = maxSize.coerceIn(800, 3200)
+        return decodeScaled(photoId, targetSize = clamped, quality = 88)
+    }
+
+    private fun decodeScaled(photoId: String, targetSize: Int, quality: Int): String? {
         val id = photoId.toLongOrNull() ?: return null
         val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
@@ -96,8 +103,6 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
             BitmapFactory.decodeStream(tempStream, null, options)
             tempStream.close()
 
-            // Calculate sample size for ~400px target (good enough for grid thumbnails)
-            val targetSize = 400
             val width = options.outWidth
             val height = options.outHeight
             var sampleSize = 1
@@ -126,12 +131,12 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
             }
 
             val out = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
             scaledBitmap.recycle()
 
             Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
         } catch (e: Exception) {
-            Log.e("GalleryProvider", "Thumbnail failed for $photoId", e)
+            Log.e("GalleryProvider", "decodeScaled($targetSize) failed for $photoId", e)
             null
         }
     }

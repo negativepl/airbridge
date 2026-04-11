@@ -39,6 +39,8 @@ public enum Message: Equatable, Sendable {
     case galleryResponse(photos: [GalleryPhotoMeta], totalCount: Int, page: Int)
     case galleryThumbnailRequest(photoId: String)
     case galleryThumbnailResponse(photoId: String, data: String)
+    case galleryPreviewRequest(photoId: String, maxSize: Int)
+    case galleryPreviewResponse(photoId: String, data: String)
     case galleryDownloadRequest(photoId: String)
     case smsConversationsRequest(page: Int, pageSize: Int)
     case smsConversationsResponse(conversations: [SmsConversationMeta], totalCount: Int, page: Int)
@@ -157,6 +159,8 @@ extension Message: Codable {
         case galleryResponse    = "gallery_response"
         case galleryThumbnailRequest  = "gallery_thumbnail_request"
         case galleryThumbnailResponse = "gallery_thumbnail_response"
+        case galleryPreviewRequest    = "gallery_preview_request"
+        case galleryPreviewResponse   = "gallery_preview_response"
         case galleryDownloadRequest   = "gallery_download_request"
         case smsConversationsRequest  = "sms_conversations_request"
         case smsConversationsResponse = "sms_conversations_response"
@@ -193,6 +197,7 @@ extension Message: Codable {
         case totalCount         = "total_count"
         case photos
         case photoId            = "photo_id"
+        case maxSize            = "max_size"
         case conversations
         case messages
         case threadId           = "thread_id"
@@ -292,6 +297,16 @@ extension Message: Codable {
 
         case .galleryThumbnailResponse(let photoId, let data):
             try container.encode(TypeKey.galleryThumbnailResponse.rawValue, forKey: .type)
+            try container.encode(photoId, forKey: .photoId)
+            try container.encode(data, forKey: .data)
+
+        case .galleryPreviewRequest(let photoId, let maxSize):
+            try container.encode(TypeKey.galleryPreviewRequest.rawValue, forKey: .type)
+            try container.encode(photoId, forKey: .photoId)
+            try container.encode(maxSize, forKey: .maxSize)
+
+        case .galleryPreviewResponse(let photoId, let data):
+            try container.encode(TypeKey.galleryPreviewResponse.rawValue, forKey: .type)
             try container.encode(photoId, forKey: .photoId)
             try container.encode(data, forKey: .data)
 
@@ -454,6 +469,16 @@ extension Message: Codable {
             let photoId = try container.decode(String.self, forKey: .photoId)
             let data = try container.decode(String.self, forKey: .data)
             self = .galleryThumbnailResponse(photoId: photoId, data: data)
+
+        case .galleryPreviewRequest:
+            let photoId = try container.decode(String.self, forKey: .photoId)
+            let maxSize = try container.decode(Int.self, forKey: .maxSize)
+            self = .galleryPreviewRequest(photoId: photoId, maxSize: maxSize)
+
+        case .galleryPreviewResponse:
+            let photoId = try container.decode(String.self, forKey: .photoId)
+            let data = try container.decode(String.self, forKey: .data)
+            self = .galleryPreviewResponse(photoId: photoId, data: data)
 
         case .galleryDownloadRequest:
             let photoId = try container.decode(String.self, forKey: .photoId)

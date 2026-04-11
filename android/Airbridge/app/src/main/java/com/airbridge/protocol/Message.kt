@@ -276,6 +276,28 @@ sealed class Message {
         }.toString()
     }
 
+    data class GalleryPreviewRequest(
+        val photoId: String,
+        val maxSize: Int
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "gallery_preview_request")
+            put("photo_id", photoId)
+            put("max_size", maxSize)
+        }.toString()
+    }
+
+    data class GalleryPreviewResponse(
+        val photoId: String,
+        val data: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "gallery_preview_response")
+            put("photo_id", photoId)
+            put("data", data)
+        }.toString()
+    }
+
     data class GalleryDownloadRequest(
         val photoId: String
     ) : Message() {
@@ -475,6 +497,14 @@ sealed class Message {
                     photoId = obj.getString("photo_id")
                 )
                 "gallery_thumbnail_response" -> GalleryThumbnailResponse(
+                    photoId = obj.getString("photo_id"),
+                    data = obj.getString("data")
+                )
+                "gallery_preview_request" -> GalleryPreviewRequest(
+                    photoId = obj.getString("photo_id"),
+                    maxSize = obj.optInt("max_size", 1920)
+                )
+                "gallery_preview_response" -> GalleryPreviewResponse(
                     photoId = obj.getString("photo_id"),
                     data = obj.getString("data")
                 )
