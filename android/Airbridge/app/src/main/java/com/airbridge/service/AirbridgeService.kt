@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 
 data class FileTransferState(
@@ -122,6 +123,7 @@ class AirbridgeService : Service() {
     private lateinit var nsdDiscovery: NsdDiscovery
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val httpFileUploader = HttpFileUploader()
+    private val httpFileDownloader = HttpFileDownloader()
     private val httpFileServer = HttpFileServer()
     private val activeTransfers = mutableMapOf<String, FileTransferState>()
     private lateinit var galleryProvider: GalleryProvider
@@ -188,6 +190,41 @@ class AirbridgeService : Service() {
                     if (offer != null) {
                         Log.d(TAG, "File accepted: ${offer.filename}")
                         webSocketClient.send(Message.FileTransferAccept(transferId))
+                        // INVERTED MAC→PHONE FLOW (see HttpFileDownloader
+                        // docs): instead of waiting for Mac to POST to our
+                        // HttpFileServer on 8767 (blocked by macOS Local
+                        // Network Privacy for ad-hoc signed apps), we
+                        // fetch the file from Mac's HTTP server via GET.
+                        // We make the outbound connection — Android has
+                        // no LNP restriction — so the transfer always
+                        // succeeds on the first try.
+                        val host = connectedHost.value
+                        val port = httpPort.value
+                        if (host != null) {
+                            serviceScope.launch {
+                                transferFileName.value = offer.filename
+                                transferIsSending.value = false
+                                transferProgress.value = 0f
+                                val tempFile = httpFileDownloader.download(
+                                    host = host,
+                                    port = port,
+                                    transferId = transferId,
+                                    filenameHint = offer.filename
+                                ) { bytesReceived, totalBytes ->
+                                    updateTransferProgress(offer.filename, bytesReceived, totalBytes)
+                                }
+                                if (tempFile != null) {
+                                    finalizeReceivedFile(offer.filename, tempFile)
+                                } else {
+                                    Log.e(TAG, "Download failed for ${offer.filename}")
+                                    transferProgress.value = null
+                                    transferFileName.value = null
+                                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(4)
+                                }
+                            }
+                        } else {
+                            Log.w(TAG, "ACCEPT_FILE: no host, cannot download")
+                        }
                     }
                 }
             }
@@ -315,82 +352,142 @@ class AirbridgeService : Service() {
     private var lastProgressNotifUpdate = 0L
 
     private fun setupHttpFileServer() {
+        // NOTE: httpFileServer is the LEGACY inbound-POST path for Mac→phone
+        // file sends. Kept alive as a no-op fallback; the active path is now
+        // phone-pulls-from-Mac via HttpFileDownloader (see handleAcceptFile).
+        // Both paths converge on updateTransferProgress / finalizeReceivedFile
+        // so the notification UX is identical.
         httpFileServer.onProgress = { filename, bytesReceived, totalBytes ->
-            transferFileName.value = filename
-            transferIsSending.value = false
-            val progress = bytesReceived.toFloat() / totalBytes
-            transferProgress.value = progress
-
-            // Throttle notification updates to max every 300ms
-            val now = System.currentTimeMillis()
-            if (now - lastProgressNotifUpdate >= 300 || bytesReceived >= totalBytes) {
-                lastProgressNotifUpdate = now
-                val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val sender = connectedDeviceName.value ?: "Mac"
-                val sizeText = when {
-                    totalBytes > 1024 * 1024 -> String.format("%.1f MB", totalBytes / (1024.0 * 1024.0))
-                    totalBytes > 1024 -> String.format("%.0f KB", totalBytes / 1024.0)
-                    else -> "$totalBytes B"
-                }
-                val progressPercent = (progress * 100).toInt()
-                val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
-                    .setContentText("$filename · $sizeText · $progressPercent%")
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setContentIntent(openAppPendingIntent())
-                    .setOngoing(true)
-                    .setOnlyAlertOnce(true)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                    val accentColor = android.graphics.Color.parseColor("#4285F4")
-                    val grayColor = android.graphics.Color.parseColor("#444444")
-                    notifBuilder.style = Notification.ProgressStyle().apply {
-                        this.progress = progressPercent
-                        this.progressSegments = listOf(
-                            Notification.ProgressStyle.Segment(progressPercent).setColor(accentColor),
-                            Notification.ProgressStyle.Segment(100 - progressPercent).setColor(grayColor)
-                        )
-                    }
-                }
-                manager.notify(4, notifBuilder.build())
-            }
+            updateTransferProgress(filename, bytesReceived.toLong(), totalBytes.toLong())
         }
         httpFileServer.onFileReceived = { filename, _, tempFile ->
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.cancel(4)
-            serviceScope.launch {
-                try {
-                    val prefs = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
-                    val folder = prefs.getString("download_folder", null)
-                        ?: android.os.Environment.getExternalStoragePublicDirectory(
-                            android.os.Environment.DIRECTORY_DOWNLOADS
-                        ).absolutePath + "/AirBridge"
-                    val dir = java.io.File(folder)
-                    if (!dir.exists()) dir.mkdirs()
-                    val file = java.io.File(dir, filename)
-                    tempFile.copyTo(file, overwrite = true)
-                    tempFile.delete()
-                    Log.d(TAG, "File received: ${file.absolutePath}")
-                    addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
-                    transferProgress.value = null
-                    transferFileName.value = null
-
-                    val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                        .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
-                        .setContentText(filename)
-                        .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                        .setContentIntent(openAppPendingIntent())
-                        .setAutoCancel(true)
-                        .build()
-                    manager.notify(3, notif)
-                } catch (e: Exception) {
-                    Log.e(TAG, "File save failed", e)
-                    transferProgress.value = null
-                    transferFileName.value = null
-                }
-            }
+            finalizeReceivedFile(filename, tempFile)
         }
         httpFileServer.start()
+    }
 
+    /// Shared progress updater used by BOTH inbound POST (legacy
+    /// `httpFileServer`) and outbound GET (`httpFileDownloader`) receive
+    /// paths. Updates the UI StateFlows and the progress notification.
+    private fun updateTransferProgress(filename: String, bytesReceived: Long, totalBytes: Long) {
+        transferFileName.value = filename
+        transferIsSending.value = false
+        val progress = if (totalBytes > 0) bytesReceived.toFloat() / totalBytes else 0f
+        transferProgress.value = progress
+
+        // Throttle notification updates to max every 300ms
+        val now = System.currentTimeMillis()
+        if (now - lastProgressNotifUpdate >= 300 || (totalBytes > 0 && bytesReceived >= totalBytes)) {
+            lastProgressNotifUpdate = now
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val sender = connectedDeviceName.value ?: "Mac"
+            val sizeText = when {
+                totalBytes > 1024 * 1024 -> String.format("%.1f MB", totalBytes / (1024.0 * 1024.0))
+                totalBytes > 1024 -> String.format("%.0f KB", totalBytes / 1024.0)
+                else -> "$totalBytes B"
+            }
+            val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
+            val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
+                .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
+                .setContentText("$filename · $sizeText · $progressPercent%")
+                .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                .setContentIntent(openAppPendingIntent())
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                val accentColor = android.graphics.Color.parseColor("#4285F4")
+                val grayColor = android.graphics.Color.parseColor("#444444")
+                notifBuilder.style = Notification.ProgressStyle().apply {
+                    this.progress = progressPercent
+                    this.progressSegments = listOf(
+                        Notification.ProgressStyle.Segment(progressPercent).setColor(accentColor),
+                        Notification.ProgressStyle.Segment(100 - progressPercent).setColor(grayColor)
+                    )
+                }
+            }
+            manager.notify(4, notifBuilder.build())
+        }
+    }
+
+    /// Shared finalization: moves the temp file into the user's Downloads
+    /// folder, clears transfer state, fires the "file received" notification.
+    /// Called by both the legacy inbound-POST path and the new GET path.
+    private fun finalizeReceivedFile(filename: String, tempFile: File) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(4)
+        serviceScope.launch {
+            try {
+                val prefs = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
+                val folder = prefs.getString("download_folder", null)
+                    ?: android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    ).absolutePath + "/AirBridge"
+                val dir = File(folder)
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, filename)
+                tempFile.copyTo(file, overwrite = true)
+                tempFile.delete()
+                Log.d(TAG, "File received: ${file.absolutePath}")
+                addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
+                transferProgress.value = null
+                transferFileName.value = null
+
+                // Tapping the "File received" notification should hand the
+                // file off to whatever app the user has registered for that
+                // MIME type (image viewer, PDF reader, etc.) — NOT drag them
+                // into AirBridge which has no per-file viewer. Build a
+                // content:// URI via FileProvider, attach it to an
+                // ACTION_VIEW intent with the MIME type inferred from the
+                // file extension, and grant the receiver one-shot read
+                // permission. Fall back to opening AirBridge if FileProvider
+                // fails for any reason (unusual download folder, etc.).
+                val openIntent = buildOpenFileIntent(file)
+                val contentIntent = openIntent?.let {
+                    android.app.PendingIntent.getActivity(
+                        this@AirbridgeService, file.absolutePath.hashCode(), it,
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                    )
+                } ?: openAppPendingIntent()
+
+                val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
+                    .setContentText(filename)
+                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(contentIntent)
+                    .setAutoCancel(true)
+                    .build()
+                manager.notify(3, notif)
+            } catch (e: Exception) {
+                Log.e(TAG, "File save failed", e)
+                transferProgress.value = null
+                transferFileName.value = null
+            }
+        }
+    }
+
+    /// Build an ACTION_VIEW intent that asks the system to open the given
+    /// file with whatever app the user has set for that MIME type. Returns
+    /// null if the URI / MIME type can't be resolved, in which case the
+    /// caller should fall back to opening the main app.
+    private fun buildOpenFileIntent(file: File): Intent? {
+        return try {
+            val authority = "$packageName.fileprovider"
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, authority, file)
+            val extension = file.extension.lowercase()
+            val mimeType = android.webkit.MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(extension) ?: "*/*"
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "buildOpenFileIntent failed for ${file.absolutePath}", e)
+            null
+        }
     }
 
     private fun handleFileTransferOffer(offer: Message.FileTransferOffer) {
@@ -421,11 +518,29 @@ class AirbridgeService : Service() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Tapping the notification body opens FileOfferDialogActivity (a
+        // transparent activity hosting a Material3 AlertDialog with the same
+        // Accept/Reject choices). This gives the user a focused confirmation
+        // surface instead of dumping them into the main app where the offer
+        // isn't even visible. The dialog reuses the same service actions as
+        // the notification's action buttons, so both paths stay in sync.
+        val dialogIntent = Intent(this, com.airbridge.ui.FileOfferDialogActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_TRANSFER_ID, offer.transferId)
+            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_FILENAME, offer.filename)
+            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_FILE_SIZE, offer.fileSize)
+            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_SENDER, sender)
+        }
+        val dialogPendingIntent = android.app.PendingIntent.getActivity(
+            this, notifId + 100000, dialogIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notif = Notification.Builder(this, CHANNEL_FILES_ID)
             .setContentTitle(getString(com.airbridge.R.string.notification_accept_file, sender))
             .setContentText(getString(com.airbridge.R.string.notification_accept_file_detail, offer.filename, sizeText))
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-            .setContentIntent(openAppPendingIntent())
+            .setContentIntent(dialogPendingIntent)
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_reject), rejectIntent).build())
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_accept), acceptIntent).build())
             .setAutoCancel(false)

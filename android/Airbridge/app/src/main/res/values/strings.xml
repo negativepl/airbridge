@@ -113,6 +113,17 @@
     <string name="sent_to_mac">Sent to Mac</string>
     <string name="share_sending">Sending to Mac via AirBridge…</string>
 
+    <!-- Share sheet -->
+    <string name="share_sheet_title">Share via AirBridge</string>
+    <string name="share_sheet_devices">Devices</string>
+    <string name="share_sheet_connected">Connected</string>
+    <string name="share_sheet_offline">Offline</string>
+    <string name="share_sheet_no_devices">No paired devices</string>
+    <string name="share_sheet_no_devices_desc">Pair a Mac first by opening the AirBridge app.</string>
+    <string name="share_sheet_send">Send</string>
+    <string name="share_sheet_text_preview">Text · %1$d characters</string>
+    <string name="share_sheet_multiple_files">%1$d files</string>
+
     <!-- Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_history">History</string>

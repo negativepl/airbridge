@@ -166,31 +166,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             return
         }
 
-        guard let rawHost = connectionService.getConnectedClientIP() else {
-            isSendingFromQueue = false
-            processQueue()
-            return
-        }
-        // Sanitize host: strip Network.framework prefixes like "IPv4#abcd1234"
-        // and extract a clean dotted-decimal IPv4 if possible.
-        let host: String = {
-            // If contains "#", assume "IPv4#hex" and decode
-            if let hashIdx = rawHost.firstIndex(of: "#") {
-                let hexPart = String(rawHost[rawHost.index(after: hashIdx)...])
-                if let intVal = UInt32(hexPart, radix: 16) {
-                    let a = (intVal >> 24) & 0xff
-                    let b = (intVal >> 16) & 0xff
-                    let c = (intVal >> 8) & 0xff
-                    let d = intVal & 0xff
-                    return "\(a).\(b).\(c).\(d)"
-                }
-            }
-            return rawHost
-        }()
-        #if DEBUG
-        print("[FileTransferService] Upload host: \(host) (raw: \(rawHost))")
-        #endif
-
         let filename = url.lastPathComponent
         let mime = Self.mimeType(for: url)
         let fileSize: Int64 = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
@@ -209,16 +184,48 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         TransferPopup.shared.show()
 
         Task {
-            // 1. Set up response stream before sending offer
+            // 1. Set up response stream for the offer (accept/reject) and
+            //    the HTTP completion stream (phone's GET finishes).
             let stream = AsyncStream<Bool> { continuation in
                 self.offerResponseStream = continuation
             }
+            let (httpStream, httpContinuation) = AsyncStream<Bool>.makeStream()
 
-            // 2. Send offer
+            // 2. Register the file with Mac's HttpUploadServer BEFORE sending
+            //    the offer. CRITICAL: the phone immediately does a GET after
+            //    sending back FileTransferAccept, so by the time the GET
+            //    arrives on Mac's listener, the file MUST already be in
+            //    `pendingOutgoingFiles`. Registering after accept creates a
+            //    race where the GET hits 404 (we observed this in testing —
+            //    "Unknown transferId" within ~80ms of Android's GET).
+            let onProgress: @Sendable (Int64, Int64) -> Void = { [weak self] sent, total in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let progress = total > 0 ? Double(sent) / Double(total) : 0
+                    // Clamp away from 0 so the view state computation
+                    // doesn't briefly return .idle between "waiting for
+                    // accept" and the first progress tick.
+                    self.fileTransferProgress = max(progress, 0.001)
+                }
+            }
+            let onComplete: @Sendable (Bool) -> Void = { ok in
+                httpContinuation.yield(ok)
+                httpContinuation.finish()
+            }
+            await connectionService.httpServer.registerOutgoingFile(
+                transferId: transferId,
+                fileURL: url,
+                filename: filename,
+                mimeType: mime,
+                onProgress: onProgress,
+                onComplete: onComplete
+            )
+
+            // 3. Send offer
             let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize)
             try? await connectionService.broadcast(offer)
 
-            // 3. Wait for accept/reject (non-blocking for MainActor)
+            // 4. Wait for accept/reject (non-blocking for MainActor)
             var accepted = false
             for await response in stream {
                 accepted = response
@@ -226,6 +233,11 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             }
 
             guard accepted else {
+                // Rejected — drop the pending outgoing file so a later GET
+                // (e.g., a retrying stale client) can't accidentally pull it.
+                await connectionService.httpServer.unregisterOutgoingFile(transferId: transferId)
+                httpContinuation.finish()
+
                 // Rejected — let view-side animation handle the morph
                 self.isWaitingForAccept = false
                 self.isRejected = true
@@ -247,7 +259,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 return
             }
 
-            // 4. Accepted — switch directly into transferring state.
+            // 5. Accepted — switch directly into transferring state.
             // CRITICAL: set progress to a tiny non-zero value BEFORE
             // clearing isWaitingForAccept. Otherwise the state computation
             // briefly returns .idle (no waiting + no progress + nothing
@@ -256,19 +268,13 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             self.fileTransferProgress = 0.001
             self.isWaitingForAccept = false
 
-            let success = await Self.httpUpload(
-                fileURL: url,
-                filename: filename,
-                mimeType: mime,
-                host: host,
-                port: 8767
-            ) { progress in
-                Task { @MainActor in
-                    // Clamp away from 0 — URLSession can report 0 on the
-                    // first callback before any bytes are sent, which would
-                    // also flash to .idle.
-                    self.fileTransferProgress = max(progress, 0.001)
-                }
+            // 6. Wait for phone's GET to finish streaming. Mac's
+            //    HttpUploadServer fires onComplete via httpContinuation
+            //    when the last chunk lands (or on any transport error).
+            var success = false
+            for await result in httpStream {
+                success = result
+                break
             }
 
             if success {
@@ -286,38 +292,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             self.fileTransferFileName = ""
             self.isSendingFromQueue = false
             self.processQueue()
-        }
-    }
-
-    private static func httpUpload(
-        fileURL: URL,
-        filename: String,
-        mimeType: String,
-        host: String,
-        port: Int,
-        onProgress: @Sendable @escaping (Double) -> Void
-    ) async -> Bool {
-        guard let data = try? Data(contentsOf: fileURL) else { return false }
-        let encodedFilename = filename.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? filename
-
-        guard let url = URL(string: "http://\(host):\(port)/upload") else { return false }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(encodedFilename, forHTTPHeaderField: "X-Filename")
-        request.setValue(mimeType, forHTTPHeaderField: "X-Mime-Type")
-        request.setValue("\(data.count)", forHTTPHeaderField: "Content-Length")
-        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-
-        let delegate = UploadProgressDelegate(onProgress: onProgress)
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-
-        do {
-            let (_, response) = try await session.upload(for: request, from: data, delegate: delegate)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return false }
-            return true
-        } catch {
-            return false
         }
     }
 
@@ -463,15 +437,3 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     }
 }
 
-private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Sendable {
-    let onProgress: @Sendable (Double) -> Void
-
-    init(onProgress: @Sendable @escaping (Double) -> Void) {
-        self.onProgress = onProgress
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
-        let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
-        onProgress(progress)
-    }
-}

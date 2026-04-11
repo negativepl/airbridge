@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths served by AirBridge's FileProvider. Used to build content:// URIs
+     for received files so other apps (image viewer, PDF reader, etc.) can
+     open them via ACTION_VIEW from the "File received" notification. We
+     expose the root of external storage because the user can configure the
+     download folder to any path under /storage/emulated/0/ — the actual
+     read grant is per-URI via FLAG_GRANT_READ_URI_PERMISSION, so exposing
+     a broad root here doesn't expose anything we don't explicitly hand out. -->
+<paths>
+    <external-path name="external_files" path="." />
+</paths>

@@ -44,6 +44,25 @@ public actor HttpUploadServer {
     /// Continuation used to signal that the listener reached `.ready`.
     private var readyContinuation: CheckedContinuation<Void, Error>?
 
+    /// Files registered for outgoing download via `GET /send/{transferId}`.
+    /// Keyed by transferId — Mac registers the file when it wants to send it
+    /// to the phone, phone fetches via GET, callbacks fire as bytes leave.
+    ///
+    /// Inverting the HTTP direction here is what lets Mac → phone file send
+    /// work without triggering the macOS Local Network Privacy check for
+    /// outbound connections. The phone initiates the TCP (outbound from its
+    /// side, Android has no LNP restriction), Mac only accepts incoming,
+    /// which is always allowed.
+    private var pendingOutgoingFiles: [String: PendingOutgoingFile] = [:]
+
+    private struct PendingOutgoingFile {
+        let fileURL: URL
+        let filename: String
+        let mimeType: String
+        let onProgress: @Sendable (Int64, Int64) -> Void
+        let onComplete: @Sendable (Bool) -> Void
+    }
+
     // MARK: - Init
 
     public init(port: UInt16 = 8766) {
@@ -100,6 +119,36 @@ public actor HttpUploadServer {
         listener?.cancel()
         listener = nil
         actualPort = nil
+        pendingOutgoingFiles.removeAll()
+    }
+
+    // MARK: - Outgoing File Registration
+
+    /// Register a file to be served over `GET /send/{transferId}`.
+    /// Call this BEFORE telling the remote peer to fetch. `onProgress` fires
+    /// repeatedly with (bytesSent, totalBytes). `onComplete` fires once with
+    /// success/failure. The registration is automatically removed after
+    /// completion, so each call pairs with at most one GET.
+    public func registerOutgoingFile(
+        transferId: String,
+        fileURL: URL,
+        filename: String,
+        mimeType: String,
+        onProgress: @escaping @Sendable (Int64, Int64) -> Void,
+        onComplete: @escaping @Sendable (Bool) -> Void
+    ) {
+        pendingOutgoingFiles[transferId] = PendingOutgoingFile(
+            fileURL: fileURL,
+            filename: filename,
+            mimeType: mimeType,
+            onProgress: onProgress,
+            onComplete: onComplete
+        )
+    }
+
+    /// Manually drop a pending outgoing file (e.g., on cancel).
+    public func unregisterOutgoingFile(transferId: String) {
+        pendingOutgoingFiles.removeValue(forKey: transferId)
     }
 
     // MARK: - Private — Listener State
@@ -222,8 +271,17 @@ public actor HttpUploadServer {
         let method = String(parts[0])
         let path = String(parts[1])
 
+        // GET /send/{transferId} — Mac serves a previously-registered file
+        // to the phone. This is the INVERTED Mac→phone file transfer path
+        // (see `pendingOutgoingFiles` docs for rationale).
+        if method == "GET", path.hasPrefix("/send/") {
+            let transferId = String(path.dropFirst("/send/".count))
+            serveOutgoingFile(on: connection, transferId: transferId)
+            return
+        }
+
         guard method == "POST", path == "/upload" else {
-            sendErrorResponse(on: connection, status: 400, message: "Expected POST /upload")
+            sendErrorResponse(on: connection, status: 400, message: "Expected POST /upload or GET /send/{id}")
             return
         }
 
@@ -374,6 +432,111 @@ public actor HttpUploadServer {
             connection.cancel()
         })
     }
+
+    // MARK: - Private — Outgoing (GET /send/{id}) File Streaming
+
+    /// Look up a registered outgoing file by transferId and stream it back
+    /// to the connecting peer. Fires the file's onProgress/onComplete
+    /// callbacks as bytes leave the box. Unregisters the entry on finish.
+    private func serveOutgoingFile(on connection: NWConnection, transferId: String) {
+        guard let pending = pendingOutgoingFiles[transferId] else {
+            sendErrorResponse(on: connection, status: 404, message: "Unknown transferId")
+            return
+        }
+
+        // Load the full file into memory. This mirrors how the POST /upload
+        // path handles bodies (see `streamBody` which accumulates all bytes
+        // before finalizing) — keeps the two paths symmetric. Real disk
+        // streaming can be a later optimization if large-file users hit it.
+        guard let data = try? Data(contentsOf: pending.fileURL) else {
+            sendErrorResponse(on: connection, status: 500, message: "File read failed")
+            pending.onComplete(false)
+            pendingOutgoingFiles.removeValue(forKey: transferId)
+            return
+        }
+
+        let total = Int64(data.count)
+        let encodedFilename = pending.filename
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? pending.filename
+        let headers = "HTTP/1.1 200 OK\r\n"
+            + "Content-Type: \(pending.mimeType)\r\n"
+            + "Content-Length: \(total)\r\n"
+            + "X-Filename: \(encodedFilename)\r\n"
+            + "Connection: close\r\n"
+            + "\r\n"
+        let headerData = Data(headers.utf8)
+
+        // Capture the per-transfer callbacks so the nonisolated streaming
+        // helper can invoke them without hopping back onto the actor for
+        // every chunk. After capture, remove the registration — from here
+        // on, only our local references matter.
+        let onProgress = pending.onProgress
+        let onComplete = pending.onComplete
+        pendingOutgoingFiles.removeValue(forKey: transferId)
+
+        // Send headers first, then kick off the chunk streamer.
+        connection.send(content: headerData, completion: .contentProcessed { error in
+            if error != nil {
+                onComplete(false)
+                connection.cancel()
+                return
+            }
+            // Report 0% before any body bytes — lets the UI switch out of
+            // "waiting for accept" into "transferring" immediately.
+            onProgress(0, total)
+            HttpUploadServer.streamOutgoingChunks(
+                on: connection,
+                data: data,
+                sent: 0,
+                total: total,
+                onProgress: onProgress,
+                onComplete: onComplete
+            )
+        })
+    }
+
+    /// Recursively sends `data` in 64 KB chunks and fires `onProgress` after
+    /// each chunk. On final chunk, fires `onComplete(true)` and cancels the
+    /// connection. On any send error, fires `onComplete(false)`.
+    private static func streamOutgoingChunks(
+        on connection: NWConnection,
+        data: Data,
+        sent: Int64,
+        total: Int64,
+        onProgress: @escaping @Sendable (Int64, Int64) -> Void,
+        onComplete: @escaping @Sendable (Bool) -> Void
+    ) {
+        if sent >= total {
+            onComplete(true)
+            connection.cancel()
+            return
+        }
+        let chunkSize: Int64 = 64 * 1024
+        let remaining = total - sent
+        let size = Int(min(chunkSize, remaining))
+        let start = Int(sent)
+        let chunk = data.subdata(in: start..<(start + size))
+
+        connection.send(content: chunk, completion: .contentProcessed { error in
+            if error != nil {
+                onComplete(false)
+                connection.cancel()
+                return
+            }
+            let newSent = sent + Int64(size)
+            onProgress(newSent, total)
+            HttpUploadServer.streamOutgoingChunks(
+                on: connection,
+                data: data,
+                sent: newSent,
+                total: total,
+                onProgress: onProgress,
+                onComplete: onComplete
+            )
+        })
+    }
+
+    // MARK: - Private — HTTP Responses (cont.)
 
     private nonisolated func sendErrorResponse(on connection: NWConnection, status: Int, message: String) {
         let escapedMessage = message

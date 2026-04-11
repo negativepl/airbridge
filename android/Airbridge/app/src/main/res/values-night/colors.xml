@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_bg">#1C1B18</color>
+    <!-- Matches AirbridgeTheme's DarkColorScheme.surface (#17140F) -->
+    <color name="share_bg">#17140F</color>
 </resources>

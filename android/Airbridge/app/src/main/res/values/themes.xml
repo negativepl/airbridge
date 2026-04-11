@@ -18,4 +18,30 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- Full-screen theme for ShareReceiverActivity. Uses DayNight so the
+         pre-Compose window background automatically matches the system
+         dark/light mode, and share_bg is set to the exact color that
+         AirbridgeTheme renders as colorScheme.surface — so the launch
+         splash phase transitions into the Compose content with zero
+         visible flash. Also forces the status / navigation bar to the
+         same color for an edge-to-edge clean look. -->
+    <style name="Theme.Airbridge.Share" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/share_bg</item>
+        <item name="android:statusBarColor">@color/share_bg</item>
+        <item name="android:navigationBarColor">@color/share_bg</item>
+    </style>
+
+    <!-- Transparent activity wrapper for FileOfferDialogActivity. The Compose
+         AlertDialog draws its own window + scrim; the host activity just has
+         to disappear visually. -->
+    <style name="Theme.Airbridge.TransparentDialog" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>
