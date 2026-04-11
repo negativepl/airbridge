@@ -65,30 +65,28 @@ struct GalleryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var photosByDay: [(Date, [GalleryPhotoMeta])] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: galleryService.photos) { photo in
-            let date = Date(timeIntervalSince1970: TimeInterval(photo.dateTaken) / 1000)
-            return calendar.startOfDay(for: date)
-        }
-        return grouped.sorted { $0.key > $1.key }
-    }
-
     private var groupedGallery: some View {
-        ScrollView(.vertical) {
-            LazyVStack(alignment: .leading, spacing: 28) {
-                ForEach(photosByDay, id: \.0) { day, photos in
-                    dayRow(day: day, photos: photos)
+        ScrollView(.horizontal, showsIndicators: true) {
+            LazyHStack(spacing: 10) {
+                ForEach(galleryService.photos) { photo in
+                    ThumbnailCell(photo: photo, galleryService: galleryService) {
+                        selectedPhoto = photo
+                    }
+                    .onAppear {
+                        if photo.id == galleryService.photos.last?.id {
+                            galleryService.loadNextPage()
+                        }
+                    }
                 }
 
                 if galleryService.isLoading {
                     ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
+                        .frame(width: 80)
+                        .padding(.horizontal, 20)
                 }
             }
-            .padding(.top, 28)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 28)
         }
         .toolbar {
             ToolbarItem {
@@ -100,51 +98,6 @@ struct GalleryView: View {
                 .help(L10n.isPL ? "Odśwież" : "Refresh")
             }
         }
-    }
-
-    private func dayRow(day: Date, photos: [GalleryPhotoMeta]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(dayLabel(day))
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 28)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 8) {
-                    ForEach(photos) { photo in
-                        ThumbnailCell(photo: photo, galleryService: galleryService) {
-                            selectedPhoto = photo
-                        }
-                        .onAppear {
-                            if photo.id == galleryService.photos.last?.id {
-                                galleryService.loadNextPage()
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 28)
-            }
-        }
-    }
-
-    private func dayLabel(_ date: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return L10n.isPL ? "Dziś" : "Today"
-        }
-        if calendar.isDateInYesterday(date) {
-            return L10n.isPL ? "Wczoraj" : "Yesterday"
-        }
-
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: L10n.isPL ? "pl_PL" : "en_US")
-        let now = Date()
-        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
-            formatter.dateFormat = L10n.isPL ? "d MMMM" : "MMMM d"
-        } else {
-            formatter.dateFormat = L10n.isPL ? "d MMMM yyyy" : "MMMM d, yyyy"
-        }
-        return formatter.string(from: date)
     }
 }
 
