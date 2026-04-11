@@ -7,8 +7,6 @@ struct GalleryView: View {
 
     @State private var selectedPhoto: GalleryPhotoMeta?
 
-    private let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 3)]
-
     var body: some View {
         Group {
             if !connectionService.isConnected {
@@ -16,10 +14,11 @@ struct GalleryView: View {
             } else if galleryService.photos.isEmpty && !galleryService.isLoading {
                 emptyView
             } else {
-                galleryGrid
+                groupedGallery
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.container, edges: .leading)
         .onAppear {
             if connectionService.isConnected && galleryService.photos.isEmpty {
                 galleryService.loadPhotos()
@@ -66,25 +65,30 @@ struct GalleryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var galleryGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 3) {
-                ForEach(galleryService.photos) { photo in
-                    ThumbnailCell(photo: photo, galleryService: galleryService) {
-                        selectedPhoto = photo
-                    }
-                    .onAppear {
-                        if photo.id == galleryService.photos.last?.id {
-                            galleryService.loadNextPage()
-                        }
-                    }
+    private var photosByDay: [(Date, [GalleryPhotoMeta])] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: galleryService.photos) { photo in
+            let date = Date(timeIntervalSince1970: TimeInterval(photo.dateTaken) / 1000)
+            return calendar.startOfDay(for: date)
+        }
+        return grouped.sorted { $0.key > $1.key }
+    }
+
+    private var groupedGallery: some View {
+        ScrollView(.vertical) {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                ForEach(photosByDay, id: \.0) { day, photos in
+                    dayRow(day: day, photos: photos)
+                }
+
+                if galleryService.isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                 }
             }
-            .padding(4)
-
-            if galleryService.isLoading {
-                ProgressView().padding()
-            }
+            .padding(.top, 28)
+            .padding(.bottom, 28)
         }
         .toolbar {
             ToolbarItem {
@@ -97,6 +101,51 @@ struct GalleryView: View {
             }
         }
     }
+
+    private func dayRow(day: Date, photos: [GalleryPhotoMeta]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(dayLabel(day))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 28)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
+                    ForEach(photos) { photo in
+                        ThumbnailCell(photo: photo, galleryService: galleryService) {
+                            selectedPhoto = photo
+                        }
+                        .onAppear {
+                            if photo.id == galleryService.photos.last?.id {
+                                galleryService.loadNextPage()
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 28)
+            }
+        }
+    }
+
+    private func dayLabel(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return L10n.isPL ? "Dziś" : "Today"
+        }
+        if calendar.isDateInYesterday(date) {
+            return L10n.isPL ? "Wczoraj" : "Yesterday"
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: L10n.isPL ? "pl_PL" : "en_US")
+        let now = Date()
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            formatter.dateFormat = L10n.isPL ? "d MMMM" : "MMMM d"
+        } else {
+            formatter.dateFormat = L10n.isPL ? "d MMMM yyyy" : "MMMM d, yyyy"
+        }
+        return formatter.string(from: date)
+    }
 }
 
 // MARK: - Thumbnail Cell (isolated to avoid full-grid re-renders)
@@ -108,6 +157,17 @@ private struct ThumbnailCell: View {
 
     @State private var image: NSImage?
 
+    private let rowHeight: CGFloat = 220
+
+    private var aspect: CGFloat {
+        guard photo.height > 0 else { return 1 }
+        return CGFloat(photo.width) / CGFloat(photo.height)
+    }
+
+    private var width: CGFloat {
+        max(140, min(420, rowHeight * aspect))
+    }
+
     var body: some View {
         ZStack {
             if let image {
@@ -115,13 +175,14 @@ private struct ThumbnailCell: View {
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
+                Rectangle()
+                    .fill(.secondary.opacity(0.15))
                 ProgressView()
                     .controlSize(.small)
             }
         }
-        .frame(height: 160)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        .frame(width: width, height: rowHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
         .onAppear { loadImage() }
