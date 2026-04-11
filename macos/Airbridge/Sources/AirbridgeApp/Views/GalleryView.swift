@@ -170,40 +170,19 @@ struct PhotoDetailView: View {
 
     var body: some View {
         ZStack {
-            // Full-bleed blurred backdrop (the photo itself, heavily blurred)
-            // so top / bottom floating bars get real Liquid Glass colour tint
-            // from the photo — Apple Photos.app pattern.
-            backdropLayer
+            Color.black.opacity(0.92)
                 .ignoresSafeArea()
 
-            // Centered photo (aspect-fit) over the backdrop
             photoLayer
 
-            // Floating Liquid Glass bars on top
             VStack {
                 topBar
                 Spacer()
                 bottomBar
             }
             .padding(20)
-            .ignoresSafeArea(.container, edges: [.top, .bottom])
         }
         .frame(minWidth: 960, idealWidth: 1280, minHeight: 720, idealHeight: 900)
-    }
-
-    private var backdropLayer: some View {
-        ZStack {
-            Color.black
-            if let nsImage = displayedImage {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
-                    .blur(radius: 60, opaque: true)
-                    .overlay(Color.black.opacity(0.35))
-            }
-        }
-        .clipped()
     }
 
     // MARK: - Photo with zoom / pan / rotation
