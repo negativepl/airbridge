@@ -14,45 +14,60 @@ struct MainWindow: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab(NavigationItem.home.title, systemImage: "house.fill", value: .home) {
-                HomeView(
-                    connectionService: connectionService,
-                    fileTransferService: fileTransferService,
-                    historyService: historyService,
-                    pairingService: pairingService
-                )
+                ScreenContainer {
+                    HomeView(
+                        connectionService: connectionService,
+                        fileTransferService: fileTransferService,
+                        historyService: historyService,
+                        pairingService: pairingService
+                    )
+                }
             }
 
             Tab(NavigationItem.history.title, systemImage: "clock.arrow.circlepath", value: .history) {
-                HistoryView(historyService: historyService)
+                ScreenContainer {
+                    HistoryView(historyService: historyService)
+                }
             }
 
             Tab(NavigationItem.send.title, systemImage: "paperplane.fill", value: .send) {
-                SendView(
-                    fileTransferService: fileTransferService,
-                    connectionService: connectionService,
-                    clipboardService: clipboardService
-                )
+                ScreenContainer {
+                    SendView(
+                        fileTransferService: fileTransferService,
+                        connectionService: connectionService,
+                        clipboardService: clipboardService
+                    )
+                }
             }
 
             Tab(NavigationItem.gallery.title, systemImage: "photo.on.rectangle", value: .gallery) {
-                GalleryView(galleryService: galleryService, connectionService: connectionService)
+                ScreenContainer(scroll: false) {
+                    GalleryView(galleryService: galleryService, connectionService: connectionService)
+                }
             }
 
             Tab(NavigationItem.messages.title, systemImage: "message.fill", value: .messages) {
-                MessagesView(smsService: smsService, connectionService: connectionService)
+                ScreenContainer(scroll: false) {
+                    MessagesView(smsService: smsService, connectionService: connectionService)
+                }
             }
 
             Tab(NavigationItem.settings.title, systemImage: "gearshape.fill", value: .settings) {
-                SettingsView(
-                    connectionService: connectionService,
-                    pairingService: pairingService
-                )
+                ScreenContainer {
+                    SettingsView(
+                        connectionService: connectionService,
+                        pairingService: pairingService
+                    )
+                }
             }
 
             Tab(NavigationItem.about.title, systemImage: "info.circle", value: .about) {
-                AboutView()
+                ScreenContainer {
+                    AboutView()
+                }
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .toolbarBackground(.regularMaterial, for: .windowToolbar)
     }
 }
