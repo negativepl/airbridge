@@ -2,8 +2,10 @@ import SwiftUI
 
 /// Standard titled glass card for grouped content.
 ///
-/// Uses `.containerRelative` shape so its corner radius is automatically
-/// concentric with the enclosing window/GlassEffectContainer — no magic numbers.
+/// Uses an explicit 18pt continuous corner radius. We tried `.containerRelative`
+/// for concentric corners, but in macOS 26 `TabView.sidebarAdaptable` content
+/// has no enclosing rounded container, so `containerRelative` fell back to 0
+/// and every card rendered as a hard rectangle.
 ///
 /// Usage:
 ///
@@ -15,6 +17,7 @@ struct GlassSection<Content: View>: View {
     var title: LocalizedStringKey? = nil
     var systemImage: String? = nil
     var padding: CGFloat = 20
+    var cornerRadius: CGFloat = 18
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -26,21 +29,22 @@ struct GlassSection<Content: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .containerRelative)
+        .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
 /// Compact unnamed glass row for lists (history, conversations, gallery tiles).
 ///
-/// Smaller padding than GlassSection, no header, same concentric corner treatment.
+/// Smaller padding and a tighter 12pt continuous corner.
 struct GlassRow<Content: View>: View {
     var padding: CGFloat = 12
+    var cornerRadius: CGFloat = 12
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .containerRelative)
+            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius, style: .continuous))
     }
 }
