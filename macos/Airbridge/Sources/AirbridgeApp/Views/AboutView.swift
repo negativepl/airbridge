@@ -68,7 +68,7 @@ struct AboutView: View {
                 }
                 .padding(16)
                 .frame(maxWidth: 440)
-                .glassEffect(.regular, in: .containerRelative)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16, style: .continuous))
 
                 // Links
                 VStack(spacing: 0) {
@@ -86,7 +86,7 @@ struct AboutView: View {
                 }
                 .padding(4)
                 .frame(maxWidth: 440)
-                .glassEffect(.regular, in: .containerRelative)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16, style: .continuous))
 
                 Text(L10n.isPL ? "Airbridge jest open source" : "Airbridge is open source")
                     .font(.caption).foregroundStyle(.secondary)

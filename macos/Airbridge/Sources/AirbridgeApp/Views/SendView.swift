@@ -84,7 +84,7 @@ struct SendView: View {
             isTargeted
                 ? .regular.tint(.accentColor).interactive()
                 : .regular.interactive(),
-            in: .containerRelative
+            in: .rect(cornerRadius: 20, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
