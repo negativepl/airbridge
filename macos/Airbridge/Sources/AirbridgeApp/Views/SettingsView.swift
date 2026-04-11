@@ -6,7 +6,7 @@ struct SettingsView: View {
     let connectionService: ConnectionService
     let pairingService: PairingService
 
-    @State private var viewModel: SettingsViewModel?
+    @State private var viewModel: SettingsViewModel
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/Airbridge"
@@ -15,23 +15,25 @@ struct SettingsView: View {
     @State private var shortcutDisplay: String = GlobalHotkeyService.currentShortcutDisplay()
     @State private var shortcutMonitor: Any?
 
+    init(connectionService: ConnectionService, pairingService: PairingService) {
+        self.connectionService = connectionService
+        self.pairingService = pairingService
+        self._viewModel = State(initialValue: SettingsViewModel(
+            connectionService: connectionService,
+            pairingService: pairingService
+        ))
+    }
+
     var body: some View {
-        Group {
-            if let vm = viewModel {
-                pairedDevicesSection(vm)
-                generalSection
-                quickDropSection
-                fileTransferSection
-                connectionSection(vm)
-            }
+        let vm = viewModel
+        VStack(spacing: 16) {
+            pairedDevicesSection(vm)
+            generalSection
+            quickDropSection
+            fileTransferSection
+            connectionSection(vm)
         }
         .onAppear {
-            if viewModel == nil {
-                viewModel = SettingsViewModel(
-                    connectionService: connectionService,
-                    pairingService: pairingService
-                )
-            }
             pairingService.refreshPairedDevices()
         }
         .onChange(of: connectionService.isConnected) { _, _ in

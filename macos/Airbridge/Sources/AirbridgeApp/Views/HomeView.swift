@@ -6,30 +6,37 @@ struct HomeView: View {
     let historyService: HistoryService
     let pairingService: PairingService
 
-    @State private var viewModel: HomeViewModel?
+    @State private var viewModel: HomeViewModel
     @State private var showPairing = false
 
+    init(
+        connectionService: ConnectionService,
+        fileTransferService: FileTransferService,
+        historyService: HistoryService,
+        pairingService: PairingService
+    ) {
+        self.connectionService = connectionService
+        self.fileTransferService = fileTransferService
+        self.historyService = historyService
+        self.pairingService = pairingService
+        self._viewModel = State(initialValue: HomeViewModel(
+            connectionService: connectionService,
+            fileTransferService: fileTransferService,
+            historyService: historyService
+        ))
+    }
+
     var body: some View {
-        Group {
-            if let vm = viewModel {
-                connectionCard(vm)
-                if vm.isTransferring {
-                    transferCard(vm)
-                }
-                if vm.hasPairedDevices {
-                    recentActivityCard(vm)
-                } else {
-                    noPairedDevicesCard
-                }
+        let vm = viewModel
+        VStack(spacing: 16) {
+            connectionCard(vm)
+            if vm.isTransferring {
+                transferCard(vm)
             }
-        }
-        .onAppear {
-            if viewModel == nil {
-                viewModel = HomeViewModel(
-                    connectionService: connectionService,
-                    fileTransferService: fileTransferService,
-                    historyService: historyService
-                )
+            if vm.hasPairedDevices {
+                recentActivityCard(vm)
+            } else {
+                noPairedDevicesCard
             }
         }
         .sheet(isPresented: $showPairing) {
@@ -42,7 +49,7 @@ struct HomeView: View {
     }
 
     private var isDisconnected: Bool {
-        viewModel?.statusMessage.contains("Rozłączono") == true || viewModel?.statusMessage.contains("Disconnected") == true
+        viewModel.statusMessage.contains("Rozłączono") || viewModel.statusMessage.contains("Disconnected")
     }
 
     private func indicatorState(_ vm: HomeViewModel) -> StatusIndicator.State {

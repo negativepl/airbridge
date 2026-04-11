@@ -68,6 +68,5 @@ struct MainWindow: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .toolbarBackground(.regularMaterial, for: .windowToolbar)
     }
 }
