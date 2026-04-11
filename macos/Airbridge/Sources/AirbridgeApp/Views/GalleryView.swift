@@ -160,81 +160,213 @@ struct PhotoDetailView: View {
     let photo: GalleryPhotoMeta
     let galleryService: GalleryService
     let onClose: () -> Void
+
+    @State private var rotation: Angle = .zero
+    @State private var scale: CGFloat = 1.0
+    @State private var committedScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var committedOffset: CGSize = .zero
     @State private var downloaded = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Photo
-            ZStack {
-                Color.black
-                if let nsImage = galleryService.thumbnailImages[photo.id] {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(8)
-                } else {
-                    ProgressView().tint(.white)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            Color.black.opacity(0.92)
+                .ignoresSafeArea()
 
-            // Info
-            VStack(spacing: 14) {
-                HStack {
-                    Text(photo.filename)
-                        .font(.title3).fontWeight(.semibold)
-                        .lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                }
+            photoLayer
 
-                HStack(spacing: 24) {
-                    metaItem(icon: "photo", title: L10n.isPL ? "Rozdzielczość" : "Resolution", value: "\(photo.width) × \(photo.height)")
-                    metaItem(icon: "doc", title: L10n.isPL ? "Rozmiar" : "Size", value: formatFileSize(photo.size))
-                    metaItem(icon: "calendar", title: L10n.isPL ? "Data" : "Date", value: formatDate(photo.dateTaken))
-                    metaItem(icon: "doc.text", title: "Format", value: photo.mimeType.replacingOccurrences(of: "image/", with: "").uppercased())
-                }
-
-                HStack(spacing: 12) {
-                    Button(L10n.isPL ? "Zamknij" : "Close") {
-                        onClose()
-                    }
-                    .keyboardShortcut(.cancelAction)
-
-                    Spacer()
-
-                    Button {
-                        galleryService.downloadPhoto(photoId: photo.id)
-                        downloaded = true
-                        Task {
-                            try? await Task.sleep(nanoseconds: 3_000_000_000)
-                            downloaded = false
-                        }
-                    } label: {
-                        Label(
-                            downloaded
-                                ? (L10n.isPL ? "Pobrano do Downloads" : "Saved to Downloads")
-                                : (L10n.isPL ? "Pobierz oryginał" : "Download Original"),
-                            systemImage: downloaded ? "checkmark.circle" : "arrow.down.circle.fill"
-                        )
-                        .frame(minWidth: 180)
-                    }
-                    .controlSize(.large)
-                    .buttonStyle(.borderedProminent)
-                }
+            VStack {
+                topBar
+                Spacer()
+                bottomBar
             }
             .padding(20)
         }
-        .frame(width: 700, height: 600)
+        .frame(minWidth: 760, idealWidth: 960, minHeight: 580, idealHeight: 720)
     }
 
-    private func metaItem(icon: String, title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 3) {
-                Image(systemName: icon).font(.caption2).foregroundStyle(.secondary)
-                Text(title).font(.caption).foregroundStyle(.secondary)
+    // MARK: - Photo with zoom / pan / rotation
+
+    private var photoLayer: some View {
+        Group {
+            if let nsImage = galleryService.thumbnailImages[photo.id] {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .rotationEffect(rotation)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(zoomGesture)
+                    .simultaneousGesture(panGesture)
+                    .onTapGesture(count: 2) { toggleDoubleTapZoom() }
+                    .animation(.airbridgeSmooth, value: rotation)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(.white)
             }
-            Text(value).font(.callout).fontWeight(.medium)
         }
+        .padding(.horizontal, 40)
+        .padding(.vertical, 80)
+    }
+
+    private var zoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                scale = max(0.8, min(6, committedScale * value.magnification))
+            }
+            .onEnded { _ in
+                if scale < 1 {
+                    resetZoomAndOffset()
+                } else {
+                    committedScale = scale
+                }
+            }
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard scale > 1 else { return }
+                offset = CGSize(
+                    width: committedOffset.width + value.translation.width,
+                    height: committedOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                committedOffset = offset
+            }
+    }
+
+    private func toggleDoubleTapZoom() {
+        withAnimation(.airbridgeSmooth) {
+            if scale > 1 {
+                resetZoomAndOffset()
+            } else {
+                scale = 2
+                committedScale = 2
+            }
+        }
+    }
+
+    private func resetZoomAndOffset() {
+        withAnimation(.airbridgeSmooth) {
+            scale = 1
+            committedScale = 1
+            offset = .zero
+            committedOffset = .zero
+        }
+    }
+
+    private var isAltered: Bool {
+        rotation != .zero || scale != 1 || offset != .zero
+    }
+
+    // MARK: - Top bar (close + rotate/reset)
+
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(width: 36, height: 36)
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .circle)
+            .keyboardShortcut(.cancelAction)
+            .help(L10n.isPL ? "Zamknij" : "Close")
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                iconButton(systemName: "rotate.left", help: L10n.isPL ? "Obróć w lewo" : "Rotate left") {
+                    withAnimation(.airbridgeSmooth) { rotation -= .degrees(90) }
+                }
+                iconButton(systemName: "rotate.right", help: L10n.isPL ? "Obróć w prawo" : "Rotate right") {
+                    withAnimation(.airbridgeSmooth) { rotation += .degrees(90) }
+                }
+
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 2)
+
+                iconButton(systemName: "arrow.counterclockwise", help: L10n.isPL ? "Resetuj widok" : "Reset view") {
+                    withAnimation(.airbridgeSmooth) {
+                        rotation = .zero
+                        resetZoomAndOffset()
+                    }
+                }
+                .disabled(!isAltered)
+            }
+            .padding(.horizontal, 6)
+            .glassEffect(.regular.interactive(), in: .capsule)
+        }
+    }
+
+    private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 32, height: 32)
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    // MARK: - Bottom bar (meta + download)
+
+    private var bottomBar: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(photo.filename)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(metaLine)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                galleryService.downloadPhoto(photoId: photo.id)
+                downloaded = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    downloaded = false
+                }
+            } label: {
+                Label(
+                    downloaded
+                        ? (L10n.isPL ? "Pobrano" : "Downloaded")
+                        : (L10n.isPL ? "Pobierz oryginał" : "Download Original"),
+                    systemImage: downloaded ? "checkmark.circle.fill" : "arrow.down.circle.fill"
+                )
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+            .symbolEffect(.bounce, value: downloaded)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
+    }
+
+    private var metaLine: String {
+        let res = "\(photo.width) × \(photo.height)"
+        let size = formatFileSize(photo.size)
+        let date = formatDate(photo.dateTaken)
+        let format = photo.mimeType.replacingOccurrences(of: "image/", with: "").uppercased()
+        return "\(res)  ·  \(size)  ·  \(format)  ·  \(date)"
     }
 
     private func formatFileSize(_ bytes: Int64) -> String {
