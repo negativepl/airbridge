@@ -9,6 +9,7 @@ struct HistoryView: View {
                 Image(systemName: "clock")
                     .font(.system(size: 40))
                     .foregroundStyle(.tertiary)
+                    .symbolEffect(.pulse, options: .repeating)
 
                 Text(L10n.isPL ? "Brak aktywności" : "No Activity")
                     .font(.title3)
@@ -24,9 +25,9 @@ struct HistoryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(historyService.records) { record in
+            LazyVStack(spacing: 6) {
+                ForEach(historyService.records) { record in
+                    GlassRow {
                         HStack(spacing: 12) {
                             Image(systemName: record.type == .clipboard ? "doc.on.clipboard" : "doc.fill")
                                 .font(.system(size: 16))
@@ -38,9 +39,12 @@ struct HistoryView: View {
                                         : .regular.tint(.green),
                                     in: .rect(cornerRadius: 8)
                                 )
+                                .contentTransition(.symbolEffect(.replace))
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(record.description).font(.system(size: 15)).lineLimit(1)
+                                Text(record.description)
+                                    .font(.system(size: 15))
+                                    .lineLimit(1)
                                 Text(record.direction == .sent
                                      ? (L10n.isPL ? "Wysłano" : "Sent")
                                      : (L10n.isPL ? "Odebrano" : "Received"))
@@ -49,16 +53,12 @@ struct HistoryView: View {
                             }
                             Spacer()
                             Text(record.timestamp, style: .relative)
-                                .font(.system(size: 13)).foregroundStyle(.secondary)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .glassEffect(in: .rect(cornerRadius: 12))
                     }
                 }
-                .padding(16)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
