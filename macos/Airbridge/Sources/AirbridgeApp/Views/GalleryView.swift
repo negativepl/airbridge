@@ -280,6 +280,7 @@ struct PhotoDetailView: View {
                     .font(.system(size: 13, weight: .bold))
                     .frame(width: 36, height: 36)
                     .foregroundStyle(.primary)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: .circle)
@@ -319,6 +320,7 @@ struct PhotoDetailView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .frame(width: 32, height: 32)
                 .foregroundStyle(.primary)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)
@@ -358,6 +360,7 @@ struct PhotoDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .contentTransition(.symbolEffect(.replace))
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
