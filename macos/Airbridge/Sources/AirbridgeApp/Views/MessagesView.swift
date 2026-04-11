@@ -90,9 +90,9 @@ struct MessagesView: View {
                             .buttonStyle(.plain)
                             .glassEffect(
                                 selectedConversation?.id == convo.id
-                                    ? .regular.tint(.accentColor)
-                                    : .regular,
-                                in: .rect(cornerRadius: 12)
+                                    ? .regular.tint(.accentColor).interactive()
+                                    : .regular.interactive(),
+                                in: .containerRelative
                             )
                         }
                     }
@@ -198,7 +198,7 @@ struct MessagesView: View {
                     .padding(.vertical, 10)
                     .glassEffect(
                         isSent ? .regular.tint(.accentColor) : .regular,
-                        in: .rect(cornerRadius: 18)
+                        in: .containerRelative
                     )
 
                 Text(formatTime(msg.date))
