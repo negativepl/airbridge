@@ -68,5 +68,11 @@ struct MainWindow: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(selectedTab.title)
+                    .font(.headline)
+            }
+        }
     }
 }

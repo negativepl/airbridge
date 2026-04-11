@@ -74,18 +74,15 @@ struct AirbridgeApp: App {
                     smsService: smsService
                 )
                 .onAppear { hotkeyService.start() }
-                .containerBackground(.thinMaterial, for: .window)
             } else {
                 OnboardingView(
                     pairingService: pairingService,
                     connectionService: connectionService,
                     onComplete: { onboardingCompleted = true }
                 )
-                .containerBackground(.thinMaterial, for: .window)
             }
         }
         .defaultSize(width: 1100, height: 850)
-        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
