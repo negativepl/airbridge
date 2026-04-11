@@ -66,7 +66,7 @@ struct TransferPopupView: View {
             .frame(width: islandWidth, height: islandHeight)
             .glassEffect(
                 .regular.tint(tint(for: state)),
-                in: .rect(cornerRadius: 28, style: .continuous)
+                in: .rect(cornerRadius: 24, style: .continuous)
             )
             .glassEffectID("popup", in: glassNS)
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)

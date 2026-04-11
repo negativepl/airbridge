@@ -97,10 +97,10 @@ struct SendView: View {
             isTargeted
                 ? .regular.tint(.accentColor).interactive()
                 : .regular.interactive(),
-            in: .rect(cornerRadius: 20, style: .continuous)
+            in: .rect(cornerRadius: 18, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(
                     style: StrokeStyle(lineWidth: 1, dash: [6, 4])
                 )

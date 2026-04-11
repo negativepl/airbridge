@@ -189,7 +189,7 @@ struct MessagesView: View {
                     .font(.system(size: 15))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
                     .onSubmit { sendMessage(to: convo) }
 
                 Button {
@@ -230,7 +230,7 @@ struct MessagesView: View {
                     .padding(.vertical, 10)
                     .glassEffect(
                         isSent ? .regular.tint(.accentColor) : .regular,
-                        in: .rect(cornerRadius: 16, style: .continuous)
+                        in: .rect(cornerRadius: 18, style: .continuous)
                     )
 
                 Text(formatTime(msg.date))
