@@ -56,7 +56,7 @@ struct MessagesView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: 10) {
                         ForEach(smsService.conversations) { convo in
                             Button {
                                 selectedConversation = convo
@@ -125,7 +125,7 @@ struct MessagesView: View {
             } else {
                 ScrollView {
                     ScrollViewReader { proxy in
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: 14) {
                             ForEach(smsService.currentMessages.reversed()) { msg in
                                 messageBubble(msg)
                                     .id(msg.id)
