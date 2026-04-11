@@ -10,19 +10,21 @@ struct HistoryView: View {
         if historyService.records.isEmpty {
             emptyView
         } else {
-            LazyVStack(spacing: 10) {
-                ForEach(historyService.records.prefix(displayedCount)) { record in
-                    recordRow(record)
-                }
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(historyService.records.prefix(displayedCount)) { record in
+                        recordRow(record)
+                    }
 
-                if displayedCount < historyService.records.count {
-                    paginationLoader
+                    if displayedCount < historyService.records.count {
+                        paginationLoader
+                    }
                 }
-            }
-            .onChange(of: historyService.records.count) { _, _ in
-                // Reset pagination when records refresh entirely
-                if displayedCount > historyService.records.count {
-                    displayedCount = min(pageSize, historyService.records.count)
+                .padding(24)
+                .onChange(of: historyService.records.count) { _, _ in
+                    if displayedCount > historyService.records.count {
+                        displayedCount = min(pageSize, historyService.records.count)
+                    }
                 }
             }
         }

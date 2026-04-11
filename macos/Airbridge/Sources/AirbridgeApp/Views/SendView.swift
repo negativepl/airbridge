@@ -38,40 +38,43 @@ struct SendView: View {
         )
     }
 
-    @ViewBuilder
     private var sendContent: some View {
-        dropZone
+        VStack(spacing: 16) {
+            dropZone
 
-        if let vm = viewModel, vm.isSending {
-            GlassSection {
-                Text(vm.fileName)
-                    .font(.system(size: 14))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                ProgressView(value: vm.progress)
-                    .tint(.accentColor)
-                Text("\(Int(vm.progress * 100))%")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
+            if let vm = viewModel, vm.isSending {
+                GlassSection {
+                    Text(vm.fileName)
+                        .font(.system(size: 14))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    ProgressView(value: vm.progress)
+                        .tint(.accentColor)
+                    Text("\(Int(vm.progress * 100))%")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+            }
+
+            HStack(spacing: 14) {
+                Button { openFilePicker() } label: {
+                    Label(L10n.selectFiles, systemImage: "folder")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.extraLarge)
+
+                Button { sendClipboard() } label: {
+                    Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
+                        .font(.system(size: 14))
+                }
+                .controlSize(.extraLarge)
+                .disabled(viewModel.map { !$0.isConnected } ?? true)
             }
         }
-
-        HStack(spacing: 14) {
-            Button { openFilePicker() } label: {
-                Label(L10n.selectFiles, systemImage: "folder")
-                    .font(.system(size: 14))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.extraLarge)
-
-            Button { sendClipboard() } label: {
-                Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
-                    .font(.system(size: 14))
-            }
-            .controlSize(.extraLarge)
-            .disabled(viewModel.map { !$0.isConnected } ?? true)
-        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var dropZone: some View {

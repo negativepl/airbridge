@@ -25,13 +25,13 @@ struct MainWindow: View {
             }
 
             Tab(NavigationItem.history.title, systemImage: "clock.arrow.circlepath", value: .history) {
-                ScreenContainer {
+                ScreenContainer(scroll: false) {
                     HistoryView(historyService: historyService)
                 }
             }
 
             Tab(NavigationItem.send.title, systemImage: "paperplane.fill", value: .send) {
-                ScreenContainer {
+                ScreenContainer(scroll: false) {
                     SendView(
                         fileTransferService: fileTransferService,
                         connectionService: connectionService,
