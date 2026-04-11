@@ -25,10 +25,10 @@ struct ScreenContainer<Content: View>: View {
     var body: some View {
         if scroll {
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     content
                 }
-                .padding(16)
+                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         } else {

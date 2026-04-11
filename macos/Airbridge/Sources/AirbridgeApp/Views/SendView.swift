@@ -39,7 +39,7 @@ struct SendView: View {
     }
 
     private var sendContent: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             dropZone
 
             if let vm = viewModel, vm.isSending {
@@ -73,7 +73,7 @@ struct SendView: View {
                 .disabled(viewModel.map { !$0.isConnected } ?? true)
             }
         }
-        .padding(16)
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 

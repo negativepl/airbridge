@@ -20,7 +20,7 @@ struct HistoryView: View {
                         paginationLoader
                     }
                 }
-                .padding(16)
+                .padding(10)
                 .onChange(of: historyService.records.count) { _, _ in
                     if displayedCount > historyService.records.count {
                         displayedCount = min(pageSize, historyService.records.count)

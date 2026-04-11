@@ -63,9 +63,9 @@ struct GalleryView: View {
 
     private var groupedGallery: some View {
         GeometryReader { geo in
-            let rowHeight = max(200, geo.size.height - 32)
+            let rowHeight = max(200, geo.size.height - 20)
             ScrollView(.horizontal, showsIndicators: true) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 10) {
                     ForEach(galleryService.photos) { photo in
                         ThumbnailCell(
                             photo: photo,
@@ -86,7 +86,7 @@ struct GalleryView: View {
                             .frame(width: 80, height: rowHeight)
                     }
                 }
-                .padding(16)
+                .padding(10)
             }
         }
         .toolbar {
