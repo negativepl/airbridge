@@ -171,36 +171,13 @@ struct MessagesView: View {
                 }
             }
         }
-        .contentMargins(.top, 72, for: .scrollContent)
+        .contentMargins(.top, 16, for: .scrollContent)
         .contentMargins(.bottom, 80, for: .scrollContent)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
-        .overlay(alignment: .top) {
-            messageDetailHeader(convo)
-        }
         .overlay(alignment: .bottom) {
             messageDetailInput(convo)
         }
-    }
-
-    private func messageDetailHeader(_ convo: SmsConversationMeta) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(convo.displayName)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(convo.address)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
     }
 
     @ViewBuilder
