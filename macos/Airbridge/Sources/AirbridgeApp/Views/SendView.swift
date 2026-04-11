@@ -11,41 +11,31 @@ struct SendView: View {
     @State private var isTargeted = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        Group {
             if let vm = viewModel, !vm.isConnected {
-                Label(L10n.isPL ? "Połącz się z urządzeniem aby wysłać" : "Connect to a device to send", systemImage: "wifi.slash")
-                    .font(.system(size: 14)).foregroundStyle(.orange).padding(.top, 8)
+                Label(
+                    L10n.isPL ? "Połącz się z urządzeniem aby wysłać" : "Connect to a device to send",
+                    systemImage: "wifi.slash"
+                )
+                .font(.system(size: 14))
+                .foregroundStyle(.orange)
             }
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
-                    .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.3))
-                VStack(spacing: 14) {
-                    Image(systemName: "arrow.down.doc")
-                        .font(.system(size: 44))
-                        .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
-                    Text(L10n.dropFilesHere)
-                        .font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                }
-            }
-            .frame(minHeight: 220)
-            .contentShape(Rectangle())
-            .onTapGesture { openFilePicker() }
-            .glassEffect(isTargeted ? .regular.tint(.accentColor) : .regular, in: .rect(cornerRadius: 20))
-            .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
-                handleDrop(providers)
-            }
+            dropZone
 
             if let vm = viewModel, vm.isSending {
-                VStack(spacing: 8) {
-                    Text(vm.fileName).font(.system(size: 14)).lineLimit(1)
+                GlassSection {
+                    Text(vm.fileName)
+                        .font(.system(size: 14))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                     ProgressView(value: vm.progress)
+                        .tint(.accentColor)
                     Text("\(Int(vm.progress * 100))%")
-                        .font(.system(size: 13)).foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
                 }
-                .padding(16)
-                .glassEffect(in: .rect(cornerRadius: 12))
             }
 
             HStack(spacing: 14) {
@@ -64,8 +54,6 @@ struct SendView: View {
                 .disabled(viewModel.map { !$0.isConnected } ?? true)
             }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
             if viewModel == nil {
                 viewModel = TransferViewModel(
@@ -73,6 +61,45 @@ struct SendView: View {
                     connectionService: connectionService
                 )
             }
+        }
+    }
+
+    private var dropZone: some View {
+        ZStack {
+            VStack(spacing: 14) {
+                Image(systemName: "arrow.down.doc")
+                    .font(.system(size: 44))
+                    .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
+                    .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
+                    .symbolEffect(.bounce, value: isTargeted)
+                Text(L10n.dropFilesHere)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, minHeight: 220)
+        }
+        .glassEffect(
+            isTargeted
+                ? .regular.tint(.accentColor).interactive()
+                : .regular.interactive(),
+            in: .containerRelative
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    style: StrokeStyle(lineWidth: 1, dash: [6, 4])
+                )
+                .foregroundStyle(.secondary.opacity(isTargeted ? 0 : 0.25))
+                .padding(8)
+                .allowsHitTesting(false)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { openFilePicker() }
+        .animation(.airbridgeQuick, value: isTargeted)
+        .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
+            handleDrop(providers)
         }
     }
 
