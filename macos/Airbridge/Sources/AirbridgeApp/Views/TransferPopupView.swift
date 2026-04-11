@@ -69,8 +69,13 @@ struct TransferPopupView: View {
                 in: .rect(cornerRadius: 28, style: .continuous)
             )
             .glassEffectID("popup", in: glassNS)
+            .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
-        .shadow(radius: 30, y: 12)
+        .padding(Self.windowPadding)
+        .frame(
+            width: islandWidth + Self.windowPadding * 2,
+            height: islandHeight + Self.windowPadding * 2
+        )
         .animation(.airbridgeSmooth, value: state)
         .onChange(of: fileTransferService.fileTransferProgress) { _, new in
             if new >= 1.0 {
@@ -80,6 +85,8 @@ struct TransferPopupView: View {
             }
         }
     }
+
+    static let windowPadding: CGFloat = 40
 
     // MARK: - Subviews per state
 
@@ -340,12 +347,19 @@ final class TransferPopup {
         let defaults = UserDefaults.standard
         let offsetFromTop = defaults.object(forKey: "islandOffsetY") as? Double ?? 0
         let islandWidth = defaults.object(forKey: "islandWidth") as? Double ?? 560
-        let height = defaults.object(forKey: "islandHeight") as? Double ?? 130
+        let islandHeight = defaults.object(forKey: "islandHeight") as? Double ?? 130
+
+        // Window is larger than the visible glass pill so the drop shadow
+        // can render without being clipped at the window edges. The SwiftUI
+        // body pads by `windowPadding` on each side to center the pill.
+        let padding = TransferPopupView.windowPadding
+        let width = islandWidth + padding * 2
+        let height = islandHeight + padding * 2
 
         let screenFrame = screen.frame
-        let x = screenFrame.midX - islandWidth / 2
-        let y = screenFrame.maxY - offsetFromTop - height
+        let x = screenFrame.midX - width / 2
+        let y = screenFrame.maxY - offsetFromTop - islandHeight - padding
 
-        return (x, y, islandWidth, height)
+        return (x, y, width, height)
     }
 }
