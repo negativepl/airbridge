@@ -85,6 +85,7 @@ struct AirbridgeApp: App {
             }
         }
         .defaultSize(width: 1100, height: 850)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
