@@ -9,9 +9,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/macos/Airbridge"
 
 echo "--- swift build ---"
-swift build 2>&1 | tee /tmp/airbridge-build.log | grep -E "error:|warning:" | head -40 || true
+swift build 2>&1 | tee /tmp/airbridge-build.log | grep -E ": (error|warning):" | head -40 || true
 
-if grep -q "error:" /tmp/airbridge-build.log; then
+if grep -qE ': error:' /tmp/airbridge-build.log; then
     echo "BUILD FAILED — see /tmp/airbridge-build.log"
     exit 1
 fi
