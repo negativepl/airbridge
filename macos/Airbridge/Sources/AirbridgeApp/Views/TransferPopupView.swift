@@ -235,17 +235,27 @@ struct TransferPopupView: View {
             .frame(width: islandWidth, height: islandHeight + notchInset)
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
+        // Apply scale + opacity OUTSIDE the GlassEffectContainer (so the
+        // glass material AND its content scale as one unit) but INSIDE
+        // the outer `windowPadding`. With anchor `.top` applied here, the
+        // kotwica is the top edge of the pill itself — which after the
+        // .padding below sits a fixed `windowPadding` from the window
+        // top. That distance stays constant regardless of scale, so the
+        // spring overshoot can only stretch the pill's BOTTOM edge; the
+        // top edge is glued under the notch and never "drops" downward.
+        //
+        // Putting .scaleEffect AFTER the outer padding (as it used to be)
+        // anchored at Y=0 of the outer window frame — so the pill itself
+        // was pushed down by `padding * scale`, and the spring's overshoot
+        // briefly moved the pill 3–4pt below its rest position, creating
+        // a visible "bounce away from the top frame" artifact.
+        .scaleEffect(presentation.isPresented ? 1.0 : 0.55, anchor: .top)
+        .opacity(presentation.isPresented ? 1.0 : 0.0)
         .padding(Self.windowPadding)
         .frame(
             width: islandWidth + Self.windowPadding * 2,
             height: islandHeight + notchInset + Self.windowPadding * 2
         )
-        // Apply scale + opacity OUTSIDE the GlassEffectContainer so the
-        // glass material AND its content (text/icons/buttons) all scale
-        // together as one unit. Putting it inside causes the glass to
-        // render in a separate layer that the text doesn't follow.
-        .scaleEffect(presentation.isPresented ? 1.0 : 0.55, anchor: .top)
-        .opacity(presentation.isPresented ? 1.0 : 0.0)
         .contentShape(Rectangle())
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
@@ -589,11 +599,16 @@ private struct TransferStateEffects: View {
                     // never trace a simple circle — they ribbon around like
                     // aurora curtains.
 
+                    // All blob centers are parked in the bottom ~1/3 of the
+                    // pill so the aurora reads as a glow rising from the
+                    // lower edge, not a wash across the middle. Y-axis
+                    // drift amplitudes are tightened (vs the earlier wider
+                    // ranges) so nothing can climb toward cy ≈ 0.5.
                     blob(
                         color: animPrimary,
                         opacity: animIntensity,
                         cx: 0.22 + sin(t * twoPi / 3.0) * 0.38,
-                        cy: 0.78 + cos(t * twoPi / 2.6) * 0.20,
+                        cy: 0.92 + cos(t * twoPi / 2.6) * 0.10,
                         radius: w * 0.22
                     )
 
@@ -601,7 +616,7 @@ private struct TransferStateEffects: View {
                         color: animSecondary,
                         opacity: animIntensity * 0.95,
                         cx: 0.78 + cos(t * twoPi / 4.0) * 0.38,
-                        cy: 0.82 + sin(t * twoPi / 3.5) * 0.18,
+                        cy: 0.95 + sin(t * twoPi / 3.5) * 0.08,
                         radius: w * 0.24
                     )
 
@@ -609,7 +624,7 @@ private struct TransferStateEffects: View {
                         color: animTertiary,
                         opacity: animIntensity * 0.85,
                         cx: 0.50 + sin(t * twoPi / 5.0) * 0.40,
-                        cy: 0.65 + cos(t * twoPi / 3.8) * 0.22,
+                        cy: 0.85 + cos(t * twoPi / 3.8) * 0.12,
                         radius: w * 0.20
                     )
 
@@ -617,7 +632,7 @@ private struct TransferStateEffects: View {
                         color: animPrimary,
                         opacity: animIntensity * 0.7,
                         cx: 0.62 + cos(t * twoPi / 6.0) * 0.34,
-                        cy: 0.88 + sin(t * twoPi / 4.5) * 0.12,
+                        cy: 0.96 + sin(t * twoPi / 4.5) * 0.06,
                         radius: w * 0.18
                     )
 
@@ -625,7 +640,7 @@ private struct TransferStateEffects: View {
                         color: animSecondary,
                         opacity: animIntensity * 0.7,
                         cx: 0.38 + sin(t * twoPi / 7.0) * 0.34,
-                        cy: 0.70 + cos(t * twoPi / 5.2) * 0.22,
+                        cy: 0.88 + cos(t * twoPi / 5.2) * 0.10,
                         radius: w * 0.19
                     )
                 }
