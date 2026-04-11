@@ -5,38 +5,255 @@ import AppKit
 
 struct TransferPopupView: View {
     let fileTransferService: FileTransferService
-    @AppStorage("islandWidth") private var islandWidth: Double = 756
+    @AppStorage("islandWidth") private var islandWidth: Double = 560
     @AppStorage("islandHeight") private var islandHeight: Double = 130
-    @AppStorage("islandCornerRadius") private var islandCornerRadius: Double = 24
 
-    private let accentLight = Color.accentColor.opacity(0.8)
-    private let accentDark = Color.accentColor
-
+    @Namespace private var glassNS
     @State private var showComplete = false
 
-    private var speedLabel: String { L10n.isPL ? "Prędkość" : "Speed" }
-    private var etaLabel: String { L10n.isPL ? "Pozostało" : "Remaining" }
+    private var state: TransferPopupState {
+        if fileTransferService.hasIncomingOffer {
+            return .incoming(
+                filename: fileTransferService.fileTransferFileName,
+                sizeBytes: fileTransferService.incomingOfferFileSize
+            )
+        }
+        if fileTransferService.isRejected {
+            return .rejected(filename: fileTransferService.fileTransferFileName)
+        }
+        if fileTransferService.isWaitingForAccept {
+            return .waiting(filename: fileTransferService.fileTransferFileName)
+        }
+        if showComplete {
+            return .complete(
+                filename: fileTransferService.fileTransferFileName,
+                isReceiving: fileTransferService.isReceivingFile
+            )
+        }
+        return .transferring(
+            filename: fileTransferService.fileTransferFileName.isEmpty ? "file" : fileTransferService.fileTransferFileName,
+            progress: fileTransferService.fileTransferProgress,
+            isReceiving: fileTransferService.isReceivingFile
+        )
+    }
+
+    private func tint(for state: TransferPopupState) -> Color {
+        switch state {
+        case .incoming, .waiting, .transferring: return .accentColor
+        case .complete: return .green
+        case .rejected: return .red
+        }
+    }
+
+    var body: some View {
+        GlassEffectContainer(spacing: 0) {
+            Group {
+                switch state {
+                case .incoming(let name, let size):
+                    incomingView(name: name, size: size)
+                case .waiting(let name):
+                    waitingView(name: name)
+                case .transferring(let name, let progress, let receiving):
+                    transferringView(name: name, progress: progress, isReceiving: receiving)
+                case .complete(_, let receiving):
+                    completeView(isReceiving: receiving)
+                case .rejected(let name):
+                    rejectedView(name: name)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .frame(width: islandWidth, height: islandHeight)
+            .glassEffect(
+                .regular.tint(tint(for: state)),
+                in: .rect(cornerRadius: 28, style: .continuous)
+            )
+            .glassEffectID("popup", in: glassNS)
+        }
+        .shadow(radius: 30, y: 12)
+        .animation(.airbridgeSmooth, value: state)
+        .onChange(of: fileTransferService.fileTransferProgress) { _, new in
+            if new >= 1.0 {
+                withAnimation(.airbridgeSmooth) { showComplete = true }
+            } else if new == 0 {
+                showComplete = false
+            }
+        }
+    }
+
+    // MARK: - Subviews per state
+
+    private func incomingView(name: String, size: Int64) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: "arrow.down.doc.fill")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: name)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(formatBytes(size))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+            Spacer()
+            HStack(spacing: 8) {
+                Button(L10n.isPL ? "Odrzuć" : "Reject") {
+                    fileTransferService.rejectIncomingOffer()
+                }
+                .controlSize(.large)
+
+                Button(L10n.isPL ? "Akceptuj" : "Accept") {
+                    fileTransferService.acceptIncomingOffer()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        }
+    }
+
+    private func waitingView(name: String) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: "hourglass")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.pulse, options: .repeating)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button(L10n.isPL ? "Anuluj" : "Cancel") {
+                fileTransferService.cancelPendingTransfer()
+            }
+            .controlSize(.large)
+        }
+    }
+
+    private func transferringView(name: String, progress: Double, isReceiving: Bool) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: isReceiving ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.variableColor, options: .repeating)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(isReceiving
+                    ? (L10n.isPL ? "Odbieram" : "Receiving")
+                    : (L10n.isPL ? "Wysyłam" : "Sending"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Text(name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+
+                HStack {
+                    Text(speedText)
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                    Spacer()
+                    Text(etaText)
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+            }
+
+            Text("\(Int(progress * 100))%")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .frame(width: 72, alignment: .trailing)
+                .contentTransition(.numericText())
+        }
+    }
+
+    private func completeView(isReceiving: Bool) -> some View {
+        HStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: isReceiving)
+            Text(isReceiving
+                ? (L10n.isPL ? "Plik odebrany!" : "File received!")
+                : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+    }
+
+    private func rejectedView(name: String) -> some View {
+        HStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 32, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: name)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Helpers
 
     private var speedText: String {
         let speed = fileTransferService.transferSpeed
+        let label = L10n.isPL ? "Prędkość" : "Speed"
         if speed > 1024 * 1024 {
-            return String(format: "%@: %.1f MB/s", speedLabel, speed / (1024 * 1024))
+            return String(format: "%@: %.1f MB/s", label, speed / (1024 * 1024))
         } else if speed > 1024 {
-            return String(format: "%@: %.0f KB/s", speedLabel, speed / 1024)
+            return String(format: "%@: %.0f KB/s", label, speed / 1024)
         }
-        return ""
+        return " "
     }
 
     private var etaText: String {
         let eta = fileTransferService.transferEta
+        let label = L10n.isPL ? "Pozostało" : "Remaining"
         if eta > 60 {
-            return "\(etaLabel): \(eta / 60) min \(eta % 60) s"
+            return "\(label): \(eta / 60) min \(eta % 60) s"
         } else if eta > 3 {
-            return "\(etaLabel): \(eta) s"
+            return "\(label): \(eta) s"
         } else if fileTransferService.fileTransferProgress > 0 && fileTransferService.fileTransferProgress < 1.0 {
-            return L10n.isPL ? "\(etaLabel): kilka sekund…" : "\(etaLabel): a few seconds…"
+            return L10n.isPL ? "\(label): kilka sekund…" : "\(label): a few seconds…"
         }
-        return ""
+        return " "
     }
 
     private func formatBytes(_ size: Int64) -> String {
@@ -44,306 +261,10 @@ struct TransferPopupView: View {
         if size > 1024 { return String(format: "%.0f KB", Double(size) / 1024.0) }
         return "\(size) B"
     }
-
-    var body: some View {
-        ZStack {
-            if fileTransferService.hasIncomingOffer {
-                HStack(spacing: 16) {
-                    Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundColor(accentLight)
-                        .padding(.leading, 24)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text(fileTransferService.fileTransferFileName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Text(formatBytes(fileTransferService.incomingOfferFileSize))
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Button {
-                            fileTransferService.rejectIncomingOffer()
-                        } label: {
-                            Text(L10n.isPL ? "Odrzuć" : "Reject")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(Capsule().fill(Color.white.opacity(0.15)))
-                        }
-                        .buttonStyle(.plain)
-                        Button {
-                            fileTransferService.acceptIncomingOffer()
-                        } label: {
-                            Text(L10n.isPL ? "Akceptuj" : "Accept")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(Capsule().fill(Color.accentColor))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.trailing, 24)
-                }
-                .padding(.top, 10)
-                .transition(.opacity)
-            } else if fileTransferService.isRejected {
-                HStack(spacing: 16) {
-                    Spacer()
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundColor(.red)
-                        .symbolEffect(.bounce, value: fileTransferService.isRejected)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.9))
-                        Text(fileTransferService.fileTransferFileName)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.55))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 10)
-                .transition(.opacity)
-            } else if fileTransferService.isWaitingForAccept {
-                HStack(spacing: 16) {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.regular)
-                        .tint(.white)
-                        .padding(.leading, 24)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.9))
-                        Text(fileTransferService.fileTransferFileName)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.55))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Spacer()
-                    Button {
-                        fileTransferService.cancelPendingTransfer()
-                    } label: {
-                        Text(L10n.isPL ? "Anuluj" : "Cancel")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                Capsule().fill(Color.white.opacity(0.15))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 24)
-                }
-                .padding(.top, 10)
-                .transition(.opacity)
-            } else if showComplete {
-                HStack(spacing: 14) {
-                    Spacer()
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundColor(.green)
-                    Text(fileTransferService.isReceivingFile
-                        ? (L10n.isPL ? "Plik odebrany!" : "File received!")
-                        : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
-                .padding(.top, 10)
-                .transition(.opacity)
-            } else {
-                HStack(spacing: 16) {
-                    Image(systemName: fileTransferService.isReceivingFile ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                        .font(.system(size: 26, weight: .medium))
-                        .foregroundColor(accentLight)
-                        .padding(.leading, 24)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(fileTransferService.isReceivingFile
-                            ? (L10n.isPL ? "Odbieram:" : "Receiving:")
-                            : (L10n.isPL ? "Wysyłam:" : "Sending:"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-
-                        MarqueeText(
-                            text: fileTransferService.fileTransferFileName.isEmpty
-                                ? "file" : fileTransferService.fileTransferFileName
-                        )
-
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 3.5)
-                                    .fill(Color.white.opacity(0.12))
-                                    .frame(height: 6)
-                                RoundedRectangle(cornerRadius: 3.5)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [accentDark, accentLight],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: geometry.size.width * max(0.01, fileTransferService.fileTransferProgress), height: 6)
-                                    .animation(.easeInOut(duration: 0.3), value: fileTransferService.fileTransferProgress)
-                            }
-                        }
-                        .frame(height: 6)
-
-                        HStack(spacing: 4) {
-                            Text(speedText.isEmpty ? " " : speedText)
-                                .font(.system(size: 13, weight: .medium))
-                                .monospacedDigit()
-                                .foregroundColor(.white.opacity(0.45))
-                            Spacer()
-                            Text(etaText.isEmpty ? " " : etaText)
-                                .font(.system(size: 13, weight: .medium))
-                                .monospacedDigit()
-                                .foregroundColor(.white.opacity(0.45))
-                        }
-                        .frame(height: 16)
-                    }
-
-                    Text("\(Int(fileTransferService.fileTransferProgress * 100))%")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .frame(width: 80, alignment: .center)
-                        .contentTransition(.numericText())
-                        .animation(.easeInOut(duration: 0.2), value: Int(fileTransferService.fileTransferProgress * 100))
-                        .padding(.trailing, 24)
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: showComplete)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isWaitingForAccept)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.isRejected)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fileTransferService.hasIncomingOffer)
-        .onChange(of: fileTransferService.fileTransferProgress) { _, new in
-            if new >= 1.0 {
-                withAnimation { showComplete = true }
-            } else if new == 0 {
-                showComplete = false
-            }
-        }
-        .padding(.top, 20)
-        .padding(.bottom, 10)
-        .frame(width: islandWidth, height: islandHeight, alignment: .center)
-        .clipShape(BottomRoundedShape(radius: islandCornerRadius))
-        .background(
-            BottomRoundedShape(radius: islandCornerRadius)
-                .fill(Color.black)
-        )
-    }
 }
 
-// MARK: - MarqueeText
-
-struct MarqueeText: View {
-    let text: String
-    @State private var textWidth: CGFloat = 0
-    @State private var containerWidth: CGFloat = 0
-    @State private var offset: CGFloat = 0
-    @State private var animating = false
-
-    private var needsScroll: Bool { textWidth > containerWidth && containerWidth > 0 }
-    private var scrollDistance: CGFloat { textWidth - containerWidth + 20 }
-
-    var body: some View {
-        GeometryReader { geo in
-            Text(text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
-                .lineLimit(1)
-                .fixedSize()
-                .background(GeometryReader { textGeo in
-                    Color.clear.onAppear {
-                        textWidth = textGeo.size.width
-                        containerWidth = geo.size.width
-                        startAnimation()
-                    }
-                })
-                .offset(x: offset)
-        }
-        .frame(height: 20)
-        .clipped()
-        .onChange(of: text) { _, _ in
-            offset = 0
-            animating = false
-            textWidth = 0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                startAnimation()
-            }
-        }
-    }
-
-    private func startAnimation() {
-        guard needsScroll, !animating else { return }
-        animating = true
-        animate()
-    }
-
-    private func animate() {
-        guard animating, needsScroll else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
-            guard animating else { return }
-            withAnimation(.linear(duration: Double(scrollDistance) / 30.0)) {
-                offset = -scrollDistance
-            }
-            let scrollDuration = Double(scrollDistance) / 30.0
-            DispatchQueue.main.asyncAfter(deadline: .now() + scrollDuration + 1.0) { [self] in
-                guard animating else { return }
-                withAnimation(.linear(duration: Double(scrollDistance) / 30.0)) {
-                    offset = 0
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + scrollDuration + 1.0) { [self] in
-                    animate()
-                }
-            }
-        }
-    }
-}
-
-// MARK: - BottomRoundedShape
-
-struct BottomRoundedShape: Shape {
-    var radius: Double
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY - radius),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        path.closeSubpath()
-        return path
-    }
-}
-
-// MARK: - TransferPopup (singleton)
+// MARK: - TransferPopup singleton
+// (Window management — see Task 18 for the slim rewrite)
 
 @MainActor
 final class TransferPopup {
@@ -379,24 +300,17 @@ final class TransferPopup {
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
+        // Slide in using NSAnimationContext instead of manual Timer
         let startY = y + height + 10
         window.setFrame(NSRect(x: x, y: startY, width: width, height: height), display: true)
         window.orderFrontRegardless()
 
-        let duration = 0.35
-        let startTime = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1.0/60.0, repeats: true) { timer in
-            let elapsed = CACurrentMediaTime() - startTime
-            let t = min(elapsed / duration, 1.0)
-            let eased = 1.0 - pow(1.0 - t, 3.0)
-            let currentY = startY + (y - startY) * eased
-            window.setFrameOrigin(NSPoint(x: x, y: currentY))
-            if t >= 1.0 {
-                timer.invalidate()
-                window.setFrameOrigin(NSPoint(x: x, y: y))
-            }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.allowsImplicitAnimation = true
+            window.animator().setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         }
-        RunLoop.main.add(timer, forMode: .common)
 
         self.panel = window
     }
@@ -408,31 +322,24 @@ final class TransferPopup {
             guard let self, let panel = self.panel else { return }
             let frame = panel.frame
             let targetY = frame.origin.y + frame.height + 10
-            let startY = frame.origin.y
-            let duration = 0.3
-            let startTime = CACurrentMediaTime()
 
-            let timer = Timer(timeInterval: 1.0/60.0, repeats: true) { [weak self] timer in
-                let elapsed = CACurrentMediaTime() - startTime
-                let t = min(elapsed / duration, 1.0)
-                let eased = t * t * t
-                let currentY = startY + (targetY - startY) * eased
-                panel.setFrameOrigin(NSPoint(x: frame.origin.x, y: currentY))
-                if t >= 1.0 {
-                    timer.invalidate()
-                    panel.orderOut(nil)
-                    self?.panel = nil
-                    self?.isVisible = false
-                }
-            }
-            RunLoop.main.add(timer, forMode: .common)
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.30
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                ctx.allowsImplicitAnimation = true
+                panel.animator().setFrameOrigin(NSPoint(x: frame.origin.x, y: targetY))
+            }, completionHandler: {
+                panel.orderOut(nil)
+                self.panel = nil
+                self.isVisible = false
+            })
         }
     }
 
     private func computeLayout(screen: NSScreen) -> (x: Double, y: Double, width: Double, height: Double) {
         let defaults = UserDefaults.standard
         let offsetFromTop = defaults.object(forKey: "islandOffsetY") as? Double ?? 0
-        let islandWidth = defaults.object(forKey: "islandWidth") as? Double ?? 756
+        let islandWidth = defaults.object(forKey: "islandWidth") as? Double ?? 560
         let height = defaults.object(forKey: "islandHeight") as? Double ?? 130
 
         let screenFrame = screen.frame
@@ -440,5 +347,24 @@ final class TransferPopup {
         let y = screenFrame.maxY - offsetFromTop - height
 
         return (x, y, islandWidth, height)
+    }
+}
+
+// TEMPORARY: kept for DropZoneView until Task 19 migrates it. Delete in Task 19.
+struct BottomRoundedShape: Shape {
+    var radius: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
+                          control: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - radius),
+                          control: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
