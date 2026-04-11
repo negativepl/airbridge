@@ -124,149 +124,145 @@ struct OnboardingView: View {
     // MARK: - Page 1: Welcome
 
     private var welcomePage: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                GlassSection {
+                    VStack(spacing: 20) {
+                        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+                           let icon = NSImage(contentsOf: iconURL) {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .frame(width: 140, height: 140)
+                                .clipShape(RoundedRectangle(cornerRadius: 30))
+                                .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+                                .symbolEffect(.bounce, value: page)
+                        }
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
-               let icon = NSImage(contentsOf: iconURL) {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 140, height: 140)
-                    .clipShape(RoundedRectangle(cornerRadius: 30))
-                    .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+                        Text("Airbridge")
+                            .font(.system(size: 36, weight: .bold))
+
+                        Text(isPL
+                            ? "Twój telefon i komputer Mac, połączone jak nigdy dotąd."
+                            : "Your phone and Mac, finally on the same team.")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                GlassSection {
+                    VStack(alignment: .leading, spacing: 18) {
+                        featureRow(
+                            icon: "doc.on.clipboard",
+                            text: isPL
+                                ? "Synchronizuj schowek między telefonem a komputerem Mac"
+                                : "Instantly copy text between your phone and Mac"
+                        )
+                        featureRow(
+                            icon: "doc.fill",
+                            text: isPL
+                                ? "Przesyłaj zdjęcia i pliki bezprzewodowo, bez chmury"
+                                : "Send photos and files — no cables, no cloud"
+                        )
+                        featureRow(
+                            icon: "lock.shield.fill",
+                            text: isPL
+                                ? "Wszystko zostaje w Twojej sieci — pełna prywatność"
+                                : "Private — your data never leaves your home network"
+                        )
+                    }
+                }
             }
-
-            Spacer().frame(height: 28)
-
-            Text("Airbridge")
-                .font(.system(size: 36, weight: .bold))
-
-            Spacer().frame(height: 10)
-
-            Text(isPL
-                ? "Twój telefon i komputer Mac, połączone jak nigdy dotąd."
-                : "Your phone and Mac, finally on the same team.")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer().frame(height: 40)
-
-            VStack(alignment: .leading, spacing: 18) {
-                featureRow(
-                    icon: "doc.on.clipboard",
-                    text: isPL
-                        ? "Synchronizuj schowek między telefonem a komputerem Mac"
-                        : "Instantly copy text between your phone and Mac"
-                )
-                featureRow(
-                    icon: "doc.fill",
-                    text: isPL
-                        ? "Przesyłaj zdjęcia i pliki bezprzewodowo, bez chmury"
-                        : "Send photos and files — no cables, no cloud"
-                )
-                featureRow(
-                    icon: "lock.shield.fill",
-                    text: isPL
-                        ? "Wszystko zostaje w Twojej sieci — pełna prywatność"
-                        : "Private — your data never leaves your home network"
-                )
-            }
-            .padding(.horizontal, 48)
-
-            Spacer()
+            .padding(24)
         }
-        .padding(36)
     }
 
     // MARK: - Page 2: How it works
 
     private var howItWorksPage: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                GlassSection {
+                    VStack(spacing: 16) {
+                        Image(systemName: "wifi")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.primary)
+                            .symbolEffect(.bounce, value: page)
 
-            Image(systemName: "wifi")
-                .font(.system(size: 56))
-                .foregroundStyle(.primary)
+                        Text(isPL ? "Jak to działa?" : "How it works")
+                            .font(.system(size: 32, weight: .bold))
 
-            Spacer().frame(height: 28)
+                        Text(isPL
+                            ? "Trzy rzeczy, które warto wiedzieć:"
+                            : "Three things you should know:")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
 
-            Text(isPL ? "Jak to działa?" : "How it works")
-                .font(.system(size: 32, weight: .bold))
-
-            Spacer().frame(height: 10)
-
-            Text(isPL
-                ? "Trzy rzeczy, które warto wiedzieć:"
-                : "Three things you should know:")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
-
-            Spacer().frame(height: 40)
-
-            VStack(alignment: .leading, spacing: 22) {
-                numberedRow(
-                    number: "1",
-                    text: isPL
-                        ? "Telefon i komputer Mac muszą być w tej samej sieci Wi-Fi"
-                        : "Both devices need to be on the same WiFi network"
-                )
-                numberedRow(
-                    number: "2",
-                    text: isPL
-                        ? "Komputer Mac zostanie wykryty automatycznie — bez konfiguracji"
-                        : "Airbridge finds your Mac automatically — no IP addresses, no configuration"
-                )
-                numberedRow(
-                    number: "3",
-                    text: isPL
-                        ? "Schowek synchronizuje się automatycznie, a pliki przesyłasz jednym kliknięciem"
-                        : "Runs quietly in the background — clipboard syncs automatically"
-                )
+                GlassSection {
+                    VStack(alignment: .leading, spacing: 22) {
+                        numberedRow(
+                            number: "1",
+                            text: isPL
+                                ? "Telefon i komputer Mac muszą być w tej samej sieci Wi-Fi"
+                                : "Both devices need to be on the same WiFi network"
+                        )
+                        numberedRow(
+                            number: "2",
+                            text: isPL
+                                ? "Komputer Mac zostanie wykryty automatycznie — bez konfiguracji"
+                                : "Airbridge finds your Mac automatically — no IP addresses, no configuration"
+                        )
+                        numberedRow(
+                            number: "3",
+                            text: isPL
+                                ? "Schowek synchronizuje się automatycznie, a pliki przesyłasz jednym kliknięciem"
+                                : "Runs quietly in the background — clipboard syncs automatically"
+                        )
+                    }
+                }
             }
-            .padding(.horizontal, 48)
-
-            Spacer()
+            .padding(24)
         }
-        .padding(36)
     }
 
     // MARK: - Page 3: Connect
 
     private var connectPage: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                GlassSection {
+                    VStack(spacing: 16) {
+                        Image(systemName: "qrcode")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.primary)
+                            .symbolEffect(.bounce, value: page)
 
-            Image(systemName: "qrcode")
-                .font(.system(size: 56))
-                .foregroundStyle(.primary)
+                        Text(isPL ? "Sparuj z telefonem" : "Pair with your phone")
+                            .font(.system(size: 32, weight: .bold))
 
-            Spacer().frame(height: 28)
+                        Text(isPL
+                            ? "Otwórz Airbridge na telefonie i zeskanuj kod QR."
+                            : "Open Airbridge on your phone and scan the QR code.")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
 
-            Text(isPL ? "Sparuj z telefonem" : "Pair with your phone")
-                .font(.system(size: 32, weight: .bold))
-
-            Spacer().frame(height: 10)
-
-            Text(isPL
-                ? "Otwórz Airbridge na telefonie i zeskanuj kod QR."
-                : "Open Airbridge on your phone and scan the QR code.")
-                .font(.system(size: 18))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer().frame(height: 14)
-
-            Text(isPL
-                ? "Oba urządzenia muszą być w tej samej sieci Wi-Fi."
-                : "Both devices must be on the same Wi-Fi network.")
-                .font(.system(size: 15))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
+                        Text(isPL
+                            ? "Oba urządzenia muszą być w tej samej sieci Wi-Fi."
+                            : "Both devices must be on the same Wi-Fi network.")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(24)
         }
-        .padding(36)
     }
 
     // MARK: - Components
@@ -289,8 +285,7 @@ struct OnboardingView: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Color.accentColor)
-                .clipShape(Circle())
+                .glassEffect(.regular.tint(.accentColor), in: .circle)
             Text(text)
                 .font(.system(size: 15))
                 .padding(.top, 5)
