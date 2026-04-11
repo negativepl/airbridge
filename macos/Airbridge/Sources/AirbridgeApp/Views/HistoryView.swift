@@ -20,7 +20,7 @@ struct HistoryView: View {
                         paginationLoader
                     }
                 }
-                .padding(24)
+                .padding(16)
                 .onChange(of: historyService.records.count) { _, _ in
                     if displayedCount > historyService.records.count {
                         displayedCount = min(pageSize, historyService.records.count)
@@ -78,7 +78,7 @@ struct HistoryView: View {
         ProgressView()
             .controlSize(.regular)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            .padding(.vertical, 16)
             .onAppear {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 250_000_000)
