@@ -103,22 +103,7 @@ struct MessagesView: View {
     }
 
     private func messageDetail(_ convo: SmsConversationMeta) -> some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(convo.displayName).font(.system(size: 16, weight: .semibold))
-                    Text(convo.address).font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(16)
-            .glassEffect(in: .rect)
-
-            // Messages
+        Group {
             if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -139,42 +124,82 @@ struct MessagesView: View {
                         }
                     }
                 }
+                .scrollEdgeEffectStyle(.soft, for: .top)
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            messageDetailHeader(convo)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            messageDetailInput(convo)
+        }
+    }
 
-            Divider()
-
-            // Input or short code warning
-            if isShortCode(convo.address) {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text(L10n.isPL
-                        ? "Nie możesz odpowiedzieć na ten krótki kod."
-                        : "You can't reply to this short code.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(14)
-            } else {
-                HStack(spacing: 10) {
-                    TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 14))
-                        .onSubmit { sendMessage(to: convo) }
-
-                    Button {
-                        sendMessage(to: convo)
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 14))
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
-                    .disabled(messageText.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                .padding(14)
+    private func messageDetailHeader(_ convo: SmsConversationMeta) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(convo.displayName)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(convo.address)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+    }
+
+    @ViewBuilder
+    private func messageDetailInput(_ convo: SmsConversationMeta) -> some View {
+        if isShortCode(convo.address) {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.orange)
+                Text(L10n.isPL
+                    ? "Nie możesz odpowiedzieć na ten krótki kod."
+                    : "You can't reply to this short code.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial)
+        } else {
+            HStack(spacing: 12) {
+                TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 15))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
+                    .onSubmit { sendMessage(to: convo) }
+
+                Button {
+                    sendMessage(to: convo)
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
+                .disabled(messageText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
         }
     }
 
