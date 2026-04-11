@@ -623,11 +623,16 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.GalleryPreviewRequest -> {
+                Log.e(TAG, "!!! GalleryPreviewRequest RECEIVED: photoId=${message.photoId} maxSize=${message.maxSize}")
                 serviceScope.launch {
                     val data = galleryProvider.getPreview(message.photoId, message.maxSize)
                     if (data != null) {
+                        Log.e(TAG, "!!! preview data ready, length=${data.length}, sending response")
                         val response = Message.GalleryPreviewResponse(message.photoId, data)
                         webSocketClient.send(response)
+                        Log.e(TAG, "!!! GalleryPreviewResponse sent")
+                    } else {
+                        Log.e(TAG, "!!! getPreview returned null for ${message.photoId}")
                     }
                 }
             }

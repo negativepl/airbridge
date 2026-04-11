@@ -230,7 +230,7 @@ final class ConnectionService {
         case .fileTransferStart, .fileChunk, .fileChunkAck, .fileTransferComplete,
              .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
             fileTransferHandler?.handleMessage(message)
-        case .galleryResponse, .galleryThumbnailResponse:
+        case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse:
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
             smsHandler?.handleMessage(message)

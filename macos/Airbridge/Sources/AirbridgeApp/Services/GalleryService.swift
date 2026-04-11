@@ -69,11 +69,13 @@ final class GalleryService: MessageHandler {
     }
 
     func requestPreview(photoId: String, maxSize: Int = 1920) {
+        // Skip only if we already have the image; always allow re-requesting
+        // if nothing arrived (covers stale pending state after APK restart).
         guard previewImages[photoId] == nil,
-              !requestedPreviews.contains(photoId),
               let connectionService else { return }
         requestedPreviews.insert(photoId)
         let message = Message.galleryPreviewRequest(photoId: photoId, maxSize: maxSize)
+        NSLog("[Gallery] requesting preview for \(photoId) maxSize=\(maxSize)")
         Task {
             try? await connectionService.broadcast(message)
         }
@@ -112,9 +114,13 @@ final class GalleryService: MessageHandler {
             }
 
         case .galleryPreviewResponse(let photoId, let data):
+            NSLog("[Gallery] received preview response for \(photoId), data length=\(data.count)")
             if let imageData = Data(base64Encoded: data),
                let image = NSImage(data: imageData) {
                 previewImages[photoId] = image
+                NSLog("[Gallery] stored preview image \(image.size.width)x\(image.size.height)")
+            } else {
+                NSLog("[Gallery] failed to decode preview image data")
             }
             requestedPreviews.remove(photoId)
 

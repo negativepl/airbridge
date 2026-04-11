@@ -89,7 +89,7 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
 
     fun getPreview(photoId: String, maxSize: Int): String? {
         val clamped = maxSize.coerceIn(800, 3200)
-        return decodeScaled(photoId, targetSize = clamped, quality = 88)
+        return decodeScaled(photoId, targetSize = clamped, quality = 75)
     }
 
     private fun decodeScaled(photoId: String, targetSize: Int, quality: Int): String? {

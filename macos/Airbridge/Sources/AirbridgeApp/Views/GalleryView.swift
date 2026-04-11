@@ -212,7 +212,7 @@ struct PhotoDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
+        .task(id: photo.id) {
             galleryService.requestPreview(photoId: photo.id, maxSize: 1920)
         }
     }
