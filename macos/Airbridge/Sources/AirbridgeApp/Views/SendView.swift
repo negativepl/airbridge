@@ -13,45 +13,9 @@ struct SendView: View {
     var body: some View {
         Group {
             if let vm = viewModel, !vm.isConnected {
-                Label(
-                    L10n.isPL ? "Połącz się z urządzeniem aby wysłać" : "Connect to a device to send",
-                    systemImage: "wifi.slash"
-                )
-                .font(.system(size: 14))
-                .foregroundStyle(.orange)
-            }
-
-            dropZone
-
-            if let vm = viewModel, vm.isSending {
-                GlassSection {
-                    Text(vm.fileName)
-                        .font(.system(size: 14))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    ProgressView(value: vm.progress)
-                        .tint(.accentColor)
-                    Text("\(Int(vm.progress * 100))%")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-            }
-
-            HStack(spacing: 14) {
-                Button { openFilePicker() } label: {
-                    Label(L10n.selectFiles, systemImage: "folder")
-                        .font(.system(size: 14))
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
-
-                Button { sendClipboard() } label: {
-                    Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
-                        .font(.system(size: 14))
-                }
-                .controlSize(.extraLarge)
-                .disabled(viewModel.map { !$0.isConnected } ?? true)
+                notConnectedView
+            } else {
+                sendContent
             }
         }
         .onAppear {
@@ -61,6 +25,52 @@ struct SendView: View {
                     connectionService: connectionService
                 )
             }
+        }
+    }
+
+    private var notConnectedView: some View {
+        EmptyStateView(
+            systemImage: "wifi.slash",
+            title: L10n.isPL ? "Wyślij" : "Send",
+            subtitle: L10n.isPL
+                ? "Połącz się z telefonem, aby wysyłać pliki i zawartość schowka."
+                : "Connect to your phone to send files and clipboard content."
+        )
+    }
+
+    @ViewBuilder
+    private var sendContent: some View {
+        dropZone
+
+        if let vm = viewModel, vm.isSending {
+            GlassSection {
+                Text(vm.fileName)
+                    .font(.system(size: 14))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                ProgressView(value: vm.progress)
+                    .tint(.accentColor)
+                Text("\(Int(vm.progress * 100))%")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+        }
+
+        HStack(spacing: 14) {
+            Button { openFilePicker() } label: {
+                Label(L10n.selectFiles, systemImage: "folder")
+                    .font(.system(size: 14))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.extraLarge)
+
+            Button { sendClipboard() } label: {
+                Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
+                    .font(.system(size: 14))
+            }
+            .controlSize(.extraLarge)
+            .disabled(viewModel.map { !$0.isConnected } ?? true)
         }
     }
 

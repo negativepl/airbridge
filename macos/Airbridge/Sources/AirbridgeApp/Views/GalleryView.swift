@@ -34,34 +34,31 @@ struct GalleryView: View {
     }
 
     private var notConnectedView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 40)).foregroundStyle(.tertiary)
-            Text(L10n.isPL ? "Galeria" : "Gallery")
-                .font(.title3).fontWeight(.semibold).foregroundStyle(.secondary)
-            Text(L10n.isPL
+        EmptyStateView(
+            systemImage: "photo.on.rectangle",
+            title: L10n.isPL ? "Galeria" : "Gallery",
+            subtitle: L10n.isPL
                 ? "Połącz się z telefonem, aby przeglądać zdjęcia."
-                : "Connect to your phone to browse photos.")
-                .font(.subheadline).foregroundStyle(.tertiary).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                : "Connect to your phone to browse photos."
+        )
     }
 
     private var emptyView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo.on.rectangle")
-                .font(.system(size: 40)).foregroundStyle(.tertiary)
-            Text(L10n.isPL ? "Brak zdjęć" : "No Photos")
-                .font(.title3).fontWeight(.semibold).foregroundStyle(.secondary)
-            Text(L10n.isPL
-                ? "Nie znaleziono zdjęć na telefonie."
-                : "No photos found on your phone.")
-                .font(.subheadline).foregroundStyle(.tertiary)
+        VStack(spacing: 20) {
+            EmptyStateView(
+                systemImage: "photo.on.rectangle",
+                title: L10n.isPL ? "Brak zdjęć" : "No Photos",
+                subtitle: L10n.isPL
+                    ? "Nie znaleziono zdjęć na telefonie."
+                    : "No photos found on your phone."
+            )
             Button(L10n.isPL ? "Odśwież" : "Refresh") {
                 galleryService.clearAndReload()
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.bottom, 80)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var groupedGallery: some View {

@@ -29,25 +29,14 @@ struct HistoryView: View {
     }
 
     private var emptyView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "clock")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-                .symbolEffect(.pulse, options: .repeating)
-
-            Text(L10n.isPL ? "Brak aktywności" : "No Activity")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-
-            Text(L10n.isPL
+        EmptyStateView(
+            systemImage: "clock",
+            title: L10n.isPL ? "Brak aktywności" : "No Activity",
+            subtitle: L10n.isPL
                 ? "Ostatnio brak aktywności.\nHistoria synchronizacji i przesłanych plików pojawi się tutaj."
-                : "No recent activity.\nSync and transfer history will appear here.")
-                .font(.system(size: 14))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                : "No recent activity.\nSync and transfer history will appear here.",
+            pulseIcon: true
+        )
     }
 
     private func recordRow(_ record: TransferRecord) -> some View {

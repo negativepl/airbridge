@@ -46,21 +46,13 @@ struct MessagesView: View {
     }
 
     private var notConnectedView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "message")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-            Text(L10n.isPL ? "Wiadomości" : "Messages")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(L10n.isPL
+        EmptyStateView(
+            systemImage: "message",
+            title: L10n.isPL ? "Wiadomości" : "Messages",
+            subtitle: L10n.isPL
                 ? "Połącz się z telefonem, aby przeglądać wiadomości."
-                : "Connect to your phone to browse messages.")
-                .font(.system(size: 14))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                : "Connect to your phone to browse messages."
+        )
     }
 
     private var conversationList: some View {
