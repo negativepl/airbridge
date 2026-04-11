@@ -183,22 +183,7 @@ struct MessagesView: View {
     @ViewBuilder
     private func messageDetailInput(_ convo: SmsConversationMeta) -> some View {
         if isShortCode(convo.address) {
-            HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.orange)
-                Text(L10n.isPL
-                    ? "Nie możesz odpowiedzieć na ten krótki kod."
-                    : "You can't reply to this short code.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
-            .padding(.horizontal, 20)
-            .padding(.bottom, 14)
+            EmptyView()
         } else {
             HStack(spacing: 12) {
                 TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
