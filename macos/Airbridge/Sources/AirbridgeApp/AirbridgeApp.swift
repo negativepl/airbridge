@@ -75,7 +75,6 @@ struct AirbridgeApp: App {
                 )
                 .onAppear { hotkeyService.start() }
                 .containerBackground(.thinMaterial, for: .window)
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             } else {
                 OnboardingView(
                     pairingService: pairingService,
@@ -86,7 +85,6 @@ struct AirbridgeApp: App {
             }
         }
         .defaultSize(width: 1100, height: 850)
-        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
