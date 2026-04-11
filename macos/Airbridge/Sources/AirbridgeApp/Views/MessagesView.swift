@@ -43,6 +43,20 @@ struct MessagesView: View {
                 smsService.loadConversations()
             }
         }
+        .navigationTitle(navTitle)
+        .navigationSubtitle(navSubtitle)
+    }
+
+    private var navTitle: String {
+        if let convo = selectedConversation {
+            return convo.displayName
+        }
+        return L10n.isPL ? "Wiadomości" : "Messages"
+    }
+
+    private var navSubtitle: String {
+        guard let convo = selectedConversation else { return "" }
+        return convo.displayName != convo.address ? convo.address : ""
     }
 
     private var notConnectedView: some View {
