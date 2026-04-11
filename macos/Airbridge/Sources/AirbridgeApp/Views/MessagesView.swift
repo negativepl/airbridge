@@ -117,7 +117,6 @@ struct MessagesView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 20)
                 .onChange(of: smsService.currentMessages.count) { _, _ in
                     if let last = smsService.currentMessages.reversed().last {
                         proxy.scrollTo(last.id, anchor: .bottom)
@@ -125,13 +124,14 @@ struct MessagesView: View {
                 }
             }
         }
-        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 72, for: .scrollContent)
+        .contentMargins(.bottom, 80, for: .scrollContent)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .overlay(alignment: .top) {
             messageDetailHeader(convo)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             messageDetailInput(convo)
         }
     }
@@ -153,7 +153,7 @@ struct MessagesView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thickMaterial)
+        .background(.ultraThinMaterial)
     }
 
     @ViewBuilder
@@ -173,7 +173,7 @@ struct MessagesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thickMaterial)
+            .background(.ultraThinMaterial)
         } else {
             HStack(spacing: 12) {
                 TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
@@ -199,7 +199,7 @@ struct MessagesView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
-            .background(.thickMaterial)
+            .background(.ultraThinMaterial)
         }
     }
 
