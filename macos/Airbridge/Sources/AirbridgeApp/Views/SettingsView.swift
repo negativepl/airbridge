@@ -40,6 +40,9 @@ struct SettingsView: View {
         .onAppear {
             pairingService.refreshPairedDevices()
             accessibilityGranted = AXIsProcessTrusted()
+            if !accessibilityGranted {
+                startAccessibilityPolling()
+            }
         }
         .onDisappear {
             accessibilityPollTimer?.invalidate()
@@ -47,6 +50,15 @@ struct SettingsView: View {
         }
         .onChange(of: connectionService.isConnected) { _, _ in
             pairingService.refreshPairedDevices()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            let granted = AXIsProcessTrusted()
+            accessibilityGranted = granted
+            if granted {
+                accessibilityPollTimer?.invalidate()
+                accessibilityPollTimer = nil
+                hotkeyService.start()
+            }
         }
         .sheet(isPresented: $showPairing) {
             PairingView(pairingService: pairingService, connectionService: connectionService, isPresented: $showPairing)

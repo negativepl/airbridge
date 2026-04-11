@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import SwiftUI
 import Protocol
 import AirbridgeSecurity
 import FileTransfer
@@ -70,6 +71,9 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     // MARK: - Incoming Offer (file from phone)
 
     private func handleIncomingOffer(transferId: String, filename: String, fileSize: Int64) {
+        // No withAnimation here — TransferPopupView has .animation(value:
+        // stateKind) which catches state changes and animates them. Wrapping
+        // in withAnimation creates a competing transaction that conflicts.
         incomingOfferTransferId = transferId
         incomingOfferFileSize = fileSize
         fileTransferFileName = filename
@@ -77,7 +81,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         isWaitingForAccept = false
         isRejected = false
         fileTransferProgress = 0
-        TransferPopup.shared.show(fileTransferService: self)
+        TransferPopup.shared.show()
     }
 
     func acceptIncomingOffer() {
@@ -100,9 +104,13 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         incomingOfferTransferId = nil
         isRejected = true
         Task {
+            // Keep rejected state visible for 2s, then hide (0.5s animation)
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             TransferPopup.shared.hide(delay: 0)
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            // Wait for hide animation + buffer so state reset happens AFTER
+            // the window is fully orderOut'd — otherwise the idle "drop file
+            // here" content flashes during the fade.
+            try? await Task.sleep(nanoseconds: 800_000_000)
             isRejected = false
             fileTransferFileName = ""
             isReceivingFile = false
@@ -188,14 +196,17 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         let fileSize: Int64 = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
         let transferId = UUID().uuidString
 
+        // No withAnimation — view-side .animation(value: stateKind) handles
+        // it. Wrapping here creates a competing transaction.
         self.fileTransferFileName = filename
         self.fileTransferProgress = 0
         self.isWaitingForAccept = true
         self.isRejected = false
         self.isReceivingFile = false
 
-        // Show the popup immediately in waiting state
-        TransferPopup.shared.show(fileTransferService: self)
+        // Show the popup immediately in waiting state (idempotent — if the
+        // user already opened it via Quick Drop, no new window is created)
+        TransferPopup.shared.show()
 
         Task {
             // 1. Set up response stream before sending offer
@@ -215,13 +226,19 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             }
 
             guard accepted else {
-                // Rejected — animate rejection in popup, then hide (no extra delay)
+                // Rejected — let view-side animation handle the morph
                 self.isWaitingForAccept = false
                 self.isRejected = true
-                // Show rejection for 2s then slide up
+                // Show rejection for 2s then slide up. Hide animation is
+                // 0.5s — total popup-visible time is 2.5s.
                 TransferPopup.shared.hide(delay: 2.0)
-                // Wait for slide-up animation to finish before clearing state
-                try? await Task.sleep(nanoseconds: 2_400_000_000)
+                // Wait UNTIL the hide animation has fully completed AND the
+                // NSWindow has been orderOut'd before resetting state. If we
+                // reset earlier, SwiftUI re-renders the fading-out window
+                // with idle content and the user sees "drop file here" flash
+                // across the dying popup.
+                try? await Task.sleep(nanoseconds: 2_800_000_000)
+                // No withAnimation — popup is already gone, no one observes
                 self.isRejected = false
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
@@ -230,7 +247,13 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 return
             }
 
-            // 4. Accepted — switch state, popup is already showing
+            // 4. Accepted — switch directly into transferring state.
+            // CRITICAL: set progress to a tiny non-zero value BEFORE
+            // clearing isWaitingForAccept. Otherwise the state computation
+            // briefly returns .idle (no waiting + no progress + nothing
+            // else active) and the user sees "drop file here" flash before
+            // the upload starts producing progress callbacks.
+            self.fileTransferProgress = 0.001
             self.isWaitingForAccept = false
 
             let success = await Self.httpUpload(
@@ -241,7 +264,10 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 port: 8767
             ) { progress in
                 Task { @MainActor in
-                    self.fileTransferProgress = progress
+                    // Clamp away from 0 — URLSession can report 0 on the
+                    // first callback before any bytes are sent, which would
+                    // also flash to .idle.
+                    self.fileTransferProgress = max(progress, 0.001)
                 }
             }
 
@@ -367,7 +393,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 if !self.isReceivingFile {
                     self.isReceivingFile = true
                     self.transferStartTime = Date()
-                    TransferPopup.shared.show(fileTransferService: self)
+                    TransferPopup.shared.show()
                 }
 
                 if let start = self.transferStartTime {

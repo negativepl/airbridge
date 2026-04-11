@@ -38,6 +38,7 @@ struct AirbridgeApp: App {
         gallery.configure(connectionService: connection)
         sms.configure(connectionService: connection)
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
+        TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms)
 
         _connectionService = State(initialValue: connection)

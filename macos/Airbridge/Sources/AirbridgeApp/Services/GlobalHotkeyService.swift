@@ -94,11 +94,7 @@ final class GlobalHotkeyService {
 
     private func handleKeyEvent(_ event: NSEvent) {
         guard matchesShortcut(event) else { return }
-        guard let connectionService, let fileTransferService else { return }
-        DropZonePopup.shared.toggle(
-            connectionService: connectionService,
-            fileTransferService: fileTransferService
-        )
+        TransferPopup.shared.toggle()
     }
 
     func matchesShortcut(_ event: NSEvent) -> Bool {

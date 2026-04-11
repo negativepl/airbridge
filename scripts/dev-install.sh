@@ -53,6 +53,12 @@ done
 echo "--- re-signing (ad-hoc) ---"
 codesign --force --deep --sign - "$APP" 2>&1 | tail -5
 
+# Ad-hoc re-sign changes the code signature on every build, which invalidates
+# the TCC Accessibility grant for com.airbridge.macos. Reset it so Quick Drop
+# always starts from a clean slate and the user can re-grant without surprise.
+echo "--- resetting Accessibility TCC ---"
+tccutil reset Accessibility com.airbridge.macos 2>&1 || true
+
 echo "--- launching ---"
 open "$APP"
 echo "✓ AirBridge running from debug build"
