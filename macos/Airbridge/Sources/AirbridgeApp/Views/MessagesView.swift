@@ -172,10 +172,7 @@ struct MessagesView: View {
                 }
             }
         }
-        .contentMargins(.top, 16, for: .scrollContent)
         .contentMargins(.bottom, 80, for: .scrollContent)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .overlay(alignment: .bottom) {
             messageDetailInput(convo)
         }
