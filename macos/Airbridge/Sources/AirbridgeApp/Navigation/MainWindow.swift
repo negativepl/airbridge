@@ -68,12 +68,7 @@ struct MainWindow: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(selectedTab.title)
-                    .font(.headline)
-            }
-        }
+        .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+        .navigationTitle(selectedTab.title)
     }
 }
