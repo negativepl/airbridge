@@ -68,27 +68,25 @@ struct AboutView: View {
                 }
                 .padding(16)
                 .frame(maxWidth: 440)
-                .glassEffect(in: .rect(cornerRadius: 16))
+                .glassEffect(.regular, in: .containerRelative)
 
                 // Links
-                GlassEffectContainer(spacing: 8) {
-                    VStack(spacing: 0) {
-                        linkRow(
-                            icon: "curlybraces",
-                            title: L10n.isPL ? "Kod źródłowy na GitHub" : "Source code on GitHub",
-                            url: "https://github.com/negativepl/airbridge"
-                        )
-                        Divider().padding(.horizontal, 4)
-                        linkRow(
-                            icon: "ladybug",
-                            title: L10n.isPL ? "Zgłoś problem" : "Report an issue",
-                            url: "https://github.com/negativepl/airbridge/issues"
-                        )
-                    }
-                    .padding(4)
+                VStack(spacing: 0) {
+                    linkRow(
+                        icon: "curlybraces",
+                        title: L10n.isPL ? "Kod źródłowy na GitHub" : "Source code on GitHub",
+                        url: "https://github.com/negativepl/airbridge"
+                    )
+                    Divider().padding(.horizontal, 4)
+                    linkRow(
+                        icon: "ladybug",
+                        title: L10n.isPL ? "Zgłoś problem" : "Report an issue",
+                        url: "https://github.com/negativepl/airbridge/issues"
+                    )
                 }
+                .padding(4)
                 .frame(maxWidth: 440)
-                .glassEffect(in: .rect(cornerRadius: 16))
+                .glassEffect(.regular, in: .containerRelative)
 
                 Text(L10n.isPL ? "Airbridge jest open source" : "Airbridge is open source")
                     .font(.caption).foregroundStyle(.secondary)
