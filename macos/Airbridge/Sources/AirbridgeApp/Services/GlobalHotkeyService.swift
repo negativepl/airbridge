@@ -10,9 +10,10 @@ final class GlobalHotkeyService {
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private weak var fileTransferService: FileTransferService?
 
-    // Default: Cmd + Shift + D
-    @ObservationIgnored private let defaultKeyCode: UInt16 = 2 // 'd' key
-    @ObservationIgnored private let defaultModifiers: NSEvent.ModifierFlags = [.command, .shift]
+    // Default: Ctrl + Option + Cmd + A (Airbridge) — triple-modifier combo to
+    // avoid any collision with macOS system shortcuts or common app shortcuts.
+    @ObservationIgnored private let defaultKeyCode: UInt16 = 0 // 'a' key
+    @ObservationIgnored private let defaultModifiers: NSEvent.ModifierFlags = [.control, .option, .command]
 
     func configure(connectionService: ConnectionService, fileTransferService: FileTransferService) {
         self.connectionService = connectionService
@@ -112,7 +113,7 @@ final class GlobalHotkeyService {
         let modifierRaw = defaults.integer(forKey: "dropZoneShortcutModifiers")
 
         if keyCode == 0 && modifierRaw == 0 {
-            return "⌘⇧D"
+            return "⌃⌥⌘A"
         }
 
         let modifiers = NSEvent.ModifierFlags(rawValue: UInt(modifierRaw))
