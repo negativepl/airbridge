@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 PLIST="$ROOT/macos/Airbridge/Resources/Info.plist"
-APP_PLIST="$HOME/Applications/Airbridge.app/Contents/Info.plist"
+APP_PLIST="$HOME/Applications/AirBridge.app/Contents/Info.plist"
 
 # Read current version from gradle
 CURRENT=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')

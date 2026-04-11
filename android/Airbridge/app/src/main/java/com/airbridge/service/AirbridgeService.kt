@@ -134,7 +134,7 @@ class AirbridgeService : Service() {
         instance = this
 
         createNotificationChannel()
-        startForegroundWithNotification("Airbridge", getString(com.airbridge.R.string.notification_running_background))
+        startForegroundWithNotification("AirBridge", getString(com.airbridge.R.string.notification_running_background))
 
         webSocketClient = WebSocketClient()
         clipboardSync = ClipboardSync(this)
@@ -363,7 +363,7 @@ class AirbridgeService : Service() {
                     val folder = prefs.getString("download_folder", null)
                         ?: android.os.Environment.getExternalStoragePublicDirectory(
                             android.os.Environment.DIRECTORY_DOWNLOADS
-                        ).absolutePath + "/Airbridge"
+                        ).absolutePath + "/AirBridge"
                     val dir = java.io.File(folder)
                     if (!dir.exists()) dir.mkdirs()
                     val file = java.io.File(dir, filename)
@@ -564,7 +564,7 @@ class AirbridgeService : Service() {
                         val folder = prefs.getString("download_folder", null)
                             ?: android.os.Environment.getExternalStoragePublicDirectory(
                                 android.os.Environment.DIRECTORY_DOWNLOADS
-                            ).absolutePath + "/Airbridge"
+                            ).absolutePath + "/AirBridge"
                         val dir = java.io.File(folder)
                         if (!dir.exists()) dir.mkdirs()
                         val file = java.io.File(dir, transfer.filename)

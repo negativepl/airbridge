@@ -66,7 +66,7 @@ class ClipboardSync(private val context: Context) {
         val hash = sha256(text)
         lastSetHash = hash
         suppressNextChange = true
-        val clip = ClipData.newPlainText("Airbridge", text)
+        val clip = ClipData.newPlainText("AirBridge", text)
         clipboardManager.setPrimaryClip(clip)
         Log.d(TAG, "Clipboard set (suppress enabled)")
     }

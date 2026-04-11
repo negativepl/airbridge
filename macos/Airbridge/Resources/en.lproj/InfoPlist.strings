@@ -1,0 +1,4 @@
+/* Localized Info.plist strings — English */
+CFBundleDisplayName = "AirBridge";
+CFBundleName = "AirBridge";
+NSLocalNetworkUsageDescription = "AirBridge needs access to your local network to discover and communicate with paired devices over Wi-Fi.";

@@ -100,7 +100,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             // Logo
             Image(
                 painter = painterResource(R.drawable.logo_airbridge),
-                contentDescription = "Airbridge",
+                contentDescription = "AirBridge",
                 modifier = Modifier
                     .size(160.dp)
                     .clip(RoundedCornerShape(32.dp)),
@@ -134,7 +134,7 @@ fun SplashScreen(onFinished: () -> Unit) {
 
             // App name at bottom
             Text(
-                text = "Airbridge",
+                text = "AirBridge",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Normal,
                 fontFamily = FontFamily.Serif,

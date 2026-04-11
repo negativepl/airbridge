@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Airbridge</string>
-    <string name="accessibility_description">Airbridge używa tego uprawnienia, by odczytywać zmiany w schowku w tle i synchronizować je z komputerem Mac. Żadne inne dane nie są pobierane.</string>
+    <string name="app_name">AirBridge</string>
+    <string name="accessibility_description">AirBridge używa tego uprawnienia, by odczytywać zmiany w schowku w tle i synchronizować je z komputerem Mac. Żadne inne dane nie są pobierane.</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_welcome_title">Airbridge</string>
+    <string name="onboarding_welcome_title">AirBridge</string>
     <string name="onboarding_welcome_desc">Twój telefon i komputer Mac, połączone jak nigdy dotąd.</string>
     <string name="onboarding_feature_clipboard">Synchronizuj schowek między telefonem, a komputerem Mac</string>
     <string name="onboarding_feature_files">Przesyłaj zdjęcia i pliki bezprzewodowo, bez chmury</string>
@@ -17,7 +17,7 @@
     <string name="onboarding_ready_title">Gotowe!</string>
     <string name="onboarding_ready_desc">Zaznacz dowolny tekst w dowolnej aplikacji — pojawi się opcja „Wyślij do komputera Mac". Kliknij, by przesłać tekst natychmiast.</string>
     <string name="onboarding_permissions_title">Uprawnienia</string>
-    <string name="onboarding_permissions_desc">Airbridge potrzebuje kilku uprawnień, aby w pełni działać.</string>
+    <string name="onboarding_permissions_desc">AirBridge potrzebuje kilku uprawnień, aby w pełni działać.</string>
     <string name="onboarding_perm_notifications">Powiadomienia o postępie przesyłania</string>
     <string name="onboarding_perm_nearby">Sieć lokalna — aby znaleźć komputer Mac w pobliżu</string>
     <string name="onboarding_perm_allow">Zezwól na powiadomienia</string>
@@ -111,7 +111,7 @@
 
     <!-- Feedback -->
     <string name="sent_to_mac">Wysłano do komputera Mac</string>
-    <string name="share_sending">Wysyłanie do komputera Mac przez Airbridge…</string>
+    <string name="share_sending">Wysyłanie do komputera Mac przez AirBridge…</string>
 
     <!-- Navigation -->
     <string name="nav_home">Główna</string>
@@ -142,12 +142,12 @@
     <string name="settings_hide_notification">Ukryj powiadomienie w tle</string>
     <string name="settings_hide_notification_desc">Otwiera ustawienia systemowe, by wyłączyć powiadomienie „Działa w tle"</string>
     <string name="channel_service_name">Usługa w tle</string>
-    <string name="channel_service_desc">Utrzymuje Airbridge aktywne w tle</string>
+    <string name="channel_service_desc">Utrzymuje AirBridge aktywne w tle</string>
     <string name="channel_files_name">Przesyłanie plików</string>
     <string name="channel_files_desc">Powiadomienia o wysyłaniu i odbieraniu plików</string>
     <string name="settings_download_folder">Folder pobierania</string>
     <string name="settings_download_folder_desc">Odebrane pliki będą zapisywane tutaj</string>
-    <string name="settings_download_folder_default">Downloads/Airbridge</string>
+    <string name="settings_download_folder_default">Downloads/AirBridge</string>
 
     <!-- About -->
     <string name="about_title">O aplikacji</string>
@@ -157,12 +157,12 @@
     <string name="about_powered_by">Powered by Claude Opus 4.6</string>
     <string name="about_source_code">Kod źródłowy na GitHub</string>
     <string name="about_report_issue">Zgłoś problem</string>
-    <string name="about_open_source">Airbridge jest open source</string>
+    <string name="about_open_source">AirBridge jest open source</string>
     <string name="about_license">Licencja MIT</string>
 
     <!-- Pairing -->
     <string name="pairing_scan_title">Zeskanuj kod QR</string>
-    <string name="pairing_scan_desc">Otwórz Airbridge na komputerze Mac i kliknij „Sparuj urządzenie"</string>
+    <string name="pairing_scan_desc">Otwórz AirBridge na komputerze Mac i kliknij „Sparuj urządzenie"</string>
     <string name="pairing_camera_required">Uprawnienie do aparatu jest wymagane, aby zeskanować kod QR.</string>
     <string name="pairing_skip">Pomiń</string>
     <string name="pairing_success">Sparowano z %s</string>

@@ -1,5 +1,5 @@
 #!/bin/bash
-# dev-install.sh — Debug build + replace binary in ~/Applications/Airbridge.app + relaunch
+# dev-install.sh — Debug build + replace binary in ~/Applications/AirBridge.app + relaunch
 #
 # Uses existing .app bundle structure created by release.sh. Fast iteration for UI work.
 # Does NOT recreate the full bundle or re-sign — only replaces the binary and resource bundle.
@@ -16,7 +16,7 @@ if grep -qE ': error:' /tmp/airbridge-build.log; then
     exit 1
 fi
 
-APP="$HOME/Applications/Airbridge.app"
+APP="$HOME/Applications/AirBridge.app"
 if [ ! -d "$APP" ]; then
     echo "ERROR: $APP doesn't exist — run scripts/release.sh once to create it"
     exit 1
@@ -35,9 +35,24 @@ if [ -d "$RES_BUNDLE" ]; then
     cp -R "$RES_BUNDLE" "$APP/Contents/Resources/Airbridge_AirbridgeApp.bundle"
 fi
 
+# Copy updated Info.plist (picks up CFBundleDevelopmentRegion / localization changes)
+cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP/Contents/Info.plist"
+
+# Copy .lproj localization folders — AppKit uses their presence to pick the
+# language for system menu items (Services, Hide, Quit, Edit, View, Window,
+# Help). Without these, AppKit falls back to English regardless of
+# CFBundleDevelopmentRegion.
+for LPROJ in "$ROOT/macos/Airbridge/Resources"/*.lproj; do
+    if [ -d "$LPROJ" ]; then
+        NAME=$(basename "$LPROJ")
+        rm -rf "$APP/Contents/Resources/$NAME"
+        cp -R "$LPROJ" "$APP/Contents/Resources/$NAME"
+    fi
+done
+
 echo "--- re-signing (ad-hoc) ---"
 codesign --force --deep --sign - "$APP" 2>&1 | tail -5
 
 echo "--- launching ---"
 open "$APP"
-echo "✓ Airbridge running from debug build"
+echo "✓ AirBridge running from debug build"

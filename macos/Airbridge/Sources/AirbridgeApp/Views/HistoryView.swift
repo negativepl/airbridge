@@ -7,10 +7,15 @@ struct HistoryView: View {
     private let pageSize: Int = 30
 
     var body: some View {
-        if historyService.records.isEmpty {
-            emptyView
-        } else {
-            ScrollView {
+        // Always wrap in ScrollView so the window's top safe area (toolbar /
+        // Liquid Glass scroll edge effect) stays installed regardless of empty
+        // vs. non-empty state. Otherwise switching from a ScrollView-based tab
+        // to a plain VStack empty view causes the sidebar to jump upward as
+        // the top safe area collapses.
+        ScrollView {
+            if historyService.records.isEmpty {
+                emptyView
+            } else {
                 LazyVStack(spacing: 10) {
                     ForEach(historyService.records.prefix(displayedCount)) { record in
                         recordRow(record)
@@ -39,6 +44,7 @@ struct HistoryView: View {
                 : "No recent activity.\nSync and transfer history will appear here.",
             pulseIcon: true
         )
+        .frame(minHeight: 500)
     }
 
     private func recordRow(_ record: TransferRecord) -> some View {

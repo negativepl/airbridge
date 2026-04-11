@@ -197,7 +197,7 @@ fun SettingsScreen(
             run {
                 val defaultFolder = android.os.Environment.getExternalStoragePublicDirectory(
                     android.os.Environment.DIRECTORY_DOWNLOADS
-                ).absolutePath + "/Airbridge"
+                ).absolutePath + "/AirBridge"
                 var downloadFolder by remember {
                     mutableStateOf(prefs.getString("download_folder", defaultFolder) ?: defaultFolder)
                 }

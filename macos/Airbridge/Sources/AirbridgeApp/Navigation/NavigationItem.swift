@@ -7,7 +7,6 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     case gallery
     case messages
     case settings
-    case about
 
     var id: String { rawValue }
 
@@ -19,7 +18,6 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .gallery: return "photo.on.rectangle"
         case .messages: return "message.fill"
         case .settings: return "gearshape.fill"
-        case .about: return "info.circle"
         }
     }
 
@@ -31,15 +29,10 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .gallery: return L10n.isPL ? "Galeria" : "Gallery"
         case .messages: return L10n.isPL ? "Wiadomości" : "Messages"
         case .settings: return L10n.isPL ? "Ustawienia" : "Settings"
-        case .about: return L10n.isPL ? "O aplikacji" : "About"
         }
     }
 
     static var topItems: [NavigationItem] {
         [.home, .history, .send, .gallery, .messages, .settings]
-    }
-
-    static var bottomItems: [NavigationItem] {
-        [.about]
     }
 }

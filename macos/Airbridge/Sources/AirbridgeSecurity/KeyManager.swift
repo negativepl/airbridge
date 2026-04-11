@@ -37,13 +37,13 @@ final class InMemoryStorage: Storage, @unchecked Sendable {
 
 // MARK: - FileStorage
 
-/// Stores key-value data as individual files inside ~/Library/Application Support/Airbridge/.
+/// Stores key-value data as individual files inside ~/Library/Application Support/AirBridge/.
 final class FileStorage: Storage, @unchecked Sendable {
     private let directory: URL
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        directory = appSupport.appendingPathComponent("Airbridge")
+        directory = appSupport.appendingPathComponent("AirBridge")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 

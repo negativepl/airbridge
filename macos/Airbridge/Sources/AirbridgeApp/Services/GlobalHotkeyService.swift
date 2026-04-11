@@ -32,18 +32,26 @@ final class GlobalHotkeyService {
         }
     }
 
+    /// Silent start — registers global hotkey only if Accessibility is already granted.
+    /// Does NOT show any TCC prompt. The user must explicitly request access from
+    /// Settings → Quick Drop → "Grant" button. After granting, the app registers
+    /// the monitors the next time start() is called (e.g. on relaunch, or when the
+    /// user explicitly calls requestAccessibilityAndStart()).
     func start() {
         stop()
+        guard AXIsProcessTrusted() else { return }
+        registerMonitors()
+    }
 
-        // Request accessibility permissions if not granted
-        if !AXIsProcessTrusted() {
-            requestAccessibilityIfNeeded()
-            // Poll until granted, then register monitors
-            pollForAccessibility()
+    /// Explicitly request Accessibility permission and start the hotkey once granted.
+    /// Shows the system TCC prompt. Intended to be called from a user action in Settings.
+    func requestAccessibilityAndStart() {
+        if AXIsProcessTrusted() {
+            start()
             return
         }
-
-        registerMonitors()
+        requestAccessibilityIfNeeded()
+        pollForAccessibility()
     }
 
     private func pollForAccessibility() {

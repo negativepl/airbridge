@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Airbridge</string>
-    <string name="accessibility_description">Airbridge uses this permission to read clipboard changes in the background and sync them with your Mac. No other data is accessed.</string>
+    <string name="app_name">AirBridge</string>
+    <string name="accessibility_description">AirBridge uses this permission to read clipboard changes in the background and sync them with your Mac. No other data is accessed.</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_welcome_title">Airbridge</string>
+    <string name="onboarding_welcome_title">AirBridge</string>
     <string name="onboarding_welcome_desc">Your phone and Mac, finally on the same team.</string>
     <string name="onboarding_feature_clipboard">Instantly copy text between your phone and Mac</string>
     <string name="onboarding_feature_files">Send photos and files — no cables, no cloud</string>
@@ -12,12 +12,12 @@
     <string name="onboarding_connect_title">How it works</string>
     <string name="onboarding_connect_desc">Three things you should know:</string>
     <string name="onboarding_how_wifi">Both devices need to be on the same WiFi network</string>
-    <string name="onboarding_how_auto">Airbridge finds your Mac automatically — no IP addresses, no configuration</string>
+    <string name="onboarding_how_auto">AirBridge finds your Mac automatically — no IP addresses, no configuration</string>
     <string name="onboarding_how_bg">Runs quietly in the background — just select text and tap \"Send to Mac\"</string>
     <string name="onboarding_ready_title">You\'re all set!</string>
     <string name="onboarding_ready_desc">Select any text in any app — a menu will appear with \'Send to Mac\' option. Tap it to transfer instantly.</string>
     <string name="onboarding_permissions_title">Permissions</string>
-    <string name="onboarding_permissions_desc">Airbridge needs a few permissions to fully work.</string>
+    <string name="onboarding_permissions_desc">AirBridge needs a few permissions to fully work.</string>
     <string name="onboarding_perm_notifications">Notifications — to show transfer progress</string>
     <string name="onboarding_perm_nearby">Local network — to find your Mac nearby</string>
     <string name="onboarding_perm_allow">Allow notifications</string>
@@ -111,7 +111,7 @@
 
     <!-- Feedback -->
     <string name="sent_to_mac">Sent to Mac</string>
-    <string name="share_sending">Sending to Mac via Airbridge…</string>
+    <string name="share_sending">Sending to Mac via AirBridge…</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>
@@ -142,12 +142,12 @@
     <string name="settings_hide_notification">Hide background notification</string>
     <string name="settings_hide_notification_desc">Opens system settings to disable the \"Running in background\" notification</string>
     <string name="channel_service_name">Background service</string>
-    <string name="channel_service_desc">Keeps Airbridge running in the background</string>
+    <string name="channel_service_desc">Keeps AirBridge running in the background</string>
     <string name="channel_files_name">File transfers</string>
     <string name="channel_files_desc">Notifications about sending and receiving files</string>
     <string name="settings_download_folder">Download folder</string>
     <string name="settings_download_folder_desc">Received files will be saved here</string>
-    <string name="settings_download_folder_default">Downloads/Airbridge</string>
+    <string name="settings_download_folder_default">Downloads/AirBridge</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -157,11 +157,11 @@
     <string name="about_powered_by">Powered by Claude Opus 4.6</string>
     <string name="about_source_code">Source code on GitHub</string>
     <string name="about_report_issue">Report an issue</string>
-    <string name="about_open_source">Airbridge is open source</string>
+    <string name="about_open_source">AirBridge is open source</string>
     <string name="about_license">MIT License</string>
     <!-- Pairing -->
     <string name="pairing_scan_title">Scan QR Code</string>
-    <string name="pairing_scan_desc">Open Airbridge on your Mac and click \"Pair Device\"</string>
+    <string name="pairing_scan_desc">Open AirBridge on your Mac and click \"Pair Device\"</string>
     <string name="pairing_camera_required">Camera permission is required to scan QR codes.</string>
     <string name="pairing_skip">Skip for now</string>
     <string name="pairing_success">Paired with %s</string>

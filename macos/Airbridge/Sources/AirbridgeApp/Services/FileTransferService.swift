@@ -400,7 +400,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     }
 
     private func saveToDownloads(filename: String, data: Data) throws -> URL {
-        let folderPath = UserDefaults.standard.string(forKey: "downloadFolder") ?? "~/Downloads/Airbridge"
+        let folderPath = UserDefaults.standard.string(forKey: "downloadFolder") ?? "~/Downloads/AirBridge"
         let expandedPath = NSString(string: folderPath).expandingTildeInPath
         let downloadsURL = URL(fileURLWithPath: expandedPath)
         try FileManager.default.createDirectory(at: downloadsURL, withIntermediateDirectories: true)

@@ -146,7 +146,7 @@ struct OnboardingView: View {
             }
 
             VStack(spacing: 14) {
-                Text("Airbridge")
+                Text("AirBridge")
                     .font(.system(size: 56, weight: .regular, design: .serif))
                     .tracking(3)
 
@@ -220,7 +220,7 @@ struct OnboardingView: View {
                     number: "2",
                     text: isPL
                         ? "Komputer Mac zostanie wykryty automatycznie — bez konfiguracji"
-                        : "Airbridge finds your Mac automatically — no IP addresses, no configuration"
+                        : "AirBridge finds your Mac automatically — no IP addresses, no configuration"
                 )
                 numberedRow(
                     number: "3",
@@ -254,8 +254,8 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text(isPL
-                    ? "Otwórz Airbridge na telefonie i zeskanuj kod QR."
-                    : "Open Airbridge on your phone and scan the QR code.")
+                    ? "Otwórz AirBridge na telefonie i zeskanuj kod QR."
+                    : "Open AirBridge on your phone and scan the QR code.")
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

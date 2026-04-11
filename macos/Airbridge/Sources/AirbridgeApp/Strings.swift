@@ -15,11 +15,11 @@ enum L10n {
     static var pairDevice: String { isPL ? "Sparuj urządzenie" : "Pair Device" }
     static var disconnect: String { isPL ? "Rozłącz" : "Disconnect" }
     static var settings: String { isPL ? "Ustawienia..." : "Settings..." }
-    static var quit: String { isPL ? "Zakończ Airbridge" : "Quit Airbridge" }
+    static var quit: String { isPL ? "Zakończ AirBridge" : "Quit AirBridge" }
     static var lastSynced: String { isPL ? "Ostatnio zsynchronizowano:" : "Last synced:" }
     static var clipboardSynced: String { isPL ? "Schowek zsynchronizowany" : "Clipboard synced" }
     static var pairTitle: String { isPL ? "Sparuj z Androidem" : "Pair with Android" }
-    static var pairDesc: String { isPL ? "Otwórz Airbridge na telefonie i zeskanuj ten kod QR" : "Open Airbridge on your phone and scan this QR code" }
+    static var pairDesc: String { isPL ? "Otwórz AirBridge na telefonie i zeskanuj ten kod QR" : "Open AirBridge on your phone and scan this QR code" }
     static var close: String { isPL ? "Zamknij" : "Close" }
     static var launchAtLogin: String { isPL ? "Uruchom przy logowaniu" : "Launch at login" }
     static var showNotifications: String { isPL ? "Pokaż powiadomienia" : "Show notifications" }
@@ -43,9 +43,9 @@ enum L10n {
     static var sending: String { isPL ? "Wysyłanie..." : "Sending..." }
     static var pairingFailed: String { isPL ? "Nie udało się wygenerować kodu parowania" : "Failed to generate pairing payload" }
     static var qrFailed: String { isPL ? "Generowanie QR nie powiodło się" : "QR generation failed" }
-    static var settingsTitle: String { isPL ? "Ustawienia Airbridge" : "Airbridge Settings" }
+    static var settingsTitle: String { isPL ? "Ustawienia AirBridge" : "AirBridge Settings" }
     static var sendFiles: String { isPL ? "Wyślij pliki" : "Send Files" }
-    static var openAirbridge: String { isPL ? "Otwórz Airbridge" : "Open Airbridge" }
+    static var openAirbridge: String { isPL ? "Otwórz AirBridge" : "Open AirBridge" }
     static var connectedToDevice: String { isPL ? "Połączono z" : "Connected to" }
     static var dropFileHere: String { isPL ? "Upuść plik tutaj" : "Drop file here" }
     static var noDeviceConnected: String { isPL ? "Brak połączenia z urządzeniem" : "No device connected" }

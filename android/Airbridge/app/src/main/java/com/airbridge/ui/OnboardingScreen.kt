@@ -251,7 +251,7 @@ private fun WelcomePage() {
         Spacer(modifier = Modifier.height(32.dp))
         Image(
             painter = painterResource(R.drawable.logo_airbridge),
-            contentDescription = "Airbridge",
+            contentDescription = "AirBridge",
             modifier = Modifier
                 .size(140.dp)
                 .clip(RoundedCornerShape(28.dp)),

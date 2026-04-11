@@ -10,6 +10,7 @@ struct MainWindow: View {
     let historyService: HistoryService
     let galleryService: GalleryService
     let smsService: SmsService
+    let hotkeyService: GlobalHotkeyService
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -56,19 +57,14 @@ struct MainWindow: View {
                 ScreenContainer {
                     SettingsView(
                         connectionService: connectionService,
-                        pairingService: pairingService
+                        pairingService: pairingService,
+                        hotkeyService: hotkeyService
                     )
-                }
-            }
-
-            Tab(NavigationItem.about.title, systemImage: "info.circle", value: .about) {
-                ScreenContainer {
-                    AboutView()
                 }
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
         .navigationTitle(selectedTab.title)
     }
 }

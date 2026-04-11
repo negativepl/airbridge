@@ -33,7 +33,7 @@ class SendToMacActivity : ComponentActivity() {
 
         // Also copy to clipboard so Mac→Android echo prevention works
         val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("Airbridge", text))
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("AirBridge", text))
 
         Toast.makeText(this, getString(com.airbridge.R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
         finish()

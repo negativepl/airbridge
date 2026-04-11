@@ -5,19 +5,23 @@ import AirbridgeSecurity
 struct SettingsView: View {
     let connectionService: ConnectionService
     let pairingService: PairingService
+    let hotkeyService: GlobalHotkeyService
 
     @State private var viewModel: SettingsViewModel
+    @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
-    @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/Airbridge"
+    @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
     @State private var isRecordingShortcut = false
     @State private var shortcutDisplay: String = GlobalHotkeyService.currentShortcutDisplay()
     @State private var shortcutMonitor: Any?
+    @State private var accessibilityPollTimer: Timer?
 
-    init(connectionService: ConnectionService, pairingService: PairingService) {
+    init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService) {
         self.connectionService = connectionService
         self.pairingService = pairingService
+        self.hotkeyService = hotkeyService
         self._viewModel = State(initialValue: SettingsViewModel(
             connectionService: connectionService,
             pairingService: pairingService
@@ -35,12 +39,31 @@ struct SettingsView: View {
         }
         .onAppear {
             pairingService.refreshPairedDevices()
+            accessibilityGranted = AXIsProcessTrusted()
+        }
+        .onDisappear {
+            accessibilityPollTimer?.invalidate()
+            accessibilityPollTimer = nil
         }
         .onChange(of: connectionService.isConnected) { _, _ in
             pairingService.refreshPairedDevices()
         }
         .sheet(isPresented: $showPairing) {
             PairingView(pairingService: pairingService, connectionService: connectionService, isPresented: $showPairing)
+        }
+    }
+
+    private func startAccessibilityPolling() {
+        accessibilityPollTimer?.invalidate()
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            let granted = AXIsProcessTrusted()
+            DispatchQueue.main.async {
+                accessibilityGranted = granted
+                if granted {
+                    accessibilityPollTimer?.invalidate()
+                    accessibilityPollTimer = nil
+                }
+            }
         }
     }
 
@@ -114,25 +137,24 @@ struct SettingsView: View {
                     .font(.system(size: 14))
                 Spacer()
                 HStack(spacing: 6) {
-                    StatusIndicator(state: AXIsProcessTrusted() ? .connected : .error, size: 12)
-                    Text(AXIsProcessTrusted()
+                    StatusIndicator(state: accessibilityGranted ? .connected : .error, size: 12)
+                    Text(accessibilityGranted
                         ? (L10n.isPL ? "Nadane" : "Granted")
                         : (L10n.isPL ? "Brak uprawnień" : "Not granted"))
                         .font(.system(size: 14))
                 }
-                if !AXIsProcessTrusted() {
+                if !accessibilityGranted {
                     Button(L10n.isPL ? "Nadaj" : "Grant") {
-                        let key = "AXTrustedCheckOptionPrompt" as CFString
-                        let options = [key: true] as CFDictionary
-                        AXIsProcessTrustedWithOptions(options)
+                        hotkeyService.requestAccessibilityAndStart()
+                        startAccessibilityPolling()
                     }
                     .controlSize(.large)
                 }
             }
 
             Text(L10n.isPL
-                ? "Skrót działa globalnie tylko z uprawnieniami Dostępności. Po nadaniu uprawnień zrestartuj aplikację."
-                : "The shortcut works globally only with Accessibility permission. Restart the app after granting.")
+                ? "Skrót działa globalnie tylko z uprawnieniami Dostępności."
+                : "The shortcut works globally only with Accessibility permission.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 

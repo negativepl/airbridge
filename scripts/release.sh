@@ -17,7 +17,7 @@ GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 VERSION=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
 TAG="v$VERSION"
 
-echo "=== Building Airbridge $TAG ==="
+echo "=== Building AirBridge $TAG ==="
 echo ""
 
 # Check tag exists
@@ -34,7 +34,7 @@ echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
 # Build app bundle from scratch
-APP_BUNDLE="$HOME/Applications/Airbridge.app"
+APP_BUNDLE="$HOME/Applications/AirBridge.app"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp "$MACOS_BIN" "$APP_BUNDLE/Contents/MacOS/AirbridgeApp"
@@ -57,30 +57,38 @@ if [ -f "$ICNS" ]; then
     cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 fi
 
+# Copy .lproj localization folders so AppKit shows system menu items in the
+# user's language (requires CFBundleDevelopmentRegion + matching .lproj dirs).
+for LPROJ in "$ROOT/macos/Airbridge/Resources"/*.lproj; do
+    if [ -d "$LPROJ" ]; then
+        cp -R "$LPROJ" "$APP_BUNDLE/Contents/Resources/"
+    fi
+done
+
 # Ad-hoc code sign so Gatekeeper doesn't show prohibition icon
 codesign --force --deep --sign - "$APP_BUNDLE"
 echo "  App bundle: $APP_BUNDLE"
 
 # Create DMG with Applications symlink and compact window
-DMG_PATH="$ROOT/Airbridge.dmg"
+DMG_PATH="$ROOT/AirBridge.dmg"
 DMG_STAGE="$ROOT/.dmg-stage"
 rm -rf "$DMG_STAGE" "$DMG_PATH"
 mkdir -p "$DMG_STAGE"
-cp -R "$APP_BUNDLE" "$DMG_STAGE/Airbridge.app"
+cp -R "$APP_BUNDLE" "$DMG_STAGE/AirBridge.app"
 ln -s /Applications "$DMG_STAGE/Applications"
 
 # Set Finder window size and icon layout via .DS_Store
 # Create a temporary read-write DMG first to set view options
 DMG_RW="$ROOT/.dmg-rw.dmg"
 rm -f "$DMG_RW"
-hdiutil create -volname "Airbridge" -srcfolder "$DMG_STAGE" -ov -format UDRW "$DMG_RW" > /dev/null 2>&1
-MOUNT_DIR=$(hdiutil attach "$DMG_RW" -readwrite -noverify -noautoopen 2>/dev/null | grep "/Volumes/Airbridge" | tail -1 | awk '{print $NF}')
+hdiutil create -volname "AirBridge" -srcfolder "$DMG_STAGE" -ov -format UDRW "$DMG_RW" > /dev/null 2>&1
+MOUNT_DIR=$(hdiutil attach "$DMG_RW" -readwrite -noverify -noautoopen 2>/dev/null | grep "/Volumes/AirBridge" | tail -1 | awk '{print $NF}')
 
 if [ -n "$MOUNT_DIR" ]; then
     # Use AppleScript to set Finder view options
     osascript <<APPLESCRIPT
 tell application "Finder"
-    tell disk "Airbridge"
+    tell disk "AirBridge"
         open
         set current view of container window to icon view
         set toolbar visible of container window to false
@@ -89,7 +97,7 @@ tell application "Finder"
         set theViewOptions to icon view options of container window
         set arrangement of theViewOptions to not arranged
         set icon size of theViewOptions to 128
-        set position of item "Airbridge.app" of container window to {110, 120}
+        set position of item "AirBridge.app" of container window to {110, 120}
         set position of item "Applications" of container window to {340, 120}
         close
     end tell
@@ -122,19 +130,19 @@ else
 fi
 
 # Copy to root
-cp "$APK_PATH" "$ROOT/Airbridge.apk"
-echo "  APK: $ROOT/Airbridge.apk"
+cp "$APK_PATH" "$ROOT/AirBridge.apk"
+echo "  APK: $ROOT/AirBridge.apk"
 
 # 3. Create GitHub release
 echo ""
 echo "--- Creating GitHub Release $TAG ---"
 
 NOTES="$(cat <<EOF
-## Airbridge $TAG
+## AirBridge $TAG
 
 ### Downloads
-- **macOS**: Airbridge.dmg
-- **Android**: Airbridge.apk
+- **macOS**: AirBridge.dmg
+- **Android**: AirBridge.apk
 
 ### Changes since last release
 $(git log --oneline v1.0.0..HEAD --no-decorate 2>/dev/null || git log --oneline -10 --no-decorate)
@@ -142,10 +150,10 @@ EOF
 )"
 
 gh release create "$TAG" \
-    --title "Airbridge $TAG" \
+    --title "AirBridge $TAG" \
     --notes "$NOTES" \
-    "$ROOT/Airbridge.dmg#Airbridge.dmg" \
-    "$ROOT/Airbridge.apk#Airbridge.apk"
+    "$ROOT/AirBridge.dmg#AirBridge.dmg" \
+    "$ROOT/AirBridge.apk#AirBridge.apk"
 
 echo ""
 echo "=== Release $TAG published ==="
