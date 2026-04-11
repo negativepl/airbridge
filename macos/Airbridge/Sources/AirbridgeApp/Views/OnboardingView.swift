@@ -147,7 +147,8 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text("Airbridge")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.system(size: 56, weight: .regular, design: .serif))
+                    .tracking(3)
 
                 Text(isPL
                     ? "Twój telefon i komputer Mac, połączone jak nigdy dotąd."
@@ -199,7 +200,7 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text(isPL ? "Jak to działa?" : "How it works")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 40, weight: .semibold))
 
                 Text(isPL
                     ? "Trzy rzeczy, które warto wiedzieć:"
@@ -249,7 +250,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 8)
 
             Text(isPL ? "Sparuj z telefonem" : "Pair with your phone")
-                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .font(.system(size: 40, weight: .semibold))
 
             VStack(spacing: 14) {
                 Text(isPL
