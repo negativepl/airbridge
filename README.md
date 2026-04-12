@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" alt="Airbridge" width="120" height="120" style="border-radius: 24px;" />
+  <img src="docs/logo.png" alt="AirBridge" width="120" height="120" style="border-radius: 24px;" />
 </p>
 
-<h1 align="center">Airbridge</h1>
+<h1 align="center">AirBridge</h1>
 
 <p align="center">
   <strong>Your phone and Mac, finally on the same team.</strong>
@@ -23,9 +23,9 @@
 
 ---
 
-## What is Airbridge?
+## What is AirBridge?
 
-Airbridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, photo gallery browsing, SMS — all without cables, accounts, or cloud services. **Your data never leaves your home network.**
+AirBridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, photo gallery browsing, SMS — all without cables, accounts, or cloud services. **Your data never leaves your home network.**
 
 This is an open-source alternative to apps like AirDrop, KDE Connect, or Intel Unison — built specifically for the Android + macOS combination that Apple ignores.
 
@@ -61,7 +61,7 @@ You can also send selected text directly from any Android app:
 3. The text is instantly sent to your Mac's clipboard
 
 > **Note:** Some apps may not show "Send to Mac" by default. If you don't see it:
-> Long-press selected text → tap **⋮ More** → **Manage apps** → enable **Airbridge**.
+> Long-press selected text → tap **⋮ More** → **Manage apps** → enable **AirBridge**.
 > After that, "Send to Mac" will appear in the text selection menu.
 
 ### File Transfer
@@ -72,7 +72,7 @@ You can also send selected text directly from any Android app:
 - **Speed**: Direct HTTP transfer over your local network. No chunking, no base64, no cloud relay. Limited only by your Wi-Fi speed.
 
 ### Photo Gallery
-Browse your phone's entire photo library from your Mac. Thumbnails load on scroll, and you can download originals in full resolution. Photos are sent directly — they don't go through any server.
+Browse your phone's entire photo library from your Mac. Thumbnails load on scroll in a horizontal strip. Tap any photo to open a full-screen viewer with pinch-to-zoom, pan, and rotation controls. Download originals in full resolution with one click. Photos are sent directly — they don't go through any server.
 
 ### SMS Messages
 Read all your SMS conversations on your Mac. Send replies directly. Full chat bubble UI with contact name resolution. Short codes (automated messages) are detected and blocked from replying.
@@ -83,12 +83,28 @@ Read all your SMS conversations on your Mac. Send replies directly. Full chat bu
 - **Signature authentication** — Every reconnection is verified with a signed timestamp. Replay window: 30 seconds.
 - **Local only** — All traffic stays on your Wi-Fi network. No internet connection required. No telemetry, no analytics, no tracking.
 - **Open source** — Every line of code is auditable. MIT license.
+- **SHA-256 checksums** — File integrity verified after every transfer.
 
 ### Auto-discovery
 No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS, and Android discovers it automatically using NSD. If your devices are on the same Wi-Fi, they will find each other.
 
 ### Multi-device
 Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing is independent and uses its own key pair.
+
+### macOS System Integration
+- **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to the main window.
+- **Launch at Login** — Optional auto-start so AirBridge is ready when you log in (configurable in Settings).
+- **Sound on receive** — Audio feedback when a file or clipboard update arrives (configurable in Settings).
+- **Configurable global hotkey** — Record your own keyboard shortcut for Quick Drop in Settings, or use the default.
+- **Download folder** — Choose where incoming files are saved (configurable in Settings).
+
+### Android Extras
+- **Share Sheet integration** — Share files or photos from any app directly to AirBridge. The app appears as a share target and lets you pick which paired device to send to.
+- **Theme selection** — Choose between System, Light, or Dark theme in Settings.
+- **Onboarding wizard** — First-launch setup guides you through permissions and pairing with animated explanations.
+
+### Localization
+Both apps support **English** and **Polish**. The UI language follows your system setting.
 
 ---
 
@@ -104,7 +120,7 @@ Supported platforms:
 | **Android** | Android 10 (API 29) or newer |
 
 > **Why not on Google Play?**
-> Airbridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background. Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync) doesn't fit into any of the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — Airbridge works reliably in the background, which is more important than being on Google Play.
+> AirBridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background. Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync) doesn't fit into any of the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — AirBridge works reliably in the background, which is more important than being on Google Play.
 
 ---
 
@@ -126,8 +142,8 @@ Supported platforms:
 
 ### Pairing (one-time)
 
-1. Open Airbridge on your Mac → **Settings** → **Add New Device**
-2. Open Airbridge on your phone → scan the QR code
+1. Open AirBridge on your Mac → **Settings** → **Add New Device**
+2. Open AirBridge on your phone → scan the QR code
 3. Done — devices are paired and will auto-connect on the same Wi-Fi
 
 ### File Transfer Protocol
@@ -227,15 +243,15 @@ UI (Jetpack Compose + Material 3)
 
 ### Protocol
 
-25 message types over JSON-encoded WebSocket:
+27 message types over JSON-encoded WebSocket:
 
 | Category | Messages |
 |---|---|
 | Clipboard | `clipboard_update` |
 | File Transfer | `file_transfer_offer`, `file_transfer_accept`, `file_transfer_reject`, `file_transfer_start`, `file_chunk`, `file_chunk_ack`, `file_transfer_complete` |
 | Authentication | `pair_request`, `pair_response`, `auth_request`, `auth_response` |
-| Gallery | `gallery_request`, `gallery_response`, `gallery_thumbnail_request`, `gallery_thumbnail_response`, `gallery_download_request` |
-| SMS | `sms_conversations_request/response`, `sms_messages_request/response`, `sms_send_request/response` |
+| Gallery | `gallery_request`, `gallery_response`, `gallery_thumbnail_request`, `gallery_thumbnail_response`, `gallery_preview_request`, `gallery_preview_response`, `gallery_download_request` |
+| SMS | `sms_conversations_request`, `sms_conversations_response`, `sms_messages_request`, `sms_messages_response`, `sms_send_request`, `sms_send_response` |
 | Utility | `ping`, `pong` |
 
 ---
@@ -294,7 +310,7 @@ airbridge/
 
 ## Design Philosophy
 
-Airbridge is built to feel native on both platforms — not like a cross-platform wrapper.
+AirBridge is built to feel native on both platforms — not like a cross-platform wrapper.
 
 **macOS** — The app is written in SwiftUI targeting **Xcode 26 and macOS Tahoe**. It uses **Liquid Glass** effects throughout the UI (glass cards, glass buttons, native sidebar via `TabView(.sidebarAdaptable)`). The file transfer notification uses a custom **floating island popup** that slides down from the notch area, inspired by Dynamic Island — showing transfer progress, speed, and ETA in real time.
 
@@ -311,7 +327,6 @@ Features we're planning to add:
 - **Cellular file transfer** — Send files over mobile data when devices aren't on the same Wi-Fi (relay server or direct connection via WebRTC)
 - **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS. Prevent a paired device from accessing features you don't want to expose
 - **Device picker on Send screen** — When multiple devices are paired, show a device selector on the Send tab instead of sending to all
-- **Transfer history persistence** — Save transfer history across app restarts
 - **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
 - **Auto-update notifications** — Both apps will check for new versions on GitHub and notify you when an update is available, with a direct link to download
 - **F-Droid listing** — Publish on F-Droid as an alternative distribution channel
@@ -323,7 +338,7 @@ Have an idea? [Open an issue](https://github.com/negativepl/airbridge/issues).
 ## FAQ
 
 **Does it work without internet?**
-Yes. Airbridge only needs a local Wi-Fi network. No internet, no cloud, no accounts.
+Yes. AirBridge only needs a local Wi-Fi network. No internet, no cloud, no accounts.
 
 **Is it safe?**
 All communication uses Ed25519 signed authentication. Data never leaves your network. The code is open source — audit it yourself.
@@ -335,7 +350,7 @@ Wi-Fi is orders of magnitude faster. File transfers run at your full Wi-Fi speed
 Android requires foreground services to show a notification. You can hide it: **Settings → Notifications → "Hide background notification"** — this opens the system channel settings where you can disable it. File transfer notifications will still work.
 
 **Does it work with iOS?**
-No. Airbridge is designed for the Android + macOS combination. If you have an iPhone, use AirDrop.
+No. AirBridge is designed for the Android + macOS combination. If you have an iPhone, use AirDrop.
 
 **Can I send files from Mac to Android?**
 Yes. Mac sends a transfer offer first — your phone shows an accept/reject notification. Files are only transferred after you explicitly accept.
