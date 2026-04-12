@@ -184,13 +184,21 @@ struct MessagesView: View {
             EmptyView()
         } else {
             HStack(spacing: 12) {
-                TextField(L10n.isPL ? "Wiadomość..." : "Message...", text: $messageText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
-                    .onSubmit { sendMessage(to: convo) }
+                ZStack(alignment: .leading) {
+                    if messageText.isEmpty {
+                        Text(L10n.isPL ? "Wiadomość..." : "Message...")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 16)
+                    }
+                    TextField("", text: $messageText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15))
+                        .padding(.horizontal, 16)
+                        .onSubmit { sendMessage(to: convo) }
+                }
+                .padding(.vertical, 12)
+                .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
 
                 Button {
                     sendMessage(to: convo)

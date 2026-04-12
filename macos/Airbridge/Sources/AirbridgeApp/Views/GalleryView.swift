@@ -11,7 +11,9 @@ struct GalleryView: View {
         Group {
             if !connectionService.isConnected {
                 notConnectedView
-            } else if galleryService.photos.isEmpty && !galleryService.isLoading {
+            } else if galleryService.photos.isEmpty && galleryService.isLoading {
+                initialLoadingView
+            } else if galleryService.photos.isEmpty {
                 emptyView
             } else {
                 groupedGallery
@@ -41,6 +43,16 @@ struct GalleryView: View {
                 ? "Połącz się z telefonem, aby przeglądać zdjęcia."
                 : "Connect to your phone to browse photos."
         )
+    }
+
+    private var initialLoadingView: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text(L10n.isPL ? "Ładowanie galerii…" : "Loading gallery…")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var emptyView: some View {
@@ -181,7 +193,7 @@ struct PhotoDetailView: View {
             }
             .padding(20)
         }
-        .frame(minWidth: 960, idealWidth: 1280, minHeight: 720, idealHeight: 900)
+        .frame(minWidth: 600, idealWidth: 860, minHeight: 500, idealHeight: 640)
     }
 
     // MARK: - Photo with zoom / pan / rotation

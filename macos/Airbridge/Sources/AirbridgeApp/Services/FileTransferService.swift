@@ -206,6 +206,16 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                     // doesn't briefly return .idle between "waiting for
                     // accept" and the first progress tick.
                     self.fileTransferProgress = max(progress, 0.001)
+
+                    if let start = self.transferStartTime {
+                        let elapsed = Date().timeIntervalSince(start)
+                        if elapsed > 0.5 {
+                            let speed = Double(sent) / elapsed
+                            self.transferSpeed = speed
+                            let remaining = total - sent
+                            self.transferEta = speed > 0 ? Int(Double(remaining) / speed) : 0
+                        }
+                    }
                 }
             }
             let onComplete: @Sendable (Bool) -> Void = { ok in
@@ -266,6 +276,9 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             // else active) and the user sees "drop file here" flash before
             // the upload starts producing progress callbacks.
             self.fileTransferProgress = 0.001
+            self.transferStartTime = Date()
+            self.transferSpeed = 0
+            self.transferEta = 0
             self.isWaitingForAccept = false
 
             // 6. Wait for phone's GET to finish streaming. Mac's

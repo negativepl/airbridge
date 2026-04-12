@@ -69,6 +69,7 @@ struct TransferPopupView: View {
     @Namespace private var glassNS
     @State private var showComplete = false
     @State private var isTargeted = false
+    @State private var bumpTrigger: Int = 0
 
     private var state: TransferPopupState {
         if fileTransferService.hasIncomingOffer {
@@ -130,13 +131,19 @@ struct TransferPopupView: View {
 
     private func intensity(for state: TransferPopupState) -> Double {
         switch state {
-        case .idle(let connected): return connected ? (isTargeted ? 0.95 : 0.55) : 0.0
-        case .incoming: return 0.75
-        case .waiting: return 0.6
-        case .transferring: return 0.85
-        case .complete: return 0.8
-        case .rejected: return 0.7
+        case .idle(let connected): return connected ? (isTargeted ? 1.0 : 0.7) : 0.0
+        case .incoming: return 0.9
+        case .waiting: return 0.75
+        case .transferring: return 1.0
+        case .complete: return 0.95
+        case .rejected: return 0.85
         }
+    }
+
+    /// Progress value for the current transfer (0 when not transferring).
+    private var transferProgress: Double {
+        if case .transferring(_, let p, _) = state { return p }
+        return 0
     }
 
     private var isIdleConnected: Bool {
@@ -205,7 +212,8 @@ struct TransferPopupView: View {
                 TransferStateEffects(
                     palette: palette(for: state),
                     intensity: intensity(for: state),
-                    notchInset: notchInset
+                    notchInset: notchInset,
+                    transferProgress: transferProgress
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .allowsHitTesting(false)
@@ -235,20 +243,12 @@ struct TransferPopupView: View {
             .frame(width: islandWidth, height: islandHeight + notchInset)
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
-        // Apply scale + opacity OUTSIDE the GlassEffectContainer (so the
-        // glass material AND its content scale as one unit) but INSIDE
-        // the outer `windowPadding`. With anchor `.top` applied here, the
-        // kotwica is the top edge of the pill itself — which after the
-        // .padding below sits a fixed `windowPadding` from the window
-        // top. That distance stays constant regardless of scale, so the
-        // spring overshoot can only stretch the pill's BOTTOM edge; the
-        // top edge is glued under the notch and never "drops" downward.
-        //
-        // Putting .scaleEffect AFTER the outer padding (as it used to be)
-        // anchored at Y=0 of the outer window frame — so the pill itself
-        // was pushed down by `padding * scale`, and the spring's overshoot
-        // briefly moved the pill 3–4pt below its rest position, creating
-        // a visible "bounce away from the top frame" artifact.
+        .keyframeAnimator(initialValue: CGFloat(1.0), trigger: bumpTrigger) { content, value in
+            content.scaleEffect(value)
+        } keyframes: { _ in
+            SpringKeyframe(1.04, duration: 0.18, spring: .bouncy(duration: 0.18, extraBounce: 0.15))
+            SpringKeyframe(1.0, duration: 0.45, spring: .bouncy(duration: 0.35, extraBounce: 0.08))
+        }
         .scaleEffect(presentation.isPresented ? 1.0 : 0.55, anchor: .top)
         .opacity(presentation.isPresented ? 1.0 : 0.0)
         .padding(Self.windowPadding)
@@ -265,6 +265,9 @@ struct TransferPopupView: View {
         // like .transferring, so progress updates don't re-trigger the
         // view-morph animation or re-mount the content).
         .animation(.airbridgeStateMorph, value: stateKind)
+        .onChange(of: stateKind) { _, _ in
+            bumpTrigger += 1
+        }
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
@@ -520,10 +523,10 @@ struct TransferPopupView: View {
         let label = L10n.isPL ? "Pozostało" : "Remaining"
         if eta > 60 {
             return "\(label): \(eta / 60) min \(eta % 60) s"
-        } else if eta > 3 {
+        } else if eta > 0 {
             return "\(label): \(eta) s"
         } else if fileTransferService.fileTransferProgress > 0 && fileTransferService.fileTransferProgress < 1.0 {
-            return L10n.isPL ? "\(label): kilka sekund…" : "\(label): a few seconds…"
+            return L10n.isPL ? "\(label): obliczanie…" : "\(label): calculating…"
         }
         return " "
     }
@@ -563,101 +566,77 @@ private struct TransferStateEffects: View {
     let palette: GradientPalette
     let intensity: Double
     let notchInset: CGFloat
+    let transferProgress: Double
 
-    /// Reveal animation — starts at false (gradient compressed at bottom),
-    /// animates to true on appear so the aurora "rises" from the bottom
-    /// edge into its full extent.
     @State private var revealed: Bool = false
-    /// Animated copies of the palette colors. Updated via `withAnimation`
-    /// in `.onChange` so SwiftUI can smoothly interpolate them as the
-    /// popup state changes — TimelineView reads these animated values on
-    /// every frame, so the color crossfade is sampled per frame.
     @State private var animPrimary: Color = .blue
     @State private var animSecondary: Color = .cyan
     @State private var animTertiary: Color = .purple
     @State private var animIntensity: Double = 0.5
+    /// Smoothly-animated mirror of transferProgress. All energy
+    /// parameters (speed, amplitude, pulse) read this so idle↔transfer
+    /// transitions are seamless — same blobs, different energy.
+    @State private var animTP: Double = 0
 
     var body: some View {
-        // TimelineView(.animation) re-renders the body at the screen refresh
-        // rate (60+Hz). On every tick we read `t` and recompute blob centers
-        // from `sin(t/period)` — that's what produces actually visible
-        // motion. The earlier `withAnimation { phase = 1 } + sin(phase*2π)`
-        // approach was a no-op because SwiftUI only interpolates the FINAL
-        // value of an animatable modifier, and sin(0)=sin(2π)=0 — start and
-        // end were the same point so SwiftUI animated zero motion.
         TimelineView(.animation) { context in
             let t = context.date.timeIntervalSinceReferenceDate
+            let tp = animTP
+            let twoPi = 2.0 * .pi
+
+            // ── Energy parameters (all lerp from idle → transfer) ──
+            let speed = 1.0 + tp * 1.2              // drift speed: 1× → 2.2×
+            let st = t * speed                       // scaled time
+            let yAmp = 1.0 + tp * 0.6               // vertical sweep: 1× → 1.6×
+            let pulseHz = 2.0 + tp * 4.0             // breathing: 2 Hz → 6 Hz
+            let pulseAmp = tp * 0.3                  // pulse depth: 0% → 30%
+            let breathe = 1.0 + sin(t * twoPi * pulseHz) * pulseAmp
+            let glow = animIntensity * breathe
+            let blurR = 20.0 - tp * 7.0              // blur: 20 → 13 (sharper)
+
             GeometryReader { geo in
                 let w = geo.size.width
                 let h = geo.size.height
                 let topMaskCutoff = max(0.04, (notchInset + 12) / h)
-                let twoPi = 2.0 * .pi
 
                 ZStack {
-                    // Five small color blobs sweeping wide orbits at coprime
-                    // periods. Each X and Y axis has its own period so blobs
-                    // never trace a simple circle — they ribbon around like
-                    // aurora curtains.
+                    blob(color: animPrimary, opacity: glow,
+                         cx: 0.20 + sin(st * twoPi / 3.0) * 0.38,
+                         cy: 0.95 + cos(st * twoPi / 2.6) * 0.20 * yAmp,
+                         radius: w * 0.28)
 
-                    // All blob centers are parked in the bottom ~1/3 of the
-                    // pill so the aurora reads as a glow rising from the
-                    // lower edge, not a wash across the middle. Y-axis
-                    // drift amplitudes are tightened (vs the earlier wider
-                    // ranges) so nothing can climb toward cy ≈ 0.5.
-                    blob(
-                        color: animPrimary,
-                        opacity: animIntensity,
-                        cx: 0.22 + sin(t * twoPi / 3.0) * 0.38,
-                        cy: 0.92 + cos(t * twoPi / 2.6) * 0.10,
-                        radius: w * 0.22
-                    )
+                    blob(color: animSecondary, opacity: glow,
+                         cx: 0.80 + cos(st * twoPi / 4.0) * 0.38,
+                         cy: 1.0 + sin(st * twoPi / 3.5) * 0.18 * yAmp,
+                         radius: w * 0.30)
 
-                    blob(
-                        color: animSecondary,
-                        opacity: animIntensity * 0.95,
-                        cx: 0.78 + cos(t * twoPi / 4.0) * 0.38,
-                        cy: 0.95 + sin(t * twoPi / 3.5) * 0.08,
-                        radius: w * 0.24
-                    )
+                    blob(color: animTertiary, opacity: glow * 0.9,
+                         cx: 0.50 + sin(st * twoPi / 5.0) * 0.40,
+                         cy: 0.88 + cos(st * twoPi / 3.0) * 0.25 * yAmp,
+                         radius: w * 0.26)
 
-                    blob(
-                        color: animTertiary,
-                        opacity: animIntensity * 0.85,
-                        cx: 0.50 + sin(t * twoPi / 5.0) * 0.40,
-                        cy: 0.85 + cos(t * twoPi / 3.8) * 0.12,
-                        radius: w * 0.20
-                    )
+                    blob(color: animPrimary, opacity: glow * 0.85,
+                         cx: 0.65 + cos(st * twoPi / 6.0) * 0.34,
+                         cy: 1.0 + sin(st * twoPi / 4.0) * 0.15 * yAmp,
+                         radius: w * 0.24)
 
-                    blob(
-                        color: animPrimary,
-                        opacity: animIntensity * 0.7,
-                        cx: 0.62 + cos(t * twoPi / 6.0) * 0.34,
-                        cy: 0.96 + sin(t * twoPi / 4.5) * 0.06,
-                        radius: w * 0.18
-                    )
-
-                    blob(
-                        color: animSecondary,
-                        opacity: animIntensity * 0.7,
-                        cx: 0.38 + sin(t * twoPi / 7.0) * 0.34,
-                        cy: 0.88 + cos(t * twoPi / 5.2) * 0.10,
-                        radius: w * 0.19
-                    )
+                    blob(color: animSecondary, opacity: glow * 0.85,
+                         cx: 0.35 + sin(st * twoPi / 7.0) * 0.34,
+                         cy: 0.92 + cos(st * twoPi / 3.4) * 0.22 * yAmp,
+                         radius: w * 0.25)
                 }
                 .compositingGroup()
-                .blur(radius: 16)
-                // RISE FROM BOTTOM on appear: scale Y 0→1 anchored at the
-                // bottom edge — aurora visually fills upward into the pill.
+                .blur(radius: blurR)
                 .scaleEffect(x: 1.0, y: revealed ? 1.0 : 0.0, anchor: .bottom)
                 .opacity(revealed ? 1.0 : 0.0)
-                // Mask: pure black above the notch line.
                 .mask(
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: 0),
                             .init(color: .clear, location: topMaskCutoff),
-                            .init(color: .black.opacity(0.6), location: topMaskCutoff + 0.18),
-                            .init(color: .black, location: 0.55),
+                            .init(color: .black.opacity(0.3), location: topMaskCutoff + 0.25),
+                            .init(color: .black.opacity(0.7), location: 0.6),
+                            .init(color: .black, location: 0.75),
                             .init(color: .black, location: 1.0),
                         ],
                         startPoint: .top,
@@ -667,21 +646,15 @@ private struct TransferStateEffects: View {
             }
         }
         .onAppear {
-            // Initialize animated color/intensity to current props
             animPrimary = palette.primary
             animSecondary = palette.secondary
             animTertiary = palette.tertiary
             animIntensity = intensity
-            // Reveal — aurora rises from the bottom edge with a soft
-            // spring slightly delayed so it follows the popup's appear
-            // animation, like a wave filling in after the pill drops.
+            animTP = transferProgress
             withAnimation(.spring(response: 0.7, dampingFraction: 0.78).delay(0.08)) {
                 revealed = true
             }
         }
-        // Smooth color crossfades when state changes — Color is Animatable,
-        // SwiftUI interpolates @State Color via withAnimation. TimelineView
-        // reads the in-flight interpolated value on each frame.
         .onChange(of: palette.primary) { _, new in
             withAnimation(.easeInOut(duration: 0.7)) { animPrimary = new }
         }
@@ -694,16 +667,14 @@ private struct TransferStateEffects: View {
         .onChange(of: intensity) { _, new in
             withAnimation(.easeInOut(duration: 0.6)) { animIntensity = new }
         }
+        .onChange(of: transferProgress) { _, new in
+            withAnimation(.easeInOut(duration: 0.5)) { animTP = new }
+        }
     }
 
-    /// Single radial-gradient blob at a unit-point center. Pulled out so
-    /// the body stays readable.
     private func blob(
-        color: Color,
-        opacity: Double,
-        cx: Double,
-        cy: Double,
-        radius: CGFloat
+        color: Color, opacity: Double,
+        cx: Double, cy: Double, radius: CGFloat
     ) -> some View {
         RadialGradient(
             colors: [color.opacity(opacity), .clear],
