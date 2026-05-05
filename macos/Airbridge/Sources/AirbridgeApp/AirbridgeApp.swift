@@ -5,6 +5,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let showInDock = UserDefaults.standard.bool(forKey: "showInDock")
+        NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+    }
 }
 
 
@@ -19,6 +24,7 @@ struct AirbridgeApp: App {
     @State private var galleryService: GalleryService
     @State private var smsService: SmsService
     @State private var hotkeyService: GlobalHotkeyService
+    @State private var mirrorService: MirrorService
 
     init() {
         UserDefaults.standard.register(defaults: ["playSound": true])
@@ -32,6 +38,8 @@ struct AirbridgeApp: App {
         let sms = SmsService()
         let hotkey = GlobalHotkeyService()
 
+        let mirror = MirrorService(pairingTokenProvider: { [weak pairing] in pairing?.currentTokenData() })
+
         clipboard.configure(connectionService: connection, historyService: history)
         fileTransfer.configure(connectionService: connection, historyService: history)
         pairing.configure(connectionService: connection)
@@ -40,6 +48,7 @@ struct AirbridgeApp: App {
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
         TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms)
+        connection.mirrorService = mirror
 
         _connectionService = State(initialValue: connection)
         _clipboardService = State(initialValue: clipboard)
@@ -49,13 +58,15 @@ struct AirbridgeApp: App {
         _galleryService = State(initialValue: gallery)
         _smsService = State(initialValue: sms)
         _hotkeyService = State(initialValue: hotkey)
+        _mirrorService = State(initialValue: mirror)
 
         connection.startServer()
+        Task { try? await mirror.start() }
         clipboard.startMonitoring()
         // hotkey.start() is called from body .onAppear to avoid blocking init
 
         // Set app icon from bundled icns
-        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+        if let iconURL = AppResources.bundle.url(forResource: "AppIcon", withExtension: "icns"),
            let icon = NSImage(contentsOf: iconURL) {
             NSApplication.shared.applicationIconImage = icon
         }
@@ -128,6 +139,14 @@ struct AirbridgeApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+
+        // Mirror window — shows the live screen stream from the paired phone.
+        // Opened programmatically when a mirror session starts.
+        Window("AirBridge Mirror", id: "mirror") {
+            MirrorWindow(mirrorService: mirrorService)
+        }
+        .defaultSize(width: 540, height: 1170)
+        .windowResizability(.contentSize)
 
         MenuBarExtra {
             MenuBarView(connectionService: connectionService, clipboardService: clipboardService)

@@ -47,4 +47,15 @@ final class PairingService {
         guard let connectionService else { return }
         pairedDevices = connectionService.keyManager.getPairedDevices()
     }
+
+    /// Returns a 16-byte pairing token derived from the first paired device's
+    /// public key. We take the leading 16 bytes of the base64-decoded Ed25519
+    /// public key — a stable per-device identifier that the phone mirror client
+    /// uses during its HELLO handshake. Returns nil when no device is paired.
+    public func currentTokenData() -> Data? {
+        guard let firstDevice = pairedDevices.first,
+              let keyData = Data(base64Encoded: firstDevice.publicKeyBase64),
+              keyData.count >= 16 else { return nil }
+        return keyData.prefix(16)
+    }
 }
