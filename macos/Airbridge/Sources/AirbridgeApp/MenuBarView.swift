@@ -29,6 +29,17 @@ struct MenuBarView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
 
+            MenuRow(
+                title: L10n.isPL ? "Mirror telefon" : "Mirror Phone",
+                systemImage: "iphone.gen3.radiowaves.left.and.right"
+            ) {
+                if let token = connectionService.currentPairingTokenString() {
+                    Task { try? await connectionService.broadcast(.mirrorStartRequest(token: token)) }
+                }
+                openWindow(id: "mirror")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+
             MenuRow(title: L10n.quit, systemImage: "xmark.circle") {
                 clipboardService.stopMonitoring()
                 connectionService.stopServer()

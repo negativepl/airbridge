@@ -46,6 +46,7 @@ final class ConnectionService {
     @ObservationIgnored let server = WebSocketServer(port: 8765)
     @ObservationIgnored let httpServer = HttpUploadServer(port: 8766)
     var mirrorService: MirrorService?
+    var pairingService: PairingService?
     private var serverStarted = false
 
     // MARK: - Message Handlers
@@ -277,6 +278,12 @@ final class ConnectionService {
             onClientConnected: onConnect,
             onClientDisconnected: onDisconnect
         )
+    }
+
+    // MARK: - Mirror Helpers
+
+    func currentPairingTokenString() -> String? {
+        pairingService?.currentTokenData()?.base64EncodedString()
     }
 
     // MARK: - Helpers

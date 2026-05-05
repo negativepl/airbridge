@@ -49,6 +49,7 @@ struct AirbridgeApp: App {
         TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms)
         connection.mirrorService = mirror
+        connection.pairingService = pairing
 
         _connectionService = State(initialValue: connection)
         _clipboardService = State(initialValue: clipboard)
