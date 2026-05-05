@@ -184,6 +184,20 @@ public actor WebSocketServer {
         }
     }
 
+    /// Sends raw binary data to all connected clients as a WebSocket binary frame.
+    public func broadcastBinary(_ data: Data) async throws {
+        for (_, conn) in connections {
+            let metadata = NWProtocolWebSocket.Metadata(opcode: .binary)
+            let context = NWConnection.ContentContext(identifier: "binary", metadata: [metadata])
+            try await withCheckedThrowingContinuation { (cc: CheckedContinuation<Void, Error>) in
+                conn.send(content: data, contentContext: context, isComplete: true,
+                          completion: .contentProcessed { err in
+                              if let err { cc.resume(throwing: err) } else { cc.resume(returning: ()) }
+                          })
+            }
+        }
+    }
+
     // MARK: - Send to Single Client
 
     /// JSON-encodes `message` and sends it to a specific connected client.
