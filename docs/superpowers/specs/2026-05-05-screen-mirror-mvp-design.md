@@ -21,9 +21,15 @@ The motivating use case: rather than picking up the phone, the user sees and rep
 
 ## Architecture overview
 
-Mirror is a **separate transport channel** from the existing clipboard / file-transfer channel. They share auth (one pairing token, validated via `PairingService`) and discovery (one mDNS Bonjour service `_airbridge._tcp`), but the actual mirror traffic flows on its own TCP port (7711) so a 500 MB file transfer cannot starve video frames of bandwidth.
+Mirror is a **separate WebSocket connection** from the existing clipboard / file-transfer channel. The existing transport is a `WebSocketServer` actor (Mac, on `Network` framework with `NWProtocolWebSocket`) on port 8765, paired with OkHttp `WebSocket` client on Android. Mirror reuses that infrastructure: a **second `WebSocketServer` instance on port 8766**, dedicated to mirror traffic only.
 
-Initiation request is sent through the **existing** control channel (port 7710, JSON-based). Once both sides agree to start, the phone opens a new socket to Mac on 7711 and begins streaming.
+Both channels share auth (one pairing token, validated via `PairingService`) and discovery (one mDNS Bonjour service `_airbridge._tcp`). The mirror port is advertised in the existing Bonjour TXT record alongside `http_port`, as a new `mirror_port` key — phone reads both ports from the same Bonjour resolution.
+
+Why a separate connection rather than multiplexing on 8765: bandwidth isolation. A 500 MB file transfer on 8765 cannot starve mirror video frames of throughput, and vice versa. Each WebSocket has independent TCP-level flow control.
+
+Initiation is a JSON message over the **existing** 8765 control channel (`mirrorStartRequest`). Once the phone gets the request and the user grants `MediaProjection` permission, the phone opens the second WebSocket to `ws://<mac-ip>:8766/` and starts streaming.
+
+**Why WebSocket and not raw TCP** for mirror: consistency with existing transport, no new framing code (WebSocket binary frames already give us length-prefixed messages), free `ping/pong` heartbeat (`autoReplyPing = true`), and the existing `WebSocketServer` already exposes the `onBinaryMessage` callback we need. Custom TCP framing on a side channel would be a shortcut, not a native solution.
 
 ### Direction of traffic
 
@@ -40,7 +46,7 @@ Following the existing AirBridge constraint that **Mac cannot initiate outbound 
 | Component | Path | Responsibility |
 |---|---|---|
 | `Mirror` SPM target | `Sources/Mirror/` | Pure logic, testable in isolation: H.264 NALU parser, `VTDecompressionSession` wrapper, wire-protocol encode/decode, control-event encoder. Knows nothing about AirBridge specifics. |
-| `MirrorService` | `Sources/AirbridgeApp/Services/MirrorService.swift` | Lifecycle (`start()`/`stop()`), owns `NWListener` on port 7711, validates handshake against `PairingService`, holds connected client state. Handoff to `Mirror` for decoding. |
+| `MirrorService` | `Sources/AirbridgeApp/Services/MirrorService.swift` | Lifecycle (`start()`/`stop()`), owns a second `WebSocketServer` actor instance on port 8766, validates handshake against `PairingService`, holds connected client state. Handoff to `Mirror` for decoding. |
 | `MirrorWindow` (SwiftUI scene) | `Sources/AirbridgeApp/Views/MirrorWindow.swift` | Window scene `id="mirror"`. Wraps `AVSampleBufferDisplayLayer` via `NSViewRepresentable`. Toolbar: Stop, Always-on-top toggle, Quality picker. Resizable, content-aspect-locked. |
 | `MirrorWindowController` | same file or sibling | Mouse → `INPUT_TAP` / `INPUT_SWIPE` (drag = swipe), keyboard → `INPUT_TEXT` (printables, batched ~50 ms) + `INPUT_KEY` (Backspace, Enter, Esc, arrows). |
 | Menu integration | `MenuBarView.swift`, main window | "Mirror" button → triggers `mirrorStartRequest` JSON on the existing 7710 channel. |
@@ -51,7 +57,7 @@ Following the existing AirBridge constraint that **Mac cannot initiate outbound 
 |---|---|---|
 | `MirrorService` (Foreground Service) | `app/src/main/java/com/airbridge/mirror/MirrorService.kt` | Foreground-service of type `mediaProjection`. Holds `MediaProjection` token, owns encoder + socket. Foreground notification with Stop action. |
 | `ScreenEncoder` | `app/.../mirror/ScreenEncoder.kt` | `MediaProjection` → `VirtualDisplay` → `MediaCodec` H.264 hardware encoder. Outputs NALU + `MediaFormat` (SPS/PPS) callbacks. Hardware encoder mandatory; software fallback only if device lacks H.264 hw (rare). |
-| `MirrorClient` | `app/.../mirror/MirrorClient.kt` | Owns the TCP socket to Mac. Pushes encoder output (`VIDEO_CONFIG`, then `VIDEO_FRAME`s). Receives `INPUT_*` events and forwards via in-process `BroadcastReceiver` to the Accessibility service. |
+| `MirrorClient` | `app/.../mirror/MirrorClient.kt` | Owns the OkHttp `WebSocket` connection to Mac on port 8766. Pushes encoder output as binary frames (`VIDEO_CONFIG`, then `VIDEO_FRAME`s). Receives `INPUT_*` events as binary frames and forwards via in-process `BroadcastReceiver` to the Accessibility service. |
 | `MirrorAccessibilityService` | `app/.../mirror/MirrorAccessibilityService.kt` | Standalone `AccessibilityService`. Receives input events from `MirrorClient`, calls `dispatchGesture(...)` for taps/swipes and `performAction(ACTION_SET_TEXT)` / `paste` for text. |
 | `MirrorActivity` | `app/.../mirror/MirrorActivity.kt` | Short-lived. Only purpose: receive `MediaProjection` permission result (Android requires an Activity for `MediaProjectionManager.createScreenCaptureIntent()`). |
 
@@ -68,7 +74,7 @@ Following the existing AirBridge constraint that **Mac cannot initiate outbound 
 
 ## Wire protocol (mirror channel only)
 
-**Framing:** `[4 B big-endian payload length][1 B type][N B payload]`. Binary throughout, **not JSON** — base64-wrapping H.264 frames in JSON would be a shortcut. JSON stays on the existing 7710 channel for control messages; binary is the right choice for streaming media.
+**Framing:** WebSocket binary frame, payload is `[1 B type][N B payload]`. WebSocket already provides length framing per binary message, so we don't need a 4-byte length prefix on top — that would duplicate work. Binary throughout, **not JSON** — base64-wrapping H.264 frames in JSON would be a shortcut. JSON stays on the existing 8765 control channel; binary stays on the 8766 mirror channel.
 
 | Type | Direction | Payload |
 |---|---|---|
@@ -124,12 +130,12 @@ Without these flags the pipeline accumulates frames in encoder/decoder buffers a
 ### Start mirror
 
 1. User clicks "Mirror" in `MenuBarView` (or main window button).
-2. Mac sends `mirrorStartRequest` JSON over the **existing** 7710 control channel.
+2. Mac sends `mirrorStartRequest` JSON over the **existing** 8765 control channel.
 3. Phone receives request, posts a system notification "AirBridge wants to mirror your screen", then launches `MirrorActivity` which immediately requests `MediaProjection` permission via the system dialog.
 4. User taps "Start now" in the dialog.
-5. Phone starts `MirrorService` foreground service, opens TCP to Mac:7711, sends `HELLO`.
+5. Phone starts `MirrorService` foreground service, opens OkHttp WebSocket to `ws://<mac-ip>:8766/` (mac IP from existing Bonjour resolution, mirror port from the `mirror_port` TXT record), sends `HELLO` as the first binary frame.
 6. Mac validates token, replies `HELLO_ACK` with quality params, opens `MirrorWindow`.
-7. Phone receives ACK, starts `ScreenEncoder`, sends `VIDEO_CONFIG`, then begins `VIDEO_FRAME` stream.
+7. Phone receives ACK, starts `ScreenEncoder`, sends `VIDEO_CONFIG`, then begins `VIDEO_FRAME` stream as binary frames.
 8. Mac decodes and renders.
 
 ### First-time Accessibility onboarding
@@ -158,13 +164,13 @@ Either side initiates:
 
 ### Connection
 
-- **Phone disconnect** (network blip, phone sleeps): Mac shows a "Reconnecting..." overlay; auto-retry with exponential backoff 1 s → 2 s → 4 s → 8 s → 16 s. After 5 failed attempts, give up and close the window with "Disconnected. Try again?".
-- **Mac window closed**: send `mirrorStop` JSON on 7710, Android terminates `MirrorService`, foreground notification dismisses.
+- **Phone disconnect** (network blip, phone sleeps, WebSocket close): Mac shows a "Reconnecting..." overlay; auto-retry with exponential backoff 1 s → 2 s → 4 s → 8 s → 16 s. After 5 failed attempts, give up and close the window with "Disconnected. Try again?".
+- **Mac window closed**: send `mirrorStop` JSON on 8765, Android terminates `MirrorService`, foreground notification dismisses.
 - **Phone killed / powered off**: Mac sees socket close, follows the disconnect/retry path above.
 
 ### MediaProjection lifecycle
 
-- **Permission denied** in the system dialog → phone sends a one-shot error back over 7710, Mac closes window with an alert.
+- **Permission denied** in the system dialog → phone sends a one-shot error back over 8765, Mac closes window with an alert.
 - **Phone app backgrounded**: Android 14+ pauses `MediaProjection` capture automatically. Phone sends `STATUS=app_backgrounded`. Mac shows "Phone in background, capture paused" overlay until frames resume.
 - **Screen off**: no new frames for >2 s → phone sends `STATUS=screen_off`. Mac overlay "Screen off" with a "Wake phone" button that sends `INPUT_KEY KEYCODE_POWER`.
 
@@ -200,7 +206,7 @@ Either side initiates:
 
 ### Integration — existing `IntegrationTests` Swift target
 
-- E2E in-process: spin up `MirrorService` `NWListener` on 7711, write a fake-Android Swift client that pushes `HELLO` + synthesized `VIDEO_CONFIG` + `VIDEO_FRAME`s from a fixture file. Assert Mac decoder produces frames without errors.
+- E2E in-process: spin up `MirrorService` `WebSocketServer` on port 8766 (or random `port=0` for tests), write a fake-Android Swift client using `URLSessionWebSocketTask` that pushes `HELLO` + synthesized `VIDEO_CONFIG` + `VIDEO_FRAME`s from a fixture file. Assert Mac decoder produces frames without errors.
 - Round-trip control: Mac issues `INPUT_TAP` programmatically through `MirrorService`, fake Android stub records the event, assert coordinates match (within float epsilon).
 
 ### Manual smoke (Galaxy Z Fold 7 + Mac)
