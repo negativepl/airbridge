@@ -26,9 +26,9 @@ public final class MirrorService {
     private var pairingTokenProvider: () -> Data?
     private var decoder: VideoDecoder?
 
-    public init(pairingTokenProvider: @escaping () -> Data? = { nil }) {
+    public init(port: UInt16 = 8766, pairingTokenProvider: @escaping () -> Data? = { nil }) {
         self.pairingTokenProvider = pairingTokenProvider
-        self.server = WebSocketServer(port: 8766)
+        self.server = WebSocketServer(port: port)
 
         // Build the inner stream that can safely cross concurrency boundaries.
         var cont: AsyncStream<UncheckedSampleBuffer>.Continuation!

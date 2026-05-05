@@ -128,7 +128,7 @@ let package = Package(
 
         .testTarget(
             name: "IntegrationTests",
-            dependencies: ["Networking", "Protocol", "Clipboard", "AirbridgeSecurity"],
+            dependencies: ["Networking", "Protocol", "Clipboard", "AirbridgeSecurity", "Mirror", "AirbridgeApp"],
             path: "Tests/IntegrationTests"
         ),
 
