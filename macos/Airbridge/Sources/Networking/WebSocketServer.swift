@@ -95,7 +95,7 @@ public actor WebSocketServer {
         authenticatedConnections.removeAll()
     }
 
-    public func start(bonjourName: String? = nil, httpPort: UInt16? = nil, publicKeyFingerprint: String? = nil) async throws {
+    public func start(bonjourName: String? = nil, httpPort: UInt16? = nil, mirrorPort: UInt16? = nil, publicKeyFingerprint: String? = nil) async throws {
         let wsOptions = NWProtocolWebSocket.Options()
         wsOptions.autoReplyPing = true
 
@@ -120,6 +120,9 @@ public actor WebSocketServer {
             var txtRecord = NWTXTRecord()
             if let httpPort {
                 txtRecord["http_port"] = "\(httpPort)"
+            }
+            if let mirrorPort {
+                txtRecord["mirror_port"] = "\(mirrorPort)"
             }
             if let publicKeyFingerprint {
                 txtRecord["pk_fingerprint"] = publicKeyFingerprint

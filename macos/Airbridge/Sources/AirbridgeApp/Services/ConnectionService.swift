@@ -45,6 +45,7 @@ final class ConnectionService {
     }
     @ObservationIgnored let server = WebSocketServer(port: 8765)
     @ObservationIgnored let httpServer = HttpUploadServer(port: 8766)
+    var mirrorService: MirrorService?
     private var serverStarted = false
 
     // MARK: - Message Handlers
@@ -81,7 +82,8 @@ final class ConnectionService {
                 let deviceName = Host.current().localizedName ?? "Mac"
                 let identity = try keyManager.getOrCreateIdentity()
                 let fingerprint = keyManager.fingerprintOf(identity.publicKeyBase64)
-                try await server.start(bonjourName: deviceName, httpPort: httpPort, publicKeyFingerprint: fingerprint)
+                let mPort = mirrorService?.actualPort
+                try await server.start(bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
 
                 await configureServerCallbacks()
 
