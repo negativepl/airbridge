@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "Pairing", targets: ["Pairing"]),
         // Named "AirbridgeSecurity" to avoid collision with Apple's Security.framework
         .library(name: "AirbridgeSecurity", targets: ["AirbridgeSecurity"]),
+        .library(name: "Mirror", targets: ["Mirror"]),
     ],
     targets: [
         // MARK: - Executable
@@ -28,6 +29,7 @@ let package = Package(
                 "FileTransfer",
                 "Pairing",
                 "AirbridgeSecurity",
+                "Mirror",
             ],
             path: "Sources/AirbridgeApp",
             resources: [
@@ -75,6 +77,11 @@ let package = Package(
             path: "Sources/AirbridgeSecurity"
         ),
 
+        .target(
+            name: "Mirror",
+            path: "Sources/Mirror"
+        ),
+
         // MARK: - Test Targets
 
         .testTarget(
@@ -111,6 +118,12 @@ let package = Package(
             name: "AirbridgeSecurityTests",
             dependencies: ["AirbridgeSecurity"],
             path: "Tests/AirbridgeSecurityTests"
+        ),
+
+        .testTarget(
+            name: "MirrorTests",
+            dependencies: ["Mirror"],
+            path: "Tests/MirrorTests"
         ),
 
         .testTarget(
