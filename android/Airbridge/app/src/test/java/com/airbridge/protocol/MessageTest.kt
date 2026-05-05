@@ -53,6 +53,27 @@ class MessageTest {
     }
 
     @Test
+    fun `MirrorStartRequest JSON round-trip`() {
+        val msg = Message.MirrorStartRequest(token = "abc123")
+        val decoded = Message.fromJson(msg.toJson())
+        assertEquals(msg, decoded)
+    }
+
+    @Test
+    fun `MirrorStop JSON round-trip`() {
+        val msg = Message.MirrorStop
+        val decoded = Message.fromJson(msg.toJson())
+        assertEquals(msg, decoded)
+    }
+
+    @Test
+    fun `MirrorError JSON round-trip`() {
+        val msg = Message.MirrorError(reason = "permission_denied")
+        val decoded = Message.fromJson(msg.toJson())
+        assertEquals(msg, decoded)
+    }
+
+    @Test
     fun `roundtrip all message types`() {
         val messages: List<Message> = listOf(
             Message.ClipboardUpdate("src-1", ContentType.PLAIN_TEXT, "test", 1000L),

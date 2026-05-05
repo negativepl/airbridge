@@ -453,4 +453,46 @@ final class MessageTests: XCTestCase {
         }
         XCTAssertEqual(ts, 8888888)
     }
+
+    // MARK: - Mirror Message Round-trips
+
+    func testRoundTrip_mirrorStartRequest() throws {
+        let original = Message.mirrorStartRequest(token: "abc123")
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(Message.self, from: data)
+        guard case .mirrorStartRequest(let token) = decoded else {
+            XCTFail("Expected mirrorStartRequest, got \(decoded)")
+            return
+        }
+        XCTAssertEqual(token, "abc123")
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["type"] as? String, "mirror_start_request")
+        XCTAssertEqual(json["token"] as? String, "abc123")
+    }
+
+    func testRoundTrip_mirrorStop() throws {
+        let original = Message.mirrorStop
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(Message.self, from: data)
+        guard case .mirrorStop = decoded else {
+            XCTFail("Expected mirrorStop, got \(decoded)")
+            return
+        }
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["type"] as? String, "mirror_stop")
+    }
+
+    func testRoundTrip_mirrorError() throws {
+        let original = Message.mirrorError(reason: "permission_denied")
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(Message.self, from: data)
+        guard case .mirrorError(let reason) = decoded else {
+            XCTFail("Expected mirrorError, got \(decoded)")
+            return
+        }
+        XCTAssertEqual(reason, "permission_denied")
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["type"] as? String, "mirror_error")
+        XCTAssertEqual(json["reason"] as? String, "permission_denied")
+    }
 }

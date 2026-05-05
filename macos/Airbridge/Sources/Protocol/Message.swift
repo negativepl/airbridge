@@ -51,6 +51,9 @@ public enum Message: Equatable, Sendable {
     case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64)
     case fileTransferAccept(transferId: String)
     case fileTransferReject(transferId: String)
+    case mirrorStartRequest(token: String)
+    case mirrorStop
+    case mirrorError(reason: String)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -171,6 +174,9 @@ extension Message: Codable {
         case fileTransferOffer        = "file_transfer_offer"
         case fileTransferAccept       = "file_transfer_accept"
         case fileTransferReject       = "file_transfer_reject"
+        case mirrorStartRequest       = "mirror_start_request"
+        case mirrorStop               = "mirror_stop"
+        case mirrorError              = "mirror_error"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -206,6 +212,7 @@ extension Message: Codable {
         case success
         case error
         case fileSize           = "file_size"
+        case token
     }
 
     // MARK: Encode
@@ -362,6 +369,17 @@ extension Message: Codable {
         case .fileTransferReject(let transferId):
             try container.encode(TypeKey.fileTransferReject.rawValue, forKey: .type)
             try container.encode(transferId, forKey: .transferId)
+
+        case let .mirrorStartRequest(token):
+            try container.encode(TypeKey.mirrorStartRequest.rawValue, forKey: .type)
+            try container.encode(token, forKey: .token)
+
+        case .mirrorStop:
+            try container.encode(TypeKey.mirrorStop.rawValue, forKey: .type)
+
+        case let .mirrorError(reason):
+            try container.encode(TypeKey.mirrorError.rawValue, forKey: .type)
+            try container.encode(reason, forKey: .reason)
         }
     }
 
@@ -532,6 +550,17 @@ extension Message: Codable {
         case .fileTransferReject:
             let transferId = try container.decode(String.self, forKey: .transferId)
             self = .fileTransferReject(transferId: transferId)
+
+        case .mirrorStartRequest:
+            let token = try container.decode(String.self, forKey: .token)
+            self = .mirrorStartRequest(token: token)
+
+        case .mirrorStop:
+            self = .mirrorStop
+
+        case .mirrorError:
+            let reason = try container.decode(String.self, forKey: .reason)
+            self = .mirrorError(reason: reason)
         }
     }
 

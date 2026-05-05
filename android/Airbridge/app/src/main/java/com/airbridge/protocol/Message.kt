@@ -404,6 +404,30 @@ sealed class Message {
         }.toString()
     }
 
+    data class MirrorStartRequest(
+        val token: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mirror_start_request")
+            put("token", token)
+        }.toString()
+    }
+
+    data object MirrorStop : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mirror_stop")
+        }.toString()
+    }
+
+    data class MirrorError(
+        val reason: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mirror_error")
+            put("reason", reason)
+        }.toString()
+    }
+
     companion object {
         fun fromJson(json: String): Message {
             val obj = JSONObject(json)
@@ -567,6 +591,13 @@ sealed class Message {
                 "sms_send_response" -> SmsSendResponse(
                     success = obj.getBoolean("success"),
                     error = if (obj.has("error")) obj.getString("error") else null
+                )
+                "mirror_start_request" -> MirrorStartRequest(
+                    token = obj.getString("token")
+                )
+                "mirror_stop" -> MirrorStop
+                "mirror_error" -> MirrorError(
+                    reason = obj.getString("reason")
                 )
                 else -> throw IllegalArgumentException("Unknown message type: $type")
             }
