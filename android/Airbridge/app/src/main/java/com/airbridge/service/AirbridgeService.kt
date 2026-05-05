@@ -130,6 +130,7 @@ class AirbridgeService : Service() {
     private lateinit var smsProvider: SmsProvider
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
+    private var currentMirrorPort: Int? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -337,10 +338,11 @@ class AirbridgeService : Service() {
                 Log.d(TAG, "NSD: $deviceName not paired (fp=${fingerprint.take(16)}...) — skipping")
                 return@handler
             }
-            Log.d(TAG, "NSD: paired device $deviceName found at $host:$port — connecting")
+            Log.d(TAG, "NSD: paired device $deviceName found at $host:$port — connecting (mirrorPort=$mirrorPort)")
             connectedHost.value = host
             connectedDeviceName.value = deviceName
             Companion.httpPort.value = httpPort
+            currentMirrorPort = mirrorPort
             nsdDiscovery.stopDiscovery()
             webSocketClient.shouldReconnect = true
             webSocketClient.connect(host, port)
@@ -801,6 +803,33 @@ class AirbridgeService : Service() {
                         webSocketClient.send(Message.SmsSendResponse(false, e.message))
                     }
                 }
+            }
+            is Message.MirrorStartRequest -> {
+                val host = connectedHost.value
+                val mirrorPort = currentMirrorPort
+                if (host == null || mirrorPort == null) {
+                    Log.w(TAG, "MirrorStartRequest received but host=$host mirrorPort=$mirrorPort — ignoring")
+                    return
+                }
+                val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
+                val intent = Intent(this, com.airbridge.mirror.MirrorActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_HOST, host)
+                    putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_PORT, mirrorPort)
+                    putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_TOKEN, tokenBytes)
+                }
+                startActivity(intent)
+                Log.d(TAG, "MirrorStartRequest: launched MirrorActivity → $host:$mirrorPort")
+            }
+            is Message.MirrorStop -> {
+                val intent = Intent(this, com.airbridge.mirror.MirrorService::class.java).apply {
+                    action = com.airbridge.mirror.MirrorService.ACTION_STOP
+                }
+                startService(intent)
+                Log.d(TAG, "MirrorStop: sent ACTION_STOP to MirrorService")
+            }
+            is Message.MirrorError -> {
+                Log.w(TAG, "Mac reported mirror error: ${message.reason}")
             }
             else -> {
                 Log.d(TAG, "Unhandled message type: ${message::class.simpleName}")
