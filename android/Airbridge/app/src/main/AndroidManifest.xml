@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -83,6 +84,15 @@
             android:name=".service.AirbridgeService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name=".mirror.MirrorService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+        <activity
+            android:name=".mirror.MirrorActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
