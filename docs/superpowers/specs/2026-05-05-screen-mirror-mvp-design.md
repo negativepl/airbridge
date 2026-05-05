@@ -91,12 +91,33 @@ Coordinates are **normalized** (0..1) so changing display dimensions on either s
 
 ## Target quality
 
-- **Resolution:** 720p default (configurable in toolbar to 480p / 1080p)
-- **Frame rate:** 30 fps target; encoder may drop under load
-- **Bitrate:** 5 Mbps default at 720p, scales with resolution. Adaptive step-down (5 → 3 → 1.5 Mbps) on encoder throttling signal.
-- **Codec:** H.264 baseline + main profile (universal hardware decode on Apple Silicon)
-- **Latency budget:** end-to-end ~150–250 ms on Wi-Fi (encoder ~33 ms + LAN ~5–30 ms + decoder ~33 ms + render ~16 ms)
-- **Keyframe interval:** 2 s (recovery vs. bandwidth tradeoff)
+- **Resolution:** 1080p default (configurable in toolbar to 480p / 720p / 1080p). Galaxy Z Fold 7's Snapdragon 8 Gen 4 hardware encoder handles 1080p60 trivially; Mac Apple Silicon decodes it without breaking sweat. 1080p chosen over 1440p because perceptual gain on a Mac-window-sized display is marginal vs. the 2× bandwidth cost.
+- **Frame rate:** 60 fps target. Encoder may drop frames under thermal throttling, but the wire format is happy with variable cadence.
+- **Bitrate:** 12 Mbps default at 1080p60 (eliminates visible artifacts on motion / scrolling). Scales with resolution: 720p → 6 Mbps, 480p → 2.5 Mbps. Adaptive step-down on encoder throttling: drop in 25 % steps until stable.
+- **Codec:** H.264 main profile (universal hardware decode on Apple Silicon, supports the low-latency flags below).
+- **Latency budget:** end-to-end **<150 ms** on Wi-Fi.
+- **Keyframe interval:** 2 s (recovery vs. bandwidth tradeoff).
+
+### Low-latency configuration (matters for the user-visible "responsiveness" feel)
+
+Without these flags the pipeline accumulates frames in encoder/decoder buffers and produces the dreaded "controlling a screen 10 frames behind reality" feel. Native APIs explicitly support real-time use, so we use them.
+
+**Android `MediaCodec` (encoder):**
+- `MediaFormat.KEY_LOW_LATENCY = 1` (API 30+, supported on Z Fold 7) — forces no B-frames, minimum encoder pipeline depth
+- `MediaFormat.KEY_OPERATING_RATE = Short.MAX_VALUE` — hint to scheduler to run encoder as fast as possible, no power-save throttling
+- `MediaFormat.KEY_PRIORITY = 0` — realtime priority for the encoder thread
+- `MediaFormat.KEY_BITRATE_MODE = BITRATE_MODE_CBR` — predictable bandwidth, no rate-control spikes that hurt latency
+
+**Mac `VTDecompressionSession` (decoder):**
+- `kVTDecompressionPropertyKey_RealTime = kCFBooleanTrue` — VideoToolbox real-time mode; skips frames rather than queuing if it can't keep up
+- `kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder = kCFBooleanTrue` — force hardware path
+- `kVTDecompressionPropertyKey_MaximizePowerEfficiency = kCFBooleanFalse` — opposite of low latency, explicitly off
+
+**`AVSampleBufferDisplayLayer` (renderer):**
+- Sample buffers enqueued with `presentationTimeStamp = .invalid` → immediate display, no playback-timing buffering
+- `controlTimebase` not set (so the layer doesn't gate on a wall-clock schedule)
+
+**Network:** No application-level jitter buffer. On a stable LAN this wins on latency; if Wi-Fi gets choppy we'd see frame drops, not stalls — better feel than buffering.
 
 ## UX flows
 
@@ -185,8 +206,8 @@ Either side initiates:
 ### Manual smoke (Galaxy Z Fold 7 + Mac)
 
 - 5 minutes of continuous mirroring — no disconnects, no encoder restarts.
-- Latency budget: end-to-end < 250 ms (measured with on-screen timestamp burned into a phone-side test pattern).
-- Quality: 720p and 1080p both look good; 480p degrades gracefully.
+- Latency budget: end-to-end < 150 ms (measured with on-screen timestamp burned into a phone-side test pattern).
+- Quality: 1080p60 (default) looks crisp on motion/scrolling; 720p and 480p degrade gracefully.
 - Recovery: screen off → wake; app switch on phone → return; disconnect → reconnect.
 
 ## Phase 2 stretch goals (post-MVP)
