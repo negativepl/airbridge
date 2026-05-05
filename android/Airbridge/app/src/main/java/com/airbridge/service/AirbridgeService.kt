@@ -328,7 +328,7 @@ class AirbridgeService : Service() {
     }
 
     private fun setupNsdDiscovery() {
-        nsdDiscovery.onServiceFound = handler@{ host, port, deviceName, httpPort, fingerprint ->
+        nsdDiscovery.onServiceFound = handler@{ host, port, deviceName, httpPort, fingerprint, mirrorPort ->
             if (fingerprint.isEmpty()) {
                 Log.d(TAG, "NSD: $deviceName has no fingerprint — skipping")
                 return@handler

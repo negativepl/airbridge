@@ -12,7 +12,7 @@ class NsdDiscovery(private val context: Context) {
         private const val SERVICE_TYPE = "_airbridge._tcp."
     }
 
-    var onServiceFound: ((host: String, port: Int, deviceName: String, httpPort: Int, fingerprint: String) -> Unit)? = null
+    var onServiceFound: ((host: String, port: Int, deviceName: String, httpPort: Int, fingerprint: String, mirrorPort: Int?) -> Unit)? = null
     var onServiceLost: (() -> Unit)? = null
 
     @Volatile
@@ -63,9 +63,11 @@ class NsdDiscovery(private val context: Context) {
             val name = serviceInfo.serviceName ?: "Mac"
             val httpPortStr = serviceInfo.attributes["http_port"]?.let { String(it, Charsets.UTF_8) }
             val httpPort = httpPortStr?.toIntOrNull() ?: 8766
+            val mirrorPortStr = serviceInfo.attributes["mirror_port"]?.let { String(it, Charsets.UTF_8) }
+            val mirrorPort = mirrorPortStr?.toIntOrNull()
             val fingerprint = serviceInfo.attributes["pk_fingerprint"]?.let { String(it, Charsets.UTF_8) } ?: ""
-            Log.d(TAG, "Service resolved: $name at $host:$port (httpPort=$httpPort, fp=${fingerprint.take(16)}...)")
-            onServiceFound?.invoke(host, port, name, httpPort, fingerprint)
+            Log.d(TAG, "Service resolved: $name at $host:$port (httpPort=$httpPort, mirrorPort=$mirrorPort, fp=${fingerprint.take(16)}...)")
+            onServiceFound?.invoke(host, port, name, httpPort, fingerprint, mirrorPort)
         }
     }
 
