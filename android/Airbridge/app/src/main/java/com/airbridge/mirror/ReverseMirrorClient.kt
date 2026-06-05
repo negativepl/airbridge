@@ -54,6 +54,14 @@ class ReverseMirrorClient(
         })
     }
 
+    fun sendInput(type: UByte, xNorm: Float, yNorm: Float) {
+        webSocket?.send(MirrorMessage.ReverseInput(type, xNorm, yNorm).encode().toByteString())
+    }
+
+    fun sendScroll(deltaX: Float, deltaY: Float) {
+        webSocket?.send(MirrorMessage.ReverseScroll(deltaX, deltaY).encode().toByteString())
+    }
+
     fun close() {
         webSocket?.close(1000, "reverse stop")
         webSocket = null

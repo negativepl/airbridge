@@ -29,6 +29,11 @@ public enum MirrorMessage: Equatable, Sendable {
     /// 1 = create a virtual display shaped to the phone). The Mac then sends
     /// videoConfig/videoFrame down this connection (Mac -> phone).
     case reverseHello(token: Data, screenWidth: UInt32, screenHeight: UInt32, mode: UInt8)
+    /// Reverse control: phone -> Mac pointer input on the captured display.
+    /// type: 0 = move, 1 = down, 2 = up, 3 = drag. Coords normalized 0..1.
+    case reverseInput(type: UInt8, xNorm: Float32, yNorm: Float32)
+    /// Reverse control: phone -> Mac scroll wheel (points).
+    case reverseScroll(deltaX: Float32, deltaY: Float32)
 
     private enum TypeByte {
         static let hello: UInt8 = 0x01
@@ -39,6 +44,8 @@ public enum MirrorMessage: Equatable, Sendable {
         static let inputTap: UInt8 = 0x20
         static let status: UInt8 = 0x30
         static let reverseHello: UInt8 = 0x40
+        static let reverseInput: UInt8 = 0x41
+        static let reverseScroll: UInt8 = 0x42
     }
 
     public func encode() -> Data {
@@ -89,6 +96,15 @@ public enum MirrorMessage: Equatable, Sendable {
             out.appendBE(w)
             out.appendBE(h)
             out.append(mode)
+        case let .reverseInput(type, x, y):
+            out.append(TypeByte.reverseInput)
+            out.append(type)
+            out.appendBE(x.bitPattern)
+            out.appendBE(y.bitPattern)
+        case let .reverseScroll(dx, dy):
+            out.append(TypeByte.reverseScroll)
+            out.appendBE(dx.bitPattern)
+            out.appendBE(dy.bitPattern)
         }
         return out
     }
@@ -170,6 +186,21 @@ public enum MirrorMessage: Equatable, Sendable {
             let h: UInt32 = payload.readBE(at: &i)
             let mode = payload[i]
             return .reverseHello(token: token, screenWidth: w, screenHeight: h, mode: mode)
+
+        case TypeByte.reverseInput:
+            guard payload.count == 1 + 4 + 4 else { throw MirrorMessageError.truncated(type: first) }
+            var i = payload.startIndex
+            let type = payload[i]; i += 1
+            let xBits: UInt32 = payload.readBE(at: &i)
+            let yBits: UInt32 = payload.readBE(at: &i)
+            return .reverseInput(type: type, xNorm: Float32(bitPattern: xBits), yNorm: Float32(bitPattern: yBits))
+
+        case TypeByte.reverseScroll:
+            guard payload.count == 4 + 4 else { throw MirrorMessageError.truncated(type: first) }
+            var i = payload.startIndex
+            let dxBits: UInt32 = payload.readBE(at: &i)
+            let dyBits: UInt32 = payload.readBE(at: &i)
+            return .reverseScroll(deltaX: Float32(bitPattern: dxBits), deltaY: Float32(bitPattern: dyBits))
 
         default:
             throw MirrorMessageError.unknownType(first)

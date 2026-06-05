@@ -17,6 +17,8 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     private let virtualSize: (Int, Int)?
     private let onPacket: @Sendable (Data) -> Void
     private let onLog: @Sendable (String) -> Void
+    /// The CGDirectDisplayID being captured — for mapping reverse-control input.
+    private let onDisplayID: @Sendable (UInt32) -> Void
 
     private var capture: ScreenCaptureService?
     private var encoder: VideoEncoder?
@@ -28,13 +30,15 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     public init(fps: Int, bitrate: Int, useHEVC: Bool = false,
                 virtualSize: (Int, Int)? = nil,
                 onPacket: @escaping @Sendable (Data) -> Void,
-                onLog: @escaping @Sendable (String) -> Void = { _ in }) {
+                onLog: @escaping @Sendable (String) -> Void = { _ in },
+                onDisplayID: @escaping @Sendable (UInt32) -> Void = { _ in }) {
         self.fps = fps
         self.bitrate = bitrate
         self.useHEVC = useHEVC
         self.virtualSize = virtualSize
         self.onPacket = onPacket
         self.onLog = onLog
+        self.onDisplayID = onDisplayID
     }
 
     public func start() async throws {
@@ -58,6 +62,9 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
             capLongEdge = nil
             forcedOutputSize = (dw, dh)   // capture full backing pixels, not halved points
             onLog("virtual display created id=\(vd.displayID) \(dw)x\(dh) (HiDPI) mode=\(vd.selectedMode ?? "?")")
+            onDisplayID(vd.displayID)
+        } else {
+            onDisplayID(CGMainDisplayID())
         }
 
         let capture = ScreenCaptureService(

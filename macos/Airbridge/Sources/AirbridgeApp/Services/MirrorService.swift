@@ -135,6 +135,8 @@ public final class MirrorService {
     // Reverse mirror (Mac -> phone)
     private var reversePipeline: ReverseMirrorPipeline?
     private var reverseSendCont: AsyncStream<Data>.Continuation?
+    /// The display the active reverse stream is capturing — maps reverse input.
+    private var reverseDisplayID: CGDirectDisplayID?
     private var frameCounter = 0
     private var bitrateWindowStartedAt = Date()
     private var bitrateByteCount = 0
@@ -298,6 +300,17 @@ public final class MirrorService {
             case .inputTap:
                 break
 
+            case let .reverseInput(type, x, y):
+                if isReverseStreaming {
+                    ReverseInputInjector.injectPointer(type: type, xNorm: x, yNorm: y,
+                                                       displayID: reverseDisplayID ?? CGMainDisplayID())
+                }
+
+            case let .reverseScroll(dx, dy):
+                if isReverseStreaming {
+                    ReverseInputInjector.injectScroll(deltaX: dx, deltaY: dy)
+                }
+
             case let .reverseHello(token, w, h, mode):
                 MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
                 guard let expected = pairingTokenProvider(), token == expected else {
@@ -379,7 +392,10 @@ public final class MirrorService {
             useHEVC: q.useHEVC,
             virtualSize: virtualSize,
             onPacket: { packet in cont.yield(packet) },
-            onLog: { msg in MirrorDebugLog.write(msg) }
+            onLog: { msg in MirrorDebugLog.write(msg) },
+            onDisplayID: { [weak self] id in
+                Task { @MainActor in self?.reverseDisplayID = id }
+            }
         )
         reversePipeline = pipeline
         isReverseStreaming = true
@@ -400,6 +416,7 @@ public final class MirrorService {
         reverseSendCont = nil
         let pipeline = reversePipeline
         reversePipeline = nil
+        reverseDisplayID = nil
         isReverseStreaming = false
         Task { await pipeline?.stop() }
         MirrorDebugLog.write("reverse mirror stopped")

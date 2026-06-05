@@ -102,6 +102,12 @@ sealed class MirrorMessage {
             (((token.contentHashCode() * 31) + screenWidth.hashCode()) * 31 + screenHeight.hashCode()) * 31 + mode.hashCode()
     }
 
+    /** Reverse control: phone -> Mac pointer. type: 0=move,1=down,2=up,3=drag. */
+    data class ReverseInput(val type: UByte, val xNorm: Float, val yNorm: Float) : MirrorMessage()
+
+    /** Reverse control: phone -> Mac scroll wheel (points). */
+    data class ReverseScroll(val deltaX: Float, val deltaY: Float) : MirrorMessage()
+
     companion object {
         private const val TYPE_HELLO: Byte = 0x01
         private const val TYPE_HELLO_ACK: Byte = 0x02
@@ -111,6 +117,8 @@ sealed class MirrorMessage {
         private const val TYPE_INPUT_TAP: Byte = 0x20
         private const val TYPE_STATUS: Byte = 0x30
         private const val TYPE_REVERSE_HELLO: Byte = 0x40
+        private const val TYPE_REVERSE_INPUT: Byte = 0x41
+        private const val TYPE_REVERSE_SCROLL: Byte = 0x42
 
         fun decode(bytes: ByteArray): MirrorMessage {
             if (bytes.isEmpty()) throw MirrorMessageException("empty payload")
@@ -178,6 +186,14 @@ sealed class MirrorMessage {
                     val mode = buf.get().toUByte()
                     ReverseHello(token, w, h, mode)
                 }
+                TYPE_REVERSE_INPUT -> {
+                    if (buf.remaining() != 1 + 4 + 4) throw MirrorMessageException("REVERSE_INPUT truncated")
+                    ReverseInput(buf.get().toUByte(), buf.float, buf.float)
+                }
+                TYPE_REVERSE_SCROLL -> {
+                    if (buf.remaining() != 4 + 4) throw MirrorMessageException("REVERSE_SCROLL truncated")
+                    ReverseScroll(buf.float, buf.float)
+                }
                 else -> throw MirrorMessageException("unknown type 0x${type.toUByte().toString(16)}")
             }
         }
@@ -201,5 +217,9 @@ sealed class MirrorMessage {
         is ReverseHello -> ByteBuffer.allocate(1 + 16 + 4 + 4 + 1).order(ByteOrder.BIG_ENDIAN)
             .put(TYPE_REVERSE_HELLO).put(token)
             .putInt(screenWidth.toInt()).putInt(screenHeight.toInt()).put(mode.toByte()).array()
+        is ReverseInput -> ByteBuffer.allocate(1 + 1 + 4 + 4).order(ByteOrder.BIG_ENDIAN)
+            .put(TYPE_REVERSE_INPUT).put(type.toByte()).putFloat(xNorm).putFloat(yNorm).array()
+        is ReverseScroll -> ByteBuffer.allocate(1 + 4 + 4).order(ByteOrder.BIG_ENDIAN)
+            .put(TYPE_REVERSE_SCROLL).putFloat(deltaX).putFloat(deltaY).array()
     }
 }

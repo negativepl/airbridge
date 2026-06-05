@@ -1,9 +1,11 @@
 package com.airbridge.mirror
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
@@ -46,6 +48,7 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         // transparent so the video layer below shows through.
         container = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         surfaceView = SurfaceView(this).apply { holder.addCallback(this@ReverseMirrorActivity) }
+        attachTouchControl(surfaceView)
         container.addView(
             surfaceView,
             FrameLayout.LayoutParams(
@@ -96,6 +99,61 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         val w = (videoW * scale).toInt()
         val h = (videoH * scale).toInt()
         surfaceView.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.CENTER)
+    }
+
+    // Touch -> reverse control. Single finger: tap = click, drag = press+drag.
+    // Two fingers: scroll. The SurfaceView is already sized to the video rect,
+    // so coords map 1:1 to the captured display.
+    @SuppressLint("ClickableViewAccessibility")
+    private fun attachTouchControl(view: SurfaceView) {
+        var pressed = false
+        var scrolling = false
+        var downX = 0f
+        var downY = 0f
+        var anchorX = 0f
+        var anchorY = 0f
+        view.setOnTouchListener { v, e ->
+            val w = v.width.toFloat(); val h = v.height.toFloat()
+            val c = client
+            if (w <= 0f || h <= 0f || c == null) return@setOnTouchListener true
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    pressed = false; scrolling = false
+                    downX = (e.x / w).coerceIn(0f, 1f); downY = (e.y / h).coerceIn(0f, 1f)
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    if (e.pointerCount == 2 && !pressed) {
+                        scrolling = true
+                        anchorX = (e.getX(0) + e.getX(1)) / 2
+                        anchorY = (e.getY(0) + e.getY(1)) / 2
+                    }
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (scrolling && e.pointerCount >= 2) {
+                        val cx = (e.getX(0) + e.getX(1)) / 2
+                        val cy = (e.getY(0) + e.getY(1)) / 2
+                        c.sendScroll(cx - anchorX, cy - anchorY)
+                        anchorX = cx; anchorY = cy
+                    } else if (!scrolling) {
+                        if (!pressed) { c.sendInput(1u, downX, downY); pressed = true }  // start press at down point
+                        c.sendInput(3u, (e.x / w).coerceIn(0f, 1f), (e.y / h).coerceIn(0f, 1f))  // drag
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!scrolling) {
+                        if (!pressed) {
+                            // Quick tap that never moved → click at the down point.
+                            c.sendInput(1u, downX, downY)
+                            c.sendInput(2u, downX, downY)
+                        } else {
+                            c.sendInput(2u, (e.x / w).coerceIn(0f, 1f), (e.y / h).coerceIn(0f, 1f))
+                        }
+                    }
+                    pressed = false; scrolling = false
+                }
+            }
+            true
+        }
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
