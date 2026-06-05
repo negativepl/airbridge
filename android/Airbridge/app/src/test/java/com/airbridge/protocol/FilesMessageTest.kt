@@ -1,0 +1,36 @@
+package com.airbridge.protocol
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Test
+
+class FilesMessageTest {
+    @Test fun filesListRequestRoundTrip() {
+        val msg = Message.FilesListRequest(path = "Download", page = 0, pageSize = 200)
+        val parsed = Message.fromJson(msg.toJson()) as Message.FilesListRequest
+        assertEquals("Download", parsed.path)
+        assertEquals(200, parsed.pageSize)
+    }
+
+    @Test fun filesListResponseRoundTrip() {
+        val entry = FileEntry("a.pdf", "Download/a.pdf", false, 1234, 1_700_000_000_000, "application/pdf")
+        val msg = Message.FilesListResponse("Download", listOf(entry), 1, 0, false)
+        val parsed = Message.fromJson(msg.toJson()) as Message.FilesListResponse
+        assertEquals(1, parsed.entries.size)
+        assertEquals("Download/a.pdf", parsed.entries[0].relativePath)
+        assertFalse(parsed.needsPermission)
+    }
+
+    @Test fun fileDownloadRequestRoundTrip() {
+        val msg = Message.FileDownloadRequest("T1", "Download/a.pdf")
+        val parsed = Message.fromJson(msg.toJson()) as Message.FileDownloadRequest
+        assertEquals("T1", parsed.transferId)
+        assertEquals("Download/a.pdf", parsed.path)
+    }
+
+    @Test fun fileTransferOfferWithDestination() {
+        val msg = Message.FileTransferOffer("T1", "a.pdf", "application/pdf", 10, "Download")
+        val parsed = Message.fromJson(msg.toJson()) as Message.FileTransferOffer
+        assertEquals("Download", parsed.destinationDir)
+    }
+}

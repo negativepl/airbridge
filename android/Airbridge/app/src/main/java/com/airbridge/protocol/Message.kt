@@ -13,6 +13,15 @@ data class PhotoMeta(
     val mimeType: String
 )
 
+data class FileEntry(
+    val name: String,
+    val relativePath: String,
+    val isDirectory: Boolean,
+    val size: Long,
+    val modified: Long,
+    val mimeType: String
+)
+
 data class SmsConversation(
     val threadId: String,
     val address: String,
@@ -123,7 +132,8 @@ sealed class Message {
         val transferId: String,
         val filename: String,
         val mimeType: String,
-        val fileSize: Long
+        val fileSize: Long,
+        val destinationDir: String? = null
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "file_transfer_offer")
@@ -131,6 +141,7 @@ sealed class Message {
             put("filename", filename)
             put("mime_type", mimeType)
             put("file_size", fileSize)
+            if (destinationDir != null) put("destination_dir", destinationDir)
         }.toString()
     }
 
@@ -307,6 +318,78 @@ sealed class Message {
         }.toString()
     }
 
+    data class FilesListRequest(
+        val path: String,
+        val page: Int,
+        val pageSize: Int
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "files_list_request")
+            put("path", path)
+            put("page", page)
+            put("page_size", pageSize)
+        }.toString()
+    }
+
+    data class FilesListResponse(
+        val path: String,
+        val entries: List<FileEntry>,
+        val totalCount: Int,
+        val page: Int,
+        val needsPermission: Boolean
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "files_list_response")
+            put("path", path)
+            put("total_count", totalCount)
+            put("page", page)
+            put("needs_permission", needsPermission)
+            put("entries", JSONArray().apply {
+                entries.forEach { e ->
+                    put(JSONObject().apply {
+                        put("name", e.name)
+                        put("relative_path", e.relativePath)
+                        put("is_directory", e.isDirectory)
+                        put("size", e.size)
+                        put("modified", e.modified)
+                        put("mime_type", e.mimeType)
+                    })
+                }
+            })
+        }.toString()
+    }
+
+    data class FileThumbnailRequest(
+        val path: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_thumbnail_request")
+            put("path", path)
+        }.toString()
+    }
+
+    data class FileThumbnailResponse(
+        val path: String,
+        val data: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_thumbnail_response")
+            put("path", path)
+            put("data", data)
+        }.toString()
+    }
+
+    data class FileDownloadRequest(
+        val transferId: String,
+        val path: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_download_request")
+            put("transfer_id", transferId)
+            put("path", path)
+        }.toString()
+    }
+
     data class SmsConversationsRequest(
         val page: Int,
         val pageSize: Int
@@ -464,7 +547,8 @@ sealed class Message {
                     transferId = obj.getString("transfer_id"),
                     filename = obj.getString("filename"),
                     mimeType = obj.getString("mime_type"),
-                    fileSize = obj.getLong("file_size")
+                    fileSize = obj.getLong("file_size"),
+                    destinationDir = if (obj.has("destination_dir")) obj.getString("destination_dir") else null
                 )
                 "file_transfer_accept" -> FileTransferAccept(
                     transferId = obj.getString("transfer_id")
@@ -534,6 +618,41 @@ sealed class Message {
                 )
                 "gallery_download_request" -> GalleryDownloadRequest(
                     photoId = obj.getString("photo_id")
+                )
+                "files_list_request" -> FilesListRequest(
+                    path = obj.getString("path"),
+                    page = obj.optInt("page", 0),
+                    pageSize = obj.optInt("page_size", 200)
+                )
+                "files_list_response" -> {
+                    val arr = obj.getJSONArray("entries")
+                    val entries = (0 until arr.length()).map { i ->
+                        val e = arr.getJSONObject(i)
+                        FileEntry(
+                            name = e.getString("name"),
+                            relativePath = e.getString("relative_path"),
+                            isDirectory = e.getBoolean("is_directory"),
+                            size = e.getLong("size"),
+                            modified = e.getLong("modified"),
+                            mimeType = e.getString("mime_type")
+                        )
+                    }
+                    FilesListResponse(
+                        path = obj.getString("path"),
+                        entries = entries,
+                        totalCount = obj.getInt("total_count"),
+                        page = obj.getInt("page"),
+                        needsPermission = obj.getBoolean("needs_permission")
+                    )
+                }
+                "file_thumbnail_request" -> FileThumbnailRequest(path = obj.getString("path"))
+                "file_thumbnail_response" -> FileThumbnailResponse(
+                    path = obj.getString("path"),
+                    data = obj.getString("data")
+                )
+                "file_download_request" -> FileDownloadRequest(
+                    transferId = obj.getString("transfer_id"),
+                    path = obj.getString("path")
                 )
                 "sms_conversations_request" -> SmsConversationsRequest(
                     page = obj.optInt("page", 0),
