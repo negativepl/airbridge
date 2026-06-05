@@ -64,6 +64,10 @@ public enum Message: Equatable, Sendable {
     case mirrorError(reason: String)
     case deviceInfoRequest
     case deviceInfoResponse(info: DeviceInfo)
+    /// Mac -> phone: send your wallpaper for the Home hero. phone -> Mac: the
+    /// wallpaper as base64 JPEG (empty string if unavailable).
+    case wallpaperRequest
+    case wallpaperResponse(imageBase64: String)
     case folderStatsRequest(path: String)
     case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
 }
@@ -265,6 +269,8 @@ extension Message: Codable {
         case mirrorError              = "mirror_error"
         case deviceInfoRequest        = "device_info_request"
         case deviceInfoResponse       = "device_info_response"
+        case wallpaperRequest         = "wallpaper_request"
+        case wallpaperResponse        = "wallpaper_response"
         case folderStatsRequest       = "folder_stats_request"
         case folderStatsResponse      = "folder_stats_response"
     }
@@ -312,6 +318,7 @@ extension Message: Codable {
         case dirCount           = "dir_count"
         case fileCount          = "file_count"
         case mode
+        case image
     }
 
     // MARK: Encode
@@ -520,6 +527,13 @@ extension Message: Codable {
         case .deviceInfoResponse(let info):
             try container.encode(TypeKey.deviceInfoResponse.rawValue, forKey: .type)
             try container.encode(info, forKey: .info)
+
+        case .wallpaperRequest:
+            try container.encode(TypeKey.wallpaperRequest.rawValue, forKey: .type)
+
+        case .wallpaperResponse(let imageBase64):
+            try container.encode(TypeKey.wallpaperResponse.rawValue, forKey: .type)
+            try container.encode(imageBase64, forKey: .image)
 
         case .folderStatsRequest(let path):
             try container.encode(TypeKey.folderStatsRequest.rawValue, forKey: .type)
@@ -753,6 +767,13 @@ extension Message: Codable {
         case .deviceInfoResponse:
             let info = try container.decode(DeviceInfo.self, forKey: .info)
             self = .deviceInfoResponse(info: info)
+
+        case .wallpaperRequest:
+            self = .wallpaperRequest
+
+        case .wallpaperResponse:
+            let image = try container.decode(String.self, forKey: .image)
+            self = .wallpaperResponse(imageBase64: image)
 
         case .folderStatsRequest:
             let path = try container.decode(String.self, forKey: .path)

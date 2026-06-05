@@ -981,6 +981,16 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            is Message.WallpaperRequest -> {
+                serviceScope.launch {
+                    try {
+                        val image = com.airbridge.device.WallpaperProvider.getWallpaperJpegBase64(applicationContext)
+                        webSocketClient.send(Message.WallpaperResponse(image))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "WallpaperRequest failed", e)
+                    }
+                }
+            }
             else -> {
                 Log.d(TAG, "Unhandled message type: ${message::class.simpleName}")
             }

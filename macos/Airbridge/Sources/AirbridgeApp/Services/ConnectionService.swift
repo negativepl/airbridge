@@ -30,6 +30,8 @@ final class ConnectionService {
     private(set) var isConnected: Bool = false
     private(set) var connectedDeviceName: String = ""
     private(set) var deviceInfo: DeviceInfo?
+    /// The phone's wallpaper (JPEG) for the Home hero, à la Phone Link.
+    private(set) var phoneWallpaper: Data?
     private(set) var connectedClientIP: String?
     private(set) var statusMessage: String = "Idle"
     private var manuallyDisconnected: Bool = false
@@ -110,6 +112,7 @@ final class ConnectionService {
         isConnected = false
         connectedDeviceName = ""
         deviceInfo = nil
+        phoneWallpaper = nil
         statusMessage = "Stopped"
         serverStarted = false
     }
@@ -130,6 +133,7 @@ final class ConnectionService {
         isConnected = false
         connectedDeviceName = ""
         deviceInfo = nil
+        phoneWallpaper = nil
         statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
     }
 
@@ -209,9 +213,10 @@ final class ConnectionService {
             self.isConnected = true
             self.statusMessage = "Connected to \(self.connectedDeviceName)"
 
-            // Pull richer device info (exact name, storage, RAM, battery) for
-            // the Home screen.
+            // Pull richer device info (exact name, storage, RAM, battery) and
+            // the wallpaper for the Home screen.
             try? await self.server.broadcast(.deviceInfoRequest)
+            try? await self.server.broadcast(.wallpaperRequest)
         }
     }
 
@@ -251,6 +256,8 @@ final class ConnectionService {
             filesHandler?.handleMessage(message)
         case .deviceInfoResponse(let info):
             deviceInfo = info
+        case .wallpaperResponse(let imageBase64):
+            phoneWallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         default:
@@ -283,6 +290,7 @@ final class ConnectionService {
                 if !stillConnected && !self.manuallyDisconnected {
                     self.connectedDeviceName = ""
                     self.deviceInfo = nil
+                    self.phoneWallpaper = nil
                     self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                 }
             }

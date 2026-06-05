@@ -543,6 +543,21 @@ sealed class Message {
         }.toString()
     }
 
+    data object WallpaperRequest : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "wallpaper_request")
+        }.toString()
+    }
+
+    data class WallpaperResponse(
+        val imageBase64: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "wallpaper_response")
+            put("image", imageBase64)
+        }.toString()
+    }
+
     data class DeviceInfoResponse(
         val info: DeviceInfo
     ) : Message() {
@@ -799,6 +814,7 @@ sealed class Message {
                     reason = obj.getString("reason")
                 )
                 "device_info_request" -> DeviceInfoRequest
+                "wallpaper_request" -> WallpaperRequest
                 "folder_stats_request" -> FolderStatsRequest(
                     path = obj.getString("path")
                 )

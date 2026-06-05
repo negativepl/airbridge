@@ -30,9 +30,7 @@ struct HomeView: View {
             if vm.isTransferring {
                 transferCard(vm)
             }
-            if let info = vm.deviceInfo {
-                deviceInfoCard(info)
-            }
+            deviceCard(vm)
             if !vm.hasPairedDevices {
                 noPairedDevicesCard
             }
@@ -166,16 +164,86 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Device info
+    // MARK: - Device card (Phone Link-style: wallpaper preview + info)
 
-    private func deviceInfoCard(_ info: DeviceInfo) -> some View {
-        GlassSection(
-            title: LocalizedStringKey(info.name.isEmpty ? info.model : info.name),
-            systemImage: "iphone"
-        ) {
+    @ViewBuilder
+    private func deviceCard(_ vm: HomeViewModel) -> some View {
+        let wallpaper = vm.isConnected ? connectionService.phoneWallpaper.flatMap { NSImage(data: $0) } : nil
+        if wallpaper != nil || vm.deviceInfo != nil {
+            GlassSection {
+                HStack(alignment: .center, spacing: 18) {
+                    if let img = wallpaper {
+                        phonePreview(img, vm: vm)
+                    }
+                    if let info = vm.deviceInfo {
+                        deviceInfoColumn(info)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    private func phonePreview(_ img: NSImage, vm: HomeViewModel) -> some View {
+        let aspect = img.size.width / max(img.size.height, 1)
+        let width: CGFloat = 150
+        let height = min(max(width / max(aspect, 0.01), 110), 280)
+        return Image(nsImage: img)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: width, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(alignment: .bottom) {
+                if let info = vm.deviceInfo {
+                    batteryPill(info.batteryPercent)
+                        .padding(.bottom, 10)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(.black.opacity(0.25), lineWidth: 3)
+                    .blur(radius: 2)
+                    .padding(-1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+            .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryPercent)
+    }
+
+    private func batteryPill(_ percent: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: batterySymbol(percent))
+            Text("\(percent)%")
+                .contentTransition(.numericText())
+        }
+        .font(.ab(.caption2, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+    }
+
+    private func batterySymbol(_ percent: Int) -> String {
+        switch percent {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default:    return "battery.100percent"
+        }
+    }
+
+    // MARK: - Device info column
+
+    @ViewBuilder
+    private func deviceInfoColumn(_ info: DeviceInfo) -> some View {
+        VStack(spacing: 12) {
             infoRow(L10n.isPL ? "Model" : "Model", "\(info.manufacturer) \(info.model)")
-            infoRow("Android", "\(info.androidVersion) · API \(info.sdkInt)")
-            infoRow(L10n.isPL ? "Bateria" : "Battery", "\(info.batteryPercent)%")
 
             usageRow(
                 label: L10n.isPL ? "Pamięć" : "Storage",
