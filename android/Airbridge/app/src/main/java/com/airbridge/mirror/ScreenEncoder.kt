@@ -41,6 +41,13 @@ class ScreenEncoder(
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, bitrateBps)
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+            // Actually throttles how many frames the VirtualDisplay surface
+            // feeds the encoder. Without it a 120 Hz panel pushes ~120 fps of
+            // mostly-duplicate frames regardless of KEY_FRAME_RATE (which is
+            // only a rate-control hint).
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, fps.toFloat())
+            }
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, keyframeIntervalSeconds)
             setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

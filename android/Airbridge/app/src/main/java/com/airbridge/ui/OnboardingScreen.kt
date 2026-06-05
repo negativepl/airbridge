@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -360,6 +361,14 @@ private fun PermissionsPage() {
     ) {
         hasFilesGrant = Environment.isExternalStorageManager()
     }
+    // Optional (mirror only): lets the Mac start screen mirroring while the app
+    // is in the background. Not part of `allGranted` so it never blocks onboarding.
+    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    val overlayLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        overlayGranted = Settings.canDrawOverlays(context)
+    }
 
     val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
 
@@ -463,6 +472,20 @@ private fun PermissionsPage() {
                     data = Uri.fromParts("package", context.packageName, null)
                 }
                 filesLauncher.launch(intent)
+            }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        PermissionRow(
+            icon = Icons.Rounded.Tv,
+            description = stringResource(R.string.onboarding_perm_overlay_desc),
+            why = stringResource(R.string.onboarding_perm_overlay_why),
+            granted = overlayGranted,
+            onRequest = {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.fromParts("package", context.packageName, null)
+                )
+                overlayLauncher.launch(intent)
             }
         )
 

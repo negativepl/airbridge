@@ -23,10 +23,9 @@ class MirrorAccessibilityService : AccessibilityService() {
             val x = metrics.widthPixels * xNorm
             val y = metrics.heightPixels * yNorm
 
-            val path = Path().apply {
-                moveTo(x, y)
-            }
-            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 1)
+            val path = Path().apply { moveTo(x, y) }
+            // ~60 ms down→up so the system registers a real tap (1 ms was too short).
+            val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 60)
             val gesture = android.accessibilityservice.GestureDescription.Builder()
                 .addStroke(stroke)
                 .build()

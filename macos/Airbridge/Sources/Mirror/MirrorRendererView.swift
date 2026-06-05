@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import CoreMedia
+import CoreImage
 
 private enum MirrorRendererDebugLog {
     static let url = URL(fileURLWithPath: "/tmp/airbridge-mirror.log")
@@ -22,45 +23,70 @@ private enum MirrorRendererDebugLog {
 }
 
 public final class MirrorRendererLayerView: NSView {
-    private var enqueuedCount = 0
     private var droppedCount = 0
 
-    public override func makeBackingLayer() -> CALayer {
-        return AVSampleBufferDisplayLayer()
-    }
+    /// Foreground: the actual mirror, aspect-fit (letterboxed).
+    private let displayLayer = AVSampleBufferDisplayLayer()
+    /// Background "ambient/cinema" fill: same frames scaled to fill + heavily
+    /// blurred, so the letterbox bars glow with the screen's colours instead
+    /// of being flat black (à la YouTube ambient mode).
+    private let ambientLayer = AVSampleBufferDisplayLayer()
+
+    public override func makeBackingLayer() -> CALayer { CALayer() }
     public override var wantsUpdateLayer: Bool { true }
 
-    public var displayLayer: AVSampleBufferDisplayLayer {
-        layer as! AVSampleBufferDisplayLayer
-    }
+    private let ambientEnabled: Bool
 
-    public override init(frame frameRect: NSRect) {
+    public init(frame frameRect: NSRect, ambient: Bool) {
+        self.ambientEnabled = ambient
         super.init(frame: frameRect)
         wantsLayer = true
-        layerContentsRedrawPolicy = .duringViewResize
+        layer?.backgroundColor = NSColor.black.cgColor
+
+        if ambient {
+            ambientLayer.videoGravity = .resizeAspectFill
+            ambientLayer.preventsDisplaySleepDuringVideoPlayback = false
+            ambientLayer.opacity = 0.55
+            if let blur = CIFilter(name: "CIGaussianBlur", parameters: [kCIInputRadiusKey: 60]) {
+                ambientLayer.filters = [blur]
+            }
+            layer?.addSublayer(ambientLayer)
+        }
+
+        // Always aspect-fit (never crop). In the tab the ambient layer fills
+        // the letterbox bars; the pop-out window aspect-locks to the video so
+        // there are no bars to fill.
         displayLayer.videoGravity = .resizeAspect
         displayLayer.preventsDisplaySleepDuringVideoPlayback = false
+        layer?.addSublayer(displayLayer)
     }
     public required init?(coder: NSCoder) { fatalError() }
 
-    public func enqueue(_ sampleBuffer: CMSampleBuffer) {
-        if displayLayer.status == .failed {
-            MirrorRendererDebugLog.write("display layer failed: \(String(describing: displayLayer.error))")
-            displayLayer.flushAndRemoveImage()
+    public override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if ambientEnabled {
+            // Oversize the ambient layer so its Gaussian blur never reveals
+            // soft transparent edges inside the view.
+            let inset = -max(bounds.width, bounds.height) * 0.1
+            ambientLayer.frame = bounds.insetBy(dx: inset, dy: inset)
         }
-        if displayLayer.isReadyForMoreMediaData {
-            enqueuedCount += 1
-            if enqueuedCount <= 10 || enqueuedCount.isMultiple(of: 60) {
-                MirrorRendererDebugLog.write("renderer enqueued sample #\(enqueuedCount)")
+        displayLayer.frame = bounds
+        CATransaction.commit()
+    }
+
+    public func enqueue(_ sampleBuffer: CMSampleBuffer) {
+        let layers = ambientEnabled ? [ambientLayer, displayLayer] : [displayLayer]
+        for layer in layers {
+            if layer.status == .failed {
+                layer.flushAndRemoveImage()
             }
-            displayLayer.enqueue(sampleBuffer)
-        } else {
-            droppedCount += 1
-            if droppedCount <= 10 || droppedCount.isMultiple(of: 30) {
-                MirrorRendererDebugLog.write("display layer not ready for media data, dropping sample #\(droppedCount)")
-            }
-            if droppedCount.isMultiple(of: 5) {
-                displayLayer.flush()
+            if layer.isReadyForMoreMediaData {
+                layer.enqueue(sampleBuffer)
+            } else if layer === displayLayer {
+                droppedCount += 1
+                if droppedCount.isMultiple(of: 5) { layer.flush() }
             }
         }
     }
@@ -72,15 +98,20 @@ public struct MirrorRendererView: NSViewRepresentable {
     }
 
     private let stream: AsyncStream<CMSampleBuffer>
+    private let ambient: Bool
 
-    public init(stream: AsyncStream<CMSampleBuffer>) {
+    /// `ambient: true` fills letterbox bars with a blurred glow of the screen
+    /// (for the tab, where the area is wider than the phone). Pass `false` for
+    /// the pop-out window, which resizes to the phone aspect — pure video.
+    public init(stream: AsyncStream<CMSampleBuffer>, ambient: Bool = true) {
         self.stream = stream
+        self.ambient = ambient
     }
 
     public func makeCoordinator() -> Coordinator { Coordinator() }
 
     public func makeNSView(context: Context) -> MirrorRendererLayerView {
-        let view = MirrorRendererLayerView(frame: .zero)
+        let view = MirrorRendererLayerView(frame: .zero, ambient: ambient)
         context.coordinator.view = view
         Task { @MainActor in
             for await sample in stream {

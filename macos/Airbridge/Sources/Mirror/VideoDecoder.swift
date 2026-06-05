@@ -44,8 +44,20 @@ public final class VideoDecoder: @unchecked Sendable {
     public func configure(sps: Data, pps: Data) throws -> CMVideoDimensions {
         let fmt = try Self.makeFormatDescription(sps: sps, pps: pps)
         self.formatDescription = fmt
-        let dims = CMVideoFormatDescriptionGetDimensions(fmt)
-        VideoDecoderDebugLog.write("decoder configured dims=\(dims.width)x\(dims.height) sps=\(sps.count) pps=\(pps.count)")
+        // Use PRESENTATION dimensions (clean aperture + pixel aspect), not the
+        // raw coded size. H.264 pads to 16px macroblocks, so the coded size can
+        // be e.g. 1088×2320 for a 1080×2316 screen — those extra padded pixels
+        // made the window slightly wider than the real frame, leaving thin side
+        // bars. Presentation dimensions are the true displayed size.
+        let presentation = CMVideoFormatDescriptionGetPresentationDimensions(
+            fmt, usePixelAspectRatio: true, useCleanAperture: true
+        )
+        let coded = CMVideoFormatDescriptionGetDimensions(fmt)
+        let dims = CMVideoDimensions(
+            width: presentation.width > 0 ? Int32(presentation.width.rounded()) : coded.width,
+            height: presentation.height > 0 ? Int32(presentation.height.rounded()) : coded.height
+        )
+        VideoDecoderDebugLog.write("decoder configured presentation=\(dims.width)x\(dims.height) coded=\(coded.width)x\(coded.height)")
         try createSession(formatDescription: fmt)
         return dims
     }

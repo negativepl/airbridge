@@ -7,14 +7,13 @@ struct MirrorWindow: View {
 
     let mirrorService: MirrorService
     @State private var window: NSWindow?
-    @State private var showsInfo = false
     @State private var titlebarInset: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .topTrailing) {
+            ZStack {
                 Color.black.ignoresSafeArea()
-                MirrorRendererView(stream: mirrorService.sampleBufferStream)
+                MirrorRendererView(stream: mirrorService.sampleBufferStream, ambient: true)
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
@@ -27,19 +26,6 @@ struct MirrorWindow: View {
                                 mirrorService.sendTap(xNorm: point.x, yNorm: point.y)
                             }
                     )
-
-                headerIcon(systemName: "info.circle") {
-                    showsInfo.toggle()
-                }
-                .keyboardShortcut("i", modifiers: [.command])
-                .padding(.top, titlebarInset + 8)
-                .padding(.trailing, 14)
-
-                if showsInfo {
-                    MirrorInfoPanel(mirrorService: mirrorService)
-                        .padding(.top, titlebarInset + 54)
-                        .padding(.trailing, 14)
-                }
             }
         }
         .background(WindowAccessor { nsWindow in
@@ -59,17 +45,11 @@ struct MirrorWindow: View {
         .onExitCommand {
             Task { await mirrorService.stop() }
         }
-    }
-
-    private func headerIcon(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.ab(.subheadline, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
+        .onAppear {
+            mirrorService.presentedInWindow = true
+            if let window { resizeWindowIfNeeded(window) }
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
+        .onDisappear { mirrorService.presentedInWindow = false }
     }
 
     private func normalizedPoint(location: CGPoint, in size: CGSize, aspectRatio: CGFloat) -> CGPoint? {
@@ -97,7 +77,8 @@ struct MirrorWindow: View {
         }
 
         let x = (location.x - origin.x) / fitted.width
-        let y = 1 - ((location.y - origin.y) / fitted.height)
+        // Top-down, matching Android screen coords (0 = top). No flip.
+        let y = (location.y - origin.y) / fitted.height
         return CGPoint(x: x, y: y)
     }
 
@@ -156,7 +137,6 @@ struct MirrorWindow: View {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = false
         window.isMovableByWindowBackground = false
-        window.showsResizeIndicator = true
     }
 
     private func updateTitlebarInset(_ window: NSWindow) {
@@ -178,36 +158,6 @@ struct MirrorWindow: View {
                 height: (Self.minShortEdge / aspect).rounded(.up)
             )
         }
-    }
-}
-
-private struct MirrorInfoPanel: View {
-    let mirrorService: MirrorService
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Mirror Info")
-                .font(.headline)
-            infoRow("Telefon", "\(Int(mirrorService.remoteScreenWidth)) × \(Int(mirrorService.remoteScreenHeight))")
-            infoRow("Stream", "\(mirrorService.targetStreamWidth) × \(mirrorService.targetStreamHeight)")
-            infoRow("FPS", String(format: "%.1f", mirrorService.decodedFramesPerSecond))
-            infoRow("Bitrate", String(format: "%.2f Mbps", mirrorService.incomingBitrateMbps))
-            infoRow("Port", "\(mirrorService.actualPort ?? 0)")
-        }
-        .padding(12)
-        .frame(width: 240, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14, style: .continuous))
-    }
-
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .monospacedDigit()
-        }
-        .font(.caption)
     }
 }
 

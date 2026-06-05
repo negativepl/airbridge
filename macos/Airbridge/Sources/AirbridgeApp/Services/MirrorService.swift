@@ -35,6 +35,10 @@ public final class MirrorService {
     public static let requestedBitrateBps: Int = 20_000_000
 
     public private(set) var isStreaming: Bool = false
+    /// True while the standalone Mirror window is showing the stream. The tab
+    /// must not render simultaneously — the frame stream has a single consumer,
+    /// so two renderers would split frames. The tab shows a placeholder instead.
+    public var presentedInWindow: Bool = false
     public private(set) var actualPort: UInt16?
     public private(set) var remoteScreenWidth: CGFloat = 540
     public private(set) var remoteScreenHeight: CGFloat = 1170
@@ -42,8 +46,36 @@ public final class MirrorService {
     public private(set) var videoHeight: CGFloat = 1170
     public private(set) var targetStreamWidth: Int = 540
     public private(set) var targetStreamHeight: Int = 1170
-    public private(set) var requestedFramesPerSecond: Int = MirrorService.requestedFramesPerSecond
-    public private(set) var requestedBitrateBps: Int = MirrorService.requestedBitrateBps
+    public static let fpsKey = "mirrorRequestedFps"
+    public static let bitrateKey = "mirrorRequestedBitrateBps"
+    public static let bitrateAutoKey = "mirrorBitrateAuto"
+    public static let resolutionScaleKey = "mirrorResolutionScale"
+
+    /// User-tunable, persisted. Applied to the encoder on the NEXT mirror start
+    /// (sent in HELLO_ACK), not mid-stream.
+    public var requestedFramesPerSecond: Int = MirrorService.requestedFramesPerSecond {
+        didSet { UserDefaults.standard.set(requestedFramesPerSecond, forKey: Self.fpsKey) }
+    }
+    public var requestedBitrateBps: Int = MirrorService.requestedBitrateBps {
+        didSet { UserDefaults.standard.set(requestedBitrateBps, forKey: Self.bitrateKey) }
+    }
+    /// When true, bitrate is derived from resolution × fps instead of the manual value.
+    public var bitrateAuto: Bool = true {
+        didSet { UserDefaults.standard.set(bitrateAuto, forKey: Self.bitrateAutoKey) }
+    }
+    /// 1.0 = native phone resolution, 0.75 / 0.5 downscale for smoothness.
+    public var resolutionScale: Double = 1.0 {
+        didSet { UserDefaults.standard.set(resolutionScale, forKey: Self.resolutionScaleKey) }
+    }
+
+    /// Bitrate actually sent to the phone: auto (derived) or the manual value.
+    public func effectiveBitrateBps(width: Int, height: Int) -> Int {
+        guard bitrateAuto else { return requestedBitrateBps }
+        // ~0.07 bits/pixel/frame for screen content, clamped to a sane range.
+        let bpp = 0.07
+        let raw = Double(width) * Double(height) * Double(requestedFramesPerSecond) * bpp
+        return min(35_000_000, max(6_000_000, Int(raw)))
+    }
     public private(set) var decodedFramesPerSecond: Double = 0
     public private(set) var incomingBitrateMbps: Double = 0
     public var remoteAspectRatio: CGFloat {
@@ -70,6 +102,19 @@ public final class MirrorService {
     public init(port: UInt16 = 8767, pairingTokenProvider: @escaping () -> Data? = { nil }) {
         self.pairingTokenProvider = pairingTokenProvider
         self.server = WebSocketServer(port: port)
+
+        if let fps = UserDefaults.standard.object(forKey: Self.fpsKey) as? Int {
+            self.requestedFramesPerSecond = fps
+        }
+        if let br = UserDefaults.standard.object(forKey: Self.bitrateKey) as? Int {
+            self.requestedBitrateBps = br
+        }
+        if let auto = UserDefaults.standard.object(forKey: Self.bitrateAutoKey) as? Bool {
+            self.bitrateAuto = auto
+        }
+        if let scale = UserDefaults.standard.object(forKey: Self.resolutionScaleKey) as? Double {
+            self.resolutionScale = scale
+        }
 
         // Build the inner stream that can safely cross concurrency boundaries.
         var cont: AsyncStream<UncheckedSampleBuffer>.Continuation!
@@ -143,9 +188,9 @@ public final class MirrorService {
                 targetStreamWidth = Int(target.width)
                 targetStreamHeight = Int(target.height)
                 let ack = MirrorMessage.helloAck(
-                    targetBitrateBps: UInt32(requestedBitrateBps),
+                    targetBitrateBps: UInt32(effectiveBitrateBps(width: targetStreamWidth, height: targetStreamHeight)),
                     fps: UInt8(requestedFramesPerSecond),
-                    keyframeIntervalSeconds: 2,
+                    keyframeIntervalSeconds: 5,
                     targetWidth: UInt32(targetStreamWidth),
                     targetHeight: UInt32(targetStreamHeight)
                 )
@@ -222,8 +267,9 @@ public final class MirrorService {
     }
 
     private func nativeStreamSize(for remoteSize: CGSize) -> CGSize {
-        let width = max(remoteSize.width, 1)
-        let height = max(remoteSize.height, 1)
+        let scale = max(0.25, min(1.0, resolutionScale))
+        let width = max(remoteSize.width * scale, 1)
+        let height = max(remoteSize.height * scale, 1)
 
         func even(_ value: CGFloat) -> Int {
             let rounded = Int(value.rounded(.toNearestOrAwayFromZero))

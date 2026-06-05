@@ -3,6 +3,7 @@ import Mirror
 
 struct MainWindow: View {
     @State private var selectedTab: NavigationItem = .home
+    @Environment(\.openWindow) private var openWindow
 
     let connectionService: ConnectionService
     let clipboardService: ClipboardService
@@ -97,6 +98,33 @@ struct MainWindow: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .help(L10n.isPL ? "Odśwież" : "Refresh")
+                }
+            }
+            if selectedTab == .mirror && mirrorService.isStreaming {
+                // Native toolbar items — macOS sizes, styles and glass-groups
+                // them itself (like Notes). No custom glass/frames.
+                ToolbarItem(placement: .primaryAction) {
+                    Text("\(Int(mirrorService.decodedFramesPerSecond)) FPS · \(String(format: "%.1f", mirrorService.incomingBitrateMbps)) Mbps")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        openWindow(id: "mirror")
+                    } label: {
+                        Label(L10n.isPL ? "Wydziel okno" : "Pop out", systemImage: "macwindow.on.rectangle")
+                    }
+                    .help(L10n.isPL ? "Otwórz w osobnym oknie" : "Open in a separate window")
+                }
+                ToolbarSpacer(.fixed)
+                ToolbarItem(placement: .primaryAction) {
+                    Button(role: .destructive) {
+                        Task { try? await connectionService.broadcast(.mirrorStop) }
+                    } label: {
+                        Label(L10n.isPL ? "Zatrzymaj" : "Stop", systemImage: "stop.fill")
+                    }
+                    .help(L10n.isPL ? "Zatrzymaj mirror" : "Stop mirroring")
                 }
             }
         }
