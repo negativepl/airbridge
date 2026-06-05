@@ -13,6 +13,8 @@ import android.os.IBinder
 import android.util.Log
 import com.airbridge.clipboard.ClipboardSync
 import com.airbridge.discovery.NsdDiscovery
+import com.airbridge.files.FilesProvider
+import com.airbridge.files.SafTreeStore
 import com.airbridge.gallery.GalleryProvider
 import com.airbridge.protocol.ContentType
 import com.airbridge.protocol.Message
@@ -22,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import okio.ByteString.Companion.toByteString
 import java.io.File
 import java.util.UUID
 
@@ -127,6 +130,7 @@ class AirbridgeService : Service() {
     private val httpFileServer = HttpFileServer()
     private val activeTransfers = mutableMapOf<String, FileTransferState>()
     private lateinit var galleryProvider: GalleryProvider
+    private val filesProvider by lazy { FilesProvider(contentResolver, SafTreeStore(this)) }
     private lateinit var smsProvider: SmsProvider
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
@@ -215,7 +219,12 @@ class AirbridgeService : Service() {
                                     updateTransferProgress(offer.filename, bytesReceived, totalBytes)
                                 }
                                 if (tempFile != null) {
-                                    finalizeReceivedFile(offer.filename, tempFile)
+                                    val destDir = offer.destinationDir
+                                    if (destDir != null) {
+                                        finalizeReceivedFileToDir(offer.filename, offer.mimeType, destDir, tempFile)
+                                    } else {
+                                        finalizeReceivedFile(offer.filename, tempFile)
+                                    }
                                 } else {
                                     Log.e(TAG, "Download failed for ${offer.filename}")
                                     transferProgress.value = null
@@ -464,6 +473,136 @@ class AirbridgeService : Service() {
                 transferProgress.value = null
                 transferFileName.value = null
             }
+        }
+    }
+
+    /// Files-browser upload variant: writes the received temp file into a
+    /// SAF-granted folder on the phone (chosen on Mac via destinationDir)
+    /// using FilesProvider.createFile, instead of the default Downloads
+    /// location. Mirrors finalizeReceivedFile's notification/state UX.
+    private fun finalizeReceivedFileToDir(filename: String, mimeType: String, destinationDir: String, tempFile: File) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(4)
+        serviceScope.launch {
+            try {
+                val mime = mimeType.ifBlank { "application/octet-stream" }
+                val out = filesProvider.createFile(destinationDir, filename, mime)
+                if (out == null) {
+                    Log.e(TAG, "createFile failed for $destinationDir/$filename — falling back to Downloads")
+                    finalizeReceivedFile(filename, tempFile)
+                    return@launch
+                }
+                out.use { os -> tempFile.inputStream().use { it.copyTo(os) } }
+                tempFile.delete()
+                Log.d(TAG, "File received into SAF dir: $destinationDir/$filename")
+                addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
+                transferProgress.value = null
+                transferFileName.value = null
+
+                val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
+                    .setContentText(filename)
+                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                    .setContentIntent(openAppPendingIntent())
+                    .setAutoCancel(true)
+                    .build()
+                manager.notify(3, notif)
+            } catch (e: Exception) {
+                Log.e(TAG, "File save to SAF dir failed", e)
+                transferProgress.value = null
+                transferFileName.value = null
+            }
+        }
+    }
+
+    /// Streams a phone file (resolved via FilesProvider / SAF) to the Mac
+    /// over the WebSocket using the binary-chunk framing the Mac's
+    /// FileTransferService.handleBinaryChunk expects:
+    ///   [36 bytes transferId ASCII][4 bytes chunkIndex big-endian][chunk data]
+    /// Sends FileTransferStart first (so the Mac creates a FileAssembler),
+    /// then the binary chunks, then FileTransferComplete. Used by the Files
+    /// Browser download (Mac pulls a file from the phone).
+    private fun sendFileToMac(transferId: String, relPath: String) {
+        if (!webSocketClient.isConnected) {
+            Log.w(TAG, "sendFileToMac: not connected")
+            return
+        }
+        val filename = relPath.substringAfterLast('/')
+        val size = filesProvider.fileSize(relPath)
+        if (size < 0) {
+            Log.e(TAG, "sendFileToMac: unknown size for $relPath")
+            return
+        }
+        val input = filesProvider.openInputStream(relPath)
+        if (input == null) {
+            Log.e(TAG, "sendFileToMac: cannot open $relPath")
+            return
+        }
+
+        val chunkSize = 65_536
+        val totalChunks = if (size == 0L) 1 else ((size + chunkSize - 1) / chunkSize).toInt()
+        val mime = android.webkit.MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(filename.substringAfterLast('.', "").lowercase())
+            ?: "application/octet-stream"
+
+        try {
+            transferFileName.value = filename
+            transferIsSending.value = true
+            transferProgress.value = 0f
+
+            webSocketClient.send(
+                Message.FileTransferStart(
+                    sourceId = deviceId,
+                    transferId = transferId,
+                    filename = filename,
+                    mimeType = mime,
+                    totalSize = size,
+                    totalChunks = totalChunks
+                )
+            )
+
+            // transferId is a UUID string — exactly 36 ASCII bytes — matching
+            // the Mac's fixed 0..<36 slice in handleBinaryChunk.
+            val idBytes = transferId.toByteArray(Charsets.US_ASCII)
+            val buffer = ByteArray(chunkSize)
+            var chunkIndex = 0
+            input.use { stream ->
+                while (true) {
+                    var read = 0
+                    while (read < chunkSize) {
+                        val n = stream.read(buffer, read, chunkSize - read)
+                        if (n < 0) break
+                        read += n
+                    }
+                    if (read == 0) break
+
+                    val frame = ByteArray(idBytes.size + 4 + read)
+                    System.arraycopy(idBytes, 0, frame, 0, idBytes.size)
+                    val off = idBytes.size
+                    frame[off] = (chunkIndex ushr 24 and 0xFF).toByte()
+                    frame[off + 1] = (chunkIndex ushr 16 and 0xFF).toByte()
+                    frame[off + 2] = (chunkIndex ushr 8 and 0xFF).toByte()
+                    frame[off + 3] = (chunkIndex and 0xFF).toByte()
+                    System.arraycopy(buffer, 0, frame, off + 4, read)
+
+                    webSocketClient.sendBinary(frame.toByteString())
+                    chunkIndex++
+                    if (totalChunks > 0) {
+                        transferProgress.value = chunkIndex.toFloat() / totalChunks
+                    }
+
+                    if (read < chunkSize) break
+                }
+            }
+
+            webSocketClient.send(Message.FileTransferComplete(transferId, ""))
+            addActivity(ActivityItem("file_sent", filename, System.currentTimeMillis()))
+            Log.d(TAG, "sendFileToMac complete: $filename ($chunkIndex chunks)")
+        } catch (e: Exception) {
+            Log.e(TAG, "sendFileToMac failed for $relPath", e)
+        } finally {
+            transferProgress.value = null
+            transferFileName.value = null
         }
     }
 
@@ -768,6 +907,49 @@ class AirbridgeService : Service() {
                             ) { _, _ -> }
                         }
                     }
+                }
+            }
+            is Message.FilesListRequest -> {
+                serviceScope.launch {
+                    try {
+                        if (!filesProvider.hasGrant()) {
+                            webSocketClient.send(
+                                Message.FilesListResponse(
+                                    path = message.path,
+                                    entries = emptyList(),
+                                    totalCount = 0,
+                                    page = message.page,
+                                    needsPermission = true
+                                )
+                            )
+                        } else {
+                            val (entries, total) = filesProvider.listDir(message.path, message.page, message.pageSize)
+                            webSocketClient.send(
+                                Message.FilesListResponse(
+                                    path = message.path,
+                                    entries = entries,
+                                    totalCount = total,
+                                    page = message.page,
+                                    needsPermission = false
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "FilesListRequest failed", e)
+                    }
+                }
+            }
+            is Message.FileThumbnailRequest -> {
+                serviceScope.launch {
+                    val data = filesProvider.getThumbnail(message.path)
+                    if (data != null) {
+                        webSocketClient.send(Message.FileThumbnailResponse(path = message.path, data = data))
+                    }
+                }
+            }
+            is Message.FileDownloadRequest -> {
+                serviceScope.launch {
+                    sendFileToMac(message.transferId, message.path)
                 }
             }
             is Message.SmsConversationsRequest -> {

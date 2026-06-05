@@ -104,6 +104,22 @@ class FilesProvider(
         return contentResolver.openInputStream(uri)
     }
 
+    /** Rozmiar pliku w bajtach (kolumna SIZE). -1 gdy nieznany/brak grantu. */
+    fun fileSize(relPath: String): Long {
+        val treeUri = store.treeUri() ?: return -1
+        val docId = resolveDocId(treeUri, relPath) ?: return -1
+        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        contentResolver.query(
+            uri,
+            arrayOf(DocumentsContract.Document.COLUMN_SIZE),
+            null, null, null
+        )?.use { c ->
+            val sizeCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
+            if (c.moveToFirst() && !c.isNull(sizeCol)) return c.getLong(sizeCol)
+        }
+        return -1
+    }
+
     /** Tworzy plik w katalogu relDir i zwraca OutputStream do zapisu (upload). */
     fun createFile(relDir: String, name: String, mimeType: String): OutputStream? {
         val treeUri = store.treeUri() ?: return null
