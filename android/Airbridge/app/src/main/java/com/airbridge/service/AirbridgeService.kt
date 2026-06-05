@@ -9,13 +9,11 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
-import android.provider.DocumentsContract
 import android.os.IBinder
 import android.util.Log
 import com.airbridge.clipboard.ClipboardSync
 import com.airbridge.discovery.NsdDiscovery
 import com.airbridge.files.FilesProvider
-import com.airbridge.files.SafTreeStore
 import com.airbridge.gallery.GalleryProvider
 import com.airbridge.protocol.ContentType
 import com.airbridge.protocol.Message
@@ -130,7 +128,7 @@ class AirbridgeService : Service() {
     private val httpFileServer = HttpFileServer()
     private val activeTransfers = mutableMapOf<String, FileTransferState>()
     private lateinit var galleryProvider: GalleryProvider
-    private val filesProvider by lazy { FilesProvider(contentResolver, SafTreeStore(this)) }
+    private val filesProvider by lazy { FilesProvider(contentResolver) }
     private lateinit var smsProvider: SmsProvider
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
@@ -496,16 +494,16 @@ class AirbridgeService : Service() {
                 try {
                     out.use { os -> tempFile.inputStream().use { it.copyTo(os) } }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Copy to SAF file failed, removing empty document $newUri", e)
-                    try { DocumentsContract.deleteDocument(contentResolver, newUri) } catch (de: Exception) {
-                        Log.w(TAG, "Could not delete empty document $newUri", de)
+                    Log.e(TAG, "Copy to file failed, removing empty file $newUri", e)
+                    try { newUri.path?.let { File(it).delete() } } catch (de: Exception) {
+                        Log.w(TAG, "Could not delete empty file $newUri", de)
                     }
                     transferProgress.value = null
                     transferFileName.value = null
                     return@launch
                 }
                 tempFile.delete()
-                Log.d(TAG, "File received into SAF dir: $destinationDir/$filename")
+                Log.d(TAG, "File received into dir: $destinationDir/$filename")
                 addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
                 transferProgress.value = null
                 transferFileName.value = null

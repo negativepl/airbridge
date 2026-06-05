@@ -1,36 +1,19 @@
 package com.airbridge.files
 
-import android.content.Context
-import android.content.SharedPreferences
-import android.net.Uri
-
 /**
- * Przechowuje grant SAF (tree URI) i dostarcza czyste helpery na ścieżki względne.
+ * Czyste helpery na ścieżki względne używane przez FilesProvider.
  * Ścieżka względna używa "/" jako separatora, korzeń = "".
+ *
+ * (Nazwa historyczna — wcześniej trzymał też grant SAF; po przejściu na
+ * MANAGE_EXTERNAL_STORAGE persystencja tree URI nie jest już potrzebna.)
  */
-class SafTreeStore(context: Context) {
+object SafTreeStore {
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    /** Rozbija ścieżkę względną na segmenty, pomijając puste. */
+    fun pathSegments(path: String): List<String> =
+        path.split("/").filter { it.isNotEmpty() }
 
-    fun saveTreeUri(uri: Uri) {
-        prefs.edit().putString(KEY_TREE_URI, uri.toString()).apply()
-    }
-
-    fun treeUri(): Uri? = prefs.getString(KEY_TREE_URI, null)?.let(Uri::parse)
-
-    fun hasGrant(): Boolean = treeUri() != null
-
-    companion object {
-        private const val PREFS = "saf_tree"
-        private const val KEY_TREE_URI = "tree_uri"
-
-        /** Rozbija ścieżkę względną na segmenty, pomijając puste. */
-        fun pathSegments(path: String): List<String> =
-            path.split("/").filter { it.isNotEmpty() }
-
-        /** Łączy katalog względny z nazwą dziecka. */
-        fun childPath(dir: String, name: String): String =
-            if (dir.isEmpty()) name else "$dir/$name"
-    }
+    /** Łączy katalog względny z nazwą dziecka. */
+    fun childPath(dir: String, name: String): String =
+        if (dir.isEmpty()) name else "$dir/$name"
 }

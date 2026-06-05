@@ -4,60 +4,43 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.provider.DocumentsContract
+import android.os.Environment
 import android.util.Base64
 import android.util.Log
+import android.webkit.MimeTypeMap
 import com.airbridge.protocol.FileEntry
 import java.io.ByteArrayOutputStream
-import java.io.InputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.OutputStream
 
+/**
+ * Provides browsing/download/upload over the whole external storage (/sdcard)
+ * via plain java.io.File. Requires MANAGE_EXTERNAL_STORAGE (All Files Access).
+ * Relative paths use "/" as separator; root ("") = /sdcard.
+ */
 class FilesProvider(
-    private val contentResolver: ContentResolver,
-    private val store: SafTreeStore
+    private val contentResolver: ContentResolver
 ) {
-    // relativePath -> documentId (cache nawigacji)
-    private val docIdCache = mutableMapOf<String, String>()
-    // Tracks the tree URI the cache was built for; cleared when the SAF grant changes.
-    private var cachedTreeUri: String? = null
+    private val root: File = Environment.getExternalStorageDirectory()
 
-    fun hasGrant(): Boolean = store.hasGrant()
+    fun hasGrant(): Boolean = Environment.isExternalStorageManager()
 
-    /** Listing katalogu (relPath="" = korzeń grantu). Zwraca (entries, totalCount). */
+    /** Listing katalogu (relPath="" = korzeń /sdcard). Zwraca (entries, totalCount). */
     fun listDir(relPath: String, page: Int, pageSize: Int): Pair<List<FileEntry>, Int> {
-        val treeUri = store.treeUri() ?: return Pair(emptyList(), 0)
-        val docId = resolveDocId(treeUri, relPath) ?: return Pair(emptyList(), 0)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+        val dir = File(root, relPath)
+        val children = dir.listFiles() ?: return Pair(emptyList(), 0)
 
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED
-        )
-
-        val all = mutableListOf<FileEntry>()
-        contentResolver.query(childrenUri, projection, null, null, null)?.use { c ->
-            val nameCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-            val mimeCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-            val sizeCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
-            val modCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-            while (c.moveToNext()) {
-                val name = c.getString(nameCol) ?: continue
-                val mime = c.getString(mimeCol) ?: "application/octet-stream"
-                val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
-                all.add(
-                    FileEntry(
-                        name = name,
-                        relativePath = SafTreeStore.childPath(relPath, name),
-                        isDirectory = isDir,
-                        size = if (isDir) 0 else c.getLong(sizeCol),
-                        modified = c.getLong(modCol),
-                        mimeType = if (isDir) "inode/directory" else mime
-                    )
-                )
-            }
+        val all = children.map { f ->
+            val isDir = f.isDirectory
+            FileEntry(
+                name = f.name,
+                relativePath = SafTreeStore.childPath(relPath, f.name),
+                isDirectory = isDir,
+                size = if (isDir) 0 else f.length(),
+                modified = f.lastModified(),
+                mimeType = if (isDir) "inode/directory" else mimeFromName(f.name)
+            )
         }
 
         // Foldery najpierw, potem alfabetycznie (case-insensitive)
@@ -72,18 +55,16 @@ class FilesProvider(
 
     /** Thumbnail dla obrazów (skala 400px, JPEG q75, base64). null dla nie-obrazów. */
     fun getThumbnail(relPath: String): String? {
-        val treeUri = store.treeUri() ?: return null
-        val docId = resolveDocId(treeUri, relPath) ?: return null
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        val file = File(root, relPath)
+        if (!file.exists() || file.isDirectory) return null
+        if (!mimeFromName(file.name).startsWith("image/")) return null
         return try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            BitmapFactory.decodeFile(file.absolutePath, opts)
             var sample = 1
             while (opts.outWidth / sample > 800 || opts.outHeight / sample > 800) sample *= 2
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val bitmap = contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, decodeOpts)
-            } ?: return null
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts) ?: return null
             val scale = 400f / maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
             val scaled = if (scale < 1f)
                 Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
@@ -99,70 +80,30 @@ class FilesProvider(
         }
     }
 
-    fun openInputStream(relPath: String): InputStream? {
-        val treeUri = store.treeUri() ?: return null
-        val docId = resolveDocId(treeUri, relPath) ?: return null
-        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-        return contentResolver.openInputStream(uri)
-    }
-
-    /** SAF document Uri dla pliku (do uploadu HTTP). null gdy brak grantu/pliku. */
-    fun fileUri(relPath: String): android.net.Uri? {
-        val treeUri = store.treeUri() ?: return null
-        val docId = resolveDocId(treeUri, relPath) ?: return null
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+    /** file:// Uri dla pliku (do uploadu HTTP). null gdy plik nie istnieje. */
+    fun fileUri(relPath: String): Uri? {
+        val file = File(root, relPath)
+        return if (file.exists()) Uri.fromFile(file) else null
     }
 
     /** Tworzy plik w katalogu relDir i zwraca (Uri, OutputStream) do zapisu (upload).
-     *  Caller receives the Uri so it can delete the document on write failure. */
+     *  Caller receives the Uri so it can delete the file on write failure. */
     fun createFile(relDir: String, name: String, mimeType: String): Pair<Uri, OutputStream>? {
-        val treeUri = store.treeUri() ?: return null
-        val parentDocId = resolveDocId(treeUri, relDir) ?: return null
-        val parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocId)
-        val newUri = DocumentsContract.createDocument(contentResolver, parentUri, mimeType, name) ?: return null
-        val stream = contentResolver.openOutputStream(newUri) ?: return null
-        return Pair(newUri, stream)
+        return try {
+            val dir = File(root, relDir)
+            dir.mkdirs()
+            val f = File(dir, name)
+            Pair(Uri.fromFile(f), FileOutputStream(f))
+        } catch (e: Exception) {
+            Log.e("FilesProvider", "createFile failed for $relDir/$name", e)
+            null
+        }
     }
 
-    /** Rozwiązuje relativePath na documentId, schodząc segment po segmencie. */
-    private fun resolveDocId(treeUri: Uri, relPath: String): String? {
-        // Invalidate cache when the SAF grant (tree URI) has changed.
-        val treeUriStr = treeUri.toString()
-        if (treeUriStr != cachedTreeUri) {
-            docIdCache.clear()
-            cachedTreeUri = treeUriStr
-        }
-
-        val rootId = DocumentsContract.getTreeDocumentId(treeUri)
-        if (relPath.isEmpty()) return rootId
-        docIdCache[relPath]?.let { return it }
-
-        var currentId = rootId
-        var currentPath = ""
-        for (segment in SafTreeStore.pathSegments(relPath)) {
-            currentPath = SafTreeStore.childPath(currentPath, segment)
-            val cached = docIdCache[currentPath]
-            if (cached != null) { currentId = cached; continue }
-            val found = findChildId(treeUri, currentId, segment) ?: return null
-            docIdCache[currentPath] = found
-            currentId = found
-        }
-        return currentId
-    }
-
-    private fun findChildId(treeUri: Uri, parentId: String, name: String): String? {
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
-        contentResolver.query(
-            childrenUri,
-            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
-            null, null, null
-        )?.use { c ->
-            val idCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-            val nameCol = c.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-            while (c.moveToNext()) {
-                if (c.getString(nameCol) == name) return c.getString(idCol)
-            }
-        }
-        return null
+    private fun mimeFromName(name: String): String {
+        val ext = name.substringAfterLast('.', "")
+        if (ext.isEmpty()) return "application/octet-stream"
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase())
+            ?: "application/octet-stream"
     }
 }

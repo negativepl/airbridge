@@ -79,8 +79,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.content.Intent
+import android.net.Uri
+import android.os.Environment
+import android.provider.Settings
 import com.airbridge.R
-import com.airbridge.files.SafTreeStore
 import kotlinx.coroutines.launch
 
 private val PillShape = RoundedCornerShape(50)
@@ -345,8 +347,7 @@ private fun PermissionsPage() {
     var smsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_SMS)) }
     var photosGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_MEDIA_IMAGES)) }
     var contactsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_CONTACTS)) }
-    val safStore = remember { SafTreeStore(context) }
-    var hasFilesGrant by remember { mutableStateOf(safStore.hasGrant()) }
+    var hasFilesGrant by remember { mutableStateOf(Environment.isExternalStorageManager()) }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsGranted = it }
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -354,17 +355,10 @@ private fun PermissionsPage() {
     }
     val photosLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { photosGranted = it }
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { contactsGranted = it }
-    val treeLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            safStore.saveTreeUri(uri)
-            hasFilesGrant = true
-        }
+    val filesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        hasFilesGrant = Environment.isExternalStorageManager()
     }
 
     val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
@@ -464,7 +458,12 @@ private fun PermissionsPage() {
             description = stringResource(R.string.onboarding_perm_files_desc),
             why = stringResource(R.string.onboarding_perm_files_why),
             granted = hasFilesGrant,
-            onRequest = { treeLauncher.launch(null) }
+            onRequest = {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                filesLauncher.launch(intent)
+            }
         )
 
         if (allGranted) {

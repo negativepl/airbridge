@@ -45,6 +45,18 @@ class HttpFileUploader {
             }
         }
 
+        // file:// URIs (FilesProvider via MANAGE_EXTERNAL_STORAGE) are not
+        // backed by a ContentProvider, so the query above returns null and
+        // leaves name/size at their defaults. The Mac receiver requires a
+        // valid Content-Length and uses X-Filename to name the saved file,
+        // so resolve them directly from the File.
+        if (uri.scheme == "file") {
+            uri.path?.let { java.io.File(it) }?.takeIf { it.exists() }?.let { f ->
+                filename = f.name
+                fileSize = f.length()
+            }
+        }
+
         Log.d(TAG, "Uploading $filename ($mimeType, $fileSize bytes) to $host:$port")
 
         // Single pass: stream upload while computing SHA-256 inline
