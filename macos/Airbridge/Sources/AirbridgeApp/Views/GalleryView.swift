@@ -36,40 +36,46 @@ struct GalleryView: View {
     }
 
     private var notConnectedView: some View {
-        EmptyStateView(
-            systemImage: "photo.on.rectangle",
-            title: L10n.isPL ? "Galeria" : "Gallery",
-            subtitle: L10n.isPL
-                ? "Połącz się z telefonem, aby przeglądać zdjęcia."
-                : "Connect to your phone to browse photos."
-        )
+        EmptyStateContainer {
+            EmptyStateView(
+                systemImage: "photo.on.rectangle",
+                title: L10n.isPL ? "Galeria" : "Gallery",
+                subtitle: L10n.isPL
+                    ? "Połącz się z telefonem, aby przeglądać zdjęcia."
+                    : "Connect to your phone to browse photos."
+            )
+        }
     }
 
     private var initialLoadingView: some View {
-        VStack(spacing: 14) {
-            ProgressView()
-                .controlSize(.large)
-            Text(L10n.isPL ? "Ładowanie galerii…" : "Loading gallery…")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+        EmptyStateContainer {
+            VStack(spacing: 14) {
+                ProgressView()
+                    .controlSize(.large)
+                Text(L10n.isPL ? "Ładowanie galerii…" : "Loading gallery…")
+                    .font(.ab(.subheadline))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private var emptyView: some View {
-        VStack(spacing: 20) {
-            EmptyStateView(
-                systemImage: "photo.on.rectangle",
-                title: L10n.isPL ? "Brak zdjęć" : "No Photos",
-                subtitle: L10n.isPL
-                    ? "Nie znaleziono zdjęć na telefonie."
-                    : "No photos found on your phone."
-            )
-            Button(L10n.isPL ? "Odśwież" : "Refresh") {
-                galleryService.clearAndReload()
+        EmptyStateContainer {
+            VStack(spacing: 20) {
+                EmptyStateView(
+                    systemImage: "photo.on.rectangle",
+                    title: L10n.isPL ? "Brak zdjęć" : "No Photos",
+                    subtitle: L10n.isPL
+                        ? "Nie znaleziono zdjęć na telefonie."
+                        : "No photos found on your phone."
+                )
+                Button(L10n.isPL ? "Odśwież" : "Refresh") {
+                    galleryService.clearAndReload()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.bottom, 80)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.bottom, 80)
         }
     }
 
@@ -101,16 +107,6 @@ struct GalleryView: View {
                 .padding(10)
             }
         }
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    galleryService.clearAndReload()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .help(L10n.isPL ? "Odśwież" : "Refresh")
-            }
-        }
     }
 }
 
@@ -139,16 +135,19 @@ private struct ThumbnailCell: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .transition(.opacity)
             } else {
+                // Plain placeholder, no per-tile spinner — tiles fill in
+                // progressively (Photos-style). The only loader is the main
+                // one, so a refresh doesn't spray a spinner over every cell.
                 Rectangle()
                     .fill(.secondary.opacity(0.15))
-                ProgressView()
-                    .controlSize(.small)
             }
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(Rectangle())
+        .animation(.easeOut(duration: 0.2), value: image == nil)
         .onTapGesture { onTap() }
         .onAppear { loadImage() }
         .onChange(of: galleryService.thumbnailImages[photo.id]) { _, newImage in
@@ -288,7 +287,7 @@ struct PhotoDetailView: View {
                 onClose()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.ab(.subheadline, weight: .bold))
                     .frame(width: 36, height: 36)
                     .foregroundStyle(.primary)
                     .contentShape(Circle())
@@ -328,7 +327,7 @@ struct PhotoDetailView: View {
     private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.ab(.subheadline, weight: .semibold))
                 .frame(width: 32, height: 32)
                 .foregroundStyle(.primary)
                 .contentShape(Rectangle())
@@ -343,12 +342,12 @@ struct PhotoDetailView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(photo.filename)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.ab(.body, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(metaLine)
-                    .font(.system(size: 12))
+                    .font(.ab(.footnote))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -360,22 +359,19 @@ struct PhotoDetailView: View {
                     downloaded = false
                 }
             } label: {
-                Label(
-                    downloaded
-                        ? (L10n.isPL ? "Pobrano" : "Downloaded")
-                        : (L10n.isPL ? "Pobierz oryginał" : "Download Original"),
-                    systemImage: downloaded ? "checkmark.circle.fill" : "arrow.down.circle.fill"
-                )
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .contentTransition(.symbolEffect(.replace))
-                .contentShape(Capsule())
+                Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .contentTransition(.symbolEffect(.replace))
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+            .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
             .symbolEffect(.bounce, value: downloaded)
+            .help(downloaded
+                  ? (L10n.isPL ? "Pobrano" : "Downloaded")
+                  : (L10n.isPL ? "Pobierz oryginał" : "Download Original"))
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)

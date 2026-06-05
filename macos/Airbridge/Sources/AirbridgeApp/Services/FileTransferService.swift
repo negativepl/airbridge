@@ -30,14 +30,12 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     @ObservationIgnored private var activeAssemblers: [String: FileAssembler] = [:]
     @ObservationIgnored private var transferStartTime: Date?
     @ObservationIgnored private weak var connectionService: ConnectionService?
-    @ObservationIgnored private weak var historyService: HistoryService?
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
     @ObservationIgnored private var isSendingFromQueue = false
     @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
 
-    func configure(connectionService: ConnectionService, historyService: HistoryService) {
+    func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
-        self.historyService = historyService
         Task {
             await setupHttpCallbacks()
         }
@@ -292,7 +290,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
             if success {
                 self.fileTransferProgress = 1.0
-                self.historyService?.add(type: .file, direction: .sent, description: filename)
                 self.playReceiveSound()
                 TransferPopup.shared.hide()
             } else {
@@ -350,12 +347,16 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             Task { @MainActor in
                 guard let self else { return }
                 self.fileTransferProgress = 1.0
-                self.isReceivingFile = false
+                // Keep `isReceivingFile = true` until the whole complete
+                // sequence has played. Flipping it false here made the popup
+                // briefly compute `.transferring(isReceiving: false)` → flash
+                // "Wysyłam 100%", then `.complete(isReceiving: false)` → wrong
+                // "Plik wysłany!" text. It's reset at the end with everything
+                // else instead.
 
                 do {
                     let _ = try self.saveToDownloads(filename: filename, data: data)
                     self.playReceiveSound()
-                    self.historyService?.add(type: .file, direction: .received, description: filename)
                 } catch {
                     #if DEBUG
                     print("[FileTransferService] HTTP file save failed: \(error)")
@@ -367,6 +368,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
+                self.isReceivingFile = false
             }
         }
 
@@ -403,10 +405,9 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     private func saveReceivedFile(assembler: FileAssembler) {
         do {
             let data = try assembler.assemble()
-            let fileURL = try saveToDownloads(filename: assembler.filename, data: data)
+            _ = try saveToDownloads(filename: assembler.filename, data: data)
             fileTransferProgress = 0
             playReceiveSound()
-            historyService?.add(type: .file, direction: .received, description: assembler.filename)
         } catch {
             fileTransferProgress = 0
         }

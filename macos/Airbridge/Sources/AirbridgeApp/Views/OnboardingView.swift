@@ -62,7 +62,7 @@ struct OnboardingView: View {
                     withAnimation(.airbridgeQuick) { page -= 1 }
                 } label: {
                     Text(isPL ? "Wstecz" : "Back")
-                        .font(.system(size: 15))
+                        .font(.ab(.callout))
                         .frame(minWidth: 96, minHeight: 40)
                         .contentShape(Capsule())
                 }
@@ -91,7 +91,7 @@ struct OnboardingView: View {
                     withAnimation(.airbridgeQuick) { page += 1 }
                 } label: {
                     Text(isPL ? "Dalej" : "Next")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.ab(.callout, weight: .semibold))
                         .frame(minWidth: 96, minHeight: 40)
                         .contentShape(Capsule())
                 }
@@ -104,7 +104,7 @@ struct OnboardingView: View {
                         onComplete()
                     } label: {
                         Text(isPL ? "Pomiń" : "Skip")
-                            .font(.system(size: 15))
+                            .font(.ab(.callout))
                             .frame(minWidth: 96, minHeight: 40)
                             .contentShape(Capsule())
                     }
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                         showPairing = true
                     } label: {
                         Text(isPL ? "Sparuj urządzenie" : "Pair Device")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.ab(.callout, weight: .semibold))
                             .frame(minWidth: 180, minHeight: 40)
                             .contentShape(Capsule())
                     }
@@ -135,7 +135,7 @@ struct OnboardingView: View {
         VStack(spacing: 40) {
             Spacer(minLength: 40)
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+            if let iconURL = AppResources.bundle.url(forResource: "AppIcon", withExtension: "icns"),
                let icon = NSImage(contentsOf: iconURL) {
                 Image(nsImage: icon)
                     .resizable()
@@ -147,13 +147,13 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text("AirBridge")
-                    .font(.system(size: 56, weight: .regular, design: .serif))
+                    .font(.abHeroName)
                     .tracking(3)
 
                 Text(isPL
                     ? "Twój telefon i komputer Mac, połączone jak nigdy dotąd."
                     : "Your phone and Mac, finally on the same team.")
-                    .font(.system(size: 20))
+                    .font(.ab(.title2))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -200,12 +200,12 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text(isPL ? "Jak to działa?" : "How it works")
-                    .font(.system(size: 40, weight: .semibold))
+                    .font(.abPageTitle)
 
                 Text(isPL
                     ? "Trzy rzeczy, które warto wiedzieć:"
                     : "Three things you should know:")
-                    .font(.system(size: 20))
+                    .font(.ab(.title2))
                     .foregroundStyle(.secondary)
             }
 
@@ -250,20 +250,20 @@ struct OnboardingView: View {
                 .padding(.bottom, 8)
 
             Text(isPL ? "Sparuj z telefonem" : "Pair with your phone")
-                .font(.system(size: 40, weight: .semibold))
+                .font(.abPageTitle)
 
             VStack(spacing: 14) {
                 Text(isPL
                     ? "Otwórz AirBridge na telefonie i zeskanuj kod QR."
                     : "Open AirBridge on your phone and scan the QR code.")
-                    .font(.system(size: 20))
+                    .font(.ab(.title2))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
                 Text(isPL
                     ? "Oba urządzenia muszą być w tej samej sieci Wi-Fi."
                     : "Both devices must be on the same Wi-Fi network.")
-                    .font(.system(size: 15))
+                    .font(.ab(.callout))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
@@ -280,12 +280,12 @@ struct OnboardingView: View {
     private func featureRow(icon: String, text: String) -> some View {
         HStack(spacing: 18) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.ab(.title2))
                 .foregroundStyle(.white)
                 .frame(width: 46, height: 46)
                 .glassEffect(.regular.tint(.accentColor), in: .rect(cornerRadius: 12, style: .continuous))
             Text(text)
-                .font(.system(size: 16))
+                .font(.ab(.headline))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -293,12 +293,12 @@ struct OnboardingView: View {
     private func numberedRow(number: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 18) {
             Text(number)
-                .font(.system(size: 18, weight: .bold))
+                .font(.ab(.title3, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 38, height: 38)
                 .glassEffect(.regular.tint(.accentColor), in: .circle)
             Text(text)
-                .font(.system(size: 16))
+                .font(.ab(.headline))
                 .padding(.top, 8)
                 .fixedSize(horizontal: false, vertical: true)
         }

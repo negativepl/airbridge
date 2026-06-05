@@ -16,7 +16,7 @@ struct SectionHeader: View {
                 Text(title)
             }
         }
-        .font(.system(size: 13, weight: .semibold))
+        .font(.ab(.subheadline, weight: .semibold))
         .foregroundStyle(.secondary)
         .textCase(.uppercase)
         .tracking(0.5)

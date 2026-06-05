@@ -79,7 +79,7 @@ struct PairingView: View {
                         isPresented = false
                     } label: {
                         Text(L10n.close)
-                            .font(.system(size: 15))
+                            .font(.ab(.callout))
                             .frame(minWidth: 100, minHeight: 36)
                     }
                     .buttonStyle(.plain)

@@ -20,7 +20,6 @@ struct AirbridgeApp: App {
     @State private var clipboardService: ClipboardService
     @State private var fileTransferService: FileTransferService
     @State private var pairingService: PairingService
-    @State private var historyService: HistoryService
     @State private var galleryService: GalleryService
     @State private var smsService: SmsService
     @State private var filesBrowserService: FilesBrowserService
@@ -34,7 +33,6 @@ struct AirbridgeApp: App {
         let clipboard = ClipboardService()
         let fileTransfer = FileTransferService()
         let pairing = PairingService()
-        let history = HistoryService()
         let gallery = GalleryService()
         let sms = SmsService()
         let filesBrowser = FilesBrowserService()
@@ -42,8 +40,8 @@ struct AirbridgeApp: App {
 
         let mirror = MirrorService(pairingTokenProvider: { [weak pairing] in pairing?.currentTokenData() })
 
-        clipboard.configure(connectionService: connection, historyService: history)
-        fileTransfer.configure(connectionService: connection, historyService: history)
+        clipboard.configure(connectionService: connection)
+        fileTransfer.configure(connectionService: connection)
         pairing.configure(connectionService: connection)
         gallery.configure(connectionService: connection)
         sms.configure(connectionService: connection)
@@ -58,7 +56,6 @@ struct AirbridgeApp: App {
         _clipboardService = State(initialValue: clipboard)
         _fileTransferService = State(initialValue: fileTransfer)
         _pairingService = State(initialValue: pairing)
-        _historyService = State(initialValue: history)
         _galleryService = State(initialValue: gallery)
         _smsService = State(initialValue: sms)
         _filesBrowserService = State(initialValue: filesBrowser)
@@ -90,11 +87,11 @@ struct AirbridgeApp: App {
                         clipboardService: clipboardService,
                         fileTransferService: fileTransferService,
                         pairingService: pairingService,
-                        historyService: historyService,
                         galleryService: galleryService,
                         smsService: smsService,
                         filesBrowserService: filesBrowserService,
-                        hotkeyService: hotkeyService
+                        hotkeyService: hotkeyService,
+                        mirrorService: mirrorService
                     )
                     .onAppear { hotkeyService.start() }
                 } else {

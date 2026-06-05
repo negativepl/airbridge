@@ -27,16 +27,35 @@ struct EmptyStateView: View {
                 .modifier(PulseIfActive(active: pulseIcon))
 
             Text(title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.ab(.title2, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             Text(subtitle)
-                .font(.system(size: 14))
+                .font(.ab(.body))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Wraps centered empty / disconnected / loading content in a ScrollView that
+/// always fills the viewport. On `scroll: false` tabs a plain centered VStack
+/// collapses the window's top safe area (the toolbar / Liquid Glass scroll edge
+/// area), which makes the sidebar jump upward when switching to an empty state.
+/// A ScrollView keeps that safe area installed; `minHeight: geo.height` keeps
+/// the content vertically centered as if it weren't scrolling.
+struct EmptyStateContainer<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        GeometryReader { geo in
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height)
+            }
+        }
     }
 }
 

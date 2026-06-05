@@ -39,6 +39,7 @@ class MirrorClientTest {
             screenHeight = 2376u,
             orientation = 0u,
             onAck = {},
+            onTap = { _, _ -> },
             onDisconnect = {}
         )
         client.connect()

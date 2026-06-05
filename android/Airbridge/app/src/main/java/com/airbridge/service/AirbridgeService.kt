@@ -865,6 +865,18 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            is Message.FolderStatsRequest -> {
+                serviceScope.launch {
+                    try {
+                        val (dirCount, fileCount, totalSize) = filesProvider.folderStats(message.path)
+                        webSocketClient.send(
+                            Message.FolderStatsResponse(message.path, dirCount, fileCount, totalSize)
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "FolderStatsRequest failed", e)
+                    }
+                }
+            }
             is Message.FileDownloadRequest -> {
                 serviceScope.launch {
                     val uri = filesProvider.fileUri(message.path)
@@ -940,6 +952,16 @@ class AirbridgeService : Service() {
             }
             is Message.MirrorError -> {
                 Log.w(TAG, "Mac reported mirror error: ${message.reason}")
+            }
+            is Message.DeviceInfoRequest -> {
+                serviceScope.launch {
+                    try {
+                        val info = com.airbridge.device.DeviceInfoProvider.collect(applicationContext)
+                        webSocketClient.send(Message.DeviceInfoResponse(info))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "DeviceInfoRequest failed", e)
+                    }
+                }
             }
             else -> {
                 Log.d(TAG, "Unhandled message type: ${message::class.simpleName}")

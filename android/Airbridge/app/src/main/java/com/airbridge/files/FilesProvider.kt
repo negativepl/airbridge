@@ -53,6 +53,28 @@ class FilesProvider(
         return Pair(sorted.subList(from, to).toList(), sorted.size)
     }
 
+    /**
+     * Statystyki folderu: liczba bezpośrednich podfolderów i plików +
+     * rozmiar rekurencyjny (suma długości wszystkich plików w drzewie).
+     * Zwraca Triple(dirCount, fileCount, totalSize).
+     */
+    fun folderStats(relPath: String): Triple<Int, Int, Long> {
+        val dir = File(root, relPath)
+        val children = dir.listFiles() ?: return Triple(0, 0, 0L)
+        var dirCount = 0
+        var fileCount = 0
+        for (c in children) {
+            if (c.isDirectory) dirCount++ else fileCount++
+        }
+        var totalSize = 0L
+        try {
+            dir.walkTopDown().forEach { f -> if (f.isFile) totalSize += f.length() }
+        } catch (e: Exception) {
+            Log.e("FilesProvider", "folderStats walk failed for $relPath", e)
+        }
+        return Triple(dirCount, fileCount, totalSize)
+    }
+
     /** Thumbnail dla obrazów (skala 400px, JPEG q75, base64). null dla nie-obrazów. */
     fun getThumbnail(relPath: String): String? {
         val file = File(root, relPath)

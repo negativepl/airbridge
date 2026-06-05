@@ -41,6 +41,19 @@ data class SmsMessage(
     val read: Boolean
 )
 
+data class DeviceInfo(
+    val name: String,
+    val model: String,
+    val manufacturer: String,
+    val androidVersion: String,
+    val sdkInt: Int,
+    val totalStorageBytes: Long,
+    val freeStorageBytes: Long,
+    val totalRamBytes: Long,
+    val freeRamBytes: Long,
+    val batteryPercent: Int
+)
+
 enum class ContentType(val value: String) {
     PLAIN_TEXT("text/plain"),
     HTML("text/html"),
@@ -511,6 +524,56 @@ sealed class Message {
         }.toString()
     }
 
+    data object DeviceInfoRequest : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "device_info_request")
+        }.toString()
+    }
+
+    data class DeviceInfoResponse(
+        val info: DeviceInfo
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "device_info_response")
+            put("info", JSONObject().apply {
+                put("name", info.name)
+                put("model", info.model)
+                put("manufacturer", info.manufacturer)
+                put("android_version", info.androidVersion)
+                put("sdk_int", info.sdkInt)
+                put("total_storage_bytes", info.totalStorageBytes)
+                put("free_storage_bytes", info.freeStorageBytes)
+                put("total_ram_bytes", info.totalRamBytes)
+                put("free_ram_bytes", info.freeRamBytes)
+                put("battery_percent", info.batteryPercent)
+            })
+        }.toString()
+    }
+
+    data class FolderStatsRequest(
+        val path: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "folder_stats_request")
+            put("path", path)
+        }.toString()
+    }
+
+    data class FolderStatsResponse(
+        val path: String,
+        val dirCount: Int,
+        val fileCount: Int,
+        val totalSize: Long
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "folder_stats_response")
+            put("path", path)
+            put("dir_count", dirCount)
+            put("file_count", fileCount)
+            put("total_size", totalSize)
+        }.toString()
+    }
+
     companion object {
         fun fromJson(json: String): Message {
             val obj = JSONObject(json)
@@ -717,6 +780,10 @@ sealed class Message {
                 "mirror_stop" -> MirrorStop
                 "mirror_error" -> MirrorError(
                     reason = obj.getString("reason")
+                )
+                "device_info_request" -> DeviceInfoRequest
+                "folder_stats_request" -> FolderStatsRequest(
+                    path = obj.getString("path")
                 )
                 else -> throw IllegalArgumentException("Unknown message type: $type")
             }

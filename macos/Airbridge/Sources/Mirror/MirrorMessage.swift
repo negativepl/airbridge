@@ -19,6 +19,7 @@ public enum MirrorMessage: Equatable, Sendable {
     case helloAck(targetBitrateBps: UInt32, fps: UInt8, keyframeIntervalSeconds: UInt8, targetWidth: UInt32, targetHeight: UInt32)
     case videoConfig(sps: Data, pps: Data)
     case videoFrame(presentationTimestampUs: UInt64, naluBytes: Data)
+    case inputTap(xNorm: Float32, yNorm: Float32)
     case status(MirrorStatusCode)
 
     private enum TypeByte {
@@ -26,6 +27,7 @@ public enum MirrorMessage: Equatable, Sendable {
         static let helloAck: UInt8 = 0x02
         static let videoConfig: UInt8 = 0x10
         static let videoFrame: UInt8 = 0x11
+        static let inputTap: UInt8 = 0x20
         static let status: UInt8 = 0x30
     }
 
@@ -55,6 +57,10 @@ public enum MirrorMessage: Equatable, Sendable {
             out.append(TypeByte.videoFrame)
             out.appendBE(pts)
             out.append(nalu)
+        case let .inputTap(xNorm, yNorm):
+            out.append(TypeByte.inputTap)
+            out.appendBE(xNorm.bitPattern)
+            out.appendBE(yNorm.bitPattern)
         case let .status(code):
             out.append(TypeByte.status)
             out.append(code.rawValue)
@@ -102,6 +108,13 @@ public enum MirrorMessage: Equatable, Sendable {
             let pts: UInt64 = payload.readBE(at: &i)
             let nalu = Data(payload[i...])
             return .videoFrame(presentationTimestampUs: pts, naluBytes: nalu)
+
+        case TypeByte.inputTap:
+            guard payload.count == 8 else { throw MirrorMessageError.truncated(type: first) }
+            var i = payload.startIndex
+            let xBits: UInt32 = payload.readBE(at: &i)
+            let yBits: UInt32 = payload.readBE(at: &i)
+            return .inputTap(xNorm: Float32(bitPattern: xBits), yNorm: Float32(bitPattern: yBits))
 
         case TypeByte.status:
             guard payload.count == 1, let code = MirrorStatusCode(rawValue: payload[payload.startIndex]) else {

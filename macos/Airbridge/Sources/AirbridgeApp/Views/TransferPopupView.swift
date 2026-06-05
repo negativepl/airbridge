@@ -18,9 +18,9 @@ final class TransferPopupPresentation {
 }
 
 // MARK: - Blur transition
-// Custom `AnyTransition` that applies a SwiftUI `.blur(radius:)` modifier
-// during insertion/removal. Used to make state transitions in the popup
-// feel fluid and liquid-glass-y instead of hard-cutting.
+// `AnyTransition` that blurs content as it enters/leaves. Paired with a
+// non-bouncy `easeInOut` (no scale, no spring overshoot) it gives the state
+// cross-fade a soft, liquid-glass feel without the island pulsing.
 
 private struct BlurTransitionModifier: ViewModifier {
     let radius: CGFloat
@@ -66,10 +66,8 @@ struct TransferPopupView: View {
     @AppStorage("islandWidth") private var islandWidth: Double = 560
     @AppStorage("islandHeight") private var islandHeight: Double = 130
 
-    @Namespace private var glassNS
     @State private var showComplete = false
     @State private var isTargeted = false
-    @State private var bumpTrigger: Int = 0
 
     private var state: TransferPopupState {
         if fileTransferService.hasIncomingOffer {
@@ -201,11 +199,23 @@ struct TransferPopupView: View {
         }
     }
 
+    /// Outer island shape: square top corners (flush with the screen edge /
+    /// notch), rounded bottom corners.
+    static let islandShape = UnevenRoundedRectangle(
+        topLeadingRadius: 0,
+        bottomLeadingRadius: 24,
+        bottomTrailingRadius: 24,
+        topTrailingRadius: 0,
+        style: .continuous
+    )
+
     var body: some View {
         GlassEffectContainer(spacing: 0) {
             ZStack {
-                // Layer 1: solid black outer pill — blends with the notch
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                // Layer 1: solid black outer shell. Square TOP corners hang
+                // flush with the screen edge / notch so it blends seamlessly;
+                // only the bottom corners are rounded.
+                Self.islandShape
                     .fill(Color.black)
 
                 // Layer 2: aurora — multi-blob drifting gradient
@@ -215,16 +225,12 @@ struct TransferPopupView: View {
                     notchInset: notchInset,
                     transferProgress: transferProgress
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(Self.islandShape)
                 .allowsHitTesting(false)
 
-                // Layer 3: inner pill — glass material + content together.
-                // The OUTER ZStack is stable (no identity change) and is what
-                // hosts the glass material. Inside it, contentForState gets
-                // `.id(stateKind)` + `.transition(...)` so SwiftUI properly
-                // mounts/unmounts the content per state, firing transitions.
-                // This way the glass pill stays put visually, while text and
-                // buttons inside it morph cleanly on every state change.
+                // Layer 3: inner pill — glass material hosting the content.
+                // `.id(stateKind)` + `.transition(...)` so SwiftUI mounts/
+                // unmounts per state, firing the morph.
                 ZStack {
                     contentForState(state)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -241,39 +247,51 @@ struct TransferPopupView: View {
                 .padding(EdgeInsets(top: 18 + notchInset, leading: 18, bottom: 18, trailing: 18))
             }
             .frame(width: islandWidth, height: islandHeight + notchInset)
+            // Black overscan glued to the island's top edge, extending upward
+            // off-screen. The island top can sit a hair below the physical
+            // screen top (safe-area rounding), leaving a constant sliver of
+            // desktop above it that becomes visible when the aurora dims during
+            // a state change. This fills that sliver with black. It's part of
+            // the island view, so it scales/fades WITH it on hide — no static
+            // square left behind.
+            .background(alignment: .top) {
+                Color.black
+                    .frame(width: islandWidth, height: 120)
+                    .offset(y: -120)
+            }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
-        .keyframeAnimator(initialValue: CGFloat(1.0), trigger: bumpTrigger) { content, value in
-            content.scaleEffect(value)
-        } keyframes: { _ in
-            SpringKeyframe(1.04, duration: 0.18, spring: .bouncy(duration: 0.18, extraBounce: 0.15))
-            SpringKeyframe(1.0, duration: 0.45, spring: .bouncy(duration: 0.35, extraBounce: 0.08))
-        }
-        .scaleEffect(presentation.isPresented ? 1.0 : 0.55, anchor: .top)
+        // No shell "bump" on state change — scaling the whole island (even
+        // anchored top) momentarily moved its edges and flashed a sliver of
+        // desktop above the notch. The per-state content morph (blur + scale,
+        // inside the glass) is the only feedback now, so the shell stays put.
+        .offset(y: presentation.isPresented ? 0 : -22)
+        .blur(radius: presentation.isPresented ? 0 : 8)
         .opacity(presentation.isPresented ? 1.0 : 0.0)
-        .padding(Self.windowPadding)
+        .padding(.horizontal, Self.windowPadding)
+        .padding(.top, Self.windowPadding)
+        // TOP-align (not center) so the island's top edge stays pinned to the
+        // screen edge / notch. Centering let any sub-1.0 bump overshoot shrink
+        // the island and drop its top, exposing a sliver above it. The extra
+        // vertical room now spills to the bottom instead.
         .frame(
             width: islandWidth + Self.windowPadding * 2,
-            height: islandHeight + notchInset + Self.windowPadding * 2
+            height: islandHeight + notchInset + Self.windowPadding * 2,
+            alignment: .top
         )
         .contentShape(Rectangle())
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
-        // Animation drives transitions between state KINDS only — not on
-        // every progress tick (stateKind is stable within a given state
-        // like .transferring, so progress updates don't re-trigger the
-        // view-morph animation or re-mount the content).
-        .animation(.airbridgeStateMorph, value: stateKind)
-        .onChange(of: stateKind) { _, _ in
-            bumpTrigger += 1
-        }
+        // Animate only between state KINDS — progress ticks keep the same
+        // stateKind, so they don't re-trigger the cross-fade or re-mount.
+        .animation(.easeInOut(duration: 0.28), value: stateKind)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
             // doing it externally via withAnimation in show() races with the
             // first render and the interpolation gets skipped).
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.68)) {
+            withAnimation(.spring(response: 0.72, dampingFraction: 0.84)) {
                 presentation.isPresented = true
             }
             // Idle auto-hide countdown
@@ -308,7 +326,16 @@ struct TransferPopupView: View {
         }
         .onChange(of: fileTransferService.fileTransferProgress) { _, new in
             if new >= 1.0 {
-                withAnimation(.airbridgeSmooth) { showComplete = true }
+                // Let the bar visibly reach 100% before morphing to complete.
+                // Small/fast files used to jump to "complete" with the bar
+                // stuck at a partial value because progress hit 1.0 and the
+                // state flipped in the same instant.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    if fileTransferService.fileTransferProgress >= 1.0 {
+                        showComplete = true
+                    }
+                }
             } else if new == 0 {
                 showComplete = false
             }
@@ -317,14 +344,20 @@ struct TransferPopupView: View {
 
     static let windowPadding: CGFloat = 40
 
-    /// Transition used between all popup state views. Opacity + strong blur
-    /// + a very subtle (96%) scale from center. Combined with the bouncy
-    /// `airbridgeStateMorph` animation this gives each new state a gentle
-    /// "lands in place" feel — content materializes from blur, scales up a
-    /// hair past 1.0 then settles back. No directional slide.
+    /// Transition used between all popup state views. Opacity + blur only —
+    /// NO scale. A center scale (even subtle) combined with the bouncy
+    /// `airbridgeStateMorph` overshoot read as the whole island "growing and
+    /// shrinking", which nudged the top edge and flashed desktop above the
+    /// notch. Content now just materializes from blur.
+    // Scale is SAFE here because it's on the CONTENT transition (inside the
+    // inset, clipped glass pill) — it never touches the island shell or its
+    // top edge. The pulsing/top-gap before came from scaling the whole island
+    // (entrance 0.62 + bump) plus a bouncy spring that overshot past 1.0. With
+    // a non-bouncy `easeInOut` the content just settles up to 1.0 — gives the
+    // animation body without any overshoot.
     static let stateTransition: AnyTransition = .opacity
-        .combined(with: .blurTransition(radius: 30))
-        .combined(with: .scale(scale: 0.96, anchor: .center))
+        .combined(with: .blurTransition(radius: 18))
+        .combined(with: .scale(scale: 0.94, anchor: .center))
 
     // MARK: - Subviews per state
 
@@ -339,7 +372,7 @@ struct TransferPopupView: View {
                     .symbolEffect(.bounce, value: isTargeted)
 
                 Text(L10n.dropFileHere)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 Spacer()
@@ -351,7 +384,7 @@ struct TransferPopupView: View {
                     .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(L10n.noDeviceConnected)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
             }
@@ -367,15 +400,15 @@ struct TransferPopupView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.ab(.footnote, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.ab(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(formatBytes(size))
-                    .font(.system(size: 12))
+                    .font(.ab(.footnote))
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
@@ -404,10 +437,10 @@ struct TransferPopupView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.ab(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(name)
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -431,28 +464,29 @@ struct TransferPopupView: View {
                 Text(isReceiving
                     ? (L10n.isPL ? "Odbieram" : "Receiving")
                     : (L10n.isPL ? "Wysyłam" : "Sending"))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.ab(.footnote, weight: .medium))
                     .foregroundStyle(.secondary)
 
                 Text(name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.ab(.callout, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                ProgressView(value: progress)
+                ProgressView(value: min(max(progress, 0), 1))
                     .progressViewStyle(.linear)
                     .tint(.accentColor)
+                    .animation(.easeOut(duration: 0.3), value: progress)
 
                 HStack {
                     Text(speedText)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.ab(.footnote, weight: .medium))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
                     Spacer()
                     Text(etaText)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.ab(.footnote, weight: .medium))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
@@ -478,7 +512,7 @@ struct TransferPopupView: View {
             Text(isReceiving
                 ? (L10n.isPL ? "Plik odebrany!" : "File received!")
                 : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
-                .font(.system(size: 18, weight: .bold))
+                .font(.ab(.title3, weight: .bold))
                 .foregroundStyle(.primary)
             Spacer()
         }
@@ -493,10 +527,10 @@ struct TransferPopupView: View {
                 .symbolEffect(.bounce, value: name)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.ab(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(name)
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -816,7 +850,7 @@ final class TransferPopup {
     }
 
     func hide(delay: TimeInterval = 2.5) {
-        guard isVisible, let panel else { return }
+        guard isVisible, panel != nil else { return }
 
         idleAutoHideTimer?.invalidate()
         idleAutoHideTimer = nil
@@ -832,7 +866,7 @@ final class TransferPopup {
             // back to 0 with a spring (slight anticipation via the spring's
             // overshoot in the opposite direction). On completion the window
             // is orderOut'd. The window itself never moves.
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
+            withAnimation(.spring(response: 0.52, dampingFraction: 0.88)) {
                 self.presentation.isPresented = false
             } completion: {
                 panel.orderOut(nil)

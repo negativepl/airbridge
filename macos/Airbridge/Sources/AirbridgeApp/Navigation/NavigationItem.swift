@@ -2,11 +2,11 @@ import Foundation
 
 enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     case home
-    case history
     case send
     case gallery
     case files
     case messages
+    case mirror
     case settings
 
     var id: String { rawValue }
@@ -14,11 +14,11 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     var iconName: String {
         switch self {
         case .home: return "house.fill"
-        case .history: return "clock.arrow.circlepath"
         case .send: return "paperplane.fill"
         case .gallery: return "photo.on.rectangle"
         case .files: return "folder.fill"
         case .messages: return "message.fill"
+        case .mirror: return "iphone.gen3.radiowaves.left.and.right"
         case .settings: return "gearshape.fill"
         }
     }
@@ -26,16 +26,16 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .home: return L10n.isPL ? "Główna" : "Home"
-        case .history: return L10n.isPL ? "Historia" : "History"
         case .send: return L10n.isPL ? "Wyślij" : "Send"
         case .gallery: return L10n.isPL ? "Galeria" : "Gallery"
         case .files: return L10n.isPL ? "Pliki" : "Files"
         case .messages: return L10n.isPL ? "Wiadomości" : "Messages"
+        case .mirror: return "Mirror"
         case .settings: return L10n.isPL ? "Ustawienia" : "Settings"
         }
     }
 
     static var topItems: [NavigationItem] {
-        [.home, .history, .send, .gallery, .files, .messages, .settings]
+        [.home, .send, .gallery, .files, .messages, .mirror, .settings]
     }
 }

@@ -85,11 +85,15 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
         return Pair(photos, totalCount)
     }
 
-    fun getThumbnail(photoId: String): String? = decodeScaled(photoId, targetSize = 400, quality = 75)
+    // Grid thumbnails are displayed near full window height in the macOS
+    // gallery, so 400px @ 75 looked soft. Send a much larger, higher-quality
+    // JPEG — crisp at typical tile sizes (incl. Retina). Bandwidth is fine on
+    // local Wi-Fi.
+    fun getThumbnail(photoId: String): String? = decodeScaled(photoId, targetSize = 1280, quality = 90)
 
     fun getPreview(photoId: String, maxSize: Int): String? {
         val clamped = maxSize.coerceIn(800, 3200)
-        return decodeScaled(photoId, targetSize = clamped, quality = 75)
+        return decodeScaled(photoId, targetSize = clamped, quality = 90)
     }
 
     private fun decodeScaled(photoId: String, targetSize: Int, quality: Int): String? {

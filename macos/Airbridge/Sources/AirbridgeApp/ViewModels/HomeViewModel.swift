@@ -1,16 +1,15 @@
 import Foundation
+import Protocol
 
 @Observable
 @MainActor
 final class HomeViewModel {
     @ObservationIgnored private let connectionService: ConnectionService
     @ObservationIgnored private let fileTransferService: FileTransferService
-    @ObservationIgnored private let historyService: HistoryService
 
-    init(connectionService: ConnectionService, fileTransferService: FileTransferService, historyService: HistoryService) {
+    init(connectionService: ConnectionService, fileTransferService: FileTransferService) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
-        self.historyService = historyService
     }
 
     var isConnected: Bool { connectionService.isConnected }
@@ -24,8 +23,8 @@ final class HomeViewModel {
     var transferSpeed: Double { fileTransferService.transferSpeed }
     var transferEta: Int { fileTransferService.transferEta }
 
-    var recentActivity: [TransferRecord] { historyService.recent(3) }
     var hasPairedDevices: Bool { !connectionService.keyManager.getPairedDevices().isEmpty }
+    var deviceInfo: DeviceInfo? { connectionService.deviceInfo }
 
     func disconnect() { connectionService.disconnect() }
     func reconnect() { connectionService.reconnect() }

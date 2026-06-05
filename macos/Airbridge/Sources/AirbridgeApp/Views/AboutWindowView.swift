@@ -24,11 +24,11 @@ struct AboutWindowView: View {
             // Name + version
             VStack(spacing: 4) {
                 Text("AirBridge")
-                    .font(.system(size: 30, weight: .regular, design: .serif))
+                    .font(.abAppName)
                     .tracking(2)
 
                 Text(L10n.isPL ? "Wersja \(version)" : "Version \(version)")
-                    .font(.system(size: 12))
+                    .font(.ab(.footnote))
                     .foregroundStyle(.secondary)
             }
 
@@ -36,7 +36,7 @@ struct AboutWindowView: View {
             Text(L10n.isPL
                  ? "Połącz telefon z komputerem Mac — lokalnie, bez chmury."
                  : "Connect your phone with your Mac — locally, no cloud.")
-                .font(.system(size: 13))
+                .font(.ab(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -73,7 +73,7 @@ struct AboutWindowView: View {
                 }
             } label: {
                 Label(L10n.isPL ? "Kod źródłowy na GitHub" : "Source Code on GitHub", systemImage: "curlybraces")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.ab(.subheadline, weight: .semibold))
                     .frame(maxWidth: .infinity, minHeight: 36)
             }
             .buttonStyle(.plain)
@@ -90,7 +90,7 @@ struct AboutWindowView: View {
                 Text("·")
                 Text("© 2026 Marcin Baszewski")
             }
-            .font(.system(size: 10))
+            .font(.ab(.caption2))
             .foregroundStyle(.tertiary)
         }
         .padding(.top, 32)
@@ -118,15 +118,15 @@ struct AboutWindowView: View {
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(caption)
-                        .font(.system(size: 10))
+                        .font(.ab(.caption2))
                         .foregroundStyle(.secondary)
                     Text(name)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.ab(.subheadline, weight: .medium))
                         .foregroundStyle(.primary)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.ab(.caption, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)
@@ -139,7 +139,7 @@ struct AboutWindowView: View {
     // MARK: - Helpers
 
     private func loadBundledImage(_ name: String) -> NSImage? {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "png") else { return nil }
+        guard let url = AppResources.bundle.url(forResource: name, withExtension: "png") else { return nil }
         return NSImage(contentsOf: url)
     }
 }

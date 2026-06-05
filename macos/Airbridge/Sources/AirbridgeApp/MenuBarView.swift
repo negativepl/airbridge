@@ -8,9 +8,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(connectionService.isConnected ? Color.green : Color.gray)
-                    .frame(width: 10, height: 10)
+                StatusIndicator(state: connectionService.isConnected ? .connected : .disconnected, size: 12)
                 if connectionService.isConnected {
                     Text("\(L10n.connectedToDevice) \(connectionService.connectedDeviceName)")
                         .font(.subheadline)
@@ -72,11 +70,11 @@ private struct MenuRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .font(.system(size: 13))
+                .font(.ab(.subheadline))
                 .frame(width: 18, alignment: .center)
                 .foregroundStyle(.primary)
             Text(title)
-                .font(.system(size: 13))
+                .font(.ab(.subheadline))
                 .foregroundStyle(.primary)
             Spacer(minLength: 0)
         }

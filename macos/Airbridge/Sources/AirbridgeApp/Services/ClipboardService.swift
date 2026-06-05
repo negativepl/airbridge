@@ -13,11 +13,9 @@ final class ClipboardService: MessageHandler {
 
     private let clipboardMonitor = ClipboardMonitor()
     private weak var connectionService: ConnectionService?
-    private weak var historyService: HistoryService?
 
-    func configure(connectionService: ConnectionService, historyService: HistoryService) {
+    func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
-        self.historyService = historyService
     }
 
     func startMonitoring() {
@@ -54,7 +52,6 @@ final class ClipboardService: MessageHandler {
         Task {
             try? await connectionService.broadcast(message)
         }
-        historyService?.add(type: .clipboard, direction: .sent, description: lastSyncedText)
     }
 
     // MARK: - MessageHandler
@@ -78,7 +75,6 @@ final class ClipboardService: MessageHandler {
             lastSyncedText = "[Image]"
         }
         clipboardMonitor.setClipboard(content: content)
-        historyService?.add(type: .clipboard, direction: .received, description: lastSyncedText)
     }
 
     // MARK: - Outgoing
@@ -114,6 +110,5 @@ final class ClipboardService: MessageHandler {
         Task {
             try? await connectionService.broadcast(message)
         }
-        historyService?.add(type: .clipboard, direction: .sent, description: lastSyncedText)
     }
 }

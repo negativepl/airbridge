@@ -63,6 +63,11 @@ sealed class MirrorMessage {
         override fun hashCode() = presentationTimestampUs.hashCode() * 31 + naluBytes.contentHashCode()
     }
 
+    data class InputTap(
+        val xNorm: Float,
+        val yNorm: Float
+    ) : MirrorMessage()
+
     data class Status(val code: MirrorStatusCode) : MirrorMessage()
 
     companion object {
@@ -70,6 +75,7 @@ sealed class MirrorMessage {
         private const val TYPE_HELLO_ACK: Byte = 0x02
         private const val TYPE_VIDEO_CONFIG: Byte = 0x10
         private const val TYPE_VIDEO_FRAME: Byte = 0x11
+        private const val TYPE_INPUT_TAP: Byte = 0x20
         private const val TYPE_STATUS: Byte = 0x30
 
         fun decode(bytes: ByteArray): MirrorMessage {
@@ -107,6 +113,10 @@ sealed class MirrorMessage {
                     val nalu = ByteArray(buf.remaining()); buf.get(nalu)
                     VideoFrame(pts, nalu)
                 }
+                TYPE_INPUT_TAP -> {
+                    if (buf.remaining() != 8) throw MirrorMessageException("INPUT_TAP truncated")
+                    InputTap(buf.float, buf.float)
+                }
                 TYPE_STATUS -> {
                     if (buf.remaining() != 1) throw MirrorMessageException("STATUS truncated")
                     val code = MirrorStatusCode.fromRaw(buf.get())
@@ -128,6 +138,8 @@ sealed class MirrorMessage {
             .put(TYPE_VIDEO_CONFIG).putInt(sps.size).put(sps).putInt(pps.size).put(pps).array()
         is VideoFrame -> ByteBuffer.allocate(1 + 8 + naluBytes.size).order(ByteOrder.BIG_ENDIAN)
             .put(TYPE_VIDEO_FRAME).putLong(presentationTimestampUs.toLong()).put(naluBytes).array()
+        is InputTap -> ByteBuffer.allocate(1 + 4 + 4).order(ByteOrder.BIG_ENDIAN)
+            .put(TYPE_INPUT_TAP).putFloat(xNorm).putFloat(yNorm).array()
         is Status -> byteArrayOf(TYPE_STATUS, code.raw)
     }
 }

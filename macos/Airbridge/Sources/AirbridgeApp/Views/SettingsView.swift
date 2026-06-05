@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
+    @AppStorage("showInDock") private var showInDock = false
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
     @State private var isRecordingShortcut = false
@@ -86,19 +87,19 @@ struct SettingsView: View {
         ) {
             if vm.pairedDevices.isEmpty {
                 Text(L10n.noDevicePaired)
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(vm.pairedDevices, id: \.publicKeyBase64) { device in
                     HStack(spacing: 12) {
                         Image(systemName: "iphone")
-                            .font(.system(size: 18))
+                            .font(.ab(.title3))
                             .foregroundStyle(Color.accentColor)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(device.deviceName)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.ab(.body, weight: .medium))
                             Text(device.pairedAt, style: .date)
-                                .font(.system(size: 12))
+                                .font(.ab(.footnote))
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -135,10 +136,19 @@ struct SettingsView: View {
                     }
                 }
             ))
-            .font(.system(size: 14))
+            .font(.ab(.body))
 
             Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
-                .font(.system(size: 14))
+                .font(.ab(.body))
+
+            Toggle(L10n.isPL ? "Pokaż w Docku" : "Show in Dock", isOn: Binding(
+                get: { showInDock },
+                set: { newValue in
+                    showInDock = newValue
+                    NSApp.setActivationPolicy(newValue ? .regular : .accessory)
+                }
+            ))
+            .font(.ab(.body))
         }
     }
 
@@ -146,14 +156,14 @@ struct SettingsView: View {
         GlassSection(title: LocalizedStringKey(L10n.quickDropShortcut), systemImage: "keyboard") {
             HStack {
                 Text(L10n.isPL ? "Dostępność:" : "Accessibility:")
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                 Spacer()
                 HStack(spacing: 6) {
                     StatusIndicator(state: accessibilityGranted ? .connected : .error, size: 12)
                     Text(accessibilityGranted
                         ? (L10n.isPL ? "Nadane" : "Granted")
                         : (L10n.isPL ? "Brak uprawnień" : "Not granted"))
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                 }
                 if !accessibilityGranted {
                     Button(L10n.isPL ? "Nadaj" : "Grant") {
@@ -167,24 +177,24 @@ struct SettingsView: View {
             Text(L10n.isPL
                 ? "Skrót działa globalnie tylko z uprawnieniami Dostępności."
                 : "The shortcut works globally only with Accessibility permission.")
-                .font(.system(size: 12))
+                .font(.ab(.footnote))
                 .foregroundStyle(.secondary)
 
             Divider()
 
             HStack {
                 Text(L10n.isPL ? "Skrót:" : "Shortcut:")
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                 Spacer()
 
                 if isRecordingShortcut {
                     Text(L10n.pressNewShortcut)
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                         .foregroundStyle(.orange)
                         .onAppear { startRecordingShortcut() }
                 } else {
                     Text(shortcutDisplay)
-                        .font(.system(size: 14, design: .monospaced))
+                        .font(.ab(.body, design: .monospaced))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .glassEffect(.regular, in: .capsule)
@@ -215,10 +225,10 @@ struct SettingsView: View {
         GlassSection(title: LocalizedStringKey(L10n.fileTransfer), systemImage: "folder") {
             HStack {
                 Text(L10n.downloadFolder)
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                 Spacer()
                 Text(downloadFolder)
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -227,7 +237,7 @@ struct SettingsView: View {
             }
 
             Text(L10n.receivedFilesSaved)
-                .font(.system(size: 12))
+                .font(.ab(.footnote))
                 .foregroundStyle(.secondary)
         }
     }
@@ -236,22 +246,22 @@ struct SettingsView: View {
         GlassSection(title: LocalizedStringKey(L10n.connection), systemImage: "antenna.radiowaves.left.and.right") {
             HStack {
                 Text(L10n.status)
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                 Spacer()
                 HStack(spacing: 6) {
                     StatusIndicator(state: vm.isConnected ? .connected : .disconnected, size: 12)
                     Text(vm.isConnected ? L10n.connected : L10n.notConnected)
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                 }
             }
 
             if let ip = vm.localIP {
                 HStack {
                     Text(L10n.localIP)
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                     Spacer()
                     Text(ip)
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())

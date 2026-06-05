@@ -2,6 +2,12 @@ import Foundation
 import AppKit
 import Protocol
 
+struct FolderStats: Equatable {
+    let dirCount: Int
+    let fileCount: Int
+    let totalSize: Int64
+}
+
 @Observable
 @MainActor
 final class FilesBrowserService: MessageHandler {
@@ -12,9 +18,12 @@ final class FilesBrowserService: MessageHandler {
     private(set) var currentPage: Int = 0
     private(set) var isLoading: Bool = false
     private(set) var needsPermission: Bool = false
+    private(set) var hasLoadedOnce: Bool = false
     private(set) var thumbnails: [String: NSImage] = [:]   // relativePath -> thumb
+    private(set) var folderStats: [String: FolderStats] = [:]  // relativePath -> stats
 
     private var requestedThumbnails: Set<String> = []
+    private var requestedFolderStats: Set<String> = []
     private let pageSize = 200
     private weak var connectionService: ConnectionService?
     private weak var fileTransferService: FileTransferService?
@@ -39,6 +48,8 @@ final class FilesBrowserService: MessageHandler {
             entries = []
             thumbnails = [:]
             requestedThumbnails = []
+            folderStats = [:]
+            requestedFolderStats = []
         }
         let message = Message.filesListRequest(path: path, page: page, pageSize: pageSize)
         Task { try? await connectionService.broadcast(message) }
@@ -81,6 +92,35 @@ final class FilesBrowserService: MessageHandler {
         Task { try? await connectionService.broadcast(.fileThumbnailRequest(path: entry.relativePath)) }
     }
 
+    // MARK: - Folder stats
+
+    /// Rows shown to the user: the leading run of entries that are fully ready
+    /// (a file is ready immediately; a folder is ready once its stats arrive).
+    /// This reveals rows top-to-bottom and never shows a half-loaded folder.
+    var displayedEntries: [FileEntry] {
+        var result: [FileEntry] = []
+        for e in entries {
+            let ready = e.isDirectory ? folderStats[e.relativePath] != nil : true
+            if ready { result.append(e) } else { break }
+        }
+        return result
+    }
+
+    var isLoadingMoreRows: Bool { displayedEntries.count < entries.count }
+
+    /// Request folder stats one at a time, in list order. Serializing keeps the
+    /// phone from running many recursive size walks at once (which is slow) and
+    /// makes rows fill in from the top down.
+    private func requestNextFolderStats() {
+        guard let connectionService else { return }
+        // Only one in flight: if the first unresolved folder is already
+        // requested, we're waiting on it.
+        guard let next = entries.first(where: { $0.isDirectory && folderStats[$0.relativePath] == nil }) else { return }
+        guard !requestedFolderStats.contains(next.relativePath) else { return }
+        requestedFolderStats.insert(next.relativePath)
+        Task { try? await connectionService.broadcast(.folderStatsRequest(path: next.relativePath)) }
+    }
+
     // MARK: - Transfer
 
     func download(_ entry: FileEntry) {
@@ -111,12 +151,18 @@ final class FilesBrowserService: MessageHandler {
             totalCount = total
             currentPage = page
             isLoading = false
+            hasLoadedOnce = true
             for entry in newEntries { requestThumbnail(entry) }
+            requestNextFolderStats()
 
         case .fileThumbnailResponse(let path, let data):
             if let imageData = Data(base64Encoded: data), let image = NSImage(data: imageData) {
                 thumbnails[path] = image
             }
+
+        case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
+            folderStats[path] = FolderStats(dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
+            requestNextFolderStats()
 
         default:
             break

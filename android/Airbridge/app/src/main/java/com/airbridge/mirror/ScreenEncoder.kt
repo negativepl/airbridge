@@ -6,6 +6,8 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.projection.MediaProjection
+import android.os.Handler
+import android.os.Looper
 import android.os.Build
 import android.util.Log
 import java.nio.ByteBuffer
@@ -24,8 +26,17 @@ class ScreenEncoder(
     private var pendingSps: ByteArray? = null
     private var pendingPps: ByteArray? = null
     private var configEmitted = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var started = false
+    private val projectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            stop()
+        }
+    }
 
     fun start() {
+        if (started) return
+        started = true
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, bitrateBps)
@@ -55,8 +66,10 @@ class ScreenEncoder(
                     extractSpsPps(payload)
                     maybeEmitConfig()
                 } else if (info.size > 0) {
-                    val nalu = stripAnnexBStartCode(payload)
-                    onMessage(MirrorMessage.VideoFrame(presentationTimestampUs = info.presentationTimeUs.toULong(), naluBytes = nalu))
+                    onMessage(MirrorMessage.VideoFrame(
+                        presentationTimestampUs = info.presentationTimeUs.toULong(),
+                        naluBytes = payload
+                    ))
                 }
                 c.releaseOutputBuffer(idx, false)
             }
@@ -65,14 +78,16 @@ class ScreenEncoder(
                 onMessage(MirrorMessage.Status(MirrorStatusCode.ENCODER_ERROR))
             }
             override fun onOutputFormatChanged(c: MediaCodec, format: MediaFormat) {
-                format.getByteBuffer("csd-0")?.let { pendingSps = it.toBytes() }
-                format.getByteBuffer("csd-1")?.let { pendingPps = it.toBytes() }
+                format.getByteBuffer("csd-0")?.let { pendingSps = stripAnnexBStartCode(it.toBytes()) }
+                format.getByteBuffer("csd-1")?.let { pendingPps = stripAnnexBStartCode(it.toBytes()) }
                 maybeEmitConfig()
             }
         })
 
         codec.start()
         encoder = codec
+
+        mediaProjection.registerCallback(projectionCallback, mainHandler)
 
         // MediaProjection.createVirtualDisplay handles scaling internally — pass target encoder dims.
         virtualDisplay = mediaProjection.createVirtualDisplay(
@@ -83,8 +98,12 @@ class ScreenEncoder(
     }
 
     fun stop() {
+        if (!started && encoder == null && virtualDisplay == null) return
+        started = false
         virtualDisplay?.release(); virtualDisplay = null
-        encoder?.stop(); encoder?.release(); encoder = null
+        encoder?.runCatching { stop() }
+        encoder?.release(); encoder = null
+        runCatching { mediaProjection.unregisterCallback(projectionCallback) }
         configEmitted = false; pendingSps = null; pendingPps = null
     }
 
@@ -107,11 +126,16 @@ class ScreenEncoder(
     }
 
     private fun stripAnnexBStartCode(annexB: ByteArray): ByteArray {
-        // Each output frame from MediaCodec starts with 00 00 00 01 or 00 00 01.
-        // For VIDEO_FRAME we send the raw NALU without the start code; AVCC-prefix added on Mac side.
         return when {
-            annexB.size > 4 && annexB[0] == 0.toByte() && annexB[1] == 0.toByte() && annexB[2] == 0.toByte() && annexB[3] == 1.toByte() -> annexB.copyOfRange(4, annexB.size)
-            annexB.size > 3 && annexB[0] == 0.toByte() && annexB[1] == 0.toByte() && annexB[2] == 1.toByte() -> annexB.copyOfRange(3, annexB.size)
+            annexB.size > 4 &&
+                annexB[0] == 0.toByte() &&
+                annexB[1] == 0.toByte() &&
+                annexB[2] == 0.toByte() &&
+                annexB[3] == 1.toByte() -> annexB.copyOfRange(4, annexB.size)
+            annexB.size > 3 &&
+                annexB[0] == 0.toByte() &&
+                annexB[1] == 0.toByte() &&
+                annexB[2] == 1.toByte() -> annexB.copyOfRange(3, annexB.size)
             else -> annexB
         }
     }

@@ -20,6 +20,8 @@ class MirrorService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var encoder: ScreenEncoder? = null
     private var client: MirrorClient? = null
+    @Volatile private var encoderStarted = false
+    @Volatile private var sessionGeneration = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -33,6 +35,9 @@ class MirrorService : Service() {
     }
 
     private fun startMirror(intent: Intent) {
+        sessionGeneration += 1
+        val generation = sessionGeneration
+        stopMirror()
         startForegroundCompat()
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
         val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA) ?: return stopSelf()
@@ -47,9 +52,15 @@ class MirrorService : Service() {
         val (w, h) = displayDimensions()
 
         client = MirrorClient(
+            onTap = { x, y ->
+                MirrorAccessibilityService.dispatchTap(this, x, y)
+            },
             host = host, port = port, pairingToken = token,
             screenWidth = w.toUInt(), screenHeight = h.toUInt(), orientation = 0u,
             onAck = { ack ->
+                if (generation != sessionGeneration) return@MirrorClient
+                if (encoderStarted) return@MirrorClient
+                encoderStarted = true
                 val targetW = ack.targetWidth.toInt().coerceAtLeast(1)
                 val targetH = ack.targetHeight.toInt().coerceAtLeast(1)
                 val enc = ScreenEncoder(
@@ -62,11 +73,15 @@ class MirrorService : Service() {
                 enc.start()
                 encoder = enc
             },
-            onDisconnect = { stopSelf() }
+            onDisconnect = {
+                if (generation != sessionGeneration) return@MirrorClient
+                stopSelf()
+            }
         ).also { it.connect() }
     }
 
     private fun stopMirror() {
+        encoderStarted = false
         encoder?.stop(); encoder = null
         client?.close(); client = null
         mediaProjection?.stop(); mediaProjection = null

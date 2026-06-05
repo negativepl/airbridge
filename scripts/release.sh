@@ -42,20 +42,16 @@ cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 
-# Copy SPM resource bundle (required by Bundle.module)
-RES_BUNDLE="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/Airbridge_AirbridgeApp.bundle"
-if [ -d "$RES_BUNDLE" ]; then
-    cp -R "$RES_BUNDLE" "$APP_BUNDLE/Contents/Resources/Airbridge_AirbridgeApp.bundle"
-else
-    echo "  WARNING: Resource bundle not found at $RES_BUNDLE"
+# Copy SPM resources directly into Contents/Resources. We avoid SwiftPM's
+# Bundle.module accessor (its generated fallback path is hardcoded to the
+# developer's .build/ directory, which crashes on any other Mac). Code in
+# AirbridgeApp uses AppResources.bundle = Bundle.main instead.
+RES_SRC="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources"
+if [ ! -d "$RES_SRC" ]; then
+    echo "  ERROR: Resources not found at $RES_SRC"
     exit 1
 fi
-
-# Copy icon
-ICNS="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources/AppIcon.icns"
-if [ -f "$ICNS" ]; then
-    cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-fi
+cp -R "$RES_SRC"/* "$APP_BUNDLE/Contents/Resources/"
 
 # Copy .lproj localization folders so AppKit shows system menu items in the
 # user's language (requires CFBundleDevelopmentRegion + matching .lproj dirs).

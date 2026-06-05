@@ -3,6 +3,24 @@ import VideoToolbox
 import CoreMedia
 import CoreVideo
 
+private enum VideoDecoderDebugLog {
+    static let url = URL(fileURLWithPath: "/tmp/airbridge-mirror.log")
+
+    static func write(_ message: String) {
+        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+        let data = Data(line.utf8)
+        if FileManager.default.fileExists(atPath: url.path) {
+            if let handle = try? FileHandle(forWritingTo: url) {
+                try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+                try? handle.close()
+            }
+        } else {
+            try? data.write(to: url)
+        }
+    }
+}
+
 public enum VideoDecoderError: Error, Sendable {
     case emptyParameterSet
     case formatDescriptionFailed(OSStatus)
@@ -22,10 +40,14 @@ public final class VideoDecoder: @unchecked Sendable {
         self.onSample = onSample
     }
 
-    public func configure(sps: Data, pps: Data) throws {
+    @discardableResult
+    public func configure(sps: Data, pps: Data) throws -> CMVideoDimensions {
         let fmt = try Self.makeFormatDescription(sps: sps, pps: pps)
         self.formatDescription = fmt
+        let dims = CMVideoFormatDescriptionGetDimensions(fmt)
+        VideoDecoderDebugLog.write("decoder configured dims=\(dims.width)x\(dims.height) sps=\(sps.count) pps=\(pps.count)")
         try createSession(formatDescription: fmt)
+        return dims
     }
 
     public func decode(avccFrame: Data, presentationTimestampUs pts: UInt64) throws {
@@ -70,7 +92,10 @@ public final class VideoDecoder: @unchecked Sendable {
         let flags: VTDecodeFrameFlags = ._EnableAsynchronousDecompression
         var infoFlags: VTDecodeInfoFlags = []
         let decodeStatus = VTDecompressionSessionDecodeFrame(session, sampleBuffer: sampleBuffer, flags: flags, frameRefcon: nil, infoFlagsOut: &infoFlags)
-        if decodeStatus != noErr { throw VideoDecoderError.decodeFailed(decodeStatus) }
+        if decodeStatus != noErr {
+            VideoDecoderDebugLog.write("decode failed status=\(decodeStatus)")
+            throw VideoDecoderError.decodeFailed(decodeStatus)
+        }
     }
 
     public static func makeFormatDescription(sps: Data, pps: Data) throws -> CMVideoFormatDescription {
@@ -137,7 +162,16 @@ public final class VideoDecoder: @unchecked Sendable {
                     sampleBufferOut: &sampleBuffer
                 )
                 guard sbStatus == noErr, let sampleBuffer else { return }
+                if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) {
+                    let dict = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
+                    CFDictionarySetValue(
+                        dict,
+                        Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
+                        Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+                    )
+                }
 
+                VideoDecoderDebugLog.write("decoder output sample pts=\(presentationTimeStamp.value)")
                 me.onSample(sampleBuffer)
             },
             decompressionOutputRefCon: Unmanaged.passUnretained(self).toOpaque()

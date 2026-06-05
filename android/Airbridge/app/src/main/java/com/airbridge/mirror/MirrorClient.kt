@@ -10,6 +10,7 @@ import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
 
 class MirrorClient(
+    private val onTap: (Float, Float) -> Unit,
     private val host: String,
     private val port: Int,
     private val pairingToken: ByteArray,
@@ -34,7 +35,13 @@ class MirrorClient(
             }
             override fun onMessage(ws: WebSocket, bytes: ByteString) {
                 runCatching { MirrorMessage.decode(bytes.toByteArray()) }
-                    .onSuccess { msg -> if (msg is MirrorMessage.HelloAck) onAck(msg) }
+                    .onSuccess { msg ->
+                        when (msg) {
+                            is MirrorMessage.HelloAck -> onAck(msg)
+                            is MirrorMessage.InputTap -> onTap(msg.xNorm, msg.yNorm)
+                            else -> Unit
+                        }
+                    }
             }
             override fun onClosed(ws: WebSocket, code: Int, reason: String) { onDisconnect() }
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) { onDisconnect() }

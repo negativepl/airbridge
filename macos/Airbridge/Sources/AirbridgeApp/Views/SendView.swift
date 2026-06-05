@@ -9,6 +9,7 @@ struct SendView: View {
 
     @State private var viewModel: TransferViewModel?
     @State private var isTargeted = false
+    @State private var isHovering = false
 
     var body: some View {
         Group {
@@ -29,13 +30,15 @@ struct SendView: View {
     }
 
     private var notConnectedView: some View {
-        EmptyStateView(
-            systemImage: "wifi.slash",
-            title: L10n.isPL ? "Wyślij" : "Send",
-            subtitle: L10n.isPL
-                ? "Połącz się z telefonem, aby wysyłać pliki i zawartość schowka."
-                : "Connect to your phone to send files and clipboard content."
-        )
+        EmptyStateContainer {
+            EmptyStateView(
+                systemImage: "wifi.slash",
+                title: L10n.isPL ? "Wyślij" : "Send",
+                subtitle: L10n.isPL
+                    ? "Połącz się z telefonem, aby wysyłać pliki i zawartość schowka."
+                    : "Connect to your phone to send files and clipboard content."
+            )
+        }
     }
 
     private var sendContent: some View {
@@ -45,13 +48,13 @@ struct SendView: View {
             if let vm = viewModel, vm.isSending {
                 GlassSection {
                     Text(vm.fileName)
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     ProgressView(value: vm.progress)
                         .tint(.accentColor)
                     Text("\(Int(vm.progress * 100))%")
-                        .font(.system(size: 13))
+                        .font(.ab(.subheadline))
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
                 }
@@ -60,14 +63,14 @@ struct SendView: View {
             HStack(spacing: 14) {
                 Button { openFilePicker() } label: {
                     Label(L10n.selectFiles, systemImage: "folder")
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.extraLarge)
 
                 Button { sendClipboard() } label: {
                     Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
-                        .font(.system(size: 14))
+                        .font(.ab(.body))
                 }
                 .controlSize(.extraLarge)
                 .disabled(viewModel.map { !$0.isConnected } ?? true)
@@ -86,7 +89,7 @@ struct SendView: View {
                     .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
                     .symbolEffect(.bounce, value: isTargeted)
                 Text(L10n.dropFilesHere)
-                    .font(.system(size: 15))
+                    .font(.ab(.callout))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -104,13 +107,15 @@ struct SendView: View {
                 .strokeBorder(
                     style: StrokeStyle(lineWidth: 1, dash: [6, 4])
                 )
-                .foregroundStyle(.secondary.opacity(isTargeted ? 0 : 0.25))
+                .foregroundStyle(.secondary.opacity(isTargeted ? 0 : (isHovering ? 0.5 : 0.25)))
                 .padding(8)
                 .allowsHitTesting(false)
         )
         .contentShape(Rectangle())
         .onTapGesture { openFilePicker() }
+        .onHover { isHovering = $0 }
         .animation(.airbridgeQuick, value: isTargeted)
+        .animation(.airbridgeQuick, value: isHovering)
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }

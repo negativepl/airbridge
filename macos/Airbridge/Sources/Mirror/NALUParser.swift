@@ -45,4 +45,25 @@ public enum NALUParser {
         out.append(nalu)
         return out
     }
+
+    /// Convert an H.264 access unit to AVCC.
+    ///
+    /// Accepts either:
+    /// - Annex-B data containing one or more NALUs with start codes, or
+    /// - a raw single-NALU payload without start codes.
+    public static func accessUnitToAVCC(_ data: Data) -> Data {
+        let nalus = splitAnnexB(data)
+        if nalus.isEmpty {
+            return toAVCC(data)
+        }
+
+        var out = Data()
+        out.reserveCapacity(data.count + nalus.count * 4)
+        for nalu in nalus where !nalu.isEmpty {
+            var len = UInt32(nalu.count).bigEndian
+            Swift.withUnsafeBytes(of: &len) { out.append(contentsOf: $0) }
+            out.append(nalu)
+        }
+        return out
+    }
 }

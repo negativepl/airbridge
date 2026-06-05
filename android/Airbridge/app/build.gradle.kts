@@ -53,11 +53,13 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     // Networking
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // QR scanning
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    // QR scanning — versions bumped for 16 KB page-size alignment of bundled
+    // native libs (libbarhopper_v3.so, libimage_processing_util_jni.so):
+    // ML Kit 17.3.0 + CameraX 1.4.x are the first 16 KB-aligned releases.
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     // Testing

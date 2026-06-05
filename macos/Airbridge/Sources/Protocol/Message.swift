@@ -59,6 +59,10 @@ public enum Message: Equatable, Sendable {
     case mirrorStartRequest(token: String)
     case mirrorStop
     case mirrorError(reason: String)
+    case deviceInfoRequest
+    case deviceInfoResponse(info: DeviceInfo)
+    case folderStatsRequest(path: String)
+    case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -174,6 +178,45 @@ public struct SmsMessageMeta: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+// MARK: - DeviceInfo
+
+public struct DeviceInfo: Codable, Equatable, Sendable {
+    public let name: String            // exact / user-set device name (e.g. "Galaxy Z Fold7")
+    public let model: String           // Build.MODEL (codename, e.g. "SM-F966B")
+    public let manufacturer: String
+    public let androidVersion: String  // Build.VERSION.RELEASE, e.g. "16"
+    public let sdkInt: Int             // API level
+    public let totalStorageBytes: Int64
+    public let freeStorageBytes: Int64
+    public let totalRamBytes: Int64
+    public let freeRamBytes: Int64
+    public let batteryPercent: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case name, model, manufacturer
+        case androidVersion     = "android_version"
+        case sdkInt             = "sdk_int"
+        case totalStorageBytes  = "total_storage_bytes"
+        case freeStorageBytes   = "free_storage_bytes"
+        case totalRamBytes      = "total_ram_bytes"
+        case freeRamBytes       = "free_ram_bytes"
+        case batteryPercent     = "battery_percent"
+    }
+
+    public init(name: String, model: String, manufacturer: String, androidVersion: String, sdkInt: Int, totalStorageBytes: Int64, freeStorageBytes: Int64, totalRamBytes: Int64, freeRamBytes: Int64, batteryPercent: Int) {
+        self.name = name
+        self.model = model
+        self.manufacturer = manufacturer
+        self.androidVersion = androidVersion
+        self.sdkInt = sdkInt
+        self.totalStorageBytes = totalStorageBytes
+        self.freeStorageBytes = freeStorageBytes
+        self.totalRamBytes = totalRamBytes
+        self.freeRamBytes = freeRamBytes
+        self.batteryPercent = batteryPercent
+    }
+}
+
 // MARK: - Codable
 
 extension Message: Codable {
@@ -216,6 +259,10 @@ extension Message: Codable {
         case mirrorStartRequest       = "mirror_start_request"
         case mirrorStop               = "mirror_stop"
         case mirrorError              = "mirror_error"
+        case deviceInfoRequest        = "device_info_request"
+        case deviceInfoResponse       = "device_info_response"
+        case folderStatsRequest       = "folder_stats_request"
+        case folderStatsResponse      = "folder_stats_response"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -257,6 +304,9 @@ extension Message: Codable {
         case isDirectory        = "is_directory"
         case needsPermission    = "needs_permission"
         case destinationDir     = "destination_dir"
+        case info
+        case dirCount           = "dir_count"
+        case fileCount          = "file_count"
     }
 
     // MARK: Encode
@@ -453,6 +503,24 @@ extension Message: Codable {
         case let .mirrorError(reason):
             try container.encode(TypeKey.mirrorError.rawValue, forKey: .type)
             try container.encode(reason, forKey: .reason)
+
+        case .deviceInfoRequest:
+            try container.encode(TypeKey.deviceInfoRequest.rawValue, forKey: .type)
+
+        case .deviceInfoResponse(let info):
+            try container.encode(TypeKey.deviceInfoResponse.rawValue, forKey: .type)
+            try container.encode(info, forKey: .info)
+
+        case .folderStatsRequest(let path):
+            try container.encode(TypeKey.folderStatsRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+
+        case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
+            try container.encode(TypeKey.folderStatsResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(dirCount, forKey: .dirCount)
+            try container.encode(fileCount, forKey: .fileCount)
+            try container.encode(totalSize, forKey: .totalSize)
         }
     }
 
@@ -663,6 +731,24 @@ extension Message: Codable {
         case .mirrorError:
             let reason = try container.decode(String.self, forKey: .reason)
             self = .mirrorError(reason: reason)
+
+        case .deviceInfoRequest:
+            self = .deviceInfoRequest
+
+        case .deviceInfoResponse:
+            let info = try container.decode(DeviceInfo.self, forKey: .info)
+            self = .deviceInfoResponse(info: info)
+
+        case .folderStatsRequest:
+            let path = try container.decode(String.self, forKey: .path)
+            self = .folderStatsRequest(path: path)
+
+        case .folderStatsResponse:
+            let path = try container.decode(String.self, forKey: .path)
+            let dirCount = try container.decode(Int.self, forKey: .dirCount)
+            let fileCount = try container.decode(Int.self, forKey: .fileCount)
+            let totalSize = try container.decode(Int64.self, forKey: .totalSize)
+            self = .folderStatsResponse(path: path, dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
         }
     }
 

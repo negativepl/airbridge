@@ -26,7 +26,7 @@ struct MessagesView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         Text(L10n.isPL ? "Wybierz konwersację" : "Select a conversation")
-                            .font(.system(size: 18))
+                            .font(.ab(.title3))
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -60,13 +60,15 @@ struct MessagesView: View {
     }
 
     private var notConnectedView: some View {
-        EmptyStateView(
-            systemImage: "message",
-            title: L10n.isPL ? "Wiadomości" : "Messages",
-            subtitle: L10n.isPL
-                ? "Połącz się z telefonem, aby przeglądać wiadomości."
-                : "Connect to your phone to browse messages."
-        )
+        EmptyStateContainer {
+            EmptyStateView(
+                systemImage: "message",
+                title: L10n.isPL ? "Wiadomości" : "Messages",
+                subtitle: L10n.isPL
+                    ? "Połącz się z telefonem, aby przeglądać wiadomości."
+                    : "Connect to your phone to browse messages."
+            )
+        }
     }
 
     private var conversationList: some View {
@@ -123,15 +125,15 @@ struct MessagesView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(convo.displayName)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.ab(.body, weight: .semibold))
                             .lineLimit(1)
                         Spacer()
                         Text(formatDate(convo.date))
-                            .font(.system(size: 11))
+                            .font(.ab(.caption))
                             .foregroundStyle(.secondary)
                     }
                     Text(convo.snippet)
-                        .font(.system(size: 13))
+                        .font(.ab(.subheadline))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -187,13 +189,13 @@ struct MessagesView: View {
                 ZStack(alignment: .leading) {
                     if messageText.isEmpty {
                         Text(L10n.isPL ? "Wiadomość..." : "Message...")
-                            .font(.system(size: 15))
+                            .font(.ab(.callout))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 16)
                     }
                     TextField("", text: $messageText)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 15))
+                        .font(.ab(.callout))
                         .padding(.horizontal, 16)
                         .onSubmit { sendMessage(to: convo) }
                 }
@@ -204,7 +206,7 @@ struct MessagesView: View {
                     sendMessage(to: convo)
                 } label: {
                     Image(systemName: "paperplane.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.ab(.headline, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                 }
@@ -233,7 +235,7 @@ struct MessagesView: View {
 
             VStack(alignment: isSent ? .trailing : .leading, spacing: 3) {
                 Text(msg.body)
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .glassEffect(
@@ -242,7 +244,7 @@ struct MessagesView: View {
                     )
 
                 Text(formatTime(msg.date))
-                    .font(.system(size: 11))
+                    .font(.ab(.caption))
                     .foregroundStyle(.tertiary)
             }
 

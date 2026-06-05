@@ -1,9 +1,9 @@
 import SwiftUI
+import Protocol
 
 struct HomeView: View {
     let connectionService: ConnectionService
     let fileTransferService: FileTransferService
-    let historyService: HistoryService
     let pairingService: PairingService
 
     @State private var viewModel: HomeViewModel
@@ -12,17 +12,14 @@ struct HomeView: View {
     init(
         connectionService: ConnectionService,
         fileTransferService: FileTransferService,
-        historyService: HistoryService,
         pairingService: PairingService
     ) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
-        self.historyService = historyService
         self.pairingService = pairingService
         self._viewModel = State(initialValue: HomeViewModel(
             connectionService: connectionService,
-            fileTransferService: fileTransferService,
-            historyService: historyService
+            fileTransferService: fileTransferService
         ))
     }
 
@@ -33,9 +30,10 @@ struct HomeView: View {
             if vm.isTransferring {
                 transferCard(vm)
             }
-            if vm.hasPairedDevices {
-                recentActivityCard(vm)
-            } else {
+            if let info = vm.deviceInfo {
+                deviceInfoCard(info)
+            }
+            if !vm.hasPairedDevices {
                 noPairedDevicesCard
             }
         }
@@ -80,7 +78,7 @@ struct HomeView: View {
                             Text(vm.statusMessage)
                         }
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.ab(.headline, weight: .semibold))
                     .contentTransition(.interpolate)
 
                     Group {
@@ -94,7 +92,7 @@ struct HomeView: View {
                             Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
                         }
                     }
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -109,27 +107,27 @@ struct HomeView: View {
     private func connectionActionButton(_ vm: HomeViewModel) -> some View {
         if vm.isConnected {
             Button(L10n.disconnect) { vm.disconnect() }
-                .controlSize(.large)
+                .controlSize(.extraLarge)
         } else if isDisconnected {
             Button(L10n.reconnect) { vm.reconnect() }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .controlSize(.extraLarge)
         } else if !vm.hasPairedDevices {
             Button(L10n.pairDevice) { showPairing = true }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .controlSize(.extraLarge)
         } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Błąd") {
             Button(L10n.reconnect) { vm.reconnect() }
                 .buttonStyle(.borderedProminent)
                 .tint(.orange)
-                .controlSize(.large)
+                .controlSize(.extraLarge)
         }
     }
 
     private func transferCard(_ vm: HomeViewModel) -> some View {
         GlassSection(title: LocalizedStringKey(L10n.fileTransfer), systemImage: "arrow.down.circle") {
             Text(vm.transferFileName)
-                .font(.system(size: 14))
+                .font(.ab(.body))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
@@ -138,43 +136,14 @@ struct HomeView: View {
 
             HStack {
                 Text(formatSpeed(vm.transferSpeed))
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
                 Spacer()
                 Text(formatEta(vm.transferEta))
-                    .font(.system(size: 13))
+                    .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
-            }
-        }
-    }
-
-    private func recentActivityCard(_ vm: HomeViewModel) -> some View {
-        GlassSection(
-            title: LocalizedStringKey(L10n.isPL ? "Ostatnia aktywność" : "Recent Activity"),
-            systemImage: "clock"
-        ) {
-            let items = vm.recentActivity
-            if items.isEmpty {
-                Text(L10n.isPL ? "Brak aktywności" : "No activity yet")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(items) { record in
-                    HStack(spacing: 8) {
-                        Image(systemName: record.type == .clipboard ? "doc.on.clipboard" : "doc")
-                            .foregroundStyle(record.direction == .sent ? Color.primary : Color.accentColor)
-                        Text(record.description)
-                            .font(.system(size: 14))
-                            .lineLimit(1)
-                        Spacer()
-                        Text(record.timestamp, style: .relative)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
             }
         }
     }
@@ -187,14 +156,79 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                     .symbolEffect(.pulse, options: .repeating)
                 Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
-                    .font(.system(size: 14))
+                    .font(.ab(.body))
                     .foregroundStyle(.secondary)
                 Button(L10n.pairDevice) { showPairing = true }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .controlSize(.extraLarge)
             }
             .frame(maxWidth: .infinity)
         }
+    }
+
+    // MARK: - Device info
+
+    private func deviceInfoCard(_ info: DeviceInfo) -> some View {
+        GlassSection(
+            title: LocalizedStringKey(info.name.isEmpty ? info.model : info.name),
+            systemImage: "iphone"
+        ) {
+            infoRow(L10n.isPL ? "Model" : "Model", "\(info.manufacturer) \(info.model)")
+            infoRow("Android", "\(info.androidVersion) · API \(info.sdkInt)")
+            infoRow(L10n.isPL ? "Bateria" : "Battery", "\(info.batteryPercent)%")
+
+            usageRow(
+                label: L10n.isPL ? "Pamięć" : "Storage",
+                freeBytes: info.freeStorageBytes,
+                totalBytes: info.totalStorageBytes
+            )
+            usageRow(
+                label: "RAM",
+                freeBytes: info.freeRamBytes,
+                totalBytes: info.totalRamBytes
+            )
+        }
+    }
+
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.ab(.body))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.ab(.body))
+                .textSelection(.enabled)
+        }
+    }
+
+    @ViewBuilder
+    private func usageRow(label: String, freeBytes: Int64, totalBytes: Int64) -> some View {
+        let used = max(0, totalBytes - freeBytes)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(label)
+                    .font(.ab(.body))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(L10n.isPL
+                     ? "\(Self.bytes(freeBytes)) wolne z \(Self.bytes(totalBytes))"
+                     : "\(Self.bytes(freeBytes)) free of \(Self.bytes(totalBytes))")
+                    .font(.ab(.subheadline))
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+            if totalBytes > 0 {
+                ProgressView(value: Double(used), total: Double(totalBytes))
+                    .tint(.accentColor)
+            }
+        }
+    }
+
+    private static func bytes(_ value: Int64) -> String {
+        let f = ByteCountFormatter()
+        f.countStyle = .binary
+        return f.string(fromByteCount: value)
     }
 
     private func formatSpeed(_ speed: Double) -> String {

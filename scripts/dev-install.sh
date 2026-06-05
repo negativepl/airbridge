@@ -29,10 +29,12 @@ sleep 0.3
 echo "--- copying binary ---"
 cp .build/debug/AirbridgeApp "$APP/Contents/MacOS/AirbridgeApp"
 
-RES_BUNDLE=".build/debug/Airbridge_AirbridgeApp.bundle"
-if [ -d "$RES_BUNDLE" ]; then
-    rm -rf "$APP/Contents/Resources/Airbridge_AirbridgeApp.bundle"
-    cp -R "$RES_BUNDLE" "$APP/Contents/Resources/Airbridge_AirbridgeApp.bundle"
+# Copy resources directly into Contents/Resources. Code uses
+# AppResources.bundle = Bundle.main, not SwiftPM's Bundle.module.
+RES_SRC="$ROOT/macos/Airbridge/Sources/AirbridgeApp/Resources"
+if [ -d "$RES_SRC" ]; then
+    rm -rf "$APP/Airbridge_AirbridgeApp.bundle" "$APP/Contents/Resources/Airbridge_AirbridgeApp.bundle"
+    cp -R "$RES_SRC"/* "$APP/Contents/Resources/"
 fi
 
 # Copy updated Info.plist (picks up CFBundleDevelopmentRegion / localization changes)

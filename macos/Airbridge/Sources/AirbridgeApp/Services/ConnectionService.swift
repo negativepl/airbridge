@@ -29,6 +29,7 @@ final class ConnectionService {
 
     private(set) var isConnected: Bool = false
     private(set) var connectedDeviceName: String = ""
+    private(set) var deviceInfo: DeviceInfo?
     private(set) var connectedClientIP: String?
     private(set) var statusMessage: String = "Idle"
     private var manuallyDisconnected: Bool = false
@@ -108,6 +109,7 @@ final class ConnectionService {
         }
         isConnected = false
         connectedDeviceName = ""
+        deviceInfo = nil
         statusMessage = "Stopped"
         serverStarted = false
     }
@@ -127,6 +129,7 @@ final class ConnectionService {
         }
         isConnected = false
         connectedDeviceName = ""
+        deviceInfo = nil
         statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
     }
 
@@ -205,6 +208,10 @@ final class ConnectionService {
             self.connectedClientIP = connectionId.components(separatedBy: ":").first
             self.isConnected = true
             self.statusMessage = "Connected to \(self.connectedDeviceName)"
+
+            // Pull richer device info (exact name, storage, RAM, battery) for
+            // the Home screen.
+            try? await self.server.broadcast(.deviceInfoRequest)
         }
     }
 
@@ -240,8 +247,10 @@ final class ConnectionService {
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
             smsHandler?.handleMessage(message)
-        case .filesListResponse, .fileThumbnailResponse:
+        case .filesListResponse, .fileThumbnailResponse, .folderStatsResponse:
             filesHandler?.handleMessage(message)
+        case .deviceInfoResponse(let info):
+            deviceInfo = info
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         default:
@@ -273,6 +282,7 @@ final class ConnectionService {
                 self.isConnected = stillConnected
                 if !stillConnected && !self.manuallyDisconnected {
                     self.connectedDeviceName = ""
+                    self.deviceInfo = nil
                     self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                 }
             }
