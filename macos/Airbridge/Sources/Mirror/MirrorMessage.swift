@@ -34,6 +34,11 @@ public enum MirrorMessage: Equatable, Sendable {
     case reverseInput(type: UInt8, xNorm: Float32, yNorm: Float32)
     /// Reverse control: phone -> Mac scroll wheel (points).
     case reverseScroll(deltaX: Float32, deltaY: Float32)
+    /// Reverse keyboard: type a UTF-8 string (normal characters).
+    case reverseText(text: String)
+    /// Reverse keyboard: a special key press (down+up). code = our key id,
+    /// modifiers bitmask 1=shift 2=ctrl 4=alt 8=cmd.
+    case reverseKey(code: UInt16, modifiers: UInt8)
 
     private enum TypeByte {
         static let hello: UInt8 = 0x01
@@ -46,6 +51,8 @@ public enum MirrorMessage: Equatable, Sendable {
         static let reverseHello: UInt8 = 0x40
         static let reverseInput: UInt8 = 0x41
         static let reverseScroll: UInt8 = 0x42
+        static let reverseText: UInt8 = 0x43
+        static let reverseKey: UInt8 = 0x44
     }
 
     public func encode() -> Data {
@@ -105,6 +112,14 @@ public enum MirrorMessage: Equatable, Sendable {
             out.append(TypeByte.reverseScroll)
             out.appendBE(dx.bitPattern)
             out.appendBE(dy.bitPattern)
+        case let .reverseText(text):
+            out.append(TypeByte.reverseText)
+            out.append(Data(text.utf8))
+        case let .reverseKey(code, modifiers):
+            out.append(TypeByte.reverseKey)
+            out.append(UInt8(code >> 8))
+            out.append(UInt8(code & 0xFF))
+            out.append(modifiers)
         }
         return out
     }
@@ -201,6 +216,16 @@ public enum MirrorMessage: Equatable, Sendable {
             let dxBits: UInt32 = payload.readBE(at: &i)
             let dyBits: UInt32 = payload.readBE(at: &i)
             return .reverseScroll(deltaX: Float32(bitPattern: dxBits), deltaY: Float32(bitPattern: dyBits))
+
+        case TypeByte.reverseText:
+            return .reverseText(text: String(decoding: payload, as: UTF8.self))
+
+        case TypeByte.reverseKey:
+            guard payload.count == 3 else { throw MirrorMessageError.truncated(type: first) }
+            let i = payload.startIndex
+            let code = (UInt16(payload[i]) << 8) | UInt16(payload[i + 1])
+            let modifiers = payload[i + 2]
+            return .reverseKey(code: code, modifiers: modifiers)
 
         default:
             throw MirrorMessageError.unknownType(first)

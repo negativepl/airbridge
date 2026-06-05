@@ -45,6 +45,18 @@ struct MirrorMessageTests {
         #expect(try MirrorMessage.decode(msg.encode()) == msg)
     }
 
+    @Test("REVERSE_TEXT round-trip")
+    func reverseTextRoundtrip() throws {
+        let msg = MirrorMessage.reverseText(text: "Cześć 👋 Mac")
+        #expect(try MirrorMessage.decode(msg.encode()) == msg)
+    }
+
+    @Test("REVERSE_KEY round-trip")
+    func reverseKeyRoundtrip() throws {
+        let msg = MirrorMessage.reverseKey(code: 36, modifiers: 8)
+        #expect(try MirrorMessage.decode(msg.encode()) == msg)
+    }
+
     @Test("VIDEO_CONFIG_HEVC round-trip")
     func videoConfigHEVCRoundtrip() throws {
         let vps = Data([0x40, 0x01, 0x0C, 0x01])

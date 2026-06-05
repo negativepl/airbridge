@@ -30,6 +30,16 @@ class MirrorMessageTest {
         assertEquals(msg, MirrorMessage.decode(msg.encode()))
     }
 
+    @Test fun `REVERSE_TEXT round-trip`() {
+        val msg = MirrorMessage.ReverseText("Cześć Mac")
+        assertEquals(msg, MirrorMessage.decode(msg.encode()))
+    }
+
+    @Test fun `REVERSE_KEY round-trip`() {
+        val msg = MirrorMessage.ReverseKey(code = 36u, modifiers = 8u)
+        assertEquals(msg, MirrorMessage.decode(msg.encode()))
+    }
+
     @Test fun `VIDEO_CONFIG_HEVC round-trip`() {
         val vps = byteArrayOf(0x40, 0x01, 0x0C, 0x01)
         val sps = byteArrayOf(0x42, 0x01, 0x01, 0x01)

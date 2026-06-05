@@ -108,6 +108,12 @@ sealed class MirrorMessage {
     /** Reverse control: phone -> Mac scroll wheel (points). */
     data class ReverseScroll(val deltaX: Float, val deltaY: Float) : MirrorMessage()
 
+    /** Reverse keyboard: type a UTF-8 string. */
+    data class ReverseText(val text: String) : MirrorMessage()
+
+    /** Reverse keyboard: special key press. modifiers 1=shift 2=ctrl 4=alt 8=cmd. */
+    data class ReverseKey(val code: UShort, val modifiers: UByte) : MirrorMessage()
+
     companion object {
         private const val TYPE_HELLO: Byte = 0x01
         private const val TYPE_HELLO_ACK: Byte = 0x02
@@ -119,6 +125,8 @@ sealed class MirrorMessage {
         private const val TYPE_REVERSE_HELLO: Byte = 0x40
         private const val TYPE_REVERSE_INPUT: Byte = 0x41
         private const val TYPE_REVERSE_SCROLL: Byte = 0x42
+        private const val TYPE_REVERSE_TEXT: Byte = 0x43
+        private const val TYPE_REVERSE_KEY: Byte = 0x44
 
         fun decode(bytes: ByteArray): MirrorMessage {
             if (bytes.isEmpty()) throw MirrorMessageException("empty payload")
@@ -194,6 +202,15 @@ sealed class MirrorMessage {
                     if (buf.remaining() != 4 + 4) throw MirrorMessageException("REVERSE_SCROLL truncated")
                     ReverseScroll(buf.float, buf.float)
                 }
+                TYPE_REVERSE_TEXT -> {
+                    val textBytes = ByteArray(buf.remaining()); buf.get(textBytes)
+                    ReverseText(String(textBytes, Charsets.UTF_8))
+                }
+                TYPE_REVERSE_KEY -> {
+                    if (buf.remaining() != 2 + 1) throw MirrorMessageException("REVERSE_KEY truncated")
+                    val code = buf.short.toUShort()
+                    ReverseKey(code, buf.get().toUByte())
+                }
                 else -> throw MirrorMessageException("unknown type 0x${type.toUByte().toString(16)}")
             }
         }
@@ -221,5 +238,11 @@ sealed class MirrorMessage {
             .put(TYPE_REVERSE_INPUT).put(type.toByte()).putFloat(xNorm).putFloat(yNorm).array()
         is ReverseScroll -> ByteBuffer.allocate(1 + 4 + 4).order(ByteOrder.BIG_ENDIAN)
             .put(TYPE_REVERSE_SCROLL).putFloat(deltaX).putFloat(deltaY).array()
+        is ReverseText -> {
+            val t = text.toByteArray(Charsets.UTF_8)
+            ByteBuffer.allocate(1 + t.size).order(ByteOrder.BIG_ENDIAN).put(TYPE_REVERSE_TEXT).put(t).array()
+        }
+        is ReverseKey -> ByteBuffer.allocate(1 + 2 + 1).order(ByteOrder.BIG_ENDIAN)
+            .put(TYPE_REVERSE_KEY).putShort(code.toShort()).put(modifiers.toByte()).array()
     }
 }

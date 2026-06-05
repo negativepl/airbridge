@@ -311,6 +311,12 @@ public final class MirrorService {
                     ReverseInputInjector.injectScroll(deltaX: dx, deltaY: dy)
                 }
 
+            case let .reverseText(text):
+                if isReverseStreaming { ReverseInputInjector.injectText(text) }
+
+            case let .reverseKey(code, modifiers):
+                if isReverseStreaming { ReverseInputInjector.injectKey(code: code, modifiers: modifiers) }
+
             case let .reverseHello(token, w, h, mode):
                 MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
                 guard let expected = pairingTokenProvider(), token == expected else {
