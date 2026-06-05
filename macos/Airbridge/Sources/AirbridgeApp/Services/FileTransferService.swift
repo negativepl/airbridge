@@ -53,7 +53,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             handleFileChunk(transferId: transferId, chunkIndex: chunkIndex, data: data)
         case .fileTransferComplete(let transferId, let checksumSHA256):
             handleFileTransferComplete(transferId: transferId, checksum: checksumSHA256)
-        case .fileTransferOffer(let transferId, let filename, _, let fileSize):
+        case .fileTransferOffer(let transferId, let filename, _, let fileSize, _):
             handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize)
         case .fileTransferAccept:
             offerResponseStream?.yield(true)
@@ -232,7 +232,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             )
 
             // 3. Send offer
-            let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize)
+            let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize, destinationDir: nil)
             try? await connectionService.broadcast(offer)
 
             // 4. Wait for accept/reject (non-blocking for MainActor)
@@ -424,7 +424,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
     private func playReceiveSound() {
         guard UserDefaults.standard.bool(forKey: "playSound") else { return }
-        if let url = Bundle.module.url(forResource: "airdrop", withExtension: "mp3") {
+        if let url = AppResources.bundle.url(forResource: "airdrop", withExtension: "mp3") {
             let sound = NSSound(contentsOf: url, byReference: true)
             sound?.play()
         }

@@ -42,13 +42,18 @@ public enum Message: Equatable, Sendable {
     case galleryPreviewRequest(photoId: String, maxSize: Int)
     case galleryPreviewResponse(photoId: String, data: String)
     case galleryDownloadRequest(photoId: String)
+    case filesListRequest(path: String, page: Int, pageSize: Int)
+    case filesListResponse(path: String, entries: [FileEntry], totalCount: Int, page: Int, needsPermission: Bool)
+    case fileThumbnailRequest(path: String)
+    case fileThumbnailResponse(path: String, data: String)
+    case fileDownloadRequest(transferId: String, path: String)
     case smsConversationsRequest(page: Int, pageSize: Int)
     case smsConversationsResponse(conversations: [SmsConversationMeta], totalCount: Int, page: Int)
     case smsMessagesRequest(threadId: String, page: Int, pageSize: Int)
     case smsMessagesResponse(threadId: String, messages: [SmsMessageMeta], totalCount: Int, page: Int)
     case smsSendRequest(address: String, body: String)
     case smsSendResponse(success: Bool, error: String?)
-    case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64)
+    case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64, destinationDir: String?)
     case fileTransferAccept(transferId: String)
     case fileTransferReject(transferId: String)
     case mirrorStartRequest(token: String)
@@ -80,6 +85,35 @@ public struct GalleryPhotoMeta: Codable, Equatable, Identifiable, Sendable {
         self.width = width
         self.height = height
         self.size = size
+        self.mimeType = mimeType
+    }
+}
+
+// MARK: - FileEntry
+
+public struct FileEntry: Codable, Equatable, Identifiable, Sendable {
+    public let name: String
+    public let relativePath: String
+    public let isDirectory: Bool
+    public let size: Int64
+    public let modified: Int64   // epoch millis
+    public let mimeType: String
+
+    public var id: String { relativePath }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, size, modified
+        case relativePath = "relative_path"
+        case isDirectory  = "is_directory"
+        case mimeType     = "mime_type"
+    }
+
+    public init(name: String, relativePath: String, isDirectory: Bool, size: Int64, modified: Int64, mimeType: String) {
+        self.name = name
+        self.relativePath = relativePath
+        self.isDirectory = isDirectory
+        self.size = size
+        self.modified = modified
         self.mimeType = mimeType
     }
 }
@@ -165,6 +199,11 @@ extension Message: Codable {
         case galleryPreviewRequest    = "gallery_preview_request"
         case galleryPreviewResponse   = "gallery_preview_response"
         case galleryDownloadRequest   = "gallery_download_request"
+        case filesListRequest         = "files_list_request"
+        case filesListResponse        = "files_list_response"
+        case fileThumbnailRequest     = "file_thumbnail_request"
+        case fileThumbnailResponse    = "file_thumbnail_response"
+        case fileDownloadRequest      = "file_download_request"
         case smsConversationsRequest  = "sms_conversations_request"
         case smsConversationsResponse = "sms_conversations_response"
         case smsMessagesRequest       = "sms_messages_request"
@@ -213,6 +252,11 @@ extension Message: Codable {
         case error
         case fileSize           = "file_size"
         case token
+        case path
+        case entries
+        case isDirectory        = "is_directory"
+        case needsPermission    = "needs_permission"
+        case destinationDir     = "destination_dir"
     }
 
     // MARK: Encode
@@ -321,6 +365,34 @@ extension Message: Codable {
             try container.encode(TypeKey.galleryDownloadRequest.rawValue, forKey: .type)
             try container.encode(photoId, forKey: .photoId)
 
+        case .filesListRequest(let path, let page, let pageSize):
+            try container.encode(TypeKey.filesListRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(page, forKey: .page)
+            try container.encode(pageSize, forKey: .pageSize)
+
+        case .filesListResponse(let path, let entries, let totalCount, let page, let needsPermission):
+            try container.encode(TypeKey.filesListResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(entries, forKey: .entries)
+            try container.encode(totalCount, forKey: .totalCount)
+            try container.encode(page, forKey: .page)
+            try container.encode(needsPermission, forKey: .needsPermission)
+
+        case .fileThumbnailRequest(let path):
+            try container.encode(TypeKey.fileThumbnailRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+
+        case .fileThumbnailResponse(let path, let data):
+            try container.encode(TypeKey.fileThumbnailResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(data, forKey: .data)
+
+        case .fileDownloadRequest(let transferId, let path):
+            try container.encode(TypeKey.fileDownloadRequest.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
+            try container.encode(path, forKey: .path)
+
         case .smsConversationsRequest(let page, let pageSize):
             try container.encode(TypeKey.smsConversationsRequest.rawValue, forKey: .type)
             try container.encode(page, forKey: .page)
@@ -355,12 +427,13 @@ extension Message: Codable {
             try container.encode(success, forKey: .success)
             try container.encodeIfPresent(error, forKey: .error)
 
-        case .fileTransferOffer(let transferId, let filename, let mimeType, let fileSize):
+        case .fileTransferOffer(let transferId, let filename, let mimeType, let fileSize, let destinationDir):
             try container.encode(TypeKey.fileTransferOffer.rawValue, forKey: .type)
             try container.encode(transferId, forKey: .transferId)
             try container.encode(filename, forKey: .filename)
             try container.encode(mimeType, forKey: .mimeType)
             try container.encode(fileSize, forKey: .fileSize)
+            try container.encodeIfPresent(destinationDir, forKey: .destinationDir)
 
         case .fileTransferAccept(let transferId):
             try container.encode(TypeKey.fileTransferAccept.rawValue, forKey: .type)
@@ -502,6 +575,34 @@ extension Message: Codable {
             let photoId = try container.decode(String.self, forKey: .photoId)
             self = .galleryDownloadRequest(photoId: photoId)
 
+        case .filesListRequest:
+            let path = try container.decode(String.self, forKey: .path)
+            let page = try container.decode(Int.self, forKey: .page)
+            let pageSize = try container.decode(Int.self, forKey: .pageSize)
+            self = .filesListRequest(path: path, page: page, pageSize: pageSize)
+
+        case .filesListResponse:
+            let path = try container.decode(String.self, forKey: .path)
+            let entries = try container.decode([FileEntry].self, forKey: .entries)
+            let totalCount = try container.decode(Int.self, forKey: .totalCount)
+            let page = try container.decode(Int.self, forKey: .page)
+            let needsPermission = try container.decode(Bool.self, forKey: .needsPermission)
+            self = .filesListResponse(path: path, entries: entries, totalCount: totalCount, page: page, needsPermission: needsPermission)
+
+        case .fileThumbnailRequest:
+            let path = try container.decode(String.self, forKey: .path)
+            self = .fileThumbnailRequest(path: path)
+
+        case .fileThumbnailResponse:
+            let path = try container.decode(String.self, forKey: .path)
+            let data = try container.decode(String.self, forKey: .data)
+            self = .fileThumbnailResponse(path: path, data: data)
+
+        case .fileDownloadRequest:
+            let transferId = try container.decode(String.self, forKey: .transferId)
+            let path = try container.decode(String.self, forKey: .path)
+            self = .fileDownloadRequest(transferId: transferId, path: path)
+
         case .smsConversationsRequest:
             let page = try container.decode(Int.self, forKey: .page)
             let pageSize = try container.decode(Int.self, forKey: .pageSize)
@@ -541,7 +642,8 @@ extension Message: Codable {
             let filename = try container.decode(String.self, forKey: .filename)
             let mimeType = try container.decode(String.self, forKey: .mimeType)
             let fileSize = try container.decode(Int64.self, forKey: .fileSize)
-            self = .fileTransferOffer(transferId: transferId, filename: filename, mimeType: mimeType, fileSize: fileSize)
+            let destinationDir = try container.decodeIfPresent(String.self, forKey: .destinationDir)
+            self = .fileTransferOffer(transferId: transferId, filename: filename, mimeType: mimeType, fileSize: fileSize, destinationDir: destinationDir)
 
         case .fileTransferAccept:
             let transferId = try container.decode(String.self, forKey: .transferId)
