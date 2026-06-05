@@ -7,18 +7,24 @@ struct FilesBrowserView: View {
     let connectionService: ConnectionService
 
     var body: some View {
-        VStack(spacing: 0) {
-            breadcrumbBar
-            Divider()
-            content
-        }
-        .onAppear { filesBrowserService.open(path: "") }
-        .onChange(of: connectionService.isConnected) { _, connected in
-            if connected { filesBrowserService.open(path: "") }
-        }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            handleDrop(providers)
-        }
+        content
+            .onAppear { filesBrowserService.open(path: "") }
+            .onChange(of: connectionService.isConnected) { _, connected in
+                if connected { filesBrowserService.open(path: "") }
+            }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                handleDrop(providers)
+            }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    breadcrumbBar
+                }
+                if filesBrowserService.isLoading {
+                    ToolbarItem(placement: .automatic) {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
     }
 
     private var breadcrumbBar: some View {
@@ -36,11 +42,7 @@ struct FilesBrowserView: View {
                 }
                 .buttonStyle(.borderless)
             }
-            Spacer()
-            if filesBrowserService.isLoading { ProgressView().controlSize(.small) }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
     }
 
     @ViewBuilder
