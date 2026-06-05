@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import okio.ByteString.Companion.toByteString
 import java.io.File
 import java.util.UUID
 
@@ -515,97 +514,6 @@ class AirbridgeService : Service() {
         }
     }
 
-    /// Streams a phone file (resolved via FilesProvider / SAF) to the Mac
-    /// over the WebSocket using the binary-chunk framing the Mac's
-    /// FileTransferService.handleBinaryChunk expects:
-    ///   [36 bytes transferId ASCII][4 bytes chunkIndex big-endian][chunk data]
-    /// Sends FileTransferStart first (so the Mac creates a FileAssembler),
-    /// then the binary chunks, then FileTransferComplete. Used by the Files
-    /// Browser download (Mac pulls a file from the phone).
-    private fun sendFileToMac(transferId: String, relPath: String) {
-        if (!webSocketClient.isConnected) {
-            Log.w(TAG, "sendFileToMac: not connected")
-            return
-        }
-        val filename = relPath.substringAfterLast('/')
-        val size = filesProvider.fileSize(relPath)
-        if (size < 0) {
-            Log.e(TAG, "sendFileToMac: unknown size for $relPath")
-            return
-        }
-        val input = filesProvider.openInputStream(relPath)
-        if (input == null) {
-            Log.e(TAG, "sendFileToMac: cannot open $relPath")
-            return
-        }
-
-        val chunkSize = 65_536
-        val totalChunks = if (size == 0L) 1 else ((size + chunkSize - 1) / chunkSize).toInt()
-        val mime = android.webkit.MimeTypeMap.getSingleton()
-            .getMimeTypeFromExtension(filename.substringAfterLast('.', "").lowercase())
-            ?: "application/octet-stream"
-
-        try {
-            transferFileName.value = filename
-            transferIsSending.value = true
-            transferProgress.value = 0f
-
-            webSocketClient.send(
-                Message.FileTransferStart(
-                    sourceId = deviceId,
-                    transferId = transferId,
-                    filename = filename,
-                    mimeType = mime,
-                    totalSize = size,
-                    totalChunks = totalChunks
-                )
-            )
-
-            // transferId is a UUID string — exactly 36 ASCII bytes — matching
-            // the Mac's fixed 0..<36 slice in handleBinaryChunk.
-            val idBytes = transferId.toByteArray(Charsets.US_ASCII)
-            val buffer = ByteArray(chunkSize)
-            var chunkIndex = 0
-            input.use { stream ->
-                while (true) {
-                    var read = 0
-                    while (read < chunkSize) {
-                        val n = stream.read(buffer, read, chunkSize - read)
-                        if (n < 0) break
-                        read += n
-                    }
-                    if (read == 0) break
-
-                    val frame = ByteArray(idBytes.size + 4 + read)
-                    System.arraycopy(idBytes, 0, frame, 0, idBytes.size)
-                    val off = idBytes.size
-                    frame[off] = (chunkIndex ushr 24 and 0xFF).toByte()
-                    frame[off + 1] = (chunkIndex ushr 16 and 0xFF).toByte()
-                    frame[off + 2] = (chunkIndex ushr 8 and 0xFF).toByte()
-                    frame[off + 3] = (chunkIndex and 0xFF).toByte()
-                    System.arraycopy(buffer, 0, frame, off + 4, read)
-
-                    webSocketClient.sendBinary(frame.toByteString())
-                    chunkIndex++
-                    if (totalChunks > 0) {
-                        transferProgress.value = chunkIndex.toFloat() / totalChunks
-                    }
-
-                    if (read < chunkSize) break
-                }
-            }
-
-            webSocketClient.send(Message.FileTransferComplete(transferId, ""))
-            addActivity(ActivityItem("file_sent", filename, System.currentTimeMillis()))
-            Log.d(TAG, "sendFileToMac complete: $filename ($chunkIndex chunks)")
-        } catch (e: Exception) {
-            Log.e(TAG, "sendFileToMac failed for $relPath", e)
-        } finally {
-            transferProgress.value = null
-            transferFileName.value = null
-        }
-    }
-
     /// Build an ACTION_VIEW intent that asks the system to open the given
     /// file with whatever app the user has set for that MIME type. Returns
     /// null if the URI / MIME type can't be resolved, in which case the
@@ -949,7 +857,17 @@ class AirbridgeService : Service() {
             }
             is Message.FileDownloadRequest -> {
                 serviceScope.launch {
-                    sendFileToMac(message.transferId, message.path)
+                    val uri = filesProvider.fileUri(message.path)
+                    val host = connectedHost.value
+                    val port = httpPort.value
+                    if (uri != null && host != null) {
+                        httpFileUploader.upload(
+                            host = host,
+                            port = port,
+                            uri = uri,
+                            contentResolver = applicationContext.contentResolver
+                        ) { _, _ -> }
+                    }
                 }
             }
             is Message.SmsConversationsRequest -> {
