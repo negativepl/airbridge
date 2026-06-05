@@ -78,7 +78,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.content.Intent
 import com.airbridge.R
+import com.airbridge.files.SafTreeStore
 import kotlinx.coroutines.launch
 
 private val PillShape = RoundedCornerShape(50)
@@ -343,6 +345,8 @@ private fun PermissionsPage() {
     var smsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_SMS)) }
     var photosGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_MEDIA_IMAGES)) }
     var contactsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_CONTACTS)) }
+    val safStore = remember { SafTreeStore(context) }
+    var hasFilesGrant by remember { mutableStateOf(safStore.hasGrant()) }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsGranted = it }
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -350,8 +354,20 @@ private fun PermissionsPage() {
     }
     val photosLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { photosGranted = it }
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { contactsGranted = it }
+    val treeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            safStore.saveTreeUri(uri)
+            hasFilesGrant = true
+        }
+    }
 
-    val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted
+    val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
 
     Column(
         modifier = Modifier
@@ -441,6 +457,14 @@ private fun PermissionsPage() {
             why = stringResource(R.string.onboarding_perm_contacts_why),
             granted = contactsGranted,
             onRequest = { contactsLauncher.launch(android.Manifest.permission.READ_CONTACTS) }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        PermissionRow(
+            icon = Icons.AutoMirrored.Rounded.InsertDriveFile,
+            description = stringResource(R.string.onboarding_perm_files_desc),
+            why = stringResource(R.string.onboarding_perm_files_why),
+            granted = hasFilesGrant,
+            onRequest = { treeLauncher.launch(null) }
         )
 
         if (allGranted) {

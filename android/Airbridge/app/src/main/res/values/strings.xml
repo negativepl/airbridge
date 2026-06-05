@@ -30,6 +30,8 @@
     <string name="onboarding_perm_photos_why">To browse and download photos from your Mac. Photos are sent directly over your local network</string>
     <string name="onboarding_perm_contacts_desc">Contacts</string>
     <string name="onboarding_perm_contacts_why">To show contact names instead of phone numbers in the SMS view</string>
+    <string name="onboarding_perm_files_desc">Files</string>
+    <string name="onboarding_perm_files_why">To browse and transfer files from your Mac. Files are sent directly over your local network — nothing is uploaded to the cloud</string>
     <string name="onboarding_perm_allow_btn">Allow</string>
     <string name="onboarding_perm_all_granted">All permissions granted</string>
     <string name="onboarding_next">Next</string>
