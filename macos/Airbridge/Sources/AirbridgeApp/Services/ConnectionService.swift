@@ -55,17 +55,20 @@ final class ConnectionService {
     private var fileTransferHandler: MessageHandler?
     private var galleryHandler: MessageHandler?
     private var smsHandler: MessageHandler?
+    private var filesHandler: MessageHandler?
 
     func registerHandlers(
         clipboard: MessageHandler,
         fileTransfer: MessageHandler,
         gallery: MessageHandler,
-        sms: MessageHandler
+        sms: MessageHandler,
+        files: MessageHandler
     ) {
         self.clipboardHandler = clipboard
         self.fileTransferHandler = fileTransfer
         self.galleryHandler = gallery
         self.smsHandler = sms
+        self.filesHandler = files
     }
 
     // MARK: - Server Lifecycle
@@ -237,6 +240,8 @@ final class ConnectionService {
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
             smsHandler?.handleMessage(message)
+        case .filesListResponse, .fileThumbnailResponse:
+            filesHandler?.handleMessage(message)
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         default:

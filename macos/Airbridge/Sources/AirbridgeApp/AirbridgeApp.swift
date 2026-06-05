@@ -23,6 +23,7 @@ struct AirbridgeApp: App {
     @State private var historyService: HistoryService
     @State private var galleryService: GalleryService
     @State private var smsService: SmsService
+    @State private var filesBrowserService: FilesBrowserService
     @State private var hotkeyService: GlobalHotkeyService
     @State private var mirrorService: MirrorService
 
@@ -36,6 +37,7 @@ struct AirbridgeApp: App {
         let history = HistoryService()
         let gallery = GalleryService()
         let sms = SmsService()
+        let filesBrowser = FilesBrowserService()
         let hotkey = GlobalHotkeyService()
 
         let mirror = MirrorService(pairingTokenProvider: { [weak pairing] in pairing?.currentTokenData() })
@@ -45,9 +47,10 @@ struct AirbridgeApp: App {
         pairing.configure(connectionService: connection)
         gallery.configure(connectionService: connection)
         sms.configure(connectionService: connection)
+        filesBrowser.configure(connectionService: connection, fileTransferService: fileTransfer)
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
         TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
-        connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms)
+        connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms, files: filesBrowser)
         connection.mirrorService = mirror
         connection.pairingService = pairing
 
@@ -58,11 +61,14 @@ struct AirbridgeApp: App {
         _historyService = State(initialValue: history)
         _galleryService = State(initialValue: gallery)
         _smsService = State(initialValue: sms)
+        _filesBrowserService = State(initialValue: filesBrowser)
         _hotkeyService = State(initialValue: hotkey)
         _mirrorService = State(initialValue: mirror)
 
-        connection.startServer()
-        Task { try? await mirror.start() }
+        Task { @MainActor in
+            try? await mirror.start()
+            connection.startServer()
+        }
         clipboard.startMonitoring()
         // hotkey.start() is called from body .onAppear to avoid blocking init
 
@@ -87,6 +93,7 @@ struct AirbridgeApp: App {
                         historyService: historyService,
                         galleryService: galleryService,
                         smsService: smsService,
+                        filesBrowserService: filesBrowserService,
                         hotkeyService: hotkeyService
                     )
                     .onAppear { hotkeyService.start() }
@@ -146,8 +153,8 @@ struct AirbridgeApp: App {
         Window("AirBridge Mirror", id: "mirror") {
             MirrorWindow(mirrorService: mirrorService)
         }
-        .defaultSize(width: 540, height: 1170)
-        .windowResizability(.contentSize)
+        .defaultSize(width: 540, height: 900)
+        .windowResizability(.contentMinSize)
 
         MenuBarExtra {
             MenuBarView(connectionService: connectionService, clipboardService: clipboardService)

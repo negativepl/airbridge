@@ -31,7 +31,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     @ObservationIgnored private var transferStartTime: Date?
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private weak var historyService: HistoryService?
-    @ObservationIgnored private var sendQueue: [URL] = []
+    @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
     @ObservationIgnored private var isSendingFromQueue = false
     @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
 
@@ -138,8 +138,8 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
     // MARK: - Sending
 
-    func sendFile(url: URL) {
-        sendQueue.append(url)
+    func sendFile(url: URL, destinationDir: String? = nil) {
+        sendQueue.append((url, destinationDir))
         processQueue()
     }
 
@@ -155,11 +155,11 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     private func processQueue() {
         guard !isSendingFromQueue, !sendQueue.isEmpty else { return }
         isSendingFromQueue = true
-        let url = sendQueue.removeFirst()
-        sendSingleFile(url: url)
+        let item = sendQueue.removeFirst()
+        sendSingleFile(url: item.url, destinationDir: item.destinationDir)
     }
 
-    private func sendSingleFile(url: URL) {
+    private func sendSingleFile(url: URL, destinationDir: String?) {
         guard let connectionService else {
             isSendingFromQueue = false
             processQueue()
@@ -232,7 +232,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             )
 
             // 3. Send offer
-            let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize, destinationDir: nil)
+            let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize, destinationDir: destinationDir)
             try? await connectionService.broadcast(offer)
 
             // 4. Wait for accept/reject (non-blocking for MainActor)
