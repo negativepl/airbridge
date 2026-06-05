@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.os.IBinder
 import android.util.Log
 import com.airbridge.clipboard.ClipboardSync
@@ -485,13 +486,24 @@ class AirbridgeService : Service() {
         serviceScope.launch {
             try {
                 val mime = mimeType.ifBlank { "application/octet-stream" }
-                val out = filesProvider.createFile(destinationDir, filename, mime)
-                if (out == null) {
+                val created = filesProvider.createFile(destinationDir, filename, mime)
+                if (created == null) {
                     Log.e(TAG, "createFile failed for $destinationDir/$filename — falling back to Downloads")
                     finalizeReceivedFile(filename, tempFile)
                     return@launch
                 }
-                out.use { os -> tempFile.inputStream().use { it.copyTo(os) } }
+                val (newUri, out) = created
+                try {
+                    out.use { os -> tempFile.inputStream().use { it.copyTo(os) } }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Copy to SAF file failed, removing empty document $newUri", e)
+                    try { DocumentsContract.deleteDocument(contentResolver, newUri) } catch (de: Exception) {
+                        Log.w(TAG, "Could not delete empty document $newUri", de)
+                    }
+                    transferProgress.value = null
+                    transferFileName.value = null
+                    return@launch
+                }
                 tempFile.delete()
                 Log.d(TAG, "File received into SAF dir: $destinationDir/$filename")
                 addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))

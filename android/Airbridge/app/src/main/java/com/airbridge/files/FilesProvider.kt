@@ -18,6 +18,8 @@ class FilesProvider(
 ) {
     // relativePath -> documentId (cache nawigacji)
     private val docIdCache = mutableMapOf<String, String>()
+    // Tracks the tree URI the cache was built for; cleared when the SAF grant changes.
+    private var cachedTreeUri: String? = null
 
     fun hasGrant(): Boolean = store.hasGrant()
 
@@ -111,17 +113,26 @@ class FilesProvider(
         return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
     }
 
-    /** Tworzy plik w katalogu relDir i zwraca OutputStream do zapisu (upload). */
-    fun createFile(relDir: String, name: String, mimeType: String): OutputStream? {
+    /** Tworzy plik w katalogu relDir i zwraca (Uri, OutputStream) do zapisu (upload).
+     *  Caller receives the Uri so it can delete the document on write failure. */
+    fun createFile(relDir: String, name: String, mimeType: String): Pair<Uri, OutputStream>? {
         val treeUri = store.treeUri() ?: return null
         val parentDocId = resolveDocId(treeUri, relDir) ?: return null
         val parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocId)
         val newUri = DocumentsContract.createDocument(contentResolver, parentUri, mimeType, name) ?: return null
-        return contentResolver.openOutputStream(newUri)
+        val stream = contentResolver.openOutputStream(newUri) ?: return null
+        return Pair(newUri, stream)
     }
 
     /** Rozwiązuje relativePath na documentId, schodząc segment po segmencie. */
     private fun resolveDocId(treeUri: Uri, relPath: String): String? {
+        // Invalidate cache when the SAF grant (tree URI) has changed.
+        val treeUriStr = treeUri.toString()
+        if (treeUriStr != cachedTreeUri) {
+            docIdCache.clear()
+            cachedTreeUri = treeUriStr
+        }
+
         val rootId = DocumentsContract.getTreeDocumentId(treeUri)
         if (relPath.isEmpty()) return rootId
         docIdCache[relPath]?.let { return it }
