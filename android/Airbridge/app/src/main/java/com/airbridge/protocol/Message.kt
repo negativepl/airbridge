@@ -515,6 +515,19 @@ sealed class Message {
         }.toString()
     }
 
+    /** Mac -> phone: "show MY screen on your phone" (reverse mirror).
+     *  mode: 0 = mirror Mac main display, 1 = virtual display shaped to phone. */
+    data class ReverseMirrorStart(
+        val token: String,
+        val mode: Int
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "reverse_mirror_start")
+            put("token", token)
+            put("mode", mode)
+        }.toString()
+    }
+
     data class MirrorError(
         val reason: String
     ) : Message() {
@@ -778,6 +791,10 @@ sealed class Message {
                     token = obj.getString("token")
                 )
                 "mirror_stop" -> MirrorStop
+                "reverse_mirror_start" -> ReverseMirrorStart(
+                    token = obj.getString("token"),
+                    mode = if (obj.has("mode")) obj.getInt("mode") else 0
+                )
                 "mirror_error" -> MirrorError(
                     reason = obj.getString("reason")
                 )

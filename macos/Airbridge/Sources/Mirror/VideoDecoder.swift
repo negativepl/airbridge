@@ -42,7 +42,16 @@ public final class VideoDecoder: @unchecked Sendable {
 
     @discardableResult
     public func configure(sps: Data, pps: Data) throws -> CMVideoDimensions {
-        let fmt = try Self.makeFormatDescription(sps: sps, pps: pps)
+        return try configure(formatDescription: try Self.makeFormatDescription(sps: sps, pps: pps))
+    }
+
+    @discardableResult
+    public func configureHEVC(vps: Data, sps: Data, pps: Data) throws -> CMVideoDimensions {
+        return try configure(formatDescription: try Self.makeFormatDescriptionHEVC(vps: vps, sps: sps, pps: pps))
+    }
+
+    @discardableResult
+    private func configure(formatDescription fmt: CMVideoFormatDescription) throws -> CMVideoDimensions {
         self.formatDescription = fmt
         // Use PRESENTATION dimensions (clean aperture + pixel aspect), not the
         // raw coded size. H.264 pads to 16px macroblocks, so the coded size can
@@ -127,6 +136,33 @@ public final class VideoDecoder: @unchecked Sendable {
                     nalUnitHeaderLength: 4,
                     formatDescriptionOut: &formatDesc
                 )
+            }
+        }
+        guard status == noErr, let formatDesc else { throw VideoDecoderError.formatDescriptionFailed(status) }
+        return formatDesc
+    }
+
+    public static func makeFormatDescriptionHEVC(vps: Data, sps: Data, pps: Data) throws -> CMVideoFormatDescription {
+        guard !vps.isEmpty, !sps.isEmpty, !pps.isEmpty else { throw VideoDecoderError.emptyParameterSet }
+        var formatDesc: CMVideoFormatDescription?
+        let vpsBytes = [UInt8](vps)
+        let spsBytes = [UInt8](sps)
+        let ppsBytes = [UInt8](pps)
+        let sizes = [vpsBytes.count, spsBytes.count, ppsBytes.count]
+        let status: OSStatus = vpsBytes.withUnsafeBufferPointer { vpsBuf in
+            spsBytes.withUnsafeBufferPointer { spsBuf in
+                ppsBytes.withUnsafeBufferPointer { ppsBuf in
+                    var ptrs: [UnsafePointer<UInt8>] = [vpsBuf.baseAddress!, spsBuf.baseAddress!, ppsBuf.baseAddress!]
+                    return CMVideoFormatDescriptionCreateFromHEVCParameterSets(
+                        allocator: kCFAllocatorDefault,
+                        parameterSetCount: 3,
+                        parameterSetPointers: &ptrs,
+                        parameterSetSizes: sizes,
+                        nalUnitHeaderLength: 4,
+                        extensions: nil,
+                        formatDescriptionOut: &formatDesc
+                    )
+                }
             }
         }
         guard status == noErr, let formatDesc else { throw VideoDecoderError.formatDescriptionFailed(status) }

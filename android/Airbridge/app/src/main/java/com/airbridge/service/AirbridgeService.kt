@@ -943,6 +943,24 @@ class AirbridgeService : Service() {
                 startActivity(intent)
                 Log.d(TAG, "MirrorStartRequest: launched MirrorActivity → $host:$mirrorPort")
             }
+            is Message.ReverseMirrorStart -> {
+                val host = connectedHost.value
+                val mirrorPort = currentMirrorPort
+                if (host == null || mirrorPort == null) {
+                    Log.w(TAG, "ReverseMirrorStart received but host=$host mirrorPort=$mirrorPort — ignoring")
+                    return
+                }
+                val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
+                val intent = Intent(this, com.airbridge.mirror.ReverseMirrorActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_HOST, host)
+                    putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_PORT, mirrorPort)
+                    putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_TOKEN, tokenBytes)
+                    putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_MODE, message.mode)
+                }
+                startActivity(intent)
+                Log.d(TAG, "ReverseMirrorStart: launched ReverseMirrorActivity → $host:$mirrorPort mode=${message.mode}")
+            }
             is Message.MirrorStop -> {
                 val intent = Intent(this, com.airbridge.mirror.MirrorService::class.java).apply {
                     action = com.airbridge.mirror.MirrorService.ACTION_STOP

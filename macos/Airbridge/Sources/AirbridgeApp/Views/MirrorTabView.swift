@@ -86,88 +86,134 @@ struct MirrorTabView: View {
     private var startView: some View {
         ScrollView {
             VStack(spacing: 16) {
-                GlassSection {
-                    HStack(spacing: 14) {
-                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                            .font(.system(size: 26))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 36, height: 36)
-                            .symbolEffect(.pulse, options: .repeating)
+                mirrorOptionCard(
+                    slot: .forward,
+                    icon: "iphone.gen3.radiowaves.left.and.right",
+                    title: L10n.isPL ? "Mirror telefonu" : "Mirror Phone",
+                    subtitle: L10n.isPL
+                        ? "Udostępnij ekran telefonu i steruj nim klikając."
+                        : "Mirror your phone screen and control it by clicking.",
+                    showResolution: true,
+                    action: { start() }
+                )
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(L10n.isPL ? "Mirror telefonu" : "Mirror Phone")
-                                .font(.ab(.headline, weight: .semibold))
-                            Text(L10n.isPL
-                                ? "Udostępnij ekran telefonu i steruj nim klikając."
-                                : "Mirror your phone screen and control it by clicking.")
-                                .font(.ab(.subheadline))
-                                .foregroundStyle(.secondary)
-                        }
+                mirrorOptionCard(
+                    slot: .reverseMirror,
+                    icon: "macbook.and.iphone",
+                    title: L10n.isPL ? "Mój ekran na telefonie" : "My Screen on Phone",
+                    subtitle: L10n.isPL
+                        ? "Lustro głównego ekranu Maca."
+                        : "Mirror this Mac's main screen.",
+                    showResolution: false,
+                    action: { startReverse(mode: 0) }
+                )
 
-                        Spacer()
+                mirrorOptionCard(
+                    slot: .reverseVirtual,
+                    icon: "rectangle.portrait.on.rectangle.portrait.angled",
+                    title: L10n.isPL ? "Telefon jako drugi monitor" : "Phone as Second Display",
+                    subtitle: L10n.isPL
+                        ? "Dodatkowy pulpit dopasowany do ekranu telefonu — pełny ekran, bez pasów."
+                        : "An extra desktop shaped to the phone — full screen, no bars.",
+                    showUIScale: true,
+                    action: { startReverse(mode: 1) }
+                )
 
-                        Button(L10n.isPL ? "Rozpocznij" : "Start") { start() }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.extraLarge)
-                    }
-                }
-
-                settingsSection
+                Text(L10n.isPL
+                    ? "Ustawienia działają od następnego startu danego trybu. Niżej = gładziej i mniejsze opóźnienie; wyżej = ostrzej."
+                    : "Settings apply on the next start of each mode. Lower = smoother and lower latency; higher = sharper.")
+                    .font(.ab(.footnote))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
-    private var fpsBinding: Binding<Int> {
-        Binding(get: { mirrorService.requestedFramesPerSecond },
-                set: { mirrorService.requestedFramesPerSecond = $0 })
-    }
-    /// 0 = Auto; otherwise the manual bitrate in bps.
-    private var bitrateBinding: Binding<Int> {
-        Binding(
-            get: { mirrorService.bitrateAuto ? 0 : mirrorService.requestedBitrateBps },
-            set: { newVal in
-                if newVal == 0 {
-                    mirrorService.bitrateAuto = true
-                } else {
-                    mirrorService.bitrateAuto = false
-                    mirrorService.requestedBitrateBps = newVal
+    /// One launch option in the Mirror tab — icon, CTA, and its own quality
+    /// settings (each mode keeps independent settings).
+    private func mirrorOptionCard(
+        slot: MirrorSlot,
+        icon: String,
+        title: String,
+        subtitle: String,
+        showResolution: Bool = false,
+        showUIScale: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        GlassSection {
+            VStack(spacing: 14) {
+                HStack(spacing: 14) {
+                    Image(systemName: icon)
+                        .font(.system(size: 26))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 36, height: 36)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.ab(.headline, weight: .semibold))
+                        Text(subtitle)
+                            .font(.ab(.subheadline))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Button(L10n.isPL ? "Rozpocznij" : "Start", action: action)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.extraLarge)
                 }
+
+                Divider().opacity(0.4)
+
+                qualityControls(slot: slot, showResolution: showResolution, showUIScale: showUIScale)
             }
-        )
-    }
-    private var scaleBinding: Binding<Double> {
-        Binding(get: { mirrorService.resolutionScale },
-                set: { mirrorService.resolutionScale = $0 })
+        }
     }
 
-    private var settingsSection: some View {
-        GlassSection(
-            title: LocalizedStringKey(L10n.isPL ? "Ustawienia udostępniania" : "Sharing settings"),
-            systemImage: "slider.horizontal.3"
-        ) {
+    @ViewBuilder
+    private func qualityControls(slot: MirrorSlot, showResolution: Bool, showUIScale: Bool) -> some View {
+        VStack(spacing: 10) {
             settingRow(L10n.isPL ? "Klatki" : "Frame rate") {
-                Picker("", selection: fpsBinding) {
+                Picker("", selection: fpsBinding(slot)) {
                     Text("30 FPS").tag(30)
                     Text("60 FPS").tag(60)
                     Text("120 FPS").tag(120)
                 }
                 .pickerStyle(.segmented)
+                .fixedSize()
             }
 
-            settingRow(L10n.isPL ? "Rozdzielczość" : "Resolution") {
-                Picker("", selection: scaleBinding) {
-                    Text(L10n.isPL ? "Pełna" : "Full").tag(1.0)
-                    Text("75%").tag(0.75)
-                    Text("50%").tag(0.5)
+            if showResolution {
+                settingRow(L10n.isPL ? "Rozdzielczość" : "Resolution") {
+                    Picker("", selection: scaleBinding(slot)) {
+                        Text(L10n.isPL ? "Pełna" : "Full").tag(1.0)
+                        Text("75%").tag(0.75)
+                        Text("50%").tag(0.5)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
+            }
+
+            if showUIScale {
+                settingRow(L10n.isPL ? "Skala UI" : "UI scale") {
+                    Picker("", selection: scaleBinding(slot)) {
+                        Text(L10n.isPL ? "Większe UI" : "Bigger UI").tag(0.8)
+                        Text(L10n.isPL ? "Standard" : "Standard").tag(1.0)
+                        Text(L10n.isPL ? "Więcej miejsca" : "More space").tag(1.4)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
             }
 
             settingRow("Bitrate") {
-                Picker("", selection: bitrateBinding) {
-                    Text(L10n.isPL ? "Auto" : "Auto").tag(0)
+                Picker("", selection: bitrateBinding(slot)) {
+                    Text("Auto").tag(0)
                     Text("8 Mbps").tag(8_000_000)
                     Text("12 Mbps").tag(12_000_000)
                     Text("20 Mbps").tag(20_000_000)
@@ -178,17 +224,45 @@ struct MirrorTabView: View {
                 .fixedSize()
             }
 
-            if mirrorService.isStreaming {
-                infoRow(L10n.isPL ? "Aktualnie" : "Current",
-                        "\(mirrorService.targetStreamWidth) × \(mirrorService.targetStreamHeight)")
+            settingRow(L10n.isPL ? "HEVC (H.265)" : "HEVC (H.265)") {
+                Toggle("", isOn: hevcBinding(slot))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
             }
-
-            Text(L10n.isPL
-                ? "Zmiany działają od następnego startu mirrora. Niższa rozdzielczość/bitrate = gładziej i mniej latencji; wyższe = ostrzej."
-                : "Changes apply on the next mirror start. Lower resolution/bitrate = smoother and lower latency; higher = sharper.")
-                .font(.ab(.footnote))
-                .foregroundStyle(.tertiary)
         }
+    }
+
+    // MARK: - Per-slot quality bindings
+
+    private func fpsBinding(_ slot: MirrorSlot) -> Binding<Int> {
+        Binding(
+            get: { mirrorService.quality(slot).fps },
+            set: { var q = mirrorService.quality(slot); q.fps = $0; mirrorService.setQuality(slot, q) }
+        )
+    }
+    /// 0 = Auto; otherwise the manual bitrate in bps.
+    private func bitrateBinding(_ slot: MirrorSlot) -> Binding<Int> {
+        Binding(
+            get: { let q = mirrorService.quality(slot); return q.bitrateAuto ? 0 : q.bitrateBps },
+            set: { newVal in
+                var q = mirrorService.quality(slot)
+                if newVal == 0 { q.bitrateAuto = true }
+                else { q.bitrateAuto = false; q.bitrateBps = newVal }
+                mirrorService.setQuality(slot, q)
+            }
+        )
+    }
+    private func scaleBinding(_ slot: MirrorSlot) -> Binding<Double> {
+        Binding(
+            get: { mirrorService.quality(slot).resolutionScale },
+            set: { var q = mirrorService.quality(slot); q.resolutionScale = $0; mirrorService.setQuality(slot, q) }
+        )
+    }
+    private func hevcBinding(_ slot: MirrorSlot) -> Binding<Bool> {
+        Binding(
+            get: { mirrorService.quality(slot).useHEVC },
+            set: { var q = mirrorService.quality(slot); q.useHEVC = $0; mirrorService.setQuality(slot, q) }
+        )
     }
 
     private func settingRow<Control: View>(_ label: String, @ViewBuilder _ control: () -> Control) -> some View {
@@ -212,6 +286,11 @@ struct MirrorTabView: View {
     private func start() {
         guard let token = connectionService.currentPairingTokenString() else { return }
         Task { try? await connectionService.broadcast(.mirrorStartRequest(token: token)) }
+    }
+
+    private func startReverse(mode: Int) {
+        guard let token = connectionService.currentPairingTokenString() else { return }
+        Task { try? await connectionService.broadcast(.reverseMirrorStart(token: token, mode: mode)) }
     }
 
     // MARK: - Tap mapping (letterboxed aspect-fit, normalized 0..1)

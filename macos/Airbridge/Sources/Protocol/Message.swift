@@ -57,6 +57,9 @@ public enum Message: Equatable, Sendable {
     case fileTransferAccept(transferId: String)
     case fileTransferReject(transferId: String)
     case mirrorStartRequest(token: String)
+    /// Mac -> phone: "show MY screen on your phone" (reverse mirror).
+    /// mode: 0 = mirror Mac's main display, 1 = virtual display shaped to phone.
+    case reverseMirrorStart(token: String, mode: Int)
     case mirrorStop
     case mirrorError(reason: String)
     case deviceInfoRequest
@@ -257,6 +260,7 @@ extension Message: Codable {
         case fileTransferAccept       = "file_transfer_accept"
         case fileTransferReject       = "file_transfer_reject"
         case mirrorStartRequest       = "mirror_start_request"
+        case reverseMirrorStart       = "reverse_mirror_start"
         case mirrorStop               = "mirror_stop"
         case mirrorError              = "mirror_error"
         case deviceInfoRequest        = "device_info_request"
@@ -307,6 +311,7 @@ extension Message: Codable {
         case info
         case dirCount           = "dir_count"
         case fileCount          = "file_count"
+        case mode
     }
 
     // MARK: Encode
@@ -496,6 +501,11 @@ extension Message: Codable {
         case let .mirrorStartRequest(token):
             try container.encode(TypeKey.mirrorStartRequest.rawValue, forKey: .type)
             try container.encode(token, forKey: .token)
+
+        case let .reverseMirrorStart(token, mode):
+            try container.encode(TypeKey.reverseMirrorStart.rawValue, forKey: .type)
+            try container.encode(token, forKey: .token)
+            try container.encode(mode, forKey: .mode)
 
         case .mirrorStop:
             try container.encode(TypeKey.mirrorStop.rawValue, forKey: .type)
@@ -724,6 +734,11 @@ extension Message: Codable {
         case .mirrorStartRequest:
             let token = try container.decode(String.self, forKey: .token)
             self = .mirrorStartRequest(token: token)
+
+        case .reverseMirrorStart:
+            let token = try container.decode(String.self, forKey: .token)
+            let mode = try container.decodeIfPresent(Int.self, forKey: .mode) ?? 0
+            self = .reverseMirrorStart(token: token, mode: mode)
 
         case .mirrorStop:
             self = .mirrorStop

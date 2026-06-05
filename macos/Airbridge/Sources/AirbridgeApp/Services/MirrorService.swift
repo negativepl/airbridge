@@ -3,7 +3,31 @@ import Network
 import Networking
 import Mirror
 import CoreMedia
+import CoreGraphics
 import Observation
+
+/// Per-mode mirror quality. Each mirror mode keeps its own settings.
+public struct MirrorQuality: Sendable, Equatable {
+    public var fps: Int
+    public var bitrateBps: Int
+    public var bitrateAuto: Bool
+    /// Only meaningful for the forward (phone -> Mac) mode.
+    public var resolutionScale: Double
+    /// H.265/HEVC instead of H.264 — better quality per bit, lower latency.
+    public var useHEVC: Bool
+    public init(fps: Int, bitrateBps: Int, bitrateAuto: Bool, resolutionScale: Double, useHEVC: Bool = false) {
+        self.fps = fps; self.bitrateBps = bitrateBps
+        self.bitrateAuto = bitrateAuto; self.resolutionScale = resolutionScale
+        self.useHEVC = useHEVC
+    }
+}
+
+/// The three independent mirror modes, each with its own `MirrorQuality`.
+public enum MirrorSlot: Int, CaseIterable, Sendable {
+    case forward = 0         // phone -> Mac
+    case reverseMirror = 1   // Mac main screen -> phone
+    case reverseVirtual = 2  // virtual display -> phone
+}
 
 private enum MirrorDebugLog {
     static let url = URL(fileURLWithPath: "/tmp/airbridge-mirror.log")
@@ -31,10 +55,11 @@ private struct UncheckedSampleBuffer: @unchecked Sendable {
 
 @Observable @MainActor
 public final class MirrorService {
-    public static let requestedFramesPerSecond: Int = 120
-    public static let requestedBitrateBps: Int = 20_000_000
+    static let defaultQuality = MirrorQuality(fps: 60, bitrateBps: 20_000_000, bitrateAuto: true, resolutionScale: 1.0)
 
     public private(set) var isStreaming: Bool = false
+    /// True while we're sending OUR screen to the phone (reverse mirror).
+    public private(set) var isReverseStreaming: Bool = false
     /// True while the standalone Mirror window is showing the stream. The tab
     /// must not render simultaneously — the frame stream has a single consumer,
     /// so two renderers would split frames. The tab shows a placeholder instead.
@@ -51,29 +76,43 @@ public final class MirrorService {
     public static let bitrateAutoKey = "mirrorBitrateAuto"
     public static let resolutionScaleKey = "mirrorResolutionScale"
 
-    /// User-tunable, persisted. Applied to the encoder on the NEXT mirror start
-    /// (sent in HELLO_ACK), not mid-stream.
-    public var requestedFramesPerSecond: Int = MirrorService.requestedFramesPerSecond {
-        didSet { UserDefaults.standard.set(requestedFramesPerSecond, forKey: Self.fpsKey) }
+    /// Per-mode quality, persisted. Applied on the NEXT start of that mode
+    /// (HELLO_ACK / reverse pipeline), not mid-stream.
+    public private(set) var quality: [Int: MirrorQuality] = [:]
+
+    public func quality(_ slot: MirrorSlot) -> MirrorQuality {
+        quality[slot.rawValue] ?? Self.defaultQuality
     }
-    public var requestedBitrateBps: Int = MirrorService.requestedBitrateBps {
-        didSet { UserDefaults.standard.set(requestedBitrateBps, forKey: Self.bitrateKey) }
-    }
-    /// When true, bitrate is derived from resolution × fps instead of the manual value.
-    public var bitrateAuto: Bool = true {
-        didSet { UserDefaults.standard.set(bitrateAuto, forKey: Self.bitrateAutoKey) }
-    }
-    /// 1.0 = native phone resolution, 0.75 / 0.5 downscale for smoothness.
-    public var resolutionScale: Double = 1.0 {
-        didSet { UserDefaults.standard.set(resolutionScale, forKey: Self.resolutionScaleKey) }
+    public func setQuality(_ slot: MirrorSlot, _ q: MirrorQuality) {
+        quality[slot.rawValue] = q
+        Self.persist(slot, q)
     }
 
-    /// Bitrate actually sent to the phone: auto (derived) or the manual value.
-    public func effectiveBitrateBps(width: Int, height: Int) -> Int {
-        guard bitrateAuto else { return requestedBitrateBps }
-        // ~0.07 bits/pixel/frame for screen content, clamped to a sane range.
-        let bpp = 0.07
-        let raw = Double(width) * Double(height) * Double(requestedFramesPerSecond) * bpp
+    private static func persist(_ slot: MirrorSlot, _ q: MirrorQuality) {
+        let d = UserDefaults.standard, p = "mirrorQ.\(slot.rawValue)."
+        d.set(q.fps, forKey: p + "fps")
+        d.set(q.bitrateBps, forKey: p + "bitrate")
+        d.set(q.bitrateAuto, forKey: p + "auto")
+        d.set(q.resolutionScale, forKey: p + "scale")
+        d.set(q.useHEVC, forKey: p + "hevc")
+    }
+    private static func load(_ slot: MirrorSlot) -> MirrorQuality? {
+        let d = UserDefaults.standard, p = "mirrorQ.\(slot.rawValue)."
+        guard d.object(forKey: p + "fps") != nil else { return nil }
+        return MirrorQuality(
+            fps: d.integer(forKey: p + "fps"),
+            bitrateBps: d.integer(forKey: p + "bitrate"),
+            bitrateAuto: d.bool(forKey: p + "auto"),
+            resolutionScale: d.double(forKey: p + "scale"),
+            useHEVC: d.bool(forKey: p + "hevc")
+        )
+    }
+
+    /// Bitrate actually sent: auto (derived from size × fps) or the manual value.
+    public func effectiveBitrateBps(width: Int, height: Int, quality q: MirrorQuality) -> Int {
+        guard q.bitrateAuto else { return q.bitrateBps }
+        let bpp = 0.07   // ~bits/pixel/frame for screen content
+        let raw = Double(width) * Double(height) * Double(q.fps) * bpp
         return min(35_000_000, max(6_000_000, Int(raw)))
     }
     public private(set) var decodedFramesPerSecond: Double = 0
@@ -93,6 +132,9 @@ public final class MirrorService {
     private let server: WebSocketServer
     private var pairingTokenProvider: () -> Data?
     private var decoder: VideoDecoder?
+    // Reverse mirror (Mac -> phone)
+    private var reversePipeline: ReverseMirrorPipeline?
+    private var reverseSendCont: AsyncStream<Data>.Continuation?
     private var frameCounter = 0
     private var bitrateWindowStartedAt = Date()
     private var bitrateByteCount = 0
@@ -103,18 +145,22 @@ public final class MirrorService {
         self.pairingTokenProvider = pairingTokenProvider
         self.server = WebSocketServer(port: port)
 
-        if let fps = UserDefaults.standard.object(forKey: Self.fpsKey) as? Int {
-            self.requestedFramesPerSecond = fps
+        // Load per-mode quality, migrating legacy single-setting keys into the
+        // forward slot on first run. Built into a local first (self isn't fully
+        // initialized until the streams below are set).
+        let d = UserDefaults.standard
+        let legacyForward = MirrorQuality(
+            fps: (d.object(forKey: Self.fpsKey) as? Int) ?? Self.defaultQuality.fps,
+            bitrateBps: (d.object(forKey: Self.bitrateKey) as? Int) ?? Self.defaultQuality.bitrateBps,
+            bitrateAuto: (d.object(forKey: Self.bitrateAutoKey) as? Bool) ?? Self.defaultQuality.bitrateAuto,
+            resolutionScale: (d.object(forKey: Self.resolutionScaleKey) as? Double) ?? Self.defaultQuality.resolutionScale
+        )
+        var loadedQuality: [Int: MirrorQuality] = [:]
+        for slot in MirrorSlot.allCases {
+            let fallback = (slot == .forward) ? legacyForward : Self.defaultQuality
+            loadedQuality[slot.rawValue] = Self.load(slot) ?? fallback
         }
-        if let br = UserDefaults.standard.object(forKey: Self.bitrateKey) as? Int {
-            self.requestedBitrateBps = br
-        }
-        if let auto = UserDefaults.standard.object(forKey: Self.bitrateAutoKey) as? Bool {
-            self.bitrateAuto = auto
-        }
-        if let scale = UserDefaults.standard.object(forKey: Self.resolutionScaleKey) as? Double {
-            self.resolutionScale = scale
-        }
+        self.quality = loadedQuality
 
         // Build the inner stream that can safely cross concurrency boundaries.
         var cont: AsyncStream<UncheckedSampleBuffer>.Continuation!
@@ -156,6 +202,7 @@ public final class MirrorService {
 
     public func stop() async {
         await server.disconnectAllClients()
+        stopReverseMirror()
         actualPort = nil
         isStreaming = false
         decoder = nil
@@ -171,6 +218,23 @@ public final class MirrorService {
         MirrorDebugLog.write("mirror server stopped")
     }
 
+    /// A VideoDecoder wired to the forward (phone -> Mac) sample pipeline. Codec
+    /// is selected by which configure(...) the caller invokes.
+    private func makeForwardDecoder() -> VideoDecoder {
+        VideoDecoder { [weak self] sample in
+            let box = UncheckedSampleBuffer(value: sample)
+            Task { @MainActor in
+                guard let self else { return }
+                self.frameCounter += 1
+                self.updateDecodedFPS()
+                if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 60) {
+                    MirrorDebugLog.write("decoded sample #\(self.frameCounter)")
+                }
+                self._continuation.yield(box)
+            }
+        }
+    }
+
     private func handleBinaryFrame(_ data: Data) {
         do {
             let msg = try MirrorMessage.decode(data)
@@ -184,37 +248,37 @@ public final class MirrorService {
                 }
                 remoteScreenWidth = CGFloat(screenWidth)
                 remoteScreenHeight = CGFloat(screenHeight)
-                let target = nativeStreamSize(for: CGSize(width: remoteScreenWidth, height: remoteScreenHeight))
+                let q = quality(.forward)
+                let target = nativeStreamSize(for: CGSize(width: remoteScreenWidth, height: remoteScreenHeight), scale: q.resolutionScale)
                 targetStreamWidth = Int(target.width)
                 targetStreamHeight = Int(target.height)
                 let ack = MirrorMessage.helloAck(
-                    targetBitrateBps: UInt32(effectiveBitrateBps(width: targetStreamWidth, height: targetStreamHeight)),
-                    fps: UInt8(requestedFramesPerSecond),
+                    targetBitrateBps: UInt32(effectiveBitrateBps(width: targetStreamWidth, height: targetStreamHeight, quality: q)),
+                    fps: UInt8(q.fps),
                     keyframeIntervalSeconds: 5,
                     targetWidth: UInt32(targetStreamWidth),
-                    targetHeight: UInt32(targetStreamHeight)
+                    targetHeight: UInt32(targetStreamHeight),
+                    codec: q.useHEVC ? 1 : 0
                 )
                 bitrateWindowStartedAt = Date()
                 bitrateByteCount = 0
                 fpsWindowStartedAt = Date()
                 fpsFrameCount = 0
-                MirrorDebugLog.write("sending HELLO_ACK bitrate=\(requestedBitrateBps) fps=\(requestedFramesPerSecond) size=\(targetStreamWidth)x\(targetStreamHeight) aspect=\(remoteScreenWidth)x\(remoteScreenHeight)")
+                MirrorDebugLog.write("sending HELLO_ACK fps=\(q.fps) size=\(targetStreamWidth)x\(targetStreamHeight) aspect=\(remoteScreenWidth)x\(remoteScreenHeight)")
                 Task { try? await server.broadcastBinary(ack.encode()) }
             case let .videoConfig(sps, pps):
-                MirrorDebugLog.write("received VIDEO_CONFIG sps=\(sps.count) pps=\(pps.count)")
-                let dec = VideoDecoder { [weak self] sample in
-                    let box = UncheckedSampleBuffer(value: sample)
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.frameCounter += 1
-                        self.updateDecodedFPS()
-                        if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 60) {
-                            MirrorDebugLog.write("decoded sample #\(self.frameCounter)")
-                        }
-                        self._continuation.yield(box)
-                    }
-                }
+                MirrorDebugLog.write("received VIDEO_CONFIG H264 sps=\(sps.count) pps=\(pps.count)")
+                let dec = makeForwardDecoder()
                 let dims = try dec.configure(sps: sps, pps: pps)
+                videoWidth = CGFloat(dims.width)
+                videoHeight = CGFloat(dims.height)
+                self.decoder = dec
+                self.isStreaming = true
+
+            case let .videoConfigHEVC(vps, sps, pps):
+                MirrorDebugLog.write("received VIDEO_CONFIG HEVC vps=\(vps.count) sps=\(sps.count) pps=\(pps.count)")
+                let dec = makeForwardDecoder()
+                let dims = try dec.configureHEVC(vps: vps, sps: sps, pps: pps)
                 videoWidth = CGFloat(dims.width)
                 videoHeight = CGFloat(dims.height)
                 self.decoder = dec
@@ -234,6 +298,15 @@ public final class MirrorService {
             case .inputTap:
                 break
 
+            case let .reverseHello(token, w, h, mode):
+                MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
+                guard let expected = pairingTokenProvider(), token == expected else {
+                    MirrorDebugLog.write("REVERSE_HELLO rejected")
+                    Task { await server.disconnectAllClients() }
+                    return
+                }
+                startReverseMirror(mode: mode, phoneWidth: Int(w), phoneHeight: Int(h))
+
             case .status, .helloAck:
                 // Status logging is in Plan B; HELLO_ACK is server→client only — ignore if received.
                 break
@@ -244,6 +317,7 @@ public final class MirrorService {
     }
 
     private func handleDisconnect() {
+        stopReverseMirror()
         isStreaming = false
         decoder = nil
         frameCounter = 0
@@ -266,8 +340,80 @@ public final class MirrorService {
         }
     }
 
-    private func nativeStreamSize(for remoteSize: CGSize) -> CGSize {
-        let scale = max(0.25, min(1.0, resolutionScale))
+    // MARK: - Reverse mirror (Mac -> phone)
+
+    /// Phone asked us to send our screen. Spin up capture+encode and pump the
+    /// resulting packets through a single ordered queue so frames stay in order.
+    private func startReverseMirror(mode: UInt8 = 0, phoneWidth: Int = 0, phoneHeight: Int = 0) {
+        guard reversePipeline == nil else { return }
+        let (stream, cont) = AsyncStream<Data>.makeStream(bufferingPolicy: .unbounded)
+        reverseSendCont = cont
+        let server = self.server
+        Task {
+            for await packet in stream {
+                try? await server.broadcastBinary(packet)
+            }
+        }
+        let slot: MirrorSlot = (mode == 1) ? .reverseVirtual : .reverseMirror
+        let q = quality(slot)
+        // UI scale: backing (and thus the "looks like" logical size) scales with
+        // resolutionScale. >1 = more desktop space (supersampled, sharp), <1 =
+        // bigger UI (slightly upscaled on the phone).
+        let virtualSize: (Int, Int)? = (mode == 1 && phoneWidth > 0 && phoneHeight > 0)
+            ? (Int(Double(phoneWidth) * q.resolutionScale), Int(Double(phoneHeight) * q.resolutionScale))
+            : nil
+
+        // Estimate the encoded size to derive an auto bitrate.
+        let (bw, bh): (Int, Int)
+        if let (pw, ph) = virtualSize {
+            (bw, bh) = Self.fitCap(pw, ph, cap: 3200)
+        } else {
+            let main = CGMainDisplayID()
+            (bw, bh) = Self.fitCap(CGDisplayPixelsWide(main), CGDisplayPixelsHigh(main), cap: 1920)
+        }
+        let bitrate = effectiveBitrateBps(width: bw, height: bh, quality: q)
+
+        let pipeline = ReverseMirrorPipeline(
+            fps: q.fps,
+            bitrate: bitrate,
+            useHEVC: q.useHEVC,
+            virtualSize: virtualSize,
+            onPacket: { packet in cont.yield(packet) },
+            onLog: { msg in MirrorDebugLog.write(msg) }
+        )
+        reversePipeline = pipeline
+        isReverseStreaming = true
+        MirrorDebugLog.write("reverse mirror starting slot=\(slot.rawValue) fps=\(q.fps) bitrate=\(bitrate) hevc=\(q.useHEVC)")
+        Task {
+            do {
+                try await pipeline.start()
+            } catch {
+                MirrorDebugLog.write("reverse mirror start failed: \(error)")
+                await MainActor.run { self.stopReverseMirror() }
+            }
+        }
+    }
+
+    private func stopReverseMirror() {
+        guard reversePipeline != nil || reverseSendCont != nil else { return }
+        reverseSendCont?.finish()
+        reverseSendCont = nil
+        let pipeline = reversePipeline
+        reversePipeline = nil
+        isReverseStreaming = false
+        Task { await pipeline?.stop() }
+        MirrorDebugLog.write("reverse mirror stopped")
+    }
+
+    private static func fitCap(_ w: Int, _ h: Int, cap: Int) -> (Int, Int) {
+        let longEdge = max(w, h)
+        let scale = longEdge > cap ? Double(cap) / Double(longEdge) : 1.0
+        func even(_ v: Double) -> Int { let r = Int(v.rounded()); return max(2, r - (r % 2)) }
+        return (even(Double(w) * scale), even(Double(h) * scale))
+    }
+
+    private func nativeStreamSize(for remoteSize: CGSize, scale rawScale: Double) -> CGSize {
+        let scale = max(0.25, min(1.0, rawScale))
         let width = max(remoteSize.width * scale, 1)
         let height = max(remoteSize.height * scale, 1)
 

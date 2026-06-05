@@ -41,7 +41,7 @@ struct MirrorIntegrationTests {
             }
         }
         let decoded = try MirrorMessage.decode(ackBytes)
-        guard case let .helloAck(bitrate, fps, kf, w, h) = decoded else {
+        guard case let .helloAck(bitrate, fps, kf, w, h, _) = decoded else {
             Issue.record("Expected HELLO_ACK, got \(decoded)")
             return
         }

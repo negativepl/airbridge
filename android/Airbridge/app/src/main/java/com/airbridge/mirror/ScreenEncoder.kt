@@ -19,10 +19,13 @@ class ScreenEncoder(
     private val fps: Int,
     private val bitrateBps: Int,
     private val keyframeIntervalSeconds: Int,
+    private val useHEVC: Boolean = false,
     private val onMessage: (MirrorMessage) -> Unit
 ) {
+    private val mime = if (useHEVC) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
     private var encoder: MediaCodec? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var pendingVps: ByteArray? = null
     private var pendingSps: ByteArray? = null
     private var pendingPps: ByteArray? = null
     private var configEmitted = false
@@ -37,7 +40,7 @@ class ScreenEncoder(
     fun start() {
         if (started) return
         started = true
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
+        val format = MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, bitrateBps)
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
@@ -58,7 +61,7 @@ class ScreenEncoder(
                 setInteger(MediaFormat.KEY_PRIORITY, 0)
             }
         }
-        val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        val codec = MediaCodec.createEncoderByType(mime)
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         val inputSurface = codec.createInputSurface()
 
@@ -70,7 +73,7 @@ class ScreenEncoder(
                 val payload = ByteArray(info.size); buf.get(payload)
 
                 if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
-                    extractSpsPps(payload)
+                    extractParamSets(payload)
                     maybeEmitConfig()
                 } else if (info.size > 0) {
                     onMessage(MirrorMessage.VideoFrame(
@@ -85,8 +88,13 @@ class ScreenEncoder(
                 onMessage(MirrorMessage.Status(MirrorStatusCode.ENCODER_ERROR))
             }
             override fun onOutputFormatChanged(c: MediaCodec, format: MediaFormat) {
-                format.getByteBuffer("csd-0")?.let { pendingSps = stripAnnexBStartCode(it.toBytes()) }
-                format.getByteBuffer("csd-1")?.let { pendingPps = stripAnnexBStartCode(it.toBytes()) }
+                if (useHEVC) {
+                    // HEVC packs VPS+SPS+PPS into csd-0.
+                    format.getByteBuffer("csd-0")?.let { extractParamSets(it.toBytes()) }
+                } else {
+                    format.getByteBuffer("csd-0")?.let { pendingSps = stripAnnexBStartCode(it.toBytes()) }
+                    format.getByteBuffer("csd-1")?.let { pendingPps = stripAnnexBStartCode(it.toBytes()) }
+                }
                 maybeEmitConfig()
             }
         })
@@ -111,24 +119,41 @@ class ScreenEncoder(
         encoder?.runCatching { stop() }
         encoder?.release(); encoder = null
         runCatching { mediaProjection.unregisterCallback(projectionCallback) }
-        configEmitted = false; pendingSps = null; pendingPps = null
+        configEmitted = false; pendingVps = null; pendingSps = null; pendingPps = null
     }
 
-    private fun extractSpsPps(annexB: ByteArray) {
-        val parts = NALUSplitter.split(annexB)
-        for (nalu in parts) {
-            when ((nalu[0].toInt() and 0x1F)) {
-                7 -> pendingSps = nalu
-                8 -> pendingPps = nalu
+    private fun extractParamSets(annexB: ByteArray) {
+        for (nalu in NALUSplitter.split(annexB)) {
+            if (nalu.isEmpty()) continue
+            if (useHEVC) {
+                when ((nalu[0].toInt() shr 1) and 0x3F) {
+                    32 -> pendingVps = nalu
+                    33 -> pendingSps = nalu
+                    34 -> pendingPps = nalu
+                }
+            } else {
+                when (nalu[0].toInt() and 0x1F) {
+                    7 -> pendingSps = nalu
+                    8 -> pendingPps = nalu
+                }
             }
         }
     }
 
     private fun maybeEmitConfig() {
-        val sps = pendingSps; val pps = pendingPps
-        if (!configEmitted && sps != null && pps != null) {
-            onMessage(MirrorMessage.VideoConfig(sps, pps))
-            configEmitted = true
+        if (configEmitted) return
+        if (useHEVC) {
+            val vps = pendingVps; val sps = pendingSps; val pps = pendingPps
+            if (vps != null && sps != null && pps != null) {
+                onMessage(MirrorMessage.VideoConfigHEVC(vps, sps, pps))
+                configEmitted = true
+            }
+        } else {
+            val sps = pendingSps; val pps = pendingPps
+            if (sps != null && pps != null) {
+                onMessage(MirrorMessage.VideoConfig(sps, pps))
+                configEmitted = true
+            }
         }
     }
 

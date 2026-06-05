@@ -78,7 +78,13 @@ let package = Package(
         ),
 
         .target(
+            name: "CVirtualDisplay",
+            path: "Sources/CVirtualDisplay"
+        ),
+
+        .target(
             name: "Mirror",
+            dependencies: ["CVirtualDisplay"],
             path: "Sources/Mirror"
         ),
 

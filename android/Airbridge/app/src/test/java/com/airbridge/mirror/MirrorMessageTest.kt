@@ -16,7 +16,15 @@ class MirrorMessageTest {
     }
 
     @Test fun `HELLO_ACK round-trip`() {
-        val msg = MirrorMessage.HelloAck(targetBitrateBps = 12_000_000u, fps = 60u, keyframeIntervalSeconds = 2u, targetWidth = 1080u, targetHeight = 1920u)
+        val msg = MirrorMessage.HelloAck(targetBitrateBps = 12_000_000u, fps = 60u, keyframeIntervalSeconds = 2u, targetWidth = 1080u, targetHeight = 1920u, codec = 0u)
+        assertEquals(msg, MirrorMessage.decode(msg.encode()))
+    }
+
+    @Test fun `VIDEO_CONFIG_HEVC round-trip`() {
+        val vps = byteArrayOf(0x40, 0x01, 0x0C, 0x01)
+        val sps = byteArrayOf(0x42, 0x01, 0x01, 0x01)
+        val pps = byteArrayOf(0x44, 0x01, 0xC0.toByte(), 0xF2.toByte())
+        val msg = MirrorMessage.VideoConfigHEVC(vps = vps, sps = sps, pps = pps)
         assertEquals(msg, MirrorMessage.decode(msg.encode()))
     }
 

@@ -46,6 +46,24 @@ public enum NALUParser {
         return out
     }
 
+    /// Convert AVCC (4-byte length-prefixed NALUs) to Annex-B (00 00 00 01
+    /// start codes). The reverse direction (Mac VTCompressionSession output ->
+    /// phone MediaCodec input).
+    public static func avccToAnnexB(_ data: Data) -> Data {
+        var out = Data(capacity: data.count + 16)
+        let startCode = Data([0x00, 0x00, 0x00, 0x01])
+        var i = data.startIndex
+        while i + 4 <= data.endIndex {
+            let len = Int(data[i..<i+4].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }.bigEndian)
+            i += 4
+            guard len > 0, i + len <= data.endIndex else { break }
+            out.append(startCode)
+            out.append(data.subdata(in: i..<i+len))
+            i += len
+        }
+        return out
+    }
+
     /// Convert an H.264 access unit to AVCC.
     ///
     /// Accepts either:

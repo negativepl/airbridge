@@ -16,19 +16,29 @@ public enum MirrorMessageError: Error, Equatable, Sendable {
 
 public enum MirrorMessage: Equatable, Sendable {
     case hello(token: Data, screenWidth: UInt32, screenHeight: UInt32, orientation: UInt8)
-    case helloAck(targetBitrateBps: UInt32, fps: UInt8, keyframeIntervalSeconds: UInt8, targetWidth: UInt32, targetHeight: UInt32)
+    /// codec: 0 = H.264, 1 = HEVC. Tells the (encoding) phone which codec to use.
+    case helloAck(targetBitrateBps: UInt32, fps: UInt8, keyframeIntervalSeconds: UInt8, targetWidth: UInt32, targetHeight: UInt32, codec: UInt8)
     case videoConfig(sps: Data, pps: Data)
+    /// HEVC parameter sets (VPS, SPS, PPS). Self-describes the stream as HEVC.
+    case videoConfigHEVC(vps: Data, sps: Data, pps: Data)
     case videoFrame(presentationTimestampUs: UInt64, naluBytes: Data)
     case inputTap(xNorm: Float32, yNorm: Float32)
     case status(MirrorStatusCode)
+    /// Reverse mirror: phone -> Mac, "start sending me YOUR screen". Carries the
+    /// phone's screen size and the mode (0 = mirror Mac's main display,
+    /// 1 = create a virtual display shaped to the phone). The Mac then sends
+    /// videoConfig/videoFrame down this connection (Mac -> phone).
+    case reverseHello(token: Data, screenWidth: UInt32, screenHeight: UInt32, mode: UInt8)
 
     private enum TypeByte {
         static let hello: UInt8 = 0x01
         static let helloAck: UInt8 = 0x02
         static let videoConfig: UInt8 = 0x10
         static let videoFrame: UInt8 = 0x11
+        static let videoConfigHEVC: UInt8 = 0x12
         static let inputTap: UInt8 = 0x20
         static let status: UInt8 = 0x30
+        static let reverseHello: UInt8 = 0x40
     }
 
     public func encode() -> Data {
@@ -40,15 +50,24 @@ public enum MirrorMessage: Equatable, Sendable {
             out.appendBE(w)
             out.appendBE(h)
             out.append(orientation)
-        case let .helloAck(bitrate, fps, keyframe, w, h):
+        case let .helloAck(bitrate, fps, keyframe, w, h, codec):
             out.append(TypeByte.helloAck)
             out.appendBE(bitrate)
             out.append(fps)
             out.append(keyframe)
             out.appendBE(w)
             out.appendBE(h)
+            out.append(codec)
         case let .videoConfig(sps, pps):
             out.append(TypeByte.videoConfig)
+            out.appendBE(UInt32(sps.count))
+            out.append(sps)
+            out.appendBE(UInt32(pps.count))
+            out.append(pps)
+        case let .videoConfigHEVC(vps, sps, pps):
+            out.append(TypeByte.videoConfigHEVC)
+            out.appendBE(UInt32(vps.count))
+            out.append(vps)
             out.appendBE(UInt32(sps.count))
             out.append(sps)
             out.appendBE(UInt32(pps.count))
@@ -64,6 +83,12 @@ public enum MirrorMessage: Equatable, Sendable {
         case let .status(code):
             out.append(TypeByte.status)
             out.append(code.rawValue)
+        case let .reverseHello(token, w, h, mode):
+            out.append(TypeByte.reverseHello)
+            out.append(token)
+            out.appendBE(w)
+            out.appendBE(h)
+            out.append(mode)
         }
         return out
     }
@@ -82,14 +107,15 @@ public enum MirrorMessage: Equatable, Sendable {
             return .hello(token: token, screenWidth: w, screenHeight: h, orientation: orientation)
 
         case TypeByte.helloAck:
-            guard payload.count == 4 + 1 + 1 + 4 + 4 else { throw MirrorMessageError.truncated(type: first) }
+            guard payload.count >= 4 + 1 + 1 + 4 + 4 else { throw MirrorMessageError.truncated(type: first) }
             var i = payload.startIndex
             let bitrate: UInt32 = payload.readBE(at: &i)
             let fps = payload[i]; i += 1
             let keyframe = payload[i]; i += 1
             let w: UInt32 = payload.readBE(at: &i)
             let h: UInt32 = payload.readBE(at: &i)
-            return .helloAck(targetBitrateBps: bitrate, fps: fps, keyframeIntervalSeconds: keyframe, targetWidth: w, targetHeight: h)
+            let codec: UInt8 = i < payload.endIndex ? payload[i] : 0   // back-compat: absent = H.264
+            return .helloAck(targetBitrateBps: bitrate, fps: fps, keyframeIntervalSeconds: keyframe, targetWidth: w, targetHeight: h, codec: codec)
 
         case TypeByte.videoConfig:
             guard payload.count >= 8 else { throw MirrorMessageError.truncated(type: first) }
@@ -101,6 +127,20 @@ public enum MirrorMessage: Equatable, Sendable {
             guard payload.count == 4 + Int(spsLen) + 4 + Int(ppsLen) else { throw MirrorMessageError.truncated(type: first) }
             let pps = Data(payload[i..<i + Int(ppsLen)])
             return .videoConfig(sps: sps, pps: pps)
+
+        case TypeByte.videoConfigHEVC:
+            guard payload.count >= 12 else { throw MirrorMessageError.truncated(type: first) }
+            var i = payload.startIndex
+            let vpsLen: UInt32 = payload.readBE(at: &i)
+            guard payload.count >= 4 + Int(vpsLen) + 8 else { throw MirrorMessageError.truncated(type: first) }
+            let vps = Data(payload[i..<i + Int(vpsLen)]); i += Int(vpsLen)
+            let spsLen: UInt32 = payload.readBE(at: &i)
+            guard payload.count >= 4 + Int(vpsLen) + 4 + Int(spsLen) + 4 else { throw MirrorMessageError.truncated(type: first) }
+            let sps = Data(payload[i..<i + Int(spsLen)]); i += Int(spsLen)
+            let ppsLen: UInt32 = payload.readBE(at: &i)
+            guard payload.count == 4 + Int(vpsLen) + 4 + Int(spsLen) + 4 + Int(ppsLen) else { throw MirrorMessageError.truncated(type: first) }
+            let pps = Data(payload[i..<i + Int(ppsLen)])
+            return .videoConfigHEVC(vps: vps, sps: sps, pps: pps)
 
         case TypeByte.videoFrame:
             guard payload.count >= 8 else { throw MirrorMessageError.truncated(type: first) }
@@ -121,6 +161,15 @@ public enum MirrorMessage: Equatable, Sendable {
                 throw MirrorMessageError.truncated(type: first)
             }
             return .status(code)
+
+        case TypeByte.reverseHello:
+            guard payload.count == 16 + 4 + 4 + 1 else { throw MirrorMessageError.truncated(type: first) }
+            let token = Data(payload.prefix(16))
+            var i = payload.startIndex + 16
+            let w: UInt32 = payload.readBE(at: &i)
+            let h: UInt32 = payload.readBE(at: &i)
+            let mode = payload[i]
+            return .reverseHello(token: token, screenWidth: w, screenHeight: h, mode: mode)
 
         default:
             throw MirrorMessageError.unknownType(first)

@@ -68,7 +68,8 @@ class MirrorService : Service() {
                     width = targetW, height = targetH,
                     fps = ack.fps.toInt(),
                     bitrateBps = ack.targetBitrateBps.toInt(),
-                    keyframeIntervalSeconds = ack.keyframeIntervalSeconds.toInt()
+                    keyframeIntervalSeconds = ack.keyframeIntervalSeconds.toInt(),
+                    useHEVC = ack.codec.toInt() == 1
                 ) { msg -> client?.send(msg) }
                 enc.start()
                 encoder = enc

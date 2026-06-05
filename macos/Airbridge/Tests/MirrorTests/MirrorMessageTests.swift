@@ -19,7 +19,7 @@ struct MirrorMessageTests {
 
     @Test("HELLO_ACK round-trip")
     func helloAckRoundtrip() throws {
-        let msg = MirrorMessage.helloAck(targetBitrateBps: 12_000_000, fps: 60, keyframeIntervalSeconds: 2, targetWidth: 1080, targetHeight: 1920)
+        let msg = MirrorMessage.helloAck(targetBitrateBps: 12_000_000, fps: 60, keyframeIntervalSeconds: 2, targetWidth: 1080, targetHeight: 1920, codec: 1)
         let decoded = try MirrorMessage.decode(msg.encode())
         #expect(decoded == msg)
     }
@@ -29,6 +29,16 @@ struct MirrorMessageTests {
         let sps = Data([0x67, 0x42, 0x00, 0x1F])
         let pps = Data([0x68, 0xCE, 0x3C, 0x80])
         let msg = MirrorMessage.videoConfig(sps: sps, pps: pps)
+        let decoded = try MirrorMessage.decode(msg.encode())
+        #expect(decoded == msg)
+    }
+
+    @Test("VIDEO_CONFIG_HEVC round-trip")
+    func videoConfigHEVCRoundtrip() throws {
+        let vps = Data([0x40, 0x01, 0x0C, 0x01])
+        let sps = Data([0x42, 0x01, 0x01, 0x01])
+        let pps = Data([0x44, 0x01, 0xC0, 0xF2])
+        let msg = MirrorMessage.videoConfigHEVC(vps: vps, sps: sps, pps: pps)
         let decoded = try MirrorMessage.decode(msg.encode())
         #expect(decoded == msg)
     }
