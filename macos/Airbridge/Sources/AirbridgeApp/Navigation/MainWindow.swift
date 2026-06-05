@@ -10,6 +10,7 @@ struct MainWindow: View {
     let historyService: HistoryService
     let galleryService: GalleryService
     let smsService: SmsService
+    let filesBrowserService: FilesBrowserService
     let hotkeyService: GlobalHotkeyService
 
     var body: some View {
@@ -44,6 +45,12 @@ struct MainWindow: View {
             Tab(NavigationItem.gallery.title, systemImage: "photo.on.rectangle", value: .gallery) {
                 ScreenContainer(scroll: false) {
                     GalleryView(galleryService: galleryService, connectionService: connectionService)
+                }
+            }
+
+            Tab(NavigationItem.files.title, systemImage: "folder.fill", value: .files) {
+                ScreenContainer(scroll: false) {
+                    FilesBrowserView(filesBrowserService: filesBrowserService, connectionService: connectionService)
                 }
             }
 

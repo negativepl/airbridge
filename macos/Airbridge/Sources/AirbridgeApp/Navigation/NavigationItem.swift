@@ -5,6 +5,7 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     case history
     case send
     case gallery
+    case files
     case messages
     case settings
 
@@ -16,6 +17,7 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .history: return "clock.arrow.circlepath"
         case .send: return "paperplane.fill"
         case .gallery: return "photo.on.rectangle"
+        case .files: return "folder.fill"
         case .messages: return "message.fill"
         case .settings: return "gearshape.fill"
         }
@@ -27,12 +29,13 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .history: return L10n.isPL ? "Historia" : "History"
         case .send: return L10n.isPL ? "Wyślij" : "Send"
         case .gallery: return L10n.isPL ? "Galeria" : "Gallery"
+        case .files: return L10n.isPL ? "Pliki" : "Files"
         case .messages: return L10n.isPL ? "Wiadomości" : "Messages"
         case .settings: return L10n.isPL ? "Ustawienia" : "Settings"
         }
     }
 
     static var topItems: [NavigationItem] {
-        [.home, .history, .send, .gallery, .messages, .settings]
+        [.home, .history, .send, .gallery, .files, .messages, .settings]
     }
 }
