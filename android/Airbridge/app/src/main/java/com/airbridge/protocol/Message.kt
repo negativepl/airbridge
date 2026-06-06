@@ -352,13 +352,21 @@ sealed class Message {
     data class FilesListRequest(
         val path: String,
         val page: Int,
-        val pageSize: Int
+        val pageSize: Int,
+        val sortBy: String = "name",
+        val sortDir: String = "asc",
+        val foldersFirst: Boolean = true,
+        val query: String = ""
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "files_list_request")
             put("path", path)
             put("page", page)
             put("page_size", pageSize)
+            put("sort_by", sortBy)
+            put("sort_dir", sortDir)
+            put("folders_first", foldersFirst)
+            put("query", query)
         }.toString()
     }
 
@@ -747,7 +755,11 @@ sealed class Message {
                 "files_list_request" -> FilesListRequest(
                     path = obj.getString("path"),
                     page = obj.optInt("page", 0),
-                    pageSize = obj.optInt("page_size", 200)
+                    pageSize = obj.optInt("page_size", 200),
+                    sortBy = obj.optString("sort_by", "name"),
+                    sortDir = obj.optString("sort_dir", "asc"),
+                    foldersFirst = obj.optBoolean("folders_first", true),
+                    query = obj.optString("query", "")
                 )
                 "files_list_response" -> {
                     val arr = obj.getJSONArray("entries")

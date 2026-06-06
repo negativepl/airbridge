@@ -33,4 +33,25 @@ class FilesMessageTest {
         val parsed = Message.fromJson(msg.toJson()) as Message.FileTransferOffer
         assertEquals("Download", parsed.destinationDir)
     }
+
+    @Test fun filesListRequestSortSearchRoundTrip() {
+        val msg = Message.FilesListRequest(
+            path = "Download", page = 1, pageSize = 200,
+            sortBy = "size", sortDir = "desc", foldersFirst = false, query = "raport"
+        )
+        val parsed = Message.fromJson(msg.toJson()) as Message.FilesListRequest
+        assertEquals("size", parsed.sortBy)
+        assertEquals("desc", parsed.sortDir)
+        assertFalse(parsed.foldersFirst)
+        assertEquals("raport", parsed.query)
+    }
+
+    @Test fun filesListRequestDefaultsWhenFieldsMissing() {
+        val legacy = """{"type":"files_list_request","path":"","page":0,"page_size":200}"""
+        val parsed = Message.fromJson(legacy) as Message.FilesListRequest
+        assertEquals("name", parsed.sortBy)
+        assertEquals("asc", parsed.sortDir)
+        assertEquals(true, parsed.foldersFirst)
+        assertEquals("", parsed.query)
+    }
 }
