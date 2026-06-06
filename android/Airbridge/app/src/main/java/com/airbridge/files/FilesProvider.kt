@@ -220,11 +220,24 @@ class FilesProvider(
     }
 
     /** Usuwa plik lub folder (rekurencyjnie). Zwraca true gdy usunięto.
-     *  Pusty relPath (korzeń /sdcard) jest odrzucany dla bezpieczeństwa. */
+     *  Pusty relPath (korzeń /sdcard) jest odrzucany. Ścieżki wychodzące poza
+     *  /sdcard (np. z ".." lub absolutne) są odrzucane (canonical-path guard).
+     *
+     *  Uwaga: deleteRecursively() przy częściowym niepowodzeniu (np. zablokowany
+     *  plik potomny) usuwa co się da i zwraca false — wynik false może więc oznaczać
+     *  częściowe usunięcie, nie tylko "nic nie usunięto".
+     */
     fun delete(relPath: String): Boolean {
         if (relPath.isBlank()) return false
         val target = File(root, relPath)
         if (!target.exists()) return false
+        val rootCanon = root.canonicalPath
+        val targetCanon = try { target.canonicalPath } catch (e: Exception) {
+            Log.e("FilesProvider", "delete canonicalPath failed for $relPath", e)
+            return false
+        }
+        // Tylko ściśle wewnątrz /sdcard (odrzuca też sam korzeń i ucieczki przez "..").
+        if (!targetCanon.startsWith(rootCanon + File.separator)) return false
         return try {
             if (target.isDirectory) target.deleteRecursively() else target.delete()
         } catch (e: Exception) {
