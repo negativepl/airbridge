@@ -49,6 +49,8 @@ public enum Message: Equatable, Sendable {
     case fileThumbnailRequest(path: String)
     case fileThumbnailResponse(path: String, data: String)
     case fileDownloadRequest(transferId: String, path: String)
+    case fileDeleteRequest(path: String)
+    case fileDeleteResponse(path: String, success: Bool, error: String?)
     case smsConversationsRequest(page: Int, pageSize: Int)
     case smsConversationsResponse(conversations: [SmsConversationMeta], totalCount: Int, page: Int)
     case smsMessagesRequest(threadId: String, page: Int, pageSize: Int)
@@ -306,6 +308,8 @@ extension Message: Codable {
         case fileThumbnailRequest     = "file_thumbnail_request"
         case fileThumbnailResponse    = "file_thumbnail_response"
         case fileDownloadRequest      = "file_download_request"
+        case fileDeleteRequest        = "file_delete_request"
+        case fileDeleteResponse       = "file_delete_response"
         case smsConversationsRequest  = "sms_conversations_request"
         case smsConversationsResponse = "sms_conversations_response"
         case smsMessagesRequest       = "sms_messages_request"
@@ -518,6 +522,16 @@ extension Message: Codable {
             try container.encode(TypeKey.fileDownloadRequest.rawValue, forKey: .type)
             try container.encode(transferId, forKey: .transferId)
             try container.encode(path, forKey: .path)
+
+        case .fileDeleteRequest(let path):
+            try container.encode(TypeKey.fileDeleteRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+
+        case .fileDeleteResponse(let path, let success, let error):
+            try container.encode(TypeKey.fileDeleteResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(success, forKey: .success)
+            try container.encodeIfPresent(error, forKey: .error)
 
         case .smsConversationsRequest(let page, let pageSize):
             try container.encode(TypeKey.smsConversationsRequest.rawValue, forKey: .type)
@@ -778,6 +792,16 @@ extension Message: Codable {
             let transferId = try container.decode(String.self, forKey: .transferId)
             let path = try container.decode(String.self, forKey: .path)
             self = .fileDownloadRequest(transferId: transferId, path: path)
+
+        case .fileDeleteRequest:
+            let path = try container.decode(String.self, forKey: .path)
+            self = .fileDeleteRequest(path: path)
+
+        case .fileDeleteResponse:
+            let path = try container.decode(String.self, forKey: .path)
+            let success = try container.decode(Bool.self, forKey: .success)
+            let error = try container.decodeIfPresent(String.self, forKey: .error)
+            self = .fileDeleteResponse(path: path, success: success, error: error)
 
         case .smsConversationsRequest:
             let page = try container.decode(Int.self, forKey: .page)

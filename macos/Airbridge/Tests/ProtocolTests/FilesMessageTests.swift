@@ -52,4 +52,19 @@ final class FilesMessageTests: XCTestCase {
                                                   sortBy: "name", sortDir: "asc",
                                                   foldersFirst: true, query: ""))
     }
+
+    func testFileDeleteRequestRoundTrip() throws {
+        XCTAssertEqual(try roundTrip(.fileDeleteRequest(path: "DCIM/old.jpg")),
+                       .fileDeleteRequest(path: "DCIM/old.jpg"))
+    }
+
+    func testFileDeleteResponseSuccessRoundTrip() throws {
+        let msg = Message.fileDeleteResponse(path: "DCIM/old.jpg", success: true, error: nil)
+        XCTAssertEqual(try roundTrip(msg), msg)
+    }
+
+    func testFileDeleteResponseErrorRoundTrip() throws {
+        let msg = Message.fileDeleteResponse(path: "DCIM/old.jpg", success: false, error: "delete_failed")
+        XCTAssertEqual(try roundTrip(msg), msg)
+    }
 }
