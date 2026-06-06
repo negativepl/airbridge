@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_primary">#8B5545</color>
-    <color name="purple_dark">#723F30</color>
-    <color name="purple_light">#DDB5A5</color>
-    <color name="purple_surface">#FFF8F5</color>
-    <color name="purple_on_surface">#1C1B18</color>
+    <!-- Amethyst palette — matches AirbridgeTheme (Theme.kt). Used by the XML
+         base theme (status bar tint, View fallbacks) so it no longer flashes
+         the old terracotta before Compose takes over. -->
+    <color name="purple_primary">#6A4D9E</color>
+    <color name="purple_dark">#38215E</color>
+    <color name="purple_light">#CBB2F2</color>
+    <color name="purple_surface">#EADDFF</color>
+    <color name="purple_on_surface">#1B1A1F</color>
     <color name="white">#FFFFFF</color>
     <color name="splash_bg">#FFFFFF</color>
     <!-- Matches AirbridgeTheme's dark DarkColorScheme.surface (#141318) so the
