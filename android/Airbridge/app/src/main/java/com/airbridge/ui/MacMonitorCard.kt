@@ -111,7 +111,11 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                 ) {
                     Icon(powerIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(5.dp))
-                    Text("${info.batteryPercent}% · $powerLabel", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    Text(
+                        "${info.batteryPercent}% · ${stringResource(R.string.power_source)}: $powerLabel",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White
+                    )
                 }
             }
         }

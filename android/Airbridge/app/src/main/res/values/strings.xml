@@ -202,4 +202,5 @@
     <string name="power_adapter">Power adapter</string>
     <string name="power_battery">Battery</string>
     <string name="power_charging">Charging</string>
+    <string name="power_source">Power source</string>
 </resources>
