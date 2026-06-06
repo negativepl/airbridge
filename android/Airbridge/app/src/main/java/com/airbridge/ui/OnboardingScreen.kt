@@ -376,6 +376,14 @@ private fun PermissionsPage() {
         overlayGranted = Settings.canDrawOverlays(context)
     }
 
+    // Notification listener: optional (mirror notifications to Mac). Not part of `allGranted`.
+    var notifListenerGranted by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
+    val notifListenerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        notifListenerGranted = isNotificationListenerEnabled(context)
+    }
+
     val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
 
     Column(
@@ -492,6 +500,16 @@ private fun PermissionsPage() {
                     Uri.fromParts("package", context.packageName, null)
                 )
                 overlayLauncher.launch(intent)
+            }
+        )
+
+        PermissionRow(
+            icon = Icons.Rounded.Notifications,
+            description = stringResource(R.string.onboarding_perm_notiflistener_desc),
+            why = stringResource(R.string.onboarding_perm_notiflistener_why),
+            granted = notifListenerGranted,
+            onRequest = {
+                notifListenerLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             }
         )
 
@@ -745,4 +763,13 @@ private fun QrSymbol() {
             drawCircle(primary, radius = w * 0.06f, center = Offset(w * 0.5f, h * 0.5f))
         }
     }
+}
+
+/** Czy Airbridge ma włączony dostęp do powiadomień (notification listener) w ustawieniach systemu. */
+fun isNotificationListenerEnabled(context: android.content.Context): Boolean {
+    val flat = android.provider.Settings.Secure.getString(
+        context.contentResolver, "enabled_notification_listeners"
+    ) ?: return false
+    val pkg = context.packageName
+    return flat.split(":").any { it.startsWith("$pkg/") }
 }

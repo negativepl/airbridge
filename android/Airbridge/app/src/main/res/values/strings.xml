@@ -34,6 +34,8 @@
     <string name="onboarding_perm_files_why">To browse and transfer files from your Mac. Files are sent directly over your local network — nothing is uploaded to the cloud</string>
     <string name="onboarding_perm_overlay_desc">Display over other apps</string>
     <string name="onboarding_perm_overlay_why">So screen mirroring can start when you request it from your Mac, even while the app is in the background. Without it you have to open the app first</string>
+    <string name="onboarding_perm_notiflistener_desc">Notifications on your Mac</string>
+    <string name="onboarding_perm_notiflistener_why">So your phone notifications appear natively on your Mac. You choose which apps to show in the Mac settings</string>
     <string name="onboarding_perm_allow_btn">Allow</string>
     <string name="onboarding_perm_all_granted">All permissions granted</string>
     <string name="onboarding_next">Next</string>
