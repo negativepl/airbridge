@@ -15,6 +15,7 @@ struct FilesBrowserView: View {
     private var deletionAlertTitle: String {
         guard let e = entryPendingDeletion else { return "" }
         if L10n.isPL {
+            // Cudzysłowy „ " jako \u — literalne typograficzne znaki łamią parser tuż przed znakiem `?`.
             return "Usunąć \u{201E}\(e.name)\u{201D}?"
         } else {
             return "Delete \"\(e.name)\"?"
@@ -77,6 +78,10 @@ struct FilesBrowserView: View {
             )
         ) {
             Button("OK", role: .cancel) { filesBrowserService.deleteError = nil }
+        } message: {
+            Text(L10n.isPL
+                 ? "Nie można było usunąć tego elementu. Spróbuj ponownie."
+                 : "This item could not be deleted. Please try again.")
         }
     }
 
