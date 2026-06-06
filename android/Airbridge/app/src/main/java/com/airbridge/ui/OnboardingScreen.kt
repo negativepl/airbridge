@@ -256,14 +256,23 @@ private fun WelcomePage() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(32.dp))
-        Image(
-            painter = painterResource(R.mipmap.ic_launcher),
-            contentDescription = "AirBridge",
+        androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(28.dp)),
-            contentScale = ContentScale.Fit
-        )
+                .clip(RoundedCornerShape(28.dp))
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_background),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = "AirBridge",
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 

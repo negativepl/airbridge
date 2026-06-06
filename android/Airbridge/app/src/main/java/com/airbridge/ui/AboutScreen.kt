@@ -71,14 +71,23 @@ fun AboutScreen() {
         Spacer(modifier = Modifier.height(32.dp))
 
         // Logo on a light tile (the mark is dark, so it needs a light backdrop)
-        Image(
-            painter = painterResource(R.mipmap.ic_launcher),
-            contentDescription = stringResource(R.string.app_name),
+        Box(
             modifier = Modifier
                 .size(120.dp)
-                .clip(RoundedCornerShape(24.dp)),
-            contentScale = ContentScale.Fit
-        )
+                .clip(RoundedCornerShape(24.dp))
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_background),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
