@@ -35,6 +35,9 @@ struct FilesBrowserView: View {
                 filesBrowserService.open(path: "")
             }
         }
+        .onChange(of: filesBrowserService.searchQuery) { _, q in
+            if q.isEmpty && !searchText.isEmpty { searchText = "" }
+        }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }

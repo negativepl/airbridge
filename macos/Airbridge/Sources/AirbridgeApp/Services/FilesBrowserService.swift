@@ -75,7 +75,6 @@ final class FilesBrowserService: MessageHandler {
             foldersFirst = d.bool(forKey: DefaultsKey.foldersFirst)
         }
         isLoadingSortPrefs = false
-        reload()
     }
 
     private func persistSort() {
@@ -145,6 +144,10 @@ final class FilesBrowserService: MessageHandler {
     /// Wejście do folderu lub pobranie pliku.
     func activate(_ entry: FileEntry) {
         if entry.isDirectory {
+            if !searchQuery.isEmpty {
+                searchTask?.cancel()
+                searchQuery = ""
+            }
             open(path: entry.relativePath)
         } else {
             download(entry)
