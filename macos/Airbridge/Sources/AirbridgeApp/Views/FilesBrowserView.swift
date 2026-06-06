@@ -86,7 +86,7 @@ struct FilesBrowserView: View {
                         filesBrowserService.setSearchQuery(new)
                     }
                 if !searchText.isEmpty {
-                    Button { searchText = ""; filesBrowserService.setSearchQuery("") } label: {
+                    Button { searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }
                     .buttonStyle(.borderless)
@@ -94,7 +94,7 @@ struct FilesBrowserView: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            .frame(maxWidth: 280)
+            .frame(minWidth: 120, maxWidth: 280)
 
             Spacer()
 
@@ -104,11 +104,14 @@ struct FilesBrowserView: View {
                 get: { viewMode },
                 set: { viewModeRaw = $0.rawValue }
             )) {
-                Image(systemName: "list.bullet").tag(FileViewMode.list)
-                Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+                Image(systemName: "list.bullet")
+                    .accessibilityLabel(L10n.isPL ? "Widok listy" : "List view").tag(FileViewMode.list)
+                Image(systemName: "square.grid.2x2")
+                    .accessibilityLabel(L10n.isPL ? "Widok siatki" : "Grid view").tag(FileViewMode.grid)
             }
             .pickerStyle(.segmented)
             .fixedSize()
+            .accessibilityLabel(L10n.isPL ? "Tryb widoku" : "View mode")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
@@ -137,6 +140,7 @@ struct FilesBrowserView: View {
                                  set: { filesBrowserService.foldersFirst = $0 }))
         } label: {
             Image(systemName: "arrow.up.arrow.down")
+                .accessibilityLabel(L10n.isPL ? "Opcje sortowania" : "Sort options")
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -235,6 +239,16 @@ struct FilesBrowserView: View {
     }
 }
 
+/// SF Symbol dla danego typu MIME (wspólne dla wiersza i kafelka siatki).
+private func fileSymbol(for mime: String) -> String {
+    if mime.hasPrefix("image/") { return "photo" }
+    if mime.hasPrefix("video/") { return "film" }
+    if mime.hasPrefix("audio/") { return "music.note" }
+    if mime == "application/pdf" { return "doc.richtext" }
+    if mime.hasPrefix("text/") { return "doc.text" }
+    return "doc"
+}
+
 private struct FileRow: View {
     let entry: FileEntry
     let thumbnail: NSImage?
@@ -293,19 +307,10 @@ private struct FileRow: View {
             Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fill)
                 .frame(width: 28, height: 28).clipShape(RoundedRectangle(cornerRadius: 4))
         } else {
-            Image(systemName: entry.isDirectory ? "folder.fill" : Self.symbol(for: entry.mimeType))
+            Image(systemName: entry.isDirectory ? "folder.fill" : fileSymbol(for: entry.mimeType))
                 .frame(width: 28, height: 28)
                 .foregroundStyle(entry.isDirectory ? Color.accentColor : Color.secondary)
         }
-    }
-
-    private static func symbol(for mime: String) -> String {
-        if mime.hasPrefix("image/") { return "photo" }
-        if mime.hasPrefix("video/") { return "film" }
-        if mime.hasPrefix("audio/") { return "music.note" }
-        if mime == "application/pdf" { return "doc.richtext" }
-        if mime.hasPrefix("text/") { return "doc.text" }
-        return "doc"
     }
 
     private static let sizeFormatter: ByteCountFormatter = {
@@ -326,7 +331,7 @@ private struct FileGridCell: View {
                     Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fill)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
-                    Image(systemName: entry.isDirectory ? "folder.fill" : FileGridCell.symbol(for: entry.mimeType))
+                    Image(systemName: entry.isDirectory ? "folder.fill" : fileSymbol(for: entry.mimeType))
                         .font(.system(size: 34))
                         .foregroundStyle(entry.isDirectory ? Color.accentColor : Color.secondary)
                 }
@@ -336,15 +341,8 @@ private struct FileGridCell: View {
             Text(showPath ? entry.relativePath : entry.name)
                 .font(.caption).lineLimit(2).multilineTextAlignment(.center)
                 .frame(maxWidth: 104)
+                .help(showPath ? entry.relativePath : entry.name)
         }
     }
 
-    static func symbol(for mime: String) -> String {
-        if mime.hasPrefix("image/") { return "photo" }
-        if mime.hasPrefix("video/") { return "film" }
-        if mime.hasPrefix("audio/") { return "music.note" }
-        if mime == "application/pdf" { return "doc.richtext" }
-        if mime.hasPrefix("text/") { return "doc.text" }
-        return "doc"
-    }
 }
