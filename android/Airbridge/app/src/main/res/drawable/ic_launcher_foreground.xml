@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AirBridge foreground: rounded "A" whose crossbar is a small bridge.
+     Glyph optically centred (lifted ~15px — an "A" is bottom-heavy) and
+     scaled to 0.74 around its centre to sit inside the adaptive safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:scaleX="0.74"
+        android:scaleY="0.74"
+        android:pivotX="256"
+        android:pivotY="246">
+        <path
+            android:pathData="M118,381 L256,111 L394,381"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="50"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M156,307 L356,307"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="26"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M196,307 L196,275"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="16"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M316,307 L316,275"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="16"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M196,283 Q256,319 316,283"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="12"
+            android:strokeLineCap="round" />
+    </group>
+</vector>
