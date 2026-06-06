@@ -14,6 +14,35 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
+/** Klucz sortowania listy plików. Wartości zgodne z protokołem (sort_by). */
+internal fun fileSortComparator(sortBy: String): Comparator<FileEntry> = when (sortBy) {
+    "size" -> compareBy { it.size }
+    "modified" -> compareBy { it.modified }
+    "type" -> compareBy(
+        { it.name.substringAfterLast('.', "").lowercase() },
+        { it.name.lowercase() }
+    )
+    else -> compareBy { it.name.lowercase() }   // "name" / nieznane
+}
+
+/**
+ * Czyste sortowanie listy wpisów. `foldersFirst` (gdy true) trzyma foldery na
+ * górze niezależnie od kierunku; kierunek odwraca tylko porządek w obrębie grupy.
+ */
+internal fun sortFileEntries(
+    entries: List<FileEntry>,
+    sortBy: String,
+    sortDir: String,
+    foldersFirst: Boolean
+): List<FileEntry> {
+    var cmp = fileSortComparator(sortBy)
+    if (sortDir == "desc") cmp = cmp.reversed()
+    if (foldersFirst) {
+        cmp = compareByDescending<FileEntry> { it.isDirectory }.then(cmp)
+    }
+    return entries.sortedWith(cmp)
+}
+
 /**
  * Provides browsing/download/upload over the whole external storage (/sdcard)
  * via plain java.io.File. Requires MANAGE_EXTERNAL_STORAGE (All Files Access).
