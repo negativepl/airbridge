@@ -175,7 +175,7 @@ struct OnboardingView: View {
                 featureRow(
                     icon: "doc.on.clipboard",
                     text: isPL
-                        ? "Synchronizuj schowek między telefonem a Makiem"
+                        ? "Synchronizuj schowek między telefonem, a Makiem"
                         : "Sync the clipboard between your phone and Mac"
                 )
                 featureRow(
@@ -199,8 +199,8 @@ struct OnboardingView: View {
                 featureRow(
                     icon: "sparkles",
                     text: isPL
-                        ? "…i to nie wszystkie funkcje — resztę odkryjesz w aplikacji"
-                        : "…and that's not all — discover the rest inside the app"
+                        ? "…i wiele więcej"
+                        : "…and much more"
                 )
             }
             .frame(maxWidth: 560, alignment: .leading)

@@ -6,10 +6,10 @@
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">AirBridge</string>
     <string name="onboarding_welcome_desc">Twój telefon i komputer Mac, połączone jak nigdy dotąd.</string>
-    <string name="onboarding_feature_clipboard">Synchronizuj schowek między telefonem a Makiem</string>
+    <string name="onboarding_feature_clipboard">Synchronizuj schowek między telefonem, a Makiem</string>
     <string name="onboarding_feature_files">Przeglądaj i przesyłaj pliki oraz zdjęcia, bez chmury</string>
     <string name="onboarding_feature_notifications">Powiadomienia z telefonu na Macu</string>
-    <string name="onboarding_feature_more">…i to nie wszystkie funkcje — resztę odkryjesz w aplikacji</string>
+    <string name="onboarding_feature_more">…i wiele więcej</string>
     <string name="onboarding_feature_local">Wszystko zostaje w Twojej sieci — pełna prywatność</string>
     <string name="onboarding_connect_title">Jak to działa?</string>
     <string name="onboarding_connect_desc">Trzy rzeczy, które warto wiedzieć:</string>
