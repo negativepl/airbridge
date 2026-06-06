@@ -346,7 +346,7 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private func permissionRow(icon: String, title: String, why: String, granted: Bool, grant: (() -> Void)?) -> some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 18) {
             Image(systemName: icon)
                 .font(.ab(.title2))
                 .foregroundStyle(.white)
