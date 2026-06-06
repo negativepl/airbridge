@@ -204,7 +204,7 @@ struct HomeView: View {
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(alignment: .bottom) {
                 if let info = vm.deviceInfo {
-                    batteryPill(info.batteryPercent)
+                    batteryPill(info.batteryPercent, charging: info.batteryCharging)
                         .padding(.bottom, 10)
                 }
             }
@@ -222,9 +222,12 @@ struct HomeView: View {
             .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryPercent)
     }
 
-    private func batteryPill(_ percent: Int) -> some View {
+    private func batteryPill(_ percent: Int, charging: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: batterySymbol(percent))
+            if charging {
+                Image(systemName: "bolt.fill")
+            }
             Text("\(percent)%")
                 .contentTransition(.numericText())
         }
@@ -264,6 +267,7 @@ struct HomeView: View {
                 freeBytes: info.freeRamBytes,
                 totalBytes: info.totalRamBytes
             )
+            infoRow(L10n.isPL ? "Zasilanie" : "Power", Self.powerText(info))
         }
     }
 
@@ -306,6 +310,18 @@ struct HomeView: View {
         let f = ByteCountFormatter()
         f.countStyle = .binary
         return f.string(fromByteCount: value)
+    }
+
+    private static func powerText(_ info: DeviceInfo) -> String {
+        let isPL = L10n.isPL
+        guard info.batteryCharging else {
+            return isPL ? "Na baterii" : "On battery"
+        }
+        if info.chargeTimeRemainingMs > 0 {
+            let t = formatChargeTime(info.chargeTimeRemainingMs, isPL: isPL)
+            return isPL ? "Ładowanie · ~\(t) do pełna" : "Charging · ~\(t) to full"
+        }
+        return isPL ? "Ładowanie" : "Charging"
     }
 
     private func formatSpeed(_ speed: Double) -> String {
