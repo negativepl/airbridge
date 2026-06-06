@@ -27,4 +27,9 @@ class FileDedupTest {
         val taken = setOf("a.tar.gz")
         assertEquals("a.tar (1).gz", dedupedName("a.tar.gz") { it in taken })
     }
+
+    @Test fun hiddenFileTreatedAsNoExtension() {
+        val taken = setOf(".gitignore")
+        assertEquals(".gitignore (1)", dedupedName(".gitignore") { it in taken })
+    }
 }
