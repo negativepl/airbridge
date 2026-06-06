@@ -147,6 +147,11 @@ final class ConnectionService {
         try await server.sendTo(message, connectionId: connectionId)
     }
 
+    /// Poproś telefon o świeże DeviceInfo (np. cyklicznie, dla stanu ładowania na żywo).
+    func requestDeviceInfo() {
+        Task { try? await server.broadcast(.deviceInfoRequest) }
+    }
+
     // MARK: - Auth Handling
 
     func handlePairRequest(deviceName: String, publicKey: String, token: String, from connectionId: String) {

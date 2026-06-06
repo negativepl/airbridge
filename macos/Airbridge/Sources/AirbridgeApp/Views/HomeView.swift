@@ -42,6 +42,15 @@ struct HomeView: View {
                 isPresented: $showPairing
             )
         }
+        .task {
+            // Odświeżaj DeviceInfo co 10 s, by stan/czas ładowania był na żywo.
+            while !Task.isCancelled {
+                if connectionService.isConnected {
+                    connectionService.requestDeviceInfo()
+                }
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+            }
+        }
     }
 
     private var isDisconnected: Bool {
