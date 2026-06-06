@@ -50,6 +50,7 @@ struct OnboardingView: View {
             bottomBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { refreshNotificationStatus() }
         .sheet(isPresented: $showPairing) {
             PairingView(
                 pairingService: pairingService,
@@ -340,7 +341,6 @@ struct OnboardingView: View {
         .onAppear {
             accessibilityGranted = AXIsProcessTrusted()
             screenRecordingGranted = CGPreflightScreenCaptureAccess()
-            refreshNotificationStatus()
         }
     }
 
