@@ -200,7 +200,7 @@ struct FilesBrowserView: View {
                     systemImage: "folder.badge.questionmark",
                     title: L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant file access on your phone",
                     subtitle: L10n.isPL
-                        ? "Na telefonie otwórz AirBridge \u{2192} wizard uprawnie\u{0144} \u{2192} \u{201E}Pliki\u{201D} i zezw\u{00F3}l na dost\u{0119}p do Pami\u{0119}ci wewn\u{0119}trznej."
+                        ? "Na telefonie otwórz AirBridge → wizard uprawnień → „Pliki” i zezwól na dostęp do Pamięci wewnętrznej."
                         : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage."
                 )
                 Button(L10n.isPL ? "Odśwież" : "Refresh") { filesBrowserService.reload() }
