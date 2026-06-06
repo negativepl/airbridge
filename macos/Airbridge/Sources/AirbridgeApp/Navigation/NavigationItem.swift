@@ -30,7 +30,7 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .gallery: return L10n.isPL ? "Galeria" : "Gallery"
         case .files: return L10n.isPL ? "Pliki" : "Files"
         case .messages: return L10n.isPL ? "Wiadomości" : "Messages"
-        case .mirror: return "Mirror"
+        case .mirror: return L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing"
         case .settings: return L10n.isPL ? "Ustawienia" : "Settings"
         }
     }

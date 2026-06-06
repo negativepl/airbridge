@@ -34,7 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Photo
@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(prefs.getBoolean("onboarding_completed", false))
             }
             var themeMode by remember {
-                mutableStateOf(prefs.getString("theme_mode", "system") ?: "system")
+                mutableStateOf(prefs.getString("theme_mode", "dark") ?: "dark")
             }
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
 
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
 
                     val navItems = listOf(
                         NavItem(R.string.nav_home, Icons.Rounded.Home),
-                        NavItem(R.string.nav_history, Icons.Rounded.History),
+                        NavItem(R.string.nav_screen_sharing, Icons.Rounded.ScreenShare),
                         NavItem(R.string.nav_settings, Icons.Rounded.Settings),
                         NavItem(R.string.nav_about, Icons.Rounded.Info)
                     )
@@ -273,7 +273,7 @@ class MainActivity : ComponentActivity() {
                             pageContent = { page ->
                                 when (page) {
                                     0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
-                                    1 -> HistoryScreen(viewModel = viewModel)
+                                    1 -> ScreenShareScreen()
                                     2 -> SettingsScreen(
                                         prefs = prefs,
                                         onThemeChanged = { themeMode = it },

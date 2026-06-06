@@ -147,7 +147,7 @@ struct AirbridgeApp: App {
 
         // Mirror window — shows the live screen stream from the paired phone.
         // Opened programmatically when a mirror session starts.
-        Window("AirBridge Mirror", id: "mirror") {
+        Window(L10n.isPL ? "AirBridge — Udostępnianie ekranu" : "AirBridge — Screen Sharing", id: "mirror") {
             MirrorWindow(mirrorService: mirrorService)
         }
         .defaultSize(width: 540, height: 900)

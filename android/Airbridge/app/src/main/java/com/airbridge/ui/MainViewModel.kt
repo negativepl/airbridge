@@ -95,6 +95,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         )
 
+        // Persist the mirror/pairing token so the phone can initiate screen
+        // sharing (reverse mirror) on its own later.
+        context.getSharedPreferences("airbridge_prefs", android.content.Context.MODE_PRIVATE)
+            .edit().putString("mirror_token", payload.pairingToken).apply()
+
         // Set pending pair request for when WebSocket connects
         AirbridgeService.pendingPairRequest = Triple(
             android.os.Build.MODEL,

@@ -57,7 +57,7 @@ class FileOfferDialogActivity : ComponentActivity() {
 
         // Pick up the user's theme preference so the dialog matches the app.
         val prefs = getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE)
-        val themeMode = prefs.getString("theme_mode", "system") ?: "system"
+        val themeMode = prefs.getString("theme_mode", "dark") ?: "dark"
 
         setContent {
             AirbridgeTheme(themeMode = themeMode) {

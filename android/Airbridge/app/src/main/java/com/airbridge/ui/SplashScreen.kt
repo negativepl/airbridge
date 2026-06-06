@@ -70,7 +70,7 @@ fun SplashScreen(onFinished: () -> Unit) {
         label = "sweep"
     )
 
-    val bgColor = Color(0xFFF5F0EB)
+    val bgColor = Color(0xFFFFFFFF)
     val loaderColor = Color(0xFF1C1B18)
     val loaderTrack = Color(0x301C1B18)
 
@@ -101,10 +101,8 @@ fun SplashScreen(onFinished: () -> Unit) {
             Image(
                 painter = painterResource(R.drawable.logo_airbridge),
                 contentDescription = "AirBridge",
-                modifier = Modifier
-                    .size(160.dp)
-                    .clip(RoundedCornerShape(32.dp)),
-                contentScale = ContentScale.Crop
+                modifier = Modifier.size(160.dp),
+                contentScale = ContentScale.Fit
             )
 
             Spacer(modifier = Modifier.height(32.dp))

@@ -22,7 +22,7 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     private(set) var isRejected: Bool = false
     private(set) var incomingOfferTransferId: String? = nil
     private(set) var incomingOfferFileSize: Int64 = 0
-    var hasIncomingOffer: Bool { incomingOfferTransferId != nil }
+    var hasIncomingOffer: Bool { !pendingOfferIds.isEmpty }
 
     // MARK: - Private
 
@@ -33,6 +33,10 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
     @ObservationIgnored private var isSendingFromQueue = false
     @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
+    /// All incoming offers awaiting one accept/reject (the phone can share many
+    /// files at once — accept/reject must cover every offer, not just the last).
+    @ObservationIgnored private var pendingOfferIds: [String] = []
+    @ObservationIgnored private var pendingOffersTotalSize: Int64 = 0
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
@@ -72,9 +76,15 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         // No withAnimation here — TransferPopupView has .animation(value:
         // stateKind) which catches state changes and animates them. Wrapping
         // in withAnimation creates a competing transaction that conflicts.
+        // Accumulate offers — the phone can share several files at once, each
+        // arriving as its own offer within milliseconds.
+        pendingOfferIds.append(transferId)
+        pendingOffersTotalSize += fileSize
         incomingOfferTransferId = transferId
-        incomingOfferFileSize = fileSize
-        fileTransferFileName = filename
+        incomingOfferFileSize = pendingOffersTotalSize
+        fileTransferFileName = pendingOfferIds.count > 1
+            ? (L10n.isPL ? "\(pendingOfferIds.count) plików" : "\(pendingOfferIds.count) files")
+            : filename
         isReceivingFile = true
         isWaitingForAccept = false
         isRejected = false
@@ -83,21 +93,31 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     }
 
     func acceptIncomingOffer() {
-        guard let transferId = incomingOfferTransferId else { return }
+        guard !pendingOfferIds.isEmpty else { return }
+        let ids = pendingOfferIds
+        pendingOfferIds = []
+        pendingOffersTotalSize = 0
         let connectionService = self.connectionService
         Task {
-            try? await connectionService?.broadcast(Message.fileTransferAccept(transferId: transferId))
+            for id in ids {
+                try? await connectionService?.broadcast(Message.fileTransferAccept(transferId: id))
+            }
         }
-        // Reset offer state — actual upload will arrive via HTTP and trigger the receive flow
+        // Reset offer state — actual uploads arrive via HTTP and trigger the receive flow
         incomingOfferTransferId = nil
         // Keep the popup visible — receive HTTP upload progress will replace it
     }
 
     func rejectIncomingOffer() {
-        guard let transferId = incomingOfferTransferId else { return }
+        guard !pendingOfferIds.isEmpty else { return }
+        let ids = pendingOfferIds
+        pendingOfferIds = []
+        pendingOffersTotalSize = 0
         let connectionService = self.connectionService
         Task {
-            try? await connectionService?.broadcast(Message.fileTransferReject(transferId: transferId))
+            for id in ids {
+                try? await connectionService?.broadcast(Message.fileTransferReject(transferId: id))
+            }
         }
         incomingOfferTransferId = nil
         isRejected = true

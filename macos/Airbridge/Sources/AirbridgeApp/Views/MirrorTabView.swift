@@ -16,7 +16,7 @@ struct MirrorTabView: View {
                 EmptyStateContainer {
                     EmptyStateView(
                         systemImage: "iphone.gen3.radiowaves.left.and.right",
-                        title: "Mirror",
+                        title: L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing",
                         subtitle: L10n.isPL
                             ? "Połącz się z telefonem, aby udostępnić jego ekran."
                             : "Connect to your phone to mirror its screen."
@@ -41,7 +41,7 @@ struct MirrorTabView: View {
             VStack(spacing: 16) {
                 EmptyStateView(
                     systemImage: "rectangle.on.rectangle",
-                    title: L10n.isPL ? "Mirror w osobnym oknie" : "Mirroring in a separate window",
+                    title: L10n.isPL ? "Udostępnianie w osobnym oknie" : "Sharing in a separate window",
                     subtitle: L10n.isPL
                         ? "Stream odtwarza się w wydzielonym oknie."
                         : "The stream is playing in its own window."
@@ -89,7 +89,7 @@ struct MirrorTabView: View {
                 mirrorOptionCard(
                     slot: .forward,
                     icon: "iphone.gen3.radiowaves.left.and.right",
-                    title: L10n.isPL ? "Mirror telefonu" : "Mirror Phone",
+                    title: L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing",
                     subtitle: L10n.isPL
                         ? "Udostępnij ekran telefonu i steruj nim klikając."
                         : "Mirror your phone screen and control it by clicking.",

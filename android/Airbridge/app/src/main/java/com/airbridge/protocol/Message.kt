@@ -54,6 +54,24 @@ data class DeviceInfo(
     val batteryPercent: Int
 )
 
+/** The Mac's own system info — phone acts as a resource monitor for the computer. */
+data class MacInfo(
+    val name: String,
+    val model: String,
+    val chip: String,
+    val osVersion: String,
+    val cpuCores: Int,
+    val cpuLoadPercent: Int,
+    val totalRamBytes: Long,
+    val usedRamBytes: Long,
+    val totalStorageBytes: Long,
+    val freeStorageBytes: Long,
+    val batteryPercent: Int,
+    val batteryCharging: Boolean,
+    val onACPower: Boolean,
+    val uptimeSeconds: Long
+)
+
 enum class ContentType(val value: String) {
     PLAIN_TEXT("text/plain"),
     HTML("text/html"),
@@ -558,6 +576,22 @@ sealed class Message {
         }.toString()
     }
 
+    data object MacInfoRequest : Message() {
+        override fun toJson(): String = JSONObject().apply { put("type", "mac_info_request") }.toString()
+    }
+
+    data class MacInfoResponse(val info: MacInfo) : Message() {
+        override fun toJson(): String = JSONObject().apply { put("type", "mac_info_response") }.toString()
+    }
+
+    data object MacWallpaperRequest : Message() {
+        override fun toJson(): String = JSONObject().apply { put("type", "mac_wallpaper_request") }.toString()
+    }
+
+    data class MacWallpaperResponse(val imageBase64: String) : Message() {
+        override fun toJson(): String = JSONObject().apply { put("type", "mac_wallpaper_response") }.toString()
+    }
+
     data class DeviceInfoResponse(
         val info: DeviceInfo
     ) : Message() {
@@ -815,6 +849,26 @@ sealed class Message {
                 )
                 "device_info_request" -> DeviceInfoRequest
                 "wallpaper_request" -> WallpaperRequest
+                "mac_info_response" -> {
+                    val o = obj.getJSONObject("info")
+                    MacInfoResponse(MacInfo(
+                        name = o.getString("name"),
+                        model = o.getString("model"),
+                        chip = o.getString("chip"),
+                        osVersion = o.getString("os_version"),
+                        cpuCores = o.getInt("cpu_cores"),
+                        cpuLoadPercent = o.optInt("cpu_load_percent", 0),
+                        totalRamBytes = o.getLong("total_ram_bytes"),
+                        usedRamBytes = o.getLong("used_ram_bytes"),
+                        totalStorageBytes = o.getLong("total_storage_bytes"),
+                        freeStorageBytes = o.getLong("free_storage_bytes"),
+                        batteryPercent = o.getInt("battery_percent"),
+                        batteryCharging = o.optBoolean("battery_charging", false),
+                        onACPower = o.optBoolean("on_ac_power", false),
+                        uptimeSeconds = o.optLong("uptime_seconds", 0)
+                    ))
+                }
+                "mac_wallpaper_response" -> MacWallpaperResponse(obj.getString("image"))
                 "folder_stats_request" -> FolderStatsRequest(
                     path = obj.getString("path")
                 )

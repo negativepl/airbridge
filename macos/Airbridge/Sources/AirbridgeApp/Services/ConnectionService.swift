@@ -79,7 +79,7 @@ final class ConnectionService {
     func startServer() {
         guard !serverStarted else { return }
         serverStarted = true
-        statusMessage = "Starting..."
+        statusMessage = L10n.isPL ? "Uruchamianie…" : "Starting…"
 
         Task {
             do {
@@ -113,7 +113,7 @@ final class ConnectionService {
         connectedDeviceName = ""
         deviceInfo = nil
         phoneWallpaper = nil
-        statusMessage = "Stopped"
+        statusMessage = L10n.isPL ? "Zatrzymano" : "Stopped"
         serverStarted = false
     }
 
@@ -151,14 +151,14 @@ final class ConnectionService {
 
     func handlePairRequest(deviceName: String, publicKey: String, token: String, from connectionId: String) {
         guard pairingManager.validateToken(token) else {
-            statusMessage = "Pairing rejected: invalid token"
+            statusMessage = L10n.isPL ? "Parowanie odrzucone: nieprawidłowy token" : "Pairing rejected: invalid token"
             return
         }
 
         pairingManager.completePairing(deviceName: deviceName, publicKey: publicKey)
         connectedDeviceName = deviceName
         connectedClientIP = connectionId.components(separatedBy: ":").first
-        statusMessage = "Paired with \(deviceName)"
+        statusMessage = L10n.isPL ? "Sparowano z \(deviceName)" : "Paired with \(deviceName)"
         isConnected = true
 
         Task {
@@ -211,7 +211,7 @@ final class ConnectionService {
             self.connectedDeviceName = device?.deviceName ?? "Device"
             self.connectedClientIP = connectionId.components(separatedBy: ":").first
             self.isConnected = true
-            self.statusMessage = "Connected to \(self.connectedDeviceName)"
+            self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
 
             // Pull richer device info (exact name, storage, RAM, battery) and
             // the wallpaper for the Home screen.
@@ -258,6 +258,12 @@ final class ConnectionService {
             deviceInfo = info
         case .wallpaperResponse(let imageBase64):
             phoneWallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
+        case .macInfoRequest:
+            let info = MacSystemInfo.collect()
+            Task { try? await server.broadcast(.macInfoResponse(info: info)) }
+        case .macWallpaperRequest:
+            let image = MacSystemInfo.wallpaperJPEGBase64()
+            Task { try? await server.broadcast(.macWallpaperResponse(imageBase64: image)) }
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         default:

@@ -68,6 +68,11 @@ public enum Message: Equatable, Sendable {
     /// wallpaper as base64 JPEG (empty string if unavailable).
     case wallpaperRequest
     case wallpaperResponse(imageBase64: String)
+    /// phone -> Mac: send your own system info / wallpaper (phone as a Mac monitor).
+    case macInfoRequest
+    case macInfoResponse(info: MacInfo)
+    case macWallpaperRequest
+    case macWallpaperResponse(imageBase64: String)
     case folderStatsRequest(path: String)
     case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
 }
@@ -224,6 +229,51 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - MacInfo
+
+/// The Mac's own system info, sent to the phone so it can act as a resource
+/// monitor / controller for the computer.
+public struct MacInfo: Codable, Equatable, Sendable {
+    public let name: String              // computer name
+    public let model: String             // friendly model, e.g. "MacBook Pro"
+    public let chip: String              // e.g. "Apple M3 Pro"
+    public let osVersion: String         // e.g. "macOS 26.0"
+    public let cpuCores: Int
+    public let cpuLoadPercent: Int       // live CPU usage 0-100
+    public let totalRamBytes: Int64
+    public let usedRamBytes: Int64
+    public let totalStorageBytes: Int64
+    public let freeStorageBytes: Int64
+    public let batteryPercent: Int       // -1 if no battery (desktop)
+    public let batteryCharging: Bool
+    public let onACPower: Bool
+    public let uptimeSeconds: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case name, model, chip
+        case osVersion          = "os_version"
+        case cpuCores           = "cpu_cores"
+        case cpuLoadPercent     = "cpu_load_percent"
+        case totalRamBytes      = "total_ram_bytes"
+        case usedRamBytes       = "used_ram_bytes"
+        case totalStorageBytes  = "total_storage_bytes"
+        case freeStorageBytes   = "free_storage_bytes"
+        case batteryPercent     = "battery_percent"
+        case batteryCharging    = "battery_charging"
+        case onACPower          = "on_ac_power"
+        case uptimeSeconds      = "uptime_seconds"
+    }
+
+    public init(name: String, model: String, chip: String, osVersion: String, cpuCores: Int, cpuLoadPercent: Int, totalRamBytes: Int64, usedRamBytes: Int64, totalStorageBytes: Int64, freeStorageBytes: Int64, batteryPercent: Int, batteryCharging: Bool, onACPower: Bool, uptimeSeconds: Int64) {
+        self.name = name; self.model = model; self.chip = chip; self.osVersion = osVersion
+        self.cpuCores = cpuCores; self.cpuLoadPercent = cpuLoadPercent
+        self.totalRamBytes = totalRamBytes; self.usedRamBytes = usedRamBytes
+        self.totalStorageBytes = totalStorageBytes; self.freeStorageBytes = freeStorageBytes
+        self.batteryPercent = batteryPercent; self.batteryCharging = batteryCharging
+        self.onACPower = onACPower; self.uptimeSeconds = uptimeSeconds
+    }
+}
+
 // MARK: - Codable
 
 extension Message: Codable {
@@ -271,6 +321,10 @@ extension Message: Codable {
         case deviceInfoResponse       = "device_info_response"
         case wallpaperRequest         = "wallpaper_request"
         case wallpaperResponse        = "wallpaper_response"
+        case macInfoRequest           = "mac_info_request"
+        case macInfoResponse          = "mac_info_response"
+        case macWallpaperRequest      = "mac_wallpaper_request"
+        case macWallpaperResponse     = "mac_wallpaper_response"
         case folderStatsRequest       = "folder_stats_request"
         case folderStatsResponse      = "folder_stats_response"
     }
@@ -535,6 +589,20 @@ extension Message: Codable {
             try container.encode(TypeKey.wallpaperResponse.rawValue, forKey: .type)
             try container.encode(imageBase64, forKey: .image)
 
+        case .macInfoRequest:
+            try container.encode(TypeKey.macInfoRequest.rawValue, forKey: .type)
+
+        case .macInfoResponse(let info):
+            try container.encode(TypeKey.macInfoResponse.rawValue, forKey: .type)
+            try container.encode(info, forKey: .info)
+
+        case .macWallpaperRequest:
+            try container.encode(TypeKey.macWallpaperRequest.rawValue, forKey: .type)
+
+        case .macWallpaperResponse(let imageBase64):
+            try container.encode(TypeKey.macWallpaperResponse.rawValue, forKey: .type)
+            try container.encode(imageBase64, forKey: .image)
+
         case .folderStatsRequest(let path):
             try container.encode(TypeKey.folderStatsRequest.rawValue, forKey: .type)
             try container.encode(path, forKey: .path)
@@ -774,6 +842,20 @@ extension Message: Codable {
         case .wallpaperResponse:
             let image = try container.decode(String.self, forKey: .image)
             self = .wallpaperResponse(imageBase64: image)
+
+        case .macInfoRequest:
+            self = .macInfoRequest
+
+        case .macInfoResponse:
+            let info = try container.decode(MacInfo.self, forKey: .info)
+            self = .macInfoResponse(info: info)
+
+        case .macWallpaperRequest:
+            self = .macWallpaperRequest
+
+        case .macWallpaperResponse:
+            let image = try container.decode(String.self, forKey: .image)
+            self = .macWallpaperResponse(imageBase64: image)
 
         case .folderStatsRequest:
             let path = try container.decode(String.self, forKey: .path)

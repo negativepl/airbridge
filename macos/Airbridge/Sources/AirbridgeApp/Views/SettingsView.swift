@@ -36,7 +36,6 @@ struct SettingsView: View {
             generalSection
             quickDropSection
             fileTransferSection
-            connectionSection(vm)
         }
         .onAppear {
             pairingService.refreshPairedDevices()
@@ -86,11 +85,15 @@ struct SettingsView: View {
             systemImage: "iphone"
         ) {
             if vm.pairedDevices.isEmpty {
-                Text(L10n.noDevicePaired)
-                    .font(.ab(.body))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Text(L10n.noDevicePaired)
+                        .font(.ab(.body))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    addDeviceButton
+                }
             } else {
-                ForEach(vm.pairedDevices, id: \.publicKeyBase64) { device in
+                ForEach(Array(vm.pairedDevices.enumerated()), id: \.element.publicKeyBase64) { index, device in
                     HStack(spacing: 12) {
                         Image(systemName: "iphone")
                             .font(.ab(.title3))
@@ -103,20 +106,26 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        // "Add" sits next to the last device's "Remove".
+                        if index == vm.pairedDevices.count - 1 {
+                            addDeviceButton
+                        }
                         Button(L10n.isPL ? "Usuń" : "Remove", role: .destructive) {
                             vm.unpairDevice(publicKey: device.publicKeyBase64)
                         }
-                        .controlSize(.large)
+                        .controlSize(.extraLarge)
                     }
                 }
             }
-
-            Button(L10n.isPL ? "Dodaj nowe urządzenie" : "Add New Device") {
-                showPairing = true
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
+    }
+
+    private var addDeviceButton: some View {
+        Button(L10n.isPL ? "Dodaj nowe urządzenie" : "Add New Device") {
+            showPairing = true
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.extraLarge)
     }
 
     private var generalSection: some View {
@@ -170,7 +179,8 @@ struct SettingsView: View {
                         hotkeyService.requestAccessibilityAndStart()
                         startAccessibilityPolling()
                     }
-                    .controlSize(.large)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.extraLarge)
                 }
             }
 
@@ -202,12 +212,12 @@ struct SettingsView: View {
 
                 Button(isRecordingShortcut
                     ? (L10n.isPL ? "Anuluj" : "Cancel")
-                    : (L10n.isPL ? "Zmień" : "Change")
+                    : L10n.change
                 ) {
                     isRecordingShortcut.toggle()
                     if !isRecordingShortcut { stopRecordingShortcut() }
                 }
-                .controlSize(.large)
+                .controlSize(.extraLarge)
 
                 if UserDefaults.standard.integer(forKey: "dropZoneShortcutKeyCode") != 0 {
                     Button(L10n.resetToDefault) {
@@ -215,7 +225,7 @@ struct SettingsView: View {
                         UserDefaults.standard.removeObject(forKey: "dropZoneShortcutModifiers")
                         shortcutDisplay = GlobalHotkeyService.currentShortcutDisplay()
                     }
-                    .controlSize(.large)
+                    .controlSize(.extraLarge)
                 }
             }
         }
@@ -233,40 +243,12 @@ struct SettingsView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Button(L10n.change) { chooseDownloadFolder() }
-                    .controlSize(.large)
+                    .controlSize(.extraLarge)
             }
 
             Text(L10n.receivedFilesSaved)
                 .font(.ab(.footnote))
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private func connectionSection(_ vm: SettingsViewModel) -> some View {
-        GlassSection(title: LocalizedStringKey(L10n.connection), systemImage: "antenna.radiowaves.left.and.right") {
-            HStack {
-                Text(L10n.status)
-                    .font(.ab(.body))
-                Spacer()
-                HStack(spacing: 6) {
-                    StatusIndicator(state: vm.isConnected ? .connected : .disconnected, size: 12)
-                    Text(vm.isConnected ? L10n.connected : L10n.notConnected)
-                        .font(.ab(.body))
-                }
-            }
-
-            if let ip = vm.localIP {
-                HStack {
-                    Text(L10n.localIP)
-                        .font(.ab(.body))
-                    Spacer()
-                    Text(ip)
-                        .font(.ab(.body))
-                        .textSelection(.enabled)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-            }
         }
     }
 

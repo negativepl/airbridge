@@ -254,14 +254,20 @@ private fun WelcomePage() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(32.dp))
-        Image(
-            painter = painterResource(R.drawable.logo_airbridge),
-            contentDescription = "AirBridge",
+        androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(28.dp)),
-            contentScale = ContentScale.Crop
-        )
+                .clip(RoundedCornerShape(28.dp))
+                .background(androidx.compose.ui.graphics.Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.logo_airbridge),
+                contentDescription = "AirBridge",
+                modifier = Modifier.size(112.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 

@@ -70,15 +70,21 @@ fun AboutScreen() {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Logo + name + version
-        Image(
-            painter = painterResource(R.drawable.logo_airbridge),
-            contentDescription = stringResource(R.string.app_name),
+        // Logo on a light tile (the mark is dark, so it needs a light backdrop)
+        Box(
             modifier = Modifier
                 .size(120.dp)
-                .clip(RoundedCornerShape(24.dp)),
-            contentScale = ContentScale.Crop
-        )
+                .clip(RoundedCornerShape(24.dp))
+                .background(androidx.compose.ui.graphics.Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.logo_airbridge),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier.size(96.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 

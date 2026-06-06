@@ -131,13 +131,29 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Device Card ──
-        DeviceCard(
-            isConnected = isConnected,
-            deviceName = connectedDeviceName,
-            onDisconnect = { viewModel.disconnect() },
-            onReconnect = { viewModel.reconnect() }
-        )
+        // ── Device / Mac monitor ──
+        val macInfo by AirbridgeService.macInfo.collectAsState()
+        val macWallpaper by AirbridgeService.macWallpaper.collectAsState()
+
+        // Live-refresh the Mac stats while connected.
+        LaunchedEffect(isConnected) {
+            while (isConnected) {
+                AirbridgeService.requestMacInfo()
+                delay(3000)
+            }
+        }
+
+        val mac = macInfo
+        if (isConnected && mac != null) {
+            MacMonitorCard(info = mac, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
+        } else {
+            DeviceCard(
+                isConnected = isConnected,
+                deviceName = connectedDeviceName,
+                onDisconnect = { viewModel.disconnect() },
+                onReconnect = { viewModel.reconnect() }
+            )
+        }
 
         // ── Transfer progress ──
         var transferExpanded by remember { mutableStateOf(false) }
@@ -279,56 +295,6 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                     }
                 }
             }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ── Recent Transfers (last 3) ──
-        Text(
-            text = stringResource(R.string.recent_activity),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = CardShape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        ) {
-            val lastThree = recentActivity.take(3)
-            if (lastThree.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.no_activity),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    lastThree.forEachIndexed { index, item ->
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = true,
-                            enter = androidx.compose.animation.slideInVertically(
-                                initialOffsetY = { -it },
-                                animationSpec = androidx.compose.animation.core.tween(300, delayMillis = index * 50)
-                            ) + androidx.compose.animation.fadeIn(
-                                animationSpec = androidx.compose.animation.core.tween(300, delayMillis = index * 50)
-                            )
-                        ) {
-                            RecentTransferRow(item = item, now = now)
-                        }
-                        if (index < lastThree.lastIndex) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
-                }
             }
         }
 

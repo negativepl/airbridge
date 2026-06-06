@@ -73,6 +73,9 @@ class AirbridgeService : Service() {
         val isConnected = MutableStateFlow(false)
         val connectedDeviceName = MutableStateFlow<String?>(null)
         val connectedHost = MutableStateFlow<String?>(null)
+        val mirrorPortFlow = MutableStateFlow<Int?>(null)   // Mac mirror server port (phone-initiated reverse mirror)
+        val macInfo = MutableStateFlow<com.airbridge.protocol.MacInfo?>(null)
+        val macWallpaper = MutableStateFlow<String?>(null)  // base64 JPEG
         val connectedSince = MutableStateFlow<Long?>(null)
         val recentActivity = MutableStateFlow<List<ActivityItem>>(emptyList())
 
@@ -111,6 +114,12 @@ class AirbridgeService : Service() {
 
         fun sendPing() {
             instance?.sendPing()
+        }
+
+        /** Re-request the Mac's live system info (for the Home monitor refresh). */
+        fun requestMacInfo() {
+            val svc = instance ?: return
+            if (svc.webSocketClient.isConnected) svc.webSocketClient.send(Message.MacInfoRequest)
         }
 
         @Volatile
@@ -311,6 +320,8 @@ class AirbridgeService : Service() {
             clipboardSync.stopListening()
             isConnected.value = false
             connectedSince.value = null
+            macInfo.value = null
+            macWallpaper.value = null
             // Keep connectedHost — WebSocket auto-reconnects to same host
             // status tracked via StateFlow, no notification update needed
         }
@@ -350,6 +361,7 @@ class AirbridgeService : Service() {
             connectedDeviceName.value = deviceName
             Companion.httpPort.value = httpPort
             currentMirrorPort = mirrorPort
+            Companion.mirrorPortFlow.value = mirrorPort
             nsdDiscovery.stopDiscovery()
             webSocketClient.shouldReconnect = true
             webSocketClient.connect(host, port)
@@ -633,6 +645,9 @@ class AirbridgeService : Service() {
                     clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
+                    // Pull the Mac's system info + wallpaper for the Home monitor.
+                    webSocketClient.send(Message.MacInfoRequest)
+                    webSocketClient.send(Message.MacWallpaperRequest)
                     // connection status tracked via StateFlow
                 } else {
                     Log.w(TAG, "Auth rejected: ${message.reason}")
@@ -933,6 +948,7 @@ class AirbridgeService : Service() {
                     Log.w(TAG, "MirrorStartRequest received but host=$host mirrorPort=$mirrorPort — ignoring")
                     return
                 }
+                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit().putString("mirror_token", message.token).apply()
                 val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
                 val intent = Intent(this, com.airbridge.mirror.MirrorActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -950,6 +966,7 @@ class AirbridgeService : Service() {
                     Log.w(TAG, "ReverseMirrorStart received but host=$host mirrorPort=$mirrorPort — ignoring")
                     return
                 }
+                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit().putString("mirror_token", message.token).apply()
                 val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
                 val intent = Intent(this, com.airbridge.mirror.ReverseMirrorActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -980,6 +997,12 @@ class AirbridgeService : Service() {
                         Log.e(TAG, "DeviceInfoRequest failed", e)
                     }
                 }
+            }
+            is Message.MacInfoResponse -> {
+                macInfo.value = message.info
+            }
+            is Message.MacWallpaperResponse -> {
+                macWallpaper.value = message.imageBase64.takeIf { it.isNotEmpty() }
             }
             is Message.WallpaperRequest -> {
                 serviceScope.launch {

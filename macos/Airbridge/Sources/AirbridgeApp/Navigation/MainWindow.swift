@@ -124,7 +124,7 @@ struct MainWindow: View {
                     } label: {
                         Label(L10n.isPL ? "Zatrzymaj" : "Stop", systemImage: "stop.fill")
                     }
-                    .help(L10n.isPL ? "Zatrzymaj mirror" : "Stop mirroring")
+                    .help(L10n.isPL ? "Zatrzymaj udostępnianie" : "Stop sharing")
                 }
             }
         }

@@ -131,6 +131,7 @@
     <!-- Navigation -->
     <string name="nav_home">Główna</string>
     <string name="nav_history">Historia</string>
+    <string name="nav_screen_sharing">Ekran</string>
     <string name="nav_send">Wyślij</string>
     <string name="nav_settings">Ustawienia</string>
     <string name="nav_about">O aplikacji</string>
@@ -169,7 +170,7 @@
     <string name="about_description">Połącz telefon z komputerem Mac. Synchronizuj schowek, przesyłaj pliki — wszystko lokalnie, bez chmury.</string>
     <string name="about_created_by">Autor</string>
     <string name="about_author">Marcin Baszewski</string>
-    <string name="about_powered_by">Powered by Claude Opus 4.6</string>
+    <string name="about_powered_by">Powered by Claude Opus 4.8</string>
     <string name="about_source_code">Kod źródłowy na GitHub</string>
     <string name="about_report_issue">Zgłoś problem</string>
     <string name="about_open_source">AirBridge jest open source</string>
@@ -192,4 +193,14 @@
     <string name="pairing_success_desc">Połączono z %s</string>
     <string name="pairing_success_connected">Połączenie aktywne</string>
     <string name="pairing_success_continue">Dalej</string>
+    <string name="screen_sharing_title">Udostępnianie ekranu</string>
+    <string name="screen_sharing_show_mac">Pokaż ekran Maca</string>
+    <string name="screen_sharing_show_mac_desc">Podgląd i sterowanie głównym ekranem Maca.</string>
+    <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>
+    <string name="screen_sharing_second_display_desc">Dodatkowy pulpit dopasowany do ekranu telefonu.</string>
+    <string name="screen_sharing_connect_first">Połącz się z Makiem, aby udostępniać ekran.</string>
+    <string name="mac_disk">Dysk</string>
+    <string name="power_adapter">Zasilacz</string>
+    <string name="power_battery">Bateria</string>
+    <string name="power_charging">Ładowanie</string>
 </resources>

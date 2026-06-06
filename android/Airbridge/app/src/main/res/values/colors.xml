@@ -6,9 +6,9 @@
     <color name="purple_surface">#FFF8F5</color>
     <color name="purple_on_surface">#1C1B18</color>
     <color name="white">#FFFFFF</color>
-    <color name="splash_bg">#F5F0EB</color>
-    <!-- Matches AirbridgeTheme's LightColorScheme.surface (#FFF9F5) so
-         ShareReceiverActivity's window background is identical to the
-         Compose surface it renders — no white flash during activity launch. -->
-    <color name="share_bg">#FFF9F5</color>
+    <color name="splash_bg">#FFFFFF</color>
+    <!-- Matches AirbridgeTheme's dark DarkColorScheme.surface (#141318) so the
+         ShareReceiverActivity window background is identical to the Compose
+         surface it renders (dark by default) — no flash during launch. -->
+    <color name="share_bg">#141318</color>
 </resources>
