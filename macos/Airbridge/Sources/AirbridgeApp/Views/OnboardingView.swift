@@ -209,7 +209,6 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Page 2: How it works
@@ -273,7 +272,6 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Page 3: Permissions
@@ -339,7 +337,6 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             accessibilityGranted = AXIsProcessTrusted()
             screenRecordingGranted = CGPreflightScreenCaptureAccess()
@@ -429,7 +426,6 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Components
