@@ -144,15 +144,20 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
         }
 
         val mac = macInfo
-        if (isConnected && mac != null) {
-            MacMonitorCard(info = mac, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
-        } else {
-            DeviceCard(
-                isConnected = isConnected,
-                deviceName = connectedDeviceName,
-                onDisconnect = { viewModel.disconnect() },
-                onReconnect = { viewModel.reconnect() }
-            )
+        when {
+            isConnected && mac != null ->
+                MacMonitorCard(info = mac, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
+            // Połączono, ale dane Maca jeszcze nie dotarły — spójny stan ładowania
+            // zamiast błysku "połączonego" DeviceCard zanim przyjdzie MacInfo.
+            isConnected ->
+                ConnectingCard(deviceName = connectedDeviceName)
+            else ->
+                DeviceCard(
+                    isConnected = isConnected,
+                    deviceName = connectedDeviceName,
+                    onDisconnect = { viewModel.disconnect() },
+                    onReconnect = { viewModel.reconnect() }
+                )
         }
 
         // ── Transfer progress ──
@@ -304,6 +309,43 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
 }
 
 // ── Device Card ──
+
+@Composable
+private fun ConnectingCard(deviceName: String?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardShape,
+        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.connecting),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (deviceName != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = deviceName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun DeviceCard(
