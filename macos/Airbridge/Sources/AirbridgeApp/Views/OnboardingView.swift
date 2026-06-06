@@ -289,6 +289,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
 
             permissionRow(
+                icon: "bell.badge",
                 title: isPL ? "Powiadomienia" : "Notifications",
                 why: isPL ? "Powiadomienia z telefonu na Macu" : "Phone notifications on your Mac",
                 granted: notificationsAuthorized,
@@ -298,6 +299,7 @@ struct OnboardingView: View {
                     }
                 })
             permissionRow(
+                icon: "hand.tap",
                 title: isPL ? "Dostępność" : "Accessibility",
                 why: isPL ? "Skrót Quick Drop i sterowanie telefonem" : "Quick Drop shortcut & controlling your phone",
                 granted: accessibilityGranted,
@@ -306,6 +308,7 @@ struct OnboardingView: View {
                     startAccessibilityPolling()
                 })
             permissionRow(
+                icon: "macwindow",
                 title: isPL ? "Nagrywanie ekranu" : "Screen recording",
                 why: isPL ? "Pokazywanie ekranu Maca na telefonie" : "Show your Mac's screen on your phone",
                 granted: screenRecordingGranted,
@@ -314,6 +317,7 @@ struct OnboardingView: View {
                     screenRecordingGranted = CGPreflightScreenCaptureAccess()
                 })
             permissionRow(
+                icon: "wifi",
                 title: isPL ? "Sieć lokalna" : "Local network",
                 why: isPL ? "Wykrywanie telefonu w Wi-Fi (systemowo przy 1. połączeniu)" : "Discover your phone on Wi-Fi (granted on first connect)",
                 granted: true,
@@ -328,15 +332,23 @@ struct OnboardingView: View {
     }
 
     @ViewBuilder
-    private func permissionRow(title: String, why: String, granted: Bool, grant: (() -> Void)?) -> some View {
-        HStack(spacing: 12) {
+    private func permissionRow(icon: String, title: String, why: String, granted: Bool, grant: (() -> Void)?) -> some View {
+        HStack(spacing: 18) {
+            Image(systemName: icon)
+                .font(.ab(.title2))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .glassEffect(.regular.tint(.accentColor), in: .rect(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.ab(.body)).fontWeight(.medium)
-                Text(why).font(.ab(.caption)).foregroundStyle(.secondary)
+                Text(title).font(.ab(.headline))
+                Text(why).font(.ab(.subheadline)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
-            StatusIndicator(state: granted ? .connected : .error, size: 12)
-            if !granted, let grant {
+            Spacer(minLength: 12)
+            if granted {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.ab(.title3)).foregroundStyle(.green)
+            } else if let grant {
                 Button(isPL ? "Przyznaj" : "Grant", action: grant)
                     .buttonStyle(.bordered).controlSize(.small)
             }
