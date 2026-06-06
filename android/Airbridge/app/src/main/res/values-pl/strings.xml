@@ -203,5 +203,4 @@
     <string name="power_adapter">Zasilacz</string>
     <string name="power_battery">Bateria</string>
     <string name="power_charging">Ładowanie</string>
-    <string name="power_source">Źródło zasilania</string>
 </resources>
