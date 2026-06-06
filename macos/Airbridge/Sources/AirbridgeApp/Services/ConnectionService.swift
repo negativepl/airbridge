@@ -252,7 +252,7 @@ final class ConnectionService {
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
             smsHandler?.handleMessage(message)
-        case .filesListResponse, .fileThumbnailResponse, .folderStatsResponse:
+        case .filesListResponse, .fileThumbnailResponse, .folderStatsResponse, .fileDeleteResponse:
             filesHandler?.handleMessage(message)
         case .deviceInfoResponse(let info):
             deviceInfo = info
