@@ -54,4 +54,25 @@ class FilesMessageTest {
         assertEquals(true, parsed.foldersFirst)
         assertEquals("", parsed.query)
     }
+
+    @Test fun fileDeleteRequestRoundTrip() {
+        val msg = Message.FileDeleteRequest("DCIM/old.jpg")
+        val parsed = Message.fromJson(msg.toJson()) as Message.FileDeleteRequest
+        assertEquals("DCIM/old.jpg", parsed.path)
+    }
+
+    @Test fun fileDeleteResponseSuccessRoundTrip() {
+        val msg = Message.FileDeleteResponse("DCIM/old.jpg", true, null)
+        val parsed = Message.fromJson(msg.toJson()) as Message.FileDeleteResponse
+        assertEquals("DCIM/old.jpg", parsed.path)
+        assertEquals(true, parsed.success)
+        assertEquals(null, parsed.error)
+    }
+
+    @Test fun fileDeleteResponseErrorRoundTrip() {
+        val msg = Message.FileDeleteResponse("DCIM/old.jpg", false, "delete_failed")
+        val parsed = Message.fromJson(msg.toJson()) as Message.FileDeleteResponse
+        assertEquals(false, parsed.success)
+        assertEquals("delete_failed", parsed.error)
+    }
 }

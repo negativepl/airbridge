@@ -429,6 +429,28 @@ sealed class Message {
         }.toString()
     }
 
+    data class FileDeleteRequest(
+        val path: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_delete_request")
+            put("path", path)
+        }.toString()
+    }
+
+    data class FileDeleteResponse(
+        val path: String,
+        val success: Boolean,
+        val error: String? = null
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_delete_response")
+            put("path", path)
+            put("success", success)
+            if (error != null) put("error", error)
+        }.toString()
+    }
+
     data class SmsConversationsRequest(
         val page: Int,
         val pageSize: Int
@@ -790,6 +812,14 @@ sealed class Message {
                 "file_download_request" -> FileDownloadRequest(
                     transferId = obj.getString("transfer_id"),
                     path = obj.getString("path")
+                )
+                "file_delete_request" -> FileDeleteRequest(
+                    path = obj.getString("path")
+                )
+                "file_delete_response" -> FileDeleteResponse(
+                    path = obj.getString("path"),
+                    success = obj.getBoolean("success"),
+                    error = if (obj.has("error")) obj.getString("error") else null
                 )
                 "sms_conversations_request" -> SmsConversationsRequest(
                     page = obj.optInt("page", 0),
