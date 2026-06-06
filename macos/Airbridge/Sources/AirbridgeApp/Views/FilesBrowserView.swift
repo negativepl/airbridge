@@ -6,6 +6,11 @@ struct FilesBrowserView: View {
     let filesBrowserService: FilesBrowserService
     let connectionService: ConnectionService
 
+    @AppStorage("files.viewMode") private var viewModeRaw: String = FileViewMode.list.rawValue
+    @State private var searchText: String = ""
+
+    private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
+
     var body: some View {
         Group {
             if !connectionService.isConnected {
@@ -13,12 +18,14 @@ struct FilesBrowserView: View {
             } else {
                 VStack(spacing: 0) {
                     breadcrumbBar
+                    toolbarBar
                     Divider()
                     content
                 }
             }
         }
         .onAppear {
+            filesBrowserService.loadPersistedSort()
             if connectionService.isConnected && !filesBrowserService.hasLoadedOnce {
                 filesBrowserService.open(path: "")
             }
@@ -69,6 +76,72 @@ struct FilesBrowserView: View {
         .padding(.vertical, 10)
     }
 
+    private var toolbarBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(L10n.isPL ? "Szukaj wszędzie" : "Search everywhere", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .onChange(of: searchText) { _, new in
+                        filesBrowserService.setSearchQuery(new)
+                    }
+                if !searchText.isEmpty {
+                    Button { searchText = ""; filesBrowserService.setSearchQuery("") } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+            .frame(maxWidth: 280)
+
+            Spacer()
+
+            sortMenu
+
+            Picker("", selection: Binding(
+                get: { viewMode },
+                set: { viewModeRaw = $0.rawValue }
+            )) {
+                Image(systemName: "list.bullet").tag(FileViewMode.list)
+                Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker(L10n.isPL ? "Sortuj wg" : "Sort by",
+                   selection: Binding(get: { filesBrowserService.sortBy },
+                                      set: { filesBrowserService.sortBy = $0 })) {
+                Text(L10n.isPL ? "Nazwa" : "Name").tag(FileSortKey.name)
+                Text(L10n.isPL ? "Rozmiar" : "Size").tag(FileSortKey.size)
+                Text(L10n.isPL ? "Data modyfikacji" : "Date modified").tag(FileSortKey.modified)
+                Text(L10n.isPL ? "Typ" : "Type").tag(FileSortKey.type)
+            }
+            Divider()
+            Picker(L10n.isPL ? "Kierunek" : "Order",
+                   selection: Binding(get: { filesBrowserService.sortAscending },
+                                      set: { filesBrowserService.sortAscending = $0 })) {
+                Text(L10n.isPL ? "Rosnąco" : "Ascending").tag(true)
+                Text(L10n.isPL ? "Malejąco" : "Descending").tag(false)
+            }
+            Divider()
+            Toggle(L10n.isPL ? "Foldery na początku" : "Folders first",
+                   isOn: Binding(get: { filesBrowserService.foldersFirst },
+                                 set: { filesBrowserService.foldersFirst = $0 }))
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
     @ViewBuilder
     private var content: some View {
         if filesBrowserService.needsPermission {
@@ -78,21 +151,46 @@ struct FilesBrowserView: View {
             ProgressView()
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if viewMode == .grid {
+            gridView
         } else {
-            List {
+            listView
+        }
+    }
+
+    private var listView: some View {
+        List {
+            ForEach(filesBrowserService.displayedEntries) { entry in
+                FileRow(
+                    entry: entry,
+                    thumbnail: filesBrowserService.thumbnails[entry.relativePath],
+                    stats: filesBrowserService.folderStats[entry.relativePath],
+                    showPath: filesBrowserService.isSearching
+                )
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
+            }
+        }
+        .listStyle(.inset)
+        .animation(.default, value: filesBrowserService.displayedEntries.count)
+    }
+
+    private var gridView: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 16)], spacing: 16) {
                 ForEach(filesBrowserService.displayedEntries) { entry in
-                    FileRow(
+                    FileGridCell(
                         entry: entry,
                         thumbnail: filesBrowserService.thumbnails[entry.relativePath],
-                        stats: filesBrowserService.folderStats[entry.relativePath]
+                        showPath: filesBrowserService.isSearching
                     )
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
                 }
             }
-            .listStyle(.inset)
-            .animation(.default, value: filesBrowserService.displayedEntries.count)
+            .padding(16)
         }
+        .animation(.default, value: filesBrowserService.displayedEntries.count)
     }
 
     private var permissionEmptyState: some View {
@@ -102,7 +200,7 @@ struct FilesBrowserView: View {
                     systemImage: "folder.badge.questionmark",
                     title: L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant file access on your phone",
                     subtitle: L10n.isPL
-                        ? "Na telefonie otwórz AirBridge → wizard uprawnień → „Pliki” i zezwól na dostęp do Pamięci wewnętrznej."
+                        ? "Na telefonie otwórz AirBridge \u{2192} wizard uprawnie\u{0144} \u{2192} \u{201E}Pliki\u{201D} i zezw\u{00F3}l na dost\u{0119}p do Pami\u{0119}ci wewn\u{0119}trznej."
                         : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage."
                 )
                 Button(L10n.isPL ? "Odśwież" : "Refresh") { filesBrowserService.reload() }
@@ -141,12 +239,13 @@ private struct FileRow: View {
     let entry: FileEntry
     let thumbnail: NSImage?
     var stats: FolderStats? = nil
+    var showPath: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
             icon
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name).lineLimit(1)
+                Text(showPath ? entry.relativePath : entry.name).lineLimit(1)
                 if entry.isDirectory {
                     if let stats {
                         Text(Self.folderSubtitle(stats))
@@ -212,4 +311,40 @@ private struct FileRow: View {
     private static let sizeFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter(); f.countStyle = .file; return f
     }()
+}
+
+private struct FileGridCell: View {
+    let entry: FileEntry
+    let thumbnail: NSImage?
+    var showPath: Bool = false
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8).fill(.quaternary)
+                if let thumbnail {
+                    Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fill)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Image(systemName: entry.isDirectory ? "folder.fill" : FileGridCell.symbol(for: entry.mimeType))
+                        .font(.system(size: 34))
+                        .foregroundStyle(entry.isDirectory ? Color.accentColor : Color.secondary)
+                }
+            }
+            .frame(width: 96, height: 96)
+
+            Text(showPath ? entry.relativePath : entry.name)
+                .font(.caption).lineLimit(2).multilineTextAlignment(.center)
+                .frame(maxWidth: 104)
+        }
+    }
+
+    static func symbol(for mime: String) -> String {
+        if mime.hasPrefix("image/") { return "photo" }
+        if mime.hasPrefix("video/") { return "film" }
+        if mime.hasPrefix("audio/") { return "music.note" }
+        if mime == "application/pdf" { return "doc.richtext" }
+        if mime.hasPrefix("text/") { return "doc.text" }
+        return "doc"
+    }
 }
