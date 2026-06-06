@@ -33,17 +33,18 @@ final class FilesBrowserService: MessageHandler {
 
     private(set) var searchQuery: String = ""
     var sortBy: FileSortKey = .name {
-        didSet { guard oldValue != sortBy else { return }; persistSort(); reload() }
+        didSet { guard oldValue != sortBy, !isLoadingSortPrefs else { return }; persistSort(); reload() }
     }
     var sortAscending: Bool = true {
-        didSet { guard oldValue != sortAscending else { return }; persistSort(); reload() }
+        didSet { guard oldValue != sortAscending, !isLoadingSortPrefs else { return }; persistSort(); reload() }
     }
     var foldersFirst: Bool = true {
-        didSet { guard oldValue != foldersFirst else { return }; persistSort(); reload() }
+        didSet { guard oldValue != foldersFirst, !isLoadingSortPrefs else { return }; persistSort(); reload() }
     }
     /// Czy aktualnie pokazujemy wyniki wyszukiwania (globalne, rekurencyjne).
     var isSearching: Bool { !searchQuery.isEmpty }
 
+    private var isLoadingSortPrefs = false
     private var requestedThumbnails: Set<String> = []
     private var requestedFolderStats: Set<String> = []
     private let pageSize = 200
@@ -55,24 +56,33 @@ final class FilesBrowserService: MessageHandler {
         self.fileTransferService = fileTransferService
     }
 
+    private enum DefaultsKey {
+        static let sortBy        = "files.sortBy"
+        static let sortAscending = "files.sortAscending"
+        static let foldersFirst  = "files.foldersFirst"
+    }
+
     func loadPersistedSort() {
+        isLoadingSortPrefs = true
         let d = UserDefaults.standard
-        if let raw = d.string(forKey: "files.sortBy"), let key = FileSortKey(rawValue: raw) {
+        if let raw = d.string(forKey: DefaultsKey.sortBy), let key = FileSortKey(rawValue: raw) {
             sortBy = key
         }
-        if d.object(forKey: "files.sortAscending") != nil {
-            sortAscending = d.bool(forKey: "files.sortAscending")
+        if d.object(forKey: DefaultsKey.sortAscending) != nil {
+            sortAscending = d.bool(forKey: DefaultsKey.sortAscending)
         }
-        if d.object(forKey: "files.foldersFirst") != nil {
-            foldersFirst = d.bool(forKey: "files.foldersFirst")
+        if d.object(forKey: DefaultsKey.foldersFirst) != nil {
+            foldersFirst = d.bool(forKey: DefaultsKey.foldersFirst)
         }
+        isLoadingSortPrefs = false
+        reload()
     }
 
     private func persistSort() {
         let d = UserDefaults.standard
-        d.set(sortBy.rawValue, forKey: "files.sortBy")
-        d.set(sortAscending, forKey: "files.sortAscending")
-        d.set(foldersFirst, forKey: "files.foldersFirst")
+        d.set(sortBy.rawValue, forKey: DefaultsKey.sortBy)
+        d.set(sortAscending, forKey: DefaultsKey.sortAscending)
+        d.set(foldersFirst, forKey: DefaultsKey.foldersFirst)
     }
 
     /// Breadcrumb segmenty bieżącej ścieżki.
@@ -114,8 +124,12 @@ final class FilesBrowserService: MessageHandler {
         let effective = trimmed.count >= 2 ? trimmed : ""
         guard effective != searchQuery else { return }
         searchTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled, let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: 300_000_000)
+            } catch {
+                return   // anulowane — nic nie rób
+            }
+            guard let self else { return }
             self.searchQuery = effective
             self.open(path: self.currentPath)
         }
