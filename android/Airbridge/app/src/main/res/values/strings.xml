@@ -6,8 +6,10 @@
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">AirBridge</string>
     <string name="onboarding_welcome_desc">Your phone and Mac, finally on the same team.</string>
-    <string name="onboarding_feature_clipboard">Instantly copy text between your phone and Mac</string>
-    <string name="onboarding_feature_files">Send photos and files — no cables, no cloud</string>
+    <string name="onboarding_feature_clipboard">Sync the clipboard between your phone and Mac</string>
+    <string name="onboarding_feature_files">Browse and transfer files and photos — no cloud</string>
+    <string name="onboarding_feature_notifications">Your phone notifications on your Mac</string>
+    <string name="onboarding_feature_more">…and that\'s not all — discover the rest inside the app</string>
     <string name="onboarding_feature_local">Private — your data never leaves your home network</string>
     <string name="onboarding_connect_title">How it works</string>
     <string name="onboarding_connect_desc">Three things you should know:</string>

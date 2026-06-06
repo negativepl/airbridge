@@ -175,21 +175,29 @@ struct OnboardingView: View {
                 featureRow(
                     icon: "doc.on.clipboard",
                     text: isPL
-                        ? "Synchronizuj schowek między telefonem a komputerem Mac"
-                        : "Instantly copy text between your phone and Mac"
+                        ? "Synchronizuj schowek między telefonem a Makiem"
+                        : "Sync the clipboard between your phone and Mac"
                 )
                 featureRow(
-                    icon: "doc.fill",
+                    icon: "photo.on.rectangle",
                     text: isPL
-                        ? "Przesyłaj zdjęcia i pliki bezprzewodowo, bez chmury"
-                        : "Send photos and files — no cables, no cloud"
+                        ? "Przeglądaj i przesyłaj pliki oraz zdjęcia, bez chmury"
+                        : "Browse and transfer files and photos — no cloud"
                 )
                 featureRow(
-                    icon: "lock.shield.fill",
+                    icon: "rectangle.on.rectangle",
                     text: isPL
-                        ? "Wszystko zostaje w Twojej sieci — pełna prywatność"
-                        : "Private — your data never leaves your home network"
+                        ? "Pokaż ekran telefonu na Macu — i odwrotnie"
+                        : "Mirror your phone screen on your Mac — and back"
                 )
+                featureRow(
+                    icon: "bell.badge",
+                    text: isPL
+                        ? "Powiadomienia z telefonu na Macu"
+                        : "Your phone notifications on your Mac"
+                )
+
+                moreFeaturesTile
             }
             .frame(maxWidth: 560, alignment: .leading)
 
@@ -391,6 +399,24 @@ struct OnboardingView: View {
                 .font(.ab(.headline))
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var moreFeaturesTile: some View {
+        HStack(spacing: 18) {
+            Image(systemName: "sparkles")
+                .font(.ab(.title2))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .glassEffect(.regular.tint(.accentColor), in: .rect(cornerRadius: 12, style: .continuous))
+            Text(isPL
+                ? "…i to nie wszystkie funkcje — resztę odkryjesz w aplikacji"
+                : "…and that's not all — discover the rest inside the app")
+                .font(.ab(.headline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.accentColor.opacity(0.12)), in: .rect(cornerRadius: 16, style: .continuous))
     }
 
     private func numberedRow(number: String, text: String) -> some View {
