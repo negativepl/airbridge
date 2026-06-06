@@ -2,6 +2,15 @@ import Foundation
 import AppKit
 import Protocol
 
+enum FileSortKey: String, CaseIterable, Identifiable {
+    case name, size, modified, type
+    var id: String { rawValue }
+}
+
+enum FileViewMode: String {
+    case list, grid
+}
+
 struct FolderStats: Equatable {
     let dirCount: Int
     let fileCount: Int
@@ -22,6 +31,19 @@ final class FilesBrowserService: MessageHandler {
     private(set) var thumbnails: [String: NSImage] = [:]   // relativePath -> thumb
     private(set) var folderStats: [String: FolderStats] = [:]  // relativePath -> stats
 
+    private(set) var searchQuery: String = ""
+    var sortBy: FileSortKey = .name {
+        didSet { guard oldValue != sortBy else { return }; persistSort(); reload() }
+    }
+    var sortAscending: Bool = true {
+        didSet { guard oldValue != sortAscending else { return }; persistSort(); reload() }
+    }
+    var foldersFirst: Bool = true {
+        didSet { guard oldValue != foldersFirst else { return }; persistSort(); reload() }
+    }
+    /// Czy aktualnie pokazujemy wyniki wyszukiwania (globalne, rekurencyjne).
+    var isSearching: Bool { !searchQuery.isEmpty }
+
     private var requestedThumbnails: Set<String> = []
     private var requestedFolderStats: Set<String> = []
     private let pageSize = 200
@@ -31,6 +53,26 @@ final class FilesBrowserService: MessageHandler {
     func configure(connectionService: ConnectionService, fileTransferService: FileTransferService) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
+    }
+
+    func loadPersistedSort() {
+        let d = UserDefaults.standard
+        if let raw = d.string(forKey: "files.sortBy"), let key = FileSortKey(rawValue: raw) {
+            sortBy = key
+        }
+        if d.object(forKey: "files.sortAscending") != nil {
+            sortAscending = d.bool(forKey: "files.sortAscending")
+        }
+        if d.object(forKey: "files.foldersFirst") != nil {
+            foldersFirst = d.bool(forKey: "files.foldersFirst")
+        }
+    }
+
+    private func persistSort() {
+        let d = UserDefaults.standard
+        d.set(sortBy.rawValue, forKey: "files.sortBy")
+        d.set(sortAscending, forKey: "files.sortAscending")
+        d.set(foldersFirst, forKey: "files.foldersFirst")
     }
 
     /// Breadcrumb segmenty bieżącej ścieżki.
@@ -51,11 +93,33 @@ final class FilesBrowserService: MessageHandler {
             folderStats = [:]
             requestedFolderStats = []
         }
-        let message = Message.filesListRequest(path: path, page: page, pageSize: pageSize)
+        let message = Message.filesListRequest(
+            path: path, page: page, pageSize: pageSize,
+            sortBy: sortBy.rawValue,
+            sortDir: sortAscending ? "asc" : "desc",
+            foldersFirst: foldersFirst,
+            query: searchQuery
+        )
         Task { try? await connectionService.broadcast(message) }
     }
 
     func reload() { open(path: currentPath) }
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Ustawia frazę z debounce ~300 ms; min. 2 znaki, inaczej czyści wyszukiwanie.
+    func setSearchQuery(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        searchTask?.cancel()
+        let effective = trimmed.count >= 2 ? trimmed : ""
+        guard effective != searchQuery else { return }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.searchQuery = effective
+            self.open(path: self.currentPath)
+        }
+    }
 
     func navigateUp() {
         guard !currentPath.isEmpty else { return }
@@ -98,6 +162,9 @@ final class FilesBrowserService: MessageHandler {
     /// (a file is ready immediately; a folder is ready once its stats arrive).
     /// This reveals rows top-to-bottom and never shows a half-loaded folder.
     var displayedEntries: [FileEntry] {
+        // W trybie search wyniki to mix z różnych ścieżek — pokazujemy od razu,
+        // bez czekania na rekurencyjne folder-stats.
+        if isSearching { return entries }
         var result: [FileEntry] = []
         for e in entries {
             let ready = e.isDirectory ? folderStats[e.relativePath] != nil : true
