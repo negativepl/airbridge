@@ -32,6 +32,8 @@ final class FilesBrowserService: MessageHandler {
     private(set) var folderStats: [String: FolderStats] = [:]  // relativePath -> stats
 
     private(set) var searchQuery: String = ""
+    /// Komunikat błędu ostatniego usuwania (nil = brak). UI pokazuje alert i czyści.
+    var deleteError: String? = nil
     var sortBy: FileSortKey = .name {
         didSet { guard oldValue != sortBy, !isLoadingSortPrefs else { return }; persistSort(); reload() }
     }
@@ -213,6 +215,11 @@ final class FilesBrowserService: MessageHandler {
         Task { try? await connectionService.broadcast(.fileDownloadRequest(transferId: transferId, path: entry.relativePath)) }
     }
 
+    func delete(_ entry: FileEntry) {
+        guard let connectionService else { return }
+        Task { try? await connectionService.broadcast(.fileDeleteRequest(path: entry.relativePath)) }
+    }
+
     func upload(urls: [URL]) {
         guard let fileTransferService else { return }
         for url in urls {
@@ -247,6 +254,13 @@ final class FilesBrowserService: MessageHandler {
         case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
             folderStats[path] = FolderStats(dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
             requestNextFolderStats()
+
+        case .fileDeleteResponse(_, let success, let error):
+            if success {
+                reload()
+            } else {
+                deleteError = error ?? "delete_failed"
+            }
 
         default:
             break
