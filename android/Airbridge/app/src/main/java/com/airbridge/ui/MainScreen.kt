@@ -144,20 +144,48 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
         }
 
         val mac = macInfo
-        when {
-            isConnected && mac != null ->
-                MacMonitorCard(info = mac, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
-            // Połączono, ale dane Maca jeszcze nie dotarły — spójny stan ładowania
-            // zamiast błysku "połączonego" DeviceCard zanim przyjdzie MacInfo.
-            isConnected ->
-                ConnectingCard(deviceName = connectedDeviceName)
-            else ->
-                DeviceCard(
+        // 2 = połączony z danymi Maca, 1 = łączenie (brak MacInfo), 0 = rozłączony.
+        val connState = when {
+            isConnected && mac != null -> 2
+            isConnected -> 1
+            else -> 0
+        }
+        androidx.compose.animation.AnimatedContent(
+            targetState = connState,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(
+                    animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
+                ) + androidx.compose.animation.scaleIn(
+                    initialScale = 0.92f,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                )).togetherWith(
+                    androidx.compose.animation.fadeOut(
+                        animationSpec = androidx.compose.animation.core.tween(150)
+                    )
+                )
+            },
+            label = "connectionState"
+        ) { state ->
+            when (state) {
+                2 -> {
+                    val macLocal = macInfo
+                    if (macLocal != null) {
+                        MacMonitorCard(info = macLocal, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
+                    }
+                }
+                // Połączono, ale dane Maca jeszcze nie dotarły — spójny stan ładowania
+                // zamiast błysku "połączonego" DeviceCard zanim przyjdzie MacInfo.
+                1 -> ConnectingCard(deviceName = connectedDeviceName)
+                else -> DeviceCard(
                     isConnected = isConnected,
                     deviceName = connectedDeviceName,
                     onDisconnect = { viewModel.disconnect() },
                     onReconnect = { viewModel.reconnect() }
                 )
+            }
         }
 
         // ── Transfer progress ──
