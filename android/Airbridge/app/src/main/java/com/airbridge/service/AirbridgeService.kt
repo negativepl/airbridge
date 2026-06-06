@@ -856,7 +856,17 @@ class AirbridgeService : Service() {
                                 )
                             )
                         } else {
-                            val (entries, total) = filesProvider.listDir(message.path, message.page, message.pageSize)
+                            val (entries, total) = if (message.query.isBlank()) {
+                                filesProvider.listDir(
+                                    message.path, message.page, message.pageSize,
+                                    message.sortBy, message.sortDir, message.foldersFirst
+                                )
+                            } else {
+                                filesProvider.searchDir(
+                                    message.query, message.page, message.pageSize,
+                                    message.sortBy, message.sortDir, message.foldersFirst
+                                )
+                            }
                             webSocketClient.send(
                                 Message.FilesListResponse(
                                     path = message.path,
