@@ -10,9 +10,9 @@ class FileSortTest {
 
     private val sample = listOf(
         f("banana.txt", size = 30, modified = 200),
-        f("Apple", dir = true, modified = 100),
+        f("Apple", dir = true, size = 0, modified = 100),
         f("cherry.txt", size = 10, modified = 300),
-        f("zebra", dir = true, modified = 50)
+        f("zebra", dir = true, size = 5, modified = 50)
     )
 
     @Test fun nameAscFoldersFirst() {
@@ -33,5 +33,18 @@ class FileSortTest {
     @Test fun modifiedDescFoldersFirst() {
         val r = sortFileEntries(sample, "modified", "desc", foldersFirst = true).map { it.name }
         assertEquals(listOf("Apple", "zebra", "cherry.txt", "banana.txt"), r)
+    }
+
+    @Test fun typeAscGroupsByExtension() {
+        val items = listOf(
+            f("report.pdf", size = 1),
+            f("photo.png", size = 2),
+            f("notes.md", size = 3),
+            f("Makefile", size = 4),        // no extension -> "" sorts first
+            f("archive.pdf", size = 5)
+        )
+        val r = sortFileEntries(items, "type", "asc", foldersFirst = false).map { it.name }
+        // "" (Makefile) < "md" < "pdf" < "png"; within pdf: archive < report by name
+        assertEquals(listOf("Makefile", "notes.md", "archive.pdf", "report.pdf", "photo.png"), r)
     }
 }
