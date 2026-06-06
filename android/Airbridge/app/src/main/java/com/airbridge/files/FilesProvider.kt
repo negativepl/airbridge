@@ -44,6 +44,24 @@ internal fun sortFileEntries(
 }
 
 /**
+ * Zwraca nazwę pliku wolną wg predykatu `exists`. Jeśli `name` jest wolna, zwraca ją bez
+ * zmian; inaczej dokleja `" (n)"` przed ostatnim rozszerzeniem: foto.jpg → foto (1).jpg,
+ * a.tar.gz → a.tar (1).gz, nazwa → nazwa (1).
+ */
+internal fun dedupedName(name: String, exists: (String) -> Boolean): String {
+    if (!exists(name)) return name
+    val dot = name.lastIndexOf('.')
+    val base = if (dot <= 0) name else name.substring(0, dot)
+    val ext = if (dot <= 0) "" else name.substring(dot + 1)
+    var i = 1
+    while (true) {
+        val candidate = if (ext.isEmpty()) "$base ($i)" else "$base ($i).$ext"
+        if (!exists(candidate)) return candidate
+        i++
+    }
+}
+
+/**
  * Provides browsing/download/upload over the whole external storage (/sdcard)
  * via plain java.io.File. Requires MANAGE_EXTERNAL_STORAGE (All Files Access).
  * Relative paths use "/" as separator; root ("") = /sdcard.
