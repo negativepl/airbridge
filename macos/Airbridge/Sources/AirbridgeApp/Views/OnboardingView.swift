@@ -152,9 +152,9 @@ struct OnboardingView: View {
                let icon = NSImage(contentsOf: iconURL) {
                 Image(nsImage: icon)
                     .resizable()
-                    .frame(width: 180, height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
-                    .shadow(color: .black.opacity(0.25), radius: 28, y: 10)
+                    .frame(width: 130, height: 130)
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
                     .symbolEffect(.bounce, value: page)
             }
 
@@ -196,8 +196,12 @@ struct OnboardingView: View {
                         ? "Powiadomienia z telefonu na Macu"
                         : "Your phone notifications on your Mac"
                 )
-
-                moreFeaturesTile
+                featureRow(
+                    icon: "sparkles",
+                    text: isPL
+                        ? "…i to nie wszystkie funkcje — resztę odkryjesz w aplikacji"
+                        : "…and that's not all — discover the rest inside the app"
+                )
             }
             .frame(maxWidth: 560, alignment: .leading)
 
@@ -401,23 +405,6 @@ struct OnboardingView: View {
         }
     }
 
-    private var moreFeaturesTile: some View {
-        HStack(spacing: 18) {
-            Image(systemName: "sparkles")
-                .font(.ab(.title2))
-                .foregroundStyle(.white)
-                .frame(width: 46, height: 46)
-                .glassEffect(.regular.tint(.accentColor), in: .rect(cornerRadius: 12, style: .continuous))
-            Text(isPL
-                ? "…i to nie wszystkie funkcje — resztę odkryjesz w aplikacji"
-                : "…and that's not all — discover the rest inside the app")
-                .font(.ab(.headline, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(.accentColor.opacity(0.12)), in: .rect(cornerRadius: 16, style: .continuous))
-    }
 
     private func numberedRow(number: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 18) {

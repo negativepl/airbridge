@@ -303,30 +303,8 @@ private fun WelcomePage() {
         FeatureRow(icon = Icons.AutoMirrored.Rounded.ScreenShare, text = stringResource(R.string.onboarding_feature_mirror))
         Spacer(modifier = Modifier.height(16.dp))
         FeatureRow(icon = Icons.Rounded.Notifications, text = stringResource(R.string.onboarding_feature_notifications))
-
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(16.dp)
-        ) {
-            Icon(
-                Icons.Rounded.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(14.dp))
-            Text(
-                text = stringResource(R.string.onboarding_feature_more),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
+        Spacer(modifier = Modifier.height(16.dp))
+        FeatureRow(icon = Icons.Rounded.AutoAwesome, text = stringResource(R.string.onboarding_feature_more))
     }
 }
 
