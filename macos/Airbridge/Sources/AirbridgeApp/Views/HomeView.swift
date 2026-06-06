@@ -220,16 +220,18 @@ struct HomeView: View {
             )
             .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
             .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryPercent)
+            .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryCharging)
     }
 
     private func batteryPill(_ percent: Int, charging: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: batterySymbol(percent))
-            if charging {
-                Image(systemName: "bolt.fill")
-            }
             Text("\(percent)%")
                 .contentTransition(.numericText())
+            if charging {
+                Image(systemName: "bolt.fill")
+                    .accessibilityHidden(true)
+            }
         }
         .font(.ab(.caption2, weight: .semibold))
         .foregroundStyle(.white)
