@@ -79,6 +79,7 @@ public enum Message: Equatable, Sendable {
     case macWallpaperResponse(imageBase64: String)
     case folderStatsRequest(path: String)
     case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
+    case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -355,6 +356,7 @@ extension Message: Codable {
         case macWallpaperResponse     = "mac_wallpaper_response"
         case folderStatsRequest       = "folder_stats_request"
         case folderStatsResponse      = "folder_stats_response"
+        case notificationPosted       = "notification_posted"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -405,6 +407,11 @@ extension Message: Codable {
         case fileCount          = "file_count"
         case mode
         case image
+        case title
+        case text
+        case packageName        = "package_name"
+        case appName            = "app_name"
+        case appIcon            = "app_icon"
     }
 
     // MARK: Encode
@@ -659,6 +666,15 @@ extension Message: Codable {
             try container.encode(dirCount, forKey: .dirCount)
             try container.encode(fileCount, forKey: .fileCount)
             try container.encode(totalSize, forKey: .totalSize)
+
+        case .notificationPosted(let packageName, let appName, let title, let text, let timestamp, let appIcon):
+            try container.encode(TypeKey.notificationPosted.rawValue, forKey: .type)
+            try container.encode(packageName, forKey: .packageName)
+            try container.encode(appName, forKey: .appName)
+            try container.encode(title, forKey: .title)
+            try container.encode(text, forKey: .text)
+            try container.encode(timestamp, forKey: .timestamp)
+            try container.encode(appIcon, forKey: .appIcon)
         }
     }
 
@@ -929,6 +945,15 @@ extension Message: Codable {
             let fileCount = try container.decode(Int.self, forKey: .fileCount)
             let totalSize = try container.decode(Int64.self, forKey: .totalSize)
             self = .folderStatsResponse(path: path, dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
+
+        case .notificationPosted:
+            let packageName = try container.decode(String.self, forKey: .packageName)
+            let appName = try container.decode(String.self, forKey: .appName)
+            let title = try container.decode(String.self, forKey: .title)
+            let text = try container.decode(String.self, forKey: .text)
+            let timestamp = try container.decode(Int64.self, forKey: .timestamp)
+            let appIcon = try container.decodeIfPresent(String.self, forKey: .appIcon) ?? ""
+            self = .notificationPosted(packageName: packageName, appName: appName, title: title, text: text, timestamp: timestamp, appIcon: appIcon)
         }
     }
 

@@ -6,6 +6,7 @@ struct SettingsView: View {
     let connectionService: ConnectionService
     let pairingService: PairingService
     let hotkeyService: GlobalHotkeyService
+    let notificationService: NotificationService
 
     @State private var viewModel: SettingsViewModel
     @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
@@ -19,10 +20,11 @@ struct SettingsView: View {
     @State private var shortcutMonitor: Any?
     @State private var accessibilityPollTimer: Timer?
 
-    init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService) {
+    init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService, notificationService: NotificationService) {
         self.connectionService = connectionService
         self.pairingService = pairingService
         self.hotkeyService = hotkeyService
+        self.notificationService = notificationService
         self._viewModel = State(initialValue: SettingsViewModel(
             connectionService: connectionService,
             pairingService: pairingService
@@ -34,6 +36,7 @@ struct SettingsView: View {
         VStack(spacing: 16) {
             pairedDevicesSection(vm)
             generalSection
+            notificationsSection
             quickDropSection
             fileTransferSection
         }
@@ -126,6 +129,31 @@ struct SettingsView: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.extraLarge)
+    }
+
+    private var notificationsSection: some View {
+        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Powiadomienia" : "Notifications"), systemImage: "bell.badge") {
+            Toggle(L10n.isPL ? "Pokazuj powiadomienia z telefonu" : "Show phone notifications", isOn: Binding(
+                get: { notificationService.enabled },
+                set: { notificationService.setEnabled($0) }
+            ))
+            .font(.ab(.body))
+
+            if notificationService.knownApps.isEmpty {
+                Text(L10n.isPL ? "Powiadomienia pojawią się tu, gdy telefon je przyśle."
+                               : "Apps will appear here once the phone sends notifications.")
+                    .font(.ab(.subheadline)).foregroundStyle(.secondary)
+            } else {
+                ForEach(notificationService.knownApps.sorted { $0.value < $1.value }, id: \.key) { pkg, name in
+                    Toggle(name, isOn: Binding(
+                        get: { !notificationService.disabledApps.contains(pkg) },
+                        set: { notificationService.setAppEnabled(pkg, $0) }
+                    ))
+                    .font(.ab(.body))
+                    .disabled(!notificationService.enabled)
+                }
+            }
+        }
     }
 
     private var generalSection: some View {

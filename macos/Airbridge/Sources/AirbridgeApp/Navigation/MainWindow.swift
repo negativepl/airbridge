@@ -12,6 +12,7 @@ struct MainWindow: View {
     let galleryService: GalleryService
     let smsService: SmsService
     let filesBrowserService: FilesBrowserService
+    let notificationService: NotificationService
     let hotkeyService: GlobalHotkeyService
     let mirrorService: MirrorService
 
@@ -66,7 +67,8 @@ struct MainWindow: View {
                     SettingsView(
                         connectionService: connectionService,
                         pairingService: pairingService,
-                        hotkeyService: hotkeyService
+                        hotkeyService: hotkeyService,
+                        notificationService: notificationService
                     )
                 }
             }

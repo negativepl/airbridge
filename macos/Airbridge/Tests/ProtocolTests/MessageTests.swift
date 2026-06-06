@@ -518,4 +518,18 @@ final class MessageTests: XCTestCase {
         XCTAssertEqual(json["type"] as? String, "mirror_error")
         XCTAssertEqual(json["reason"] as? String, "permission_denied")
     }
+
+    func testNotificationPostedRoundTrip() throws {
+        let msg = Message.notificationPosted(packageName: "com.whatsapp", appName: "WhatsApp",
+                                             title: "Mama", text: "Zadzwoń",
+                                             timestamp: 1_700_000_000_000, appIcon: "QQ==")
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
+    }
+
+    func testNotificationPostedLegacyNoIcon() throws {
+        let legacy = #"{"type":"notification_posted","package_name":"a","app_name":"A","title":"t","text":"x","timestamp":1}"#
+        let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded, .notificationPosted(packageName: "a", appName: "A", title: "t", text: "x", timestamp: 1, appIcon: ""))
+    }
 }

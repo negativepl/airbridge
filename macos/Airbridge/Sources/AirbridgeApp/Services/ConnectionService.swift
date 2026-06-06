@@ -59,19 +59,22 @@ final class ConnectionService {
     private var galleryHandler: MessageHandler?
     private var smsHandler: MessageHandler?
     private var filesHandler: MessageHandler?
+    private var notificationHandler: MessageHandler?
 
     func registerHandlers(
         clipboard: MessageHandler,
         fileTransfer: MessageHandler,
         gallery: MessageHandler,
         sms: MessageHandler,
-        files: MessageHandler
+        files: MessageHandler,
+        notifications: MessageHandler
     ) {
         self.clipboardHandler = clipboard
         self.fileTransferHandler = fileTransfer
         self.galleryHandler = gallery
         self.smsHandler = sms
         self.filesHandler = files
+        self.notificationHandler = notifications
     }
 
     // MARK: - Server Lifecycle
@@ -259,6 +262,8 @@ final class ConnectionService {
             smsHandler?.handleMessage(message)
         case .filesListResponse, .fileThumbnailResponse, .folderStatsResponse, .fileDeleteResponse:
             filesHandler?.handleMessage(message)
+        case .notificationPosted:
+            notificationHandler?.handleMessage(message)
         case .deviceInfoResponse(let info):
             deviceInfo = info
         case .wallpaperResponse(let imageBase64):

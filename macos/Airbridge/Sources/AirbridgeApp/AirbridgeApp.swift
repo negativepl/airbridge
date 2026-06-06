@@ -23,6 +23,7 @@ struct AirbridgeApp: App {
     @State private var galleryService: GalleryService
     @State private var smsService: SmsService
     @State private var filesBrowserService: FilesBrowserService
+    @State private var notificationService: NotificationService
     @State private var hotkeyService: GlobalHotkeyService
     @State private var mirrorService: MirrorService
 
@@ -36,6 +37,7 @@ struct AirbridgeApp: App {
         let gallery = GalleryService()
         let sms = SmsService()
         let filesBrowser = FilesBrowserService()
+        let notifications = NotificationService()
         let hotkey = GlobalHotkeyService()
 
         let mirror = MirrorService(pairingTokenProvider: { [weak pairing] in pairing?.currentTokenData() })
@@ -48,7 +50,7 @@ struct AirbridgeApp: App {
         filesBrowser.configure(connectionService: connection, fileTransferService: fileTransfer)
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
         TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
-        connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms, files: filesBrowser)
+        connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms, files: filesBrowser, notifications: notifications)
         connection.mirrorService = mirror
         connection.pairingService = pairing
 
@@ -59,6 +61,7 @@ struct AirbridgeApp: App {
         _galleryService = State(initialValue: gallery)
         _smsService = State(initialValue: sms)
         _filesBrowserService = State(initialValue: filesBrowser)
+        _notificationService = State(initialValue: notifications)
         _hotkeyService = State(initialValue: hotkey)
         _mirrorService = State(initialValue: mirror)
 
@@ -90,6 +93,7 @@ struct AirbridgeApp: App {
                         galleryService: galleryService,
                         smsService: smsService,
                         filesBrowserService: filesBrowserService,
+                        notificationService: notificationService,
                         hotkeyService: hotkeyService,
                         mirrorService: mirrorService
                     )
