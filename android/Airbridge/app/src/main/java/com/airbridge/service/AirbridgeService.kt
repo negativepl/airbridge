@@ -884,15 +884,19 @@ class AirbridgeService : Service() {
             }
             is Message.FileDeleteRequest -> {
                 serviceScope.launch {
-                    if (!filesProvider.hasGrant()) {
-                        webSocketClient.send(
-                            Message.FileDeleteResponse(message.path, false, "no_permission")
-                        )
-                    } else {
-                        val ok = filesProvider.delete(message.path)
-                        webSocketClient.send(
-                            Message.FileDeleteResponse(message.path, ok, if (ok) null else "delete_failed")
-                        )
+                    try {
+                        if (!filesProvider.hasGrant()) {
+                            webSocketClient.send(
+                                Message.FileDeleteResponse(message.path, false, "no_permission")
+                            )
+                        } else {
+                            val ok = filesProvider.delete(message.path)
+                            webSocketClient.send(
+                                Message.FileDeleteResponse(message.path, ok, if (ok) null else "delete_failed")
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "FileDeleteRequest failed", e)
                     }
                 }
             }
