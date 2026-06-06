@@ -42,7 +42,9 @@ public enum Message: Equatable, Sendable {
     case galleryPreviewRequest(photoId: String, maxSize: Int)
     case galleryPreviewResponse(photoId: String, data: String)
     case galleryDownloadRequest(photoId: String)
-    case filesListRequest(path: String, page: Int, pageSize: Int)
+    case filesListRequest(path: String, page: Int, pageSize: Int,
+                          sortBy: String = "name", sortDir: String = "asc",
+                          foldersFirst: Bool = true, query: String = "")
     case filesListResponse(path: String, entries: [FileEntry], totalCount: Int, page: Int, needsPermission: Bool)
     case fileThumbnailRequest(path: String)
     case fileThumbnailResponse(path: String, data: String)
@@ -350,6 +352,10 @@ extension Message: Codable {
         case reason
         case page
         case pageSize           = "page_size"
+        case sortBy             = "sort_by"
+        case sortDir            = "sort_dir"
+        case foldersFirst       = "folders_first"
+        case query
         case totalCount         = "total_count"
         case photos
         case photoId            = "photo_id"
@@ -481,11 +487,15 @@ extension Message: Codable {
             try container.encode(TypeKey.galleryDownloadRequest.rawValue, forKey: .type)
             try container.encode(photoId, forKey: .photoId)
 
-        case .filesListRequest(let path, let page, let pageSize):
+        case .filesListRequest(let path, let page, let pageSize, let sortBy, let sortDir, let foldersFirst, let query):
             try container.encode(TypeKey.filesListRequest.rawValue, forKey: .type)
             try container.encode(path, forKey: .path)
             try container.encode(page, forKey: .page)
             try container.encode(pageSize, forKey: .pageSize)
+            try container.encode(sortBy, forKey: .sortBy)
+            try container.encode(sortDir, forKey: .sortDir)
+            try container.encode(foldersFirst, forKey: .foldersFirst)
+            try container.encode(query, forKey: .query)
 
         case .filesListResponse(let path, let entries, let totalCount, let page, let needsPermission):
             try container.encode(TypeKey.filesListResponse.rawValue, forKey: .type)
@@ -739,7 +749,13 @@ extension Message: Codable {
             let path = try container.decode(String.self, forKey: .path)
             let page = try container.decode(Int.self, forKey: .page)
             let pageSize = try container.decode(Int.self, forKey: .pageSize)
-            self = .filesListRequest(path: path, page: page, pageSize: pageSize)
+            let sortBy = try container.decodeIfPresent(String.self, forKey: .sortBy) ?? "name"
+            let sortDir = try container.decodeIfPresent(String.self, forKey: .sortDir) ?? "asc"
+            let foldersFirst = try container.decodeIfPresent(Bool.self, forKey: .foldersFirst) ?? true
+            let query = try container.decodeIfPresent(String.self, forKey: .query) ?? ""
+            self = .filesListRequest(path: path, page: page, pageSize: pageSize,
+                                     sortBy: sortBy, sortDir: sortDir,
+                                     foldersFirst: foldersFirst, query: query)
 
         case .filesListResponse:
             let path = try container.decode(String.self, forKey: .path)

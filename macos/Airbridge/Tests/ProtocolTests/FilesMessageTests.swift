@@ -37,4 +37,19 @@ final class FilesMessageTests: XCTestCase {
                                             mimeType: "application/pdf", fileSize: 10, destinationDir: "Download")
         XCTAssertEqual(try roundTrip(msg), msg)
     }
+
+    func testFilesListRequestSortSearchRoundTrip() throws {
+        let msg = Message.filesListRequest(path: "Download", page: 1, pageSize: 200,
+                                           sortBy: "size", sortDir: "desc",
+                                           foldersFirst: false, query: "raport")
+        XCTAssertEqual(try roundTrip(msg), msg)
+    }
+
+    func testFilesListRequestDecodesLegacyWithDefaults() throws {
+        let legacy = #"{"type":"files_list_request","path":"","page":0,"page_size":200}"#
+        let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded, .filesListRequest(path: "", page: 0, pageSize: 200,
+                                                  sortBy: "name", sortDir: "asc",
+                                                  foldersFirst: true, query: ""))
+    }
 }
