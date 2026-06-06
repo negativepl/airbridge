@@ -69,9 +69,7 @@ class FilesProvider(
 
         val all = children.map { f -> toEntry(f, relPath) }
         val sorted = sortFileEntries(all, sortBy, sortDir, foldersFirst)
-        val from = (page * pageSize).coerceAtMost(sorted.size)
-        val to = (from + pageSize).coerceAtMost(sorted.size)
-        return Pair(sorted.subList(from, to).toList(), sorted.size)
+        return paginate(sorted, page, pageSize)
     }
 
     /** Mapuje plik na FileEntry z relatywną ścieżką liczoną względem `parentRel`. */
@@ -104,9 +102,10 @@ class FilesProvider(
         if (needle.isEmpty()) return Pair(emptyList(), 0)
         val hits = ArrayList<FileEntry>()
         try {
-            for (f in root.walkTopDown()) {
+            for (f in root.walkTopDown().onFail { _, _ -> }) {   // pomiń niedostępne katalogi, kontynuuj
                 if (f == root) continue
                 if (f.name.lowercase().contains(needle)) {
+                    // parentRel = ścieżka trafienia względem root bez ostatniego segmentu → childPath odtwarza pełną ścieżkę jak w listDir
                     val rel = f.relativeTo(root).path.replace(File.separatorChar, '/')
                     hits.add(toEntry(f, rel.substringBeforeLast('/', "")))
                     if (hits.size >= SEARCH_LIMIT) break
@@ -116,6 +115,11 @@ class FilesProvider(
             Log.e("FilesProvider", "searchDir walk failed for '$query'", e)
         }
         val sorted = sortFileEntries(hits, sortBy, sortDir, foldersFirst)
+        return paginate(sorted, page, pageSize)
+    }
+
+    /** Wytnij stronę `page` o rozmiarze `pageSize` z posortowanej listy. Zwraca (strona, totalCount). */
+    private fun <T> paginate(sorted: List<T>, page: Int, pageSize: Int): Pair<List<T>, Int> {
         val from = (page * pageSize).coerceAtMost(sorted.size)
         val to = (from + pageSize).coerceAtMost(sorted.size)
         return Pair(sorted.subList(from, to).toList(), sorted.size)
