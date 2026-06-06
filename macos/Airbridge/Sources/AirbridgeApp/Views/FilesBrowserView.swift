@@ -8,8 +8,18 @@ struct FilesBrowserView: View {
 
     @AppStorage("files.viewMode") private var viewModeRaw: String = FileViewMode.list.rawValue
     @State private var searchText: String = ""
+    @State private var entryPendingDeletion: FileEntry?
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
+
+    private var deletionAlertTitle: String {
+        guard let e = entryPendingDeletion else { return "" }
+        if L10n.isPL {
+            return "Usunąć \u{201E}\(e.name)\u{201D}?"
+        } else {
+            return "Delete \"\(e.name)\"?"
+        }
+    }
 
     var body: some View {
         Group {
@@ -40,6 +50,33 @@ struct FilesBrowserView: View {
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
+        }
+        .alert(
+            deletionAlertTitle,
+            isPresented: Binding(
+                get: { entryPendingDeletion != nil },
+                set: { if !$0 { entryPendingDeletion = nil } }
+            ),
+            presenting: entryPendingDeletion
+        ) { entry in
+            Button(L10n.isPL ? "Usuń" : "Delete", role: .destructive) {
+                filesBrowserService.delete(entry)
+                entryPendingDeletion = nil
+            }
+            Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) {
+                entryPendingDeletion = nil
+            }
+        } message: { _ in
+            Text(L10n.isPL ? "Tej operacji nie można cofnąć." : "This cannot be undone.")
+        }
+        .alert(
+            L10n.isPL ? "Nie udało się usunąć" : "Delete failed",
+            isPresented: Binding(
+                get: { filesBrowserService.deleteError != nil },
+                set: { if !$0 { filesBrowserService.deleteError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { filesBrowserService.deleteError = nil }
         }
     }
 
@@ -176,6 +213,11 @@ struct FilesBrowserView: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
+                .contextMenu {
+                    Button(role: .destructive) { entryPendingDeletion = entry } label: {
+                        Label(L10n.isPL ? "Usuń" : "Delete", systemImage: "trash")
+                    }
+                }
             }
         }
         .listStyle(.inset)
@@ -193,6 +235,11 @@ struct FilesBrowserView: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
+                    .contextMenu {
+                        Button(role: .destructive) { entryPendingDeletion = entry } label: {
+                            Label(L10n.isPL ? "Usuń" : "Delete", systemImage: "trash")
+                        }
+                    }
                 }
             }
             .padding(16)
