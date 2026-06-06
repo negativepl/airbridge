@@ -100,6 +100,23 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                     Icons.Rounded.BatteryChargingFull
                 else
                     batteryIcon(info.batteryPercent)
+                // Źródło zasilania — osobno, lewy górny róg
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${stringResource(R.string.power_source)}: $powerLabel",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White
+                    )
+                }
+                // Bateria — prawy górny róg
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -111,11 +128,7 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                 ) {
                     Icon(powerIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(5.dp))
-                    Text(
-                        "${info.batteryPercent}% · ${stringResource(R.string.power_source)}: $powerLabel",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White
-                    )
+                    Text("${info.batteryPercent}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
                 }
             }
         }
