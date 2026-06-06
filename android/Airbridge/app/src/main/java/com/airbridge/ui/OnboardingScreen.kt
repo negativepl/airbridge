@@ -260,7 +260,7 @@ private fun WelcomePage() {
             modifier = Modifier
                 .size(140.dp)
                 .clip(RoundedCornerShape(28.dp))
-                .background(androidx.compose.ui.graphics.Color.White),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -297,6 +297,7 @@ private fun WelcomePage() {
         FeatureRow(icon = Icons.AutoMirrored.Rounded.InsertDriveFile, text = stringResource(R.string.onboarding_feature_files))
         Spacer(modifier = Modifier.height(16.dp))
         FeatureRow(icon = Icons.AutoMirrored.Rounded.ScreenShare, text = stringResource(R.string.onboarding_feature_mirror))
+        Spacer(modifier = Modifier.height(16.dp))
         FeatureRow(icon = Icons.Rounded.Lock, text = stringResource(R.string.onboarding_feature_local))
     }
 }
