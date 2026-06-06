@@ -58,7 +58,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,9 +96,6 @@ class MainActivity : ComponentActivity() {
             var themeMode by remember {
                 mutableStateOf(prefs.getString("theme_mode", "dark") ?: "dark")
             }
-            var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
-
-            Box {
             AirbridgeTheme(themeMode = themeMode) {
                 var showQrScanner by remember { mutableStateOf(false) }
                 var showPairingSuccess by remember { mutableStateOf(false) }
@@ -389,11 +385,6 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
-            }
-            // Splash overlay on top
-            if (showSplash) {
-                SplashScreen(onFinished = { showSplash = false })
-            }
             }
         }
     }
