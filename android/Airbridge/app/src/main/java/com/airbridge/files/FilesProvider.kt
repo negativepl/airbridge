@@ -56,30 +56,74 @@ class FilesProvider(
     fun hasGrant(): Boolean = Environment.isExternalStorageManager()
 
     /** Listing katalogu (relPath="" = korzeń /sdcard). Zwraca (entries, totalCount). */
-    fun listDir(relPath: String, page: Int, pageSize: Int): Pair<List<FileEntry>, Int> {
+    fun listDir(
+        relPath: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String = "name",
+        sortDir: String = "asc",
+        foldersFirst: Boolean = true
+    ): Pair<List<FileEntry>, Int> {
         val dir = File(root, relPath)
         val children = dir.listFiles() ?: return Pair(emptyList(), 0)
 
-        val all = children.map { f ->
-            val isDir = f.isDirectory
-            FileEntry(
-                name = f.name,
-                relativePath = SafTreeStore.childPath(relPath, f.name),
-                isDirectory = isDir,
-                size = if (isDir) 0 else f.length(),
-                modified = f.lastModified(),
-                mimeType = if (isDir) "inode/directory" else mimeFromName(f.name)
-            )
-        }
-
-        // Foldery najpierw, potem alfabetycznie (case-insensitive)
-        val sorted = all.sortedWith(
-            compareByDescending<FileEntry> { it.isDirectory }
-                .thenBy { it.name.lowercase() }
-        )
+        val all = children.map { f -> toEntry(f, relPath) }
+        val sorted = sortFileEntries(all, sortBy, sortDir, foldersFirst)
         val from = (page * pageSize).coerceAtMost(sorted.size)
         val to = (from + pageSize).coerceAtMost(sorted.size)
         return Pair(sorted.subList(from, to).toList(), sorted.size)
+    }
+
+    /** Mapuje plik na FileEntry z relatywną ścieżką liczoną względem `parentRel`. */
+    private fun toEntry(f: File, parentRel: String): FileEntry {
+        val isDir = f.isDirectory
+        return FileEntry(
+            name = f.name,
+            relativePath = SafTreeStore.childPath(parentRel, f.name),
+            isDirectory = isDir,
+            size = if (isDir) 0 else f.length(),
+            modified = f.lastModified(),
+            mimeType = if (isDir) "inode/directory" else mimeFromName(f.name)
+        )
+    }
+
+    /**
+     * Globalny rekurencyjny search po nazwie od korzenia /sdcard. Dopasowanie
+     * po podłańcuchu (case-insensitive). Early-stop po SEARCH_LIMIT trafieniach,
+     * żeby walk całego drzewa nie wisiał. Zwraca (entries strony, totalCount trafień).
+     */
+    fun searchDir(
+        query: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String = "name",
+        sortDir: String = "asc",
+        foldersFirst: Boolean = true
+    ): Pair<List<FileEntry>, Int> {
+        val needle = query.trim().lowercase()
+        if (needle.isEmpty()) return Pair(emptyList(), 0)
+        val hits = ArrayList<FileEntry>()
+        try {
+            for (f in root.walkTopDown()) {
+                if (f == root) continue
+                if (f.name.lowercase().contains(needle)) {
+                    val rel = f.relativeTo(root).path.replace(File.separatorChar, '/')
+                    hits.add(toEntry(f, rel.substringBeforeLast('/', "")))
+                    if (hits.size >= SEARCH_LIMIT) break
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("FilesProvider", "searchDir walk failed for '$query'", e)
+        }
+        val sorted = sortFileEntries(hits, sortBy, sortDir, foldersFirst)
+        val from = (page * pageSize).coerceAtMost(sorted.size)
+        val to = (from + pageSize).coerceAtMost(sorted.size)
+        return Pair(sorted.subList(from, to).toList(), sorted.size)
+    }
+
+    companion object {
+        /** Górny limit trafień search, chroni przed pełnym walkiem /sdcard. */
+        const val SEARCH_LIMIT = 500
     }
 
     /**
