@@ -203,17 +203,33 @@ class FilesProvider(
         return if (file.exists()) Uri.fromFile(file) else null
     }
 
-    /** Tworzy plik w katalogu relDir i zwraca (Uri, OutputStream) do zapisu (upload).
-     *  Caller receives the Uri so it can delete the file on write failure. */
+    /** Tworzy plik w katalogu relDir, wybierając wolną nazwę (bez nadpisywania istniejących),
+     *  i zwraca (Uri, OutputStream) do zapisu (upload). Caller dostaje Uri, by móc skasować
+     *  plik przy błędzie zapisu. */
     fun createFile(relDir: String, name: String, mimeType: String): Pair<Uri, OutputStream>? {
         return try {
             val dir = File(root, relDir)
             dir.mkdirs()
-            val f = File(dir, name)
+            val finalName = dedupedName(name) { File(dir, it).exists() }
+            val f = File(dir, finalName)
             Pair(Uri.fromFile(f), FileOutputStream(f))
         } catch (e: Exception) {
             Log.e("FilesProvider", "createFile failed for $relDir/$name", e)
             null
+        }
+    }
+
+    /** Usuwa plik lub folder (rekurencyjnie). Zwraca true gdy usunięto.
+     *  Pusty relPath (korzeń /sdcard) jest odrzucany dla bezpieczeństwa. */
+    fun delete(relPath: String): Boolean {
+        if (relPath.isBlank()) return false
+        val target = File(root, relPath)
+        if (!target.exists()) return false
+        return try {
+            if (target.isDirectory) target.deleteRecursively() else target.delete()
+        } catch (e: Exception) {
+            Log.e("FilesProvider", "delete failed for $relPath", e)
+            false
         }
     }
 
