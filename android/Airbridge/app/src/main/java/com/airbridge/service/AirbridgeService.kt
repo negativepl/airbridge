@@ -122,6 +122,18 @@ class AirbridgeService : Service() {
             if (svc.webSocketClient.isConnected) svc.webSocketClient.send(Message.MacInfoRequest)
         }
 
+        /** Most z NotificationRelayService: wyślij powiadomienie na Maca, gdy połączony. */
+        fun relayNotification(
+            packageName: String, appName: String, title: String, text: String,
+            timestamp: Long, appIcon: String
+        ) {
+            val svc = instance ?: return
+            if (!svc.webSocketClient.isConnected) return
+            svc.webSocketClient.send(
+                Message.NotificationPosted(packageName, appName, title, text, timestamp, appIcon)
+            )
+        }
+
         @Volatile
         var pendingPairRequest: Triple<String, String, String>? = null  // (deviceName, publicKey, token)
     }

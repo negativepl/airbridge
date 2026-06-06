@@ -111,4 +111,24 @@ class MessageTest {
         assertEquals(true, obj.getBoolean("battery_charging"))
         assertEquals(4_800_000L, obj.getLong("charge_time_remaining_ms"))
     }
+
+    @Test fun notificationPostedRoundTrip() {
+        val msg = Message.NotificationPosted(
+            packageName = "com.whatsapp", appName = "WhatsApp",
+            title = "Mama", text = "Zadzwoń", timestamp = 1_700_000_000_000, appIcon = "QQ=="
+        )
+        val parsed = Message.fromJson(msg.toJson()) as Message.NotificationPosted
+        assertEquals("com.whatsapp", parsed.packageName)
+        assertEquals("WhatsApp", parsed.appName)
+        assertEquals("Mama", parsed.title)
+        assertEquals("Zadzwoń", parsed.text)
+        assertEquals(1_700_000_000_000, parsed.timestamp)
+        assertEquals("QQ==", parsed.appIcon)
+    }
+
+    @Test fun notificationPostedDefaultsWhenIconMissing() {
+        val legacy = """{"type":"notification_posted","package_name":"a","app_name":"A","title":"t","text":"x","timestamp":1}"""
+        val parsed = Message.fromJson(legacy) as Message.NotificationPosted
+        assertEquals("", parsed.appIcon)
+    }
 }

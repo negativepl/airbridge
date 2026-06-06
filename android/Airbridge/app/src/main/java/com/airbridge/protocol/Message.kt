@@ -670,6 +670,25 @@ sealed class Message {
         }.toString()
     }
 
+    data class NotificationPosted(
+        val packageName: String,
+        val appName: String,
+        val title: String,
+        val text: String,
+        val timestamp: Long,
+        val appIcon: String = ""
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "notification_posted")
+            put("package_name", packageName)
+            put("app_name", appName)
+            put("title", title)
+            put("text", text)
+            put("timestamp", timestamp)
+            put("app_icon", appIcon)
+        }.toString()
+    }
+
     companion object {
         fun fromJson(json: String): Message {
             val obj = JSONObject(json)
@@ -917,6 +936,14 @@ sealed class Message {
                 "mac_wallpaper_response" -> MacWallpaperResponse(obj.getString("image"))
                 "folder_stats_request" -> FolderStatsRequest(
                     path = obj.getString("path")
+                )
+                "notification_posted" -> NotificationPosted(
+                    packageName = obj.getString("package_name"),
+                    appName = obj.getString("app_name"),
+                    title = obj.getString("title"),
+                    text = obj.getString("text"),
+                    timestamp = obj.getLong("timestamp"),
+                    appIcon = obj.optString("app_icon", "")
                 )
                 else -> throw IllegalArgumentException("Unknown message type: $type")
             }
