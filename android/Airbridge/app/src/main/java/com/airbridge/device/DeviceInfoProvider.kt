@@ -28,6 +28,14 @@ object DeviceInfoProvider {
 
         val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val battery = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val charging = bm.isCharging
+        val chargeTimeMs: Long =
+            if (charging && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                // computeChargeTimeRemaining(): ms do pełna, lub -1 gdy nieznany.
+                bm.computeChargeTimeRemaining()
+            } else {
+                -1L
+            }
 
         return DeviceInfo(
             name = name,
@@ -39,7 +47,9 @@ object DeviceInfoProvider {
             freeStorageBytes = freeStorage,
             totalRamBytes = mem.totalMem,
             freeRamBytes = mem.availMem,
-            batteryPercent = battery
+            batteryPercent = battery,
+            batteryCharging = charging,
+            chargeTimeRemainingMs = chargeTimeMs
         )
     }
 
