@@ -228,30 +228,42 @@ struct OnboardingView: View {
                     .font(.abPageTitle)
 
                 Text(isPL
-                    ? "Trzy rzeczy, które warto wiedzieć:"
-                    : "Three things you should know:")
+                    ? "Kilka rzeczy, które warto wiedzieć:"
+                    : "A few things worth knowing:")
                     .font(.ab(.title2))
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 18) {
                 numberedRow(
                     number: "1",
                     text: isPL
-                        ? "Telefon i komputer Mac muszą być w tej samej sieci Wi-Fi"
-                        : "Both devices need to be on the same WiFi network"
+                        ? "Telefon i Mac muszą być w tej samej sieci Wi-Fi"
+                        : "Your phone and Mac must be on the same Wi-Fi network"
                 )
                 numberedRow(
                     number: "2",
                     text: isPL
-                        ? "Komputer Mac zostanie wykryty automatycznie — bez konfiguracji"
-                        : "AirBridge finds your Mac automatically — no IP addresses, no configuration"
+                        ? "Mac zostaje wykryty automatycznie — bez adresów IP i konfiguracji"
+                        : "Your Mac is found automatically — no IP addresses, no setup"
                 )
                 numberedRow(
                     number: "3",
                     text: isPL
-                        ? "Schowek synchronizuje się automatycznie, a pliki przesyłasz jednym kliknięciem"
-                        : "Runs quietly in the background — clipboard syncs automatically"
+                        ? "Nie potrzebujesz internetu — wszystko działa w Twojej sieci lokalnej"
+                        : "No internet needed — everything runs over your local network"
+                )
+                numberedRow(
+                    number: "4",
+                    text: isPL
+                        ? "Twoje dane nie opuszczają domu — nic nie trafia do chmury"
+                        : "Your data never leaves home — nothing goes to the cloud"
+                )
+                numberedRow(
+                    number: "5",
+                    text: isPL
+                        ? "Parujesz raz kodem QR — potem łączy się samo"
+                        : "Pair once with a QR code — after that it connects on its own"
                 )
             }
             .frame(maxWidth: 620, alignment: .leading)

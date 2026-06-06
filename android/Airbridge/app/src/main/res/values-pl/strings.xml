@@ -12,10 +12,12 @@
     <string name="onboarding_feature_more">…i wiele więcej</string>
     <string name="onboarding_feature_local">Wszystko zostaje w Twojej sieci — pełna prywatność</string>
     <string name="onboarding_connect_title">Jak to działa?</string>
-    <string name="onboarding_connect_desc">Trzy rzeczy, które warto wiedzieć:</string>
-    <string name="onboarding_how_wifi">Telefon i komputer Mac muszą być w tej samej sieci Wi-Fi</string>
-    <string name="onboarding_how_auto">Komputer Mac zostanie wykryty automatycznie, jeśli jest podłączony do Twojej sieci lokalnej</string>
-    <string name="onboarding_how_bg">Schowek synchronizuje się automatycznie, a pliki przesyłasz jednym kliknięciem</string>
+    <string name="onboarding_connect_desc">Kilka rzeczy, które warto wiedzieć:</string>
+    <string name="onboarding_how_wifi">Telefon i Mac muszą być w tej samej sieci Wi-Fi</string>
+    <string name="onboarding_how_auto">Mac zostaje wykryty automatycznie — bez adresów IP i konfiguracji</string>
+    <string name="onboarding_how_local">Nie potrzebujesz internetu — wszystko działa w Twojej sieci lokalnej</string>
+    <string name="onboarding_how_privacy">Twoje dane nie opuszczają domu — nic nie trafia do chmury</string>
+    <string name="onboarding_how_pairing">Parujesz raz kodem QR — potem łączy się samo</string>
     <string name="onboarding_ready_title">Gotowe!</string>
     <string name="onboarding_ready_desc">Zaznacz dowolny tekst w dowolnej aplikacji — pojawi się opcja „Wyślij do komputera Mac". Kliknij, by przesłać tekst natychmiast.</string>
     <string name="onboarding_permissions_title">Uprawnienia</string>

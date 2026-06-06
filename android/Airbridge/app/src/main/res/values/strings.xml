@@ -12,10 +12,12 @@
     <string name="onboarding_feature_more">…and much more</string>
     <string name="onboarding_feature_local">Private — your data never leaves your home network</string>
     <string name="onboarding_connect_title">How it works</string>
-    <string name="onboarding_connect_desc">Three things you should know:</string>
-    <string name="onboarding_how_wifi">Both devices need to be on the same WiFi network</string>
-    <string name="onboarding_how_auto">AirBridge finds your Mac automatically — no IP addresses, no configuration</string>
-    <string name="onboarding_how_bg">Runs quietly in the background — just select text and tap \"Send to Mac\"</string>
+    <string name="onboarding_connect_desc">A few things worth knowing:</string>
+    <string name="onboarding_how_wifi">Your phone and Mac must be on the same Wi-Fi network</string>
+    <string name="onboarding_how_auto">Your Mac is found automatically — no IP addresses, no setup</string>
+    <string name="onboarding_how_local">No internet needed — everything runs over your local network</string>
+    <string name="onboarding_how_privacy">Your data never leaves home — nothing goes to the cloud</string>
+    <string name="onboarding_how_pairing">Pair once with a QR code — after that it connects on its own</string>
     <string name="onboarding_ready_title">You\'re all set!</string>
     <string name="onboarding_ready_desc">Select any text in any app — a menu will appear with \'Send to Mac\' option. Tap it to transfer instantly.</string>
     <string name="onboarding_permissions_title">Permissions</string>

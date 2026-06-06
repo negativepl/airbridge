@@ -345,7 +345,11 @@ private fun HowItWorksPage() {
         Spacer(modifier = Modifier.height(16.dp))
         NumberedRow(number = "2", text = stringResource(R.string.onboarding_how_auto))
         Spacer(modifier = Modifier.height(16.dp))
-        NumberedRow(number = "3", text = stringResource(R.string.onboarding_how_bg))
+        NumberedRow(number = "3", text = stringResource(R.string.onboarding_how_local))
+        Spacer(modifier = Modifier.height(16.dp))
+        NumberedRow(number = "4", text = stringResource(R.string.onboarding_how_privacy))
+        Spacer(modifier = Modifier.height(16.dp))
+        NumberedRow(number = "5", text = stringResource(R.string.onboarding_how_pairing))
     }
 }
 
