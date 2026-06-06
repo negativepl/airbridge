@@ -7,7 +7,18 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
+import android.content.Intent
+import android.content.IntentFilter
 import com.airbridge.protocol.DeviceInfo
+
+/**
+ * Czy dany status baterii (EXTRA_STATUS z ACTION_BATTERY_CHANGED) oznacza ładowanie.
+ * Używamy statusu z broadcastu, bo `BatteryManager.isCharging` bywa niewiarygodne
+ * na niektórych urządzeniach (np. Samsung zwraca false mimo statusu CHARGING).
+ */
+internal fun batteryStatusIsCharging(status: Int): Boolean =
+    status == BatteryManager.BATTERY_STATUS_CHARGING ||
+    status == BatteryManager.BATTERY_STATUS_FULL
 
 /**
  * Collects device hardware/OS info for the macOS Home screen: exact (user-set)
@@ -28,7 +39,14 @@ object DeviceInfoProvider {
 
         val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val battery = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        val charging = bm.isCharging
+
+        // Stan ładowania ze sticky broadcastu (źródło prawdy zgodne z systemowym UI);
+        // BatteryManager.isCharging bywa zawodne (Samsung zwraca false mimo CHARGING).
+        val batteryStatus = context
+            .registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ?.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            ?: BatteryManager.BATTERY_STATUS_UNKNOWN
+        val charging = batteryStatusIsCharging(batteryStatus)
         val chargeTimeMs: Long =
             if (charging && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 // computeChargeTimeRemaining(): ms do pełna, lub -1 gdy nieznany.
