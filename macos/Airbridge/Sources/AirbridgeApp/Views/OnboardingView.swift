@@ -1,15 +1,24 @@
 import SwiftUI
 import Pairing
+import UserNotifications
+import CoreGraphics
+import ApplicationServices
 
 struct OnboardingView: View {
     let pairingService: PairingService
     let connectionService: ConnectionService
+    let hotkeyService: GlobalHotkeyService
+    let notificationService: NotificationService
     let onComplete: () -> Void
 
     private enum Direction { case forward, backward }
     @State private var page = 0
     @State private var direction: Direction = .forward
     @State private var showPairing = false
+    @State private var accessibilityGranted = AXIsProcessTrusted()
+    @State private var screenRecordingGranted = CGPreflightScreenCaptureAccess()
+    @State private var notificationsAuthorized = false
+    @State private var accessibilityPollTimer: Timer?
 
     private var isPL: Bool { L10n.isPL }
 
@@ -22,6 +31,10 @@ struct OnboardingView: View {
                     removal: .move(edge: .leading)
                 ))
                 case 1: howItWorksPage.transition(.asymmetric(
+                    insertion: .move(edge: direction == .forward ? .trailing : .leading),
+                    removal: .move(edge: direction == .forward ? .leading : .trailing)
+                ))
+                case 2: permissionsPage.transition(.asymmetric(
                     insertion: .move(edge: direction == .forward ? .trailing : .leading),
                     removal: .move(edge: direction == .forward ? .leading : .trailing)
                 ))
@@ -75,7 +88,7 @@ struct OnboardingView: View {
             Spacer()
 
             HStack(spacing: 10) {
-                ForEach(0..<3, id: \.self) { i in
+                ForEach(0..<4, id: \.self) { i in
                     Capsule()
                         .fill(i == page ? Color.accentColor : Color.primary.opacity(0.25))
                         .frame(width: i == page ? 28 : 10, height: 10)
@@ -85,7 +98,7 @@ struct OnboardingView: View {
 
             Spacer()
 
-            if page < 2 {
+            if page < 3 {
                 Button {
                     direction = .forward
                     withAnimation(.airbridgeQuick) { page += 1 }
@@ -237,7 +250,97 @@ struct OnboardingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Page 3: Connect
+    // MARK: - Page 3: Permissions
+
+    private var permissionsPage: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.shield")
+                .font(.system(size: 56)).foregroundStyle(.tint)
+                .symbolEffect(.bounce, value: page)
+            Text(isPL ? "Uprawnienia" : "Permissions")
+                .font(.ab(.title2)).fontWeight(.bold)
+            Text(isPL ? "Wszystkie opcjonalne poza siecią — możesz pominąć i wrócić w Ustawieniach."
+                      : "All optional except network — you can skip and return in Settings.")
+                .font(.ab(.subheadline)).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            permissionRow(
+                title: isPL ? "Powiadomienia" : "Notifications",
+                why: isPL ? "Powiadomienia z telefonu na Macu" : "Phone notifications on your Mac",
+                granted: notificationsAuthorized,
+                grant: {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+                        refreshNotificationStatus()
+                    }
+                })
+            permissionRow(
+                title: isPL ? "Dostępność" : "Accessibility",
+                why: isPL ? "Skrót Quick Drop i sterowanie telefonem" : "Quick Drop shortcut & controlling your phone",
+                granted: accessibilityGranted,
+                grant: {
+                    hotkeyService.requestAccessibilityAndStart()
+                    startAccessibilityPolling()
+                })
+            permissionRow(
+                title: isPL ? "Nagrywanie ekranu" : "Screen recording",
+                why: isPL ? "Pokazywanie ekranu Maca na telefonie" : "Show your Mac's screen on your phone",
+                granted: screenRecordingGranted,
+                grant: {
+                    _ = CGRequestScreenCaptureAccess()
+                    screenRecordingGranted = CGPreflightScreenCaptureAccess()
+                })
+            permissionRow(
+                title: isPL ? "Sieć lokalna" : "Local network",
+                why: isPL ? "Wykrywanie telefonu w Wi-Fi (systemowo przy 1. połączeniu)" : "Discover your phone on Wi-Fi (granted on first connect)",
+                granted: true,
+                grant: nil)
+        }
+        .padding(.horizontal, 48)
+        .onAppear {
+            accessibilityGranted = AXIsProcessTrusted()
+            screenRecordingGranted = CGPreflightScreenCaptureAccess()
+            refreshNotificationStatus()
+        }
+    }
+
+    @ViewBuilder
+    private func permissionRow(title: String, why: String, granted: Bool, grant: (() -> Void)?) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.ab(.body)).fontWeight(.medium)
+                Text(why).font(.ab(.caption)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            StatusIndicator(state: granted ? .connected : .error, size: 12)
+            if !granted, let grant {
+                Button(isPL ? "Przyznaj" : "Grant", action: grant)
+                    .buttonStyle(.bordered).controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func refreshNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let authorized = settings.authorizationStatus == .authorized
+            DispatchQueue.main.async {
+                notificationsAuthorized = authorized
+            }
+        }
+    }
+
+    private func startAccessibilityPolling() {
+        accessibilityPollTimer?.invalidate()
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            if AXIsProcessTrusted() {
+                accessibilityGranted = true
+                accessibilityPollTimer?.invalidate()
+                accessibilityPollTimer = nil
+            }
+        }
+    }
+
+    // MARK: - Page 4: Connect
 
     private var connectPage: some View {
         VStack(spacing: 32) {

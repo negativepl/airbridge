@@ -102,6 +102,8 @@ struct AirbridgeApp: App {
                     OnboardingView(
                         pairingService: pairingService,
                         connectionService: connectionService,
+                        hotkeyService: hotkeyService,
+                        notificationService: notificationService,
                         onComplete: { onboardingCompleted = true }
                     )
                 }

@@ -33,6 +33,8 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>AirBridge needs access to your local network to discover and communicate with paired devices over Wi-Fi.</string>
+	<key>NSScreenRecordingUsageDescription</key>
+	<string>AirBridge needs screen recording to show your Mac's screen on your phone (reverse mirroring).</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_airbridge._tcp</string>
