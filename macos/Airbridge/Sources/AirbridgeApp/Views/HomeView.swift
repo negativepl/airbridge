@@ -321,7 +321,7 @@ struct HomeView: View {
         }
         if info.chargeTimeRemainingMs > 0 {
             let t = formatChargeTime(info.chargeTimeRemainingMs, isPL: isPL)
-            return isPL ? "Ładowanie · ~\(t) do pełna" : "Charging · ~\(t) to full"
+            return isPL ? "Ładowanie · \(t) do pełna" : "Charging · \(t) to full"
         }
         return isPL ? "Ładowanie" : "Charging"
     }

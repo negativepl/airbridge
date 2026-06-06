@@ -91,11 +91,6 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                 )
             }
             if (info.batteryPercent in 0..100) {
-                val powerLabel = when {
-                    info.batteryCharging -> stringResource(R.string.power_charging)
-                    info.onACPower -> stringResource(R.string.power_adapter)
-                    else -> stringResource(R.string.power_battery)
-                }
                 val powerIcon = if (info.batteryCharging)
                     Icons.Rounded.BatteryChargingFull
                 else
@@ -111,7 +106,7 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                 ) {
                     Icon(powerIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(5.dp))
-                    Text("${info.batteryPercent}% · $powerLabel", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    Text("${info.batteryPercent}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
                 }
             }
         }
@@ -122,6 +117,22 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
             barRow("RAM", "${gb(info.usedRamBytes)} / ${gb(info.totalRamBytes)}", frac(info.usedRamBytes, info.totalRamBytes))
             Spacer(Modifier.size(14.dp))
             barRow(stringResource(R.string.mac_disk), "${gb(info.totalStorageBytes - info.freeStorageBytes)} / ${gb(info.totalStorageBytes)}", frac(info.totalStorageBytes - info.freeStorageBytes, info.totalStorageBytes))
+
+            Spacer(Modifier.size(14.dp))
+            val powerLabel = when {
+                info.batteryCharging -> stringResource(R.string.power_charging)
+                info.onACPower -> stringResource(R.string.power_adapter)
+                else -> stringResource(R.string.power_battery)
+            }
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.power_source),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(powerLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            }
 
             Spacer(Modifier.size(18.dp))
             FilledTonalButton(
