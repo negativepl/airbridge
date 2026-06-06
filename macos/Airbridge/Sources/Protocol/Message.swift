@@ -207,6 +207,8 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
     public let totalRamBytes: Int64
     public let freeRamBytes: Int64
     public let batteryPercent: Int
+    public let batteryCharging: Bool
+    public let chargeTimeRemainingMs: Int64
 
     private enum CodingKeys: String, CodingKey {
         case name, model, manufacturer
@@ -217,9 +219,11 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
         case totalRamBytes      = "total_ram_bytes"
         case freeRamBytes       = "free_ram_bytes"
         case batteryPercent     = "battery_percent"
+        case batteryCharging      = "battery_charging"
+        case chargeTimeRemainingMs = "charge_time_remaining_ms"
     }
 
-    public init(name: String, model: String, manufacturer: String, androidVersion: String, sdkInt: Int, totalStorageBytes: Int64, freeStorageBytes: Int64, totalRamBytes: Int64, freeRamBytes: Int64, batteryPercent: Int) {
+    public init(name: String, model: String, manufacturer: String, androidVersion: String, sdkInt: Int, totalStorageBytes: Int64, freeStorageBytes: Int64, totalRamBytes: Int64, freeRamBytes: Int64, batteryPercent: Int, batteryCharging: Bool = false, chargeTimeRemainingMs: Int64 = -1) {
         self.name = name
         self.model = model
         self.manufacturer = manufacturer
@@ -230,6 +234,24 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
         self.totalRamBytes = totalRamBytes
         self.freeRamBytes = freeRamBytes
         self.batteryPercent = batteryPercent
+        self.batteryCharging = batteryCharging
+        self.chargeTimeRemainingMs = chargeTimeRemainingMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        model = try c.decode(String.self, forKey: .model)
+        manufacturer = try c.decode(String.self, forKey: .manufacturer)
+        androidVersion = try c.decode(String.self, forKey: .androidVersion)
+        sdkInt = try c.decode(Int.self, forKey: .sdkInt)
+        totalStorageBytes = try c.decode(Int64.self, forKey: .totalStorageBytes)
+        freeStorageBytes = try c.decode(Int64.self, forKey: .freeStorageBytes)
+        totalRamBytes = try c.decode(Int64.self, forKey: .totalRamBytes)
+        freeRamBytes = try c.decode(Int64.self, forKey: .freeRamBytes)
+        batteryPercent = try c.decode(Int.self, forKey: .batteryPercent)
+        batteryCharging = try c.decodeIfPresent(Bool.self, forKey: .batteryCharging) ?? false
+        chargeTimeRemainingMs = try c.decodeIfPresent(Int64.self, forKey: .chargeTimeRemainingMs) ?? -1
     }
 }
 

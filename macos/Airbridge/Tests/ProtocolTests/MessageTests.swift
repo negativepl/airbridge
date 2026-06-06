@@ -454,6 +454,29 @@ final class MessageTests: XCTestCase {
         XCTAssertEqual(ts, 8888888)
     }
 
+    // MARK: - DeviceInfo Charging Fields
+
+    func testDeviceInfoChargingRoundTrip() throws {
+        let info = DeviceInfo(name: "Galaxy", model: "SM", manufacturer: "Samsung",
+                              androidVersion: "16", sdkInt: 34,
+                              totalStorageBytes: 1, freeStorageBytes: 1,
+                              totalRamBytes: 1, freeRamBytes: 1, batteryPercent: 80,
+                              batteryCharging: true, chargeTimeRemainingMs: 4_800_000)
+        let data = try JSONEncoder().encode(info)
+        let decoded = try JSONDecoder().decode(DeviceInfo.self, from: data)
+        XCTAssertEqual(decoded.batteryCharging, true)
+        XCTAssertEqual(decoded.chargeTimeRemainingMs, 4_800_000)
+    }
+
+    func testDeviceInfoLegacyDecodeDefaults() throws {
+        let legacy = #"""
+        {"name":"G","model":"M","manufacturer":"S","android_version":"16","sdk_int":34,"total_storage_bytes":1,"free_storage_bytes":1,"total_ram_bytes":1,"free_ram_bytes":1,"battery_percent":80}
+        """#
+        let decoded = try JSONDecoder().decode(DeviceInfo.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.batteryCharging, false)
+        XCTAssertEqual(decoded.chargeTimeRemainingMs, -1)
+    }
+
     // MARK: - Mirror Message Round-trips
 
     func testRoundTrip_mirrorStartRequest() throws {
