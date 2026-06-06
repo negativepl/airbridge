@@ -25,9 +25,9 @@
 
 ## What is AirBridge?
 
-AirBridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, photo gallery browsing, SMS — all without cables, accounts, or cloud services. **Your data never leaves your home network.**
+AirBridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, a full phone-storage browser, photo gallery, SMS, live Mac system monitoring, and two-way **screen mirroring with remote control** — all without cables, accounts, or cloud services. **Your data never leaves your home network.**
 
-This is an open-source alternative to apps like AirDrop, KDE Connect, or Intel Unison — built specifically for the Android + macOS combination that Apple ignores.
+This is an open-source alternative to apps like Phone Link, KDE Connect, or Intel Unison — built specifically for the Android + macOS combination that Apple ignores.
 
 ---
 
@@ -36,10 +36,12 @@ This is an open-source alternative to apps like AirDrop, KDE Connect, or Intel U
 | | macOS | Android |
 |---|---|---|
 | **Language** | Swift 6.2 (strict concurrency) | Kotlin 2.0 |
-| **UI** | SwiftUI + Liquid Glass (macOS 26) | Jetpack Compose + Material 3 |
+| **UI** | SwiftUI + Liquid Glass (macOS 26) | Jetpack Compose + Material 3 Expressive |
 | **Networking** | Network.framework (NWListener) | OkHttp WebSocket |
 | **Discovery** | Bonjour / mDNS (NWListener.service) | NSD (NsdManager) |
 | **File Transfer** | HTTP upload (URLSession) | HTTP server (ServerSocket) + HTTP upload (OkHttp) |
+| **Screen Mirror** | VideoToolbox (VTDecompressionSession) + AVSampleBufferDisplayLayer | MediaProjection + MediaCodec (HW H.264/HEVC) |
+| **Remote control** | CGEvent injection (mouse/keyboard) | AccessibilityService (gesture/text injection) |
 | **Crypto** | CryptoKit (Ed25519) | AndroidX Security |
 | **Camera** | — | CameraX + ML Kit (QR scanning) |
 | **Architecture** | MVVM, SPM, @Observable | MVVM, Foreground Service, StateFlow |
@@ -50,6 +52,31 @@ This is an open-source alternative to apps like AirDrop, KDE Connect, or Intel U
 ---
 
 ## Features
+
+### Screen Mirroring & Remote Control
+
+AirBridge streams screens **both ways** over a dedicated low-latency video channel, with full interactive control:
+
+- **Phone → Mac (forward)** — Mirror your Android screen into a window on the Mac. Not just view-only: **click, drag, type, and scroll with your Mac's mouse and keyboard** to drive the phone. Input is injected on the phone through an AccessibilityService.
+- **Mac → Phone (reverse)** — Mirror your **Mac's screen onto the phone** and control the Mac with touch: tap to click, drag to move the cursor, two-finger scroll, long-press for right-click, and the soft keyboard for text. Drive your Mac from the couch.
+- **Virtual second display** — In reverse mode, the phone can act as a **second display shaped to the phone's own aspect ratio** instead of mirroring the main screen — a portable extra monitor.
+- **Codecs** — Hardware **H.264** by default, with an optional **HEVC / H.265** toggle for better quality per bit. Decoded with VideoToolbox on the Mac and rendered with no jitter buffer for minimal LAN latency.
+- **Per-mode quality settings** — Each mode (forward, reverse-mirror, reverse-virtual) keeps its **own** resolution, frame rate, bitrate, UI scale, and HEVC preference. Live FPS / Mbps read-outs and a pop-out window are available from the toolbar. An ambient mode keeps the stream gently visible when idle.
+- **Consent-gated** — On the phone, mirroring starts a foreground service and goes through the system **MediaProjection** permission prompt; nothing is captured without you tapping Allow.
+
+### Phone File Browser
+
+Browse your phone's **entire storage** from the Mac in a Finder-like view:
+
+- **Navigate the whole filesystem** — Download, Documents, DCIM, WhatsApp, anything. Clickable breadcrumb path lives right in the window toolbar.
+- **Thumbnails** — Image files get real JPEG thumbnails generated on the phone; everything else gets a type icon. Folders show a live item/size summary.
+- **Download** — Pull any file to your Mac with one click, over the same fast HTTP transfer path as everything else.
+- **Upload to a chosen folder** — Drag a file from Finder onto a folder in the browser and it lands **exactly there** on the phone (not just the default Downloads).
+- **Access model** — Uses Android's **All Files Access** (`MANAGE_EXTERNAL_STORAGE`) for full, direct filesystem access. Granted from the onboarding wizard or Settings.
+
+### Live Mac System Monitor
+
+When connected, the phone shows a **Phone Link-style card for your Mac**: the Mac's wallpaper as a hero banner with computer name, model and chip, plus **live CPU load, RAM, disk usage, and battery** (with charging / AC-power state). The Mac's Home tab mirrors this back — showing the **phone's wallpaper, model, battery, storage and RAM** in a glass hero card.
 
 ### Clipboard Sync
 Copy text on your phone, paste on your Mac — and vice versa. Works automatically in the background. Supports plain text and HTML.
@@ -81,18 +108,19 @@ Read all your SMS conversations on your Mac. Send replies directly. Full chat bu
 - **Ed25519 key pairs** — Each device generates a cryptographic identity on first launch.
 - **QR code pairing** — One-time scan to exchange public keys. No accounts, no registration.
 - **Signature authentication** — Every reconnection is verified with a signed timestamp. Replay window: 30 seconds.
+- **Token-gated mirror channel** — The video channel requires the same 16-byte pairing token; a bad token is dropped instantly with no response.
 - **Local only** — All traffic stays on your Wi-Fi network. No internet connection required. No telemetry, no analytics, no tracking.
 - **Open source** — Every line of code is auditable. MIT license.
 - **SHA-256 checksums** — File integrity verified after every transfer.
 
 ### Auto-discovery
-No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS, and Android discovers it automatically using NSD. If your devices are on the same Wi-Fi, they will find each other.
+No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS (including the mirror port in its TXT record), and Android discovers it automatically using NSD. If your devices are on the same Wi-Fi, they will find each other.
 
 ### Multi-device
 Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing is independent and uses its own key pair.
 
 ### macOS System Integration
-- **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to the main window.
+- **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to the main window and a one-click "Mirror Phone".
 - **Launch at Login** — Optional auto-start so AirBridge is ready when you log in (configurable in Settings).
 - **Sound on receive** — Audio feedback when a file or clipboard update arrives (configurable in Settings).
 - **Configurable global hotkey** — Record your own keyboard shortcut for Quick Drop in Settings, or use the default.
@@ -101,7 +129,7 @@ Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing
 ### Android Extras
 - **Share Sheet integration** — Share files or photos from any app directly to AirBridge. The app appears as a share target and lets you pick which paired device to send to.
 - **Theme selection** — Choose between System, Light, or Dark theme in Settings.
-- **Onboarding wizard** — First-launch setup guides you through permissions and pairing with animated explanations.
+- **Onboarding wizard** — First-launch setup guides you through permissions (including All Files Access and Accessibility) and pairing with animated explanations.
 
 ### Localization
 Both apps support **English** and **Polish**. The UI language follows your system setting.
@@ -120,7 +148,7 @@ Supported platforms:
 | **Android** | Android 10 (API 29) or newer |
 
 > **Why not on Google Play?**
-> AirBridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background. Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync) doesn't fit into any of the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — AirBridge works reliably in the background, which is more important than being on Google Play.
+> AirBridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background (and a MediaProjection foreground service for screen mirroring). Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync + mirroring) doesn't fit into the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — AirBridge works reliably in the background, which is more important than being on Google Play.
 
 ---
 
@@ -129,16 +157,26 @@ Supported platforms:
 ```
 ┌──────────────┐       Local Wi-Fi       ┌──────────────┐
 │    macOS     │◄──────────────────────►│   Android    │
-│   (Server)   │   WebSocket + HTTP     │   (Client)   │
+│   (Server)   │  WebSocket + HTTP +    │   (Client)   │
+│              │     Video stream       │              │
 └──────────────┘                         └──────────────┘
 ```
 
-1. **Mac** starts a WebSocket server (port 8765) and HTTP server (port 8766)
-2. **Mac** advertises itself via Bonjour as `_airbridge._tcp`
-3. **Android** discovers the service via NSD and connects over WebSocket
+| Channel | Port | Direction | Purpose |
+|---|---|---|---|
+| Control WebSocket | **8765** | Phone → Mac | Clipboard, gallery, SMS, files, device info, control |
+| HTTP upload | **8766** | Phone → Mac | File transfer (Android → Mac) |
+| HTTP file server | **8767** | Mac → Phone | File transfer (Mac → Android) |
+| Mirror WebSocket | **8767** (Mac) | Phone → Mac | Screen mirror video + input stream (advertised as `mirror_port`) |
+
+1. **Mac** starts a control WebSocket server (8765), an HTTP upload server (8766), and a mirror WebSocket server (8767)
+2. **Mac** advertises itself via Bonjour as `_airbridge._tcp`, publishing `http_port` and `mirror_port` in its TXT record
+3. **Android** discovers the service via NSD and connects over the control WebSocket
 4. **Android** authenticates with its Ed25519 key pair
-5. **Both** exchange messages over WebSocket (clipboard, SMS, gallery, control)
-6. **Files** are transferred via HTTP POST — Android → Mac on port 8766, Mac → Android on port 8767
+5. **Both** exchange JSON messages over the control channel (clipboard, SMS, gallery, files, device info, mirror control)
+6. **Files** are transferred via HTTP POST; **screen frames and input events** flow over the binary mirror channel
+
+> Because macOS quietly blocks outbound TCP to local IPs, the phone always initiates every connection — including the mirror channel. The Mac only ever listens.
 
 ### Pairing (one-time)
 
@@ -150,10 +188,10 @@ Supported platforms:
 
 Mac → Android follows a consent-based flow:
 
-1. Mac sends `fileTransferOffer` (filename, size, type) via WebSocket
+1. Mac sends `file_transfer_offer` (filename, size, type, optional destination folder) via WebSocket
 2. Android shows a notification: **"Mac wants to send you a file"** with Accept / Reject buttons
-3. User taps **Accept** → Android sends `fileTransferAccept` → Mac uploads via HTTP
-4. User taps **Reject** → Android sends `fileTransferReject` → nothing is transferred
+3. User taps **Accept** → Android sends `file_transfer_accept` → Mac uploads via HTTP
+4. User taps **Reject** → Android sends `file_transfer_reject` → nothing is transferred
 
 Android → Mac uploads directly via HTTP POST — no confirmation needed (Mac always accepts from paired devices).
 
@@ -192,9 +230,9 @@ APK: `app/build/outputs/apk/release/app-release.apk`
 ### Versioning
 
 ```bash
-./scripts/bump-version.sh patch   # 1.2.0 → 1.2.1
-./scripts/bump-version.sh minor   # 1.2.0 → 1.3.0
-./scripts/bump-version.sh major   # 1.2.0 → 2.0.0
+./scripts/bump-version.sh patch   # 2.0.0 → 2.0.1
+./scripts/bump-version.sh minor   # 2.0.0 → 2.1.0
+./scripts/bump-version.sh major   # 2.0.0 → 3.0.0
 ```
 
 Updates version in `build.gradle.kts`, `Info.plist`, and app bundle simultaneously.
@@ -211,31 +249,38 @@ Views (SwiftUI + Liquid Glass)
         └── Services (@Observable, @MainActor)
               └── Library Modules (SPM)
                     ├── Protocol      — Message types, JSON coding
-                    ├── Networking    — WebSocket server, HTTP upload server
+                    ├── Networking    — WebSocket server, HTTP upload server, Bonjour
                     ├── Clipboard     — NSPasteboard monitoring
                     ├── FileTransfer  — File chunking, assembly
+                    ├── Mirror        — Video encode/decode, renderer, reverse pipeline
                     ├── Pairing       — QR generation, key exchange
                     └── AirbridgeSecurity — Ed25519 keys, device identity
 ```
 
 - **Swift 6** language mode with strict `Sendable` concurrency
 - **Liquid Glass** UI throughout (macOS 26 native glass effects)
-- **Modular SPM package** — 6 library targets, 1 executable, 8 test targets
+- **7 tabs** — Home, Send, Gallery, Files, Messages, Mirror, Settings (`TabView(.sidebarAdaptable)`)
+- **`MacSystemInfo`** service collects CPU/RAM/disk/battery + a downscaled wallpaper to feed the phone's monitor card
 
 ### Android — Service + Compose
 
 ```
-UI (Jetpack Compose + Material 3)
+UI (Jetpack Compose + Material 3 Expressive)
   └── MainViewModel (AndroidViewModel)
         └── AirbridgeService (Foreground Service)
-              ├── WebSocketClient     — OkHttp WebSocket
+              ├── WebSocketClient     — OkHttp WebSocket (control channel)
               ├── HttpFileUploader    — HTTP POST to Mac
               ├── HttpFileServer      — HTTP server for receiving from Mac
-              ├── NsdDiscovery        — Bonjour/mDNS discovery
+              ├── NsdDiscovery        — Bonjour/mDNS discovery (reads mirror_port)
               ├── ClipboardSync       — System clipboard monitoring
               ├── GalleryProvider     — MediaStore queries
+              ├── FilesProvider       — Full filesystem listing + thumbnails (All Files Access)
               ├── SmsProvider         — SMS ContentProvider
               └── KeyManager          — Ed25519 key generation
+        └── MirrorService (Foreground Service, mediaProjection)
+              ├── ScreenEncoder       — Hardware H.264/HEVC via MediaCodec
+              ├── MirrorClient        — Binary video/input WebSocket to Mac
+              └── MirrorAccessibilityService — Injects Mac-driven input on the phone
 ```
 
 - **compileSdk 36** (Android 16) with `Notification.ProgressStyle`
@@ -243,7 +288,7 @@ UI (Jetpack Compose + Material 3)
 
 ### Protocol
 
-27 message types over JSON-encoded WebSocket:
+**46 JSON message types** over the control WebSocket, plus a separate **binary video/input protocol** for the mirror channel:
 
 | Category | Messages |
 |---|---|
@@ -252,21 +297,29 @@ UI (Jetpack Compose + Material 3)
 | Authentication | `pair_request`, `pair_response`, `auth_request`, `auth_response` |
 | Gallery | `gallery_request`, `gallery_response`, `gallery_thumbnail_request`, `gallery_thumbnail_response`, `gallery_preview_request`, `gallery_preview_response`, `gallery_download_request` |
 | SMS | `sms_conversations_request`, `sms_conversations_response`, `sms_messages_request`, `sms_messages_response`, `sms_send_request`, `sms_send_response` |
+| Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response` |
+| Device Info & Monitor | `device_info_request`, `device_info_response`, `wallpaper_request`, `wallpaper_response`, `mac_info_request`, `mac_info_response`, `mac_wallpaper_request`, `mac_wallpaper_response` |
+| Mirror control | `mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error` |
 | Utility | `ping`, `pong` |
+
+The mirror video stream is **not** JSON — it's a binary frame protocol (`[1B type][payload]`): `HELLO` / `HELLO_ACK` handshake, `VIDEO_CONFIG` (SPS/PPS or VPS/SPS/PPS for HEVC), `VIDEO_FRAME`, forward input (`INPUT_TAP`, `INPUT_SWIPE`, `INPUT_KEY`, `INPUT_TEXT`), and reverse input (`REVERSE_HELLO`, `REVERSE_INPUT`, `REVERSE_SCROLL`, `REVERSE_TEXT`, `REVERSE_KEY`). See [docs/protocol.md](docs/protocol.md) for the full spec.
 
 ---
 
 ## Android Permissions
 
-Every permission is explained during onboarding. All are optional — the app works with reduced functionality if you decline.
+Every permission is explained during onboarding. Most are optional — the app works with reduced functionality if you decline.
 
 | Permission | Purpose |
 |---|---|
 | `POST_NOTIFICATIONS` | Show file transfer progress and incoming file requests |
+| `MANAGE_EXTERNAL_STORAGE` | Browse and transfer files across the whole phone storage from Mac |
 | `READ_MEDIA_IMAGES` | Browse your photo gallery from Mac |
 | `READ_SMS` / `SEND_SMS` | Browse and send SMS from Mac. Messages stay on your phone. |
 | `READ_CONTACTS` | Show contact names instead of phone numbers in SMS |
 | `CAMERA` | Scan QR code for pairing |
+| `FOREGROUND_SERVICE_MEDIA_PROJECTION` | Capture the screen for mirroring |
+| Accessibility service | Inject Mac-driven taps, swipes and text when controlling the phone |
 | `INTERNET` | Local network communication (WebSocket + HTTP) |
 
 ---
@@ -280,6 +333,8 @@ airbridge/
 │       ├── ui/                 # Compose screens + ViewModel
 │       ├── service/            # AirbridgeService, WebSocket, HTTP
 │       ├── protocol/           # Message types + JSON parsing
+│       ├── mirror/             # MediaProjection capture, encoder, input injection
+│       ├── files/              # Full filesystem provider (All Files Access)
 │       ├── pairing/            # QR scanner (CameraX + ML Kit)
 │       ├── gallery/            # MediaStore photo provider
 │       ├── sms/                # SMS provider
@@ -291,9 +346,10 @@ airbridge/
 │   ├── Sources/
 │   │   ├── AirbridgeApp/       # App entry, Views, ViewModels, Services
 │   │   ├── Protocol/           # Shared message types
-│   │   ├── Networking/         # WebSocket + HTTP servers
+│   │   ├── Networking/         # WebSocket + HTTP servers + Bonjour
 │   │   ├── Clipboard/          # NSPasteboard monitor
 │   │   ├── FileTransfer/       # File chunking + assembly
+│   │   ├── Mirror/             # Video encode/decode, renderer, reverse pipeline
 │   │   ├── Pairing/            # QR code generation
 │   │   └── AirbridgeSecurity/  # Ed25519 + device identity
 │   ├── Tests/                  # Unit + integration tests
@@ -302,7 +358,8 @@ airbridge/
 │   ├── bump-version.sh         # Version bumping across platforms
 │   └── release.sh              # Build + GitHub release automation
 ├── docs/
-│   └── protocol.md             # Protocol specification
+│   ├── protocol.md             # Protocol specification
+│   └── landing/                # Landing page + screenshots
 └── LICENSE                     # MIT
 ```
 
@@ -312,11 +369,11 @@ airbridge/
 
 AirBridge is built to feel native on both platforms — not like a cross-platform wrapper.
 
-**macOS** — The app is written in SwiftUI targeting **Xcode 26 and macOS Tahoe**. It uses **Liquid Glass** effects throughout the UI (glass cards, glass buttons, native sidebar via `TabView(.sidebarAdaptable)`). The file transfer notification uses a custom **floating island popup** that slides down from the notch area, inspired by Dynamic Island — showing transfer progress, speed, and ETA in real time.
+**macOS** — The app is written in SwiftUI targeting **Xcode 26 and macOS Tahoe**. It uses **Liquid Glass** effects throughout the UI (glass cards, glass buttons, native sidebar via `TabView(.sidebarAdaptable)`). The file transfer notification uses a custom **floating island popup** that slides down from the notch area, inspired by Dynamic Island — showing transfer progress, speed, and ETA in real time. Mirrored video is decoded with VideoToolbox and rendered directly into an `AVSampleBufferDisplayLayer` for near-zero added latency.
 
-**Android** — The app is written in **Jetpack Compose with Material 3** (Material Expressive). It uses native notification channels, `Notification.ProgressStyle` (API 36) for transfer progress, and the Android text selection menu ("Send to Mac") for clipboard sharing. The onboarding wizard follows Material 3 patterns with animated page transitions and per-permission explanations.
+**Android** — The app is written in **Jetpack Compose with Material 3** (Material Expressive). It uses native notification channels, `Notification.ProgressStyle` (API 36) for transfer progress, the Android text selection menu ("Send to Mac") for clipboard sharing, and hardware `MediaCodec` for low-latency screen encoding. The onboarding wizard follows Material 3 patterns with animated page transitions and per-permission explanations.
 
-Both apps share the same WebSocket + HTTP protocol but have completely independent, platform-native implementations. No shared runtime, no React Native, no Flutter — just Swift and Kotlin.
+Both apps share the same protocol but have completely independent, platform-native implementations. No shared runtime, no React Native, no Flutter — just Swift and Kotlin.
 
 ---
 
@@ -325,8 +382,9 @@ Both apps share the same WebSocket + HTTP protocol but have completely independe
 Features we're planning to add:
 
 - **Cellular file transfer** — Send files over mobile data when devices aren't on the same Wi-Fi (relay server or direct connection via WebRTC)
-- **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS. Prevent a paired device from accessing features you don't want to expose
+- **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS, screen. Prevent a paired device from accessing features you don't want to expose
 - **Device picker on Send screen** — When multiple devices are paired, show a device selector on the Send tab instead of sending to all
+- **Mirror audio** — Stream the phone's audio alongside the screen
 - **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
 - **Auto-update notifications** — Both apps will check for new versions on GitHub and notify you when an update is available, with a direct link to download
 - **F-Droid listing** — Publish on F-Droid as an alternative distribution channel
@@ -341,10 +399,16 @@ Have an idea? [Open an issue](https://github.com/negativepl/airbridge/issues).
 Yes. AirBridge only needs a local Wi-Fi network. No internet, no cloud, no accounts.
 
 **Is it safe?**
-All communication uses Ed25519 signed authentication. Data never leaves your network. The code is open source — audit it yourself.
+All communication uses Ed25519 signed authentication, and the mirror channel is gated by the same pairing token. Data never leaves your network. The code is open source — audit it yourself.
+
+**Can I control my phone from my Mac (and vice versa)?**
+Yes — both ways. Mirror the phone to the Mac and drive it with mouse + keyboard, or mirror the Mac to the phone and control it by touch. The phone can even act as a phone-shaped second display.
+
+**Why is screen mirroring fast?**
+Frames are hardware-encoded on the phone (H.264 or HEVC), streamed over a dedicated WebSocket on your LAN, and decoded with VideoToolbox into a display layer with no jitter buffer.
 
 **Why not Bluetooth?**
-Wi-Fi is orders of magnitude faster. File transfers run at your full Wi-Fi speed (typically 20-50 MB/s on local network).
+Wi-Fi is orders of magnitude faster. File transfers run at your full Wi-Fi speed (typically 20–50 MB/s on local network), and screen mirroring needs the bandwidth.
 
 **Why is there a "Running in background" notification on Android?**
 Android requires foreground services to show a notification. You can hide it: **Settings → Notifications → "Hide background notification"** — this opens the system channel settings where you can disable it. File transfer notifications will still work.
@@ -353,14 +417,14 @@ Android requires foreground services to show a notification. You can hide it: **
 No. AirBridge is designed for the Android + macOS combination. If you have an iPhone, use AirDrop.
 
 **Can I send files from Mac to Android?**
-Yes. Mac sends a transfer offer first — your phone shows an accept/reject notification. Files are only transferred after you explicitly accept.
+Yes. Mac sends a transfer offer first — your phone shows an accept/reject notification. Files are only transferred after you explicitly accept, and Mac can even target a specific folder on the phone.
 
 ---
 
 ## Credits
 
 - **Author** — [Marcin Baszewski](https://github.com/negativepl)
-- **AI** — Built with [Claude Opus 4.6](https://claude.ai) by Anthropic
+- **AI** — Built with [Claude Opus](https://claude.ai) by Anthropic
 
 ## License
 

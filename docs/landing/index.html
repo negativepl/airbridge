@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AirBridge — Your phone and your Mac, on one bridge</title>
+<meta name="description" content="Mirror your Android phone, control it from your Mac, browse its files, answer its texts — all over your own Wi-Fi. No cloud, no accounts, no subscriptions.">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<style>
+/* ============================================================
+   AirBridge — landing
+   Pro-dark Material 3 Expressive · graphite-violet + amethyst
+   ============================================================ */
+
+:root{
+  /* surfaces — graphite base, amethyst stays an accent only */
+  --bg:        #0D0D10;
+  --bg-2:      #121217;
+  --surface:   #18181D;
+  --surface-2: #201F26;
+  --surface-3: #2A2932;
+
+  /* translucent material — frosted glass, M3 Expressive surfaces (graphite) */
+  --glass:    rgba(32,31,38,.5);
+  --glass-2:  rgba(46,44,54,.56);
+  --glass-hi: rgba(58,54,72,.5);
+  --blur:     saturate(150%) blur(20px);
+
+  /* lines */
+  --border:        rgba(167,139,250,.13);
+  --border-strong: rgba(167,139,250,.28);
+
+  /* text — neutral graphite greys */
+  --text:       #F2F2F4;
+  --text-muted: #ACABB3;
+  --text-dim:   #76747E;
+
+  /* amethyst — brand / Android */
+  --amethyst:        #A78BFA;
+  --amethyst-bright: #C7B5FF;
+  --amethyst-deep:   #7C5CFF;
+  --amethyst-ink:    #2A2139;
+  --amethyst-ink-2:  #382C50;
+  --on-amethyst:     #18102A;
+
+  /* native macOS blue — only ever referenced for the "native" story */
+  --mac-blue: #0A84FF;
+
+  /* native Apple system font — San Francisco */
+  --font-sans:    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Helvetica Neue", sans-serif;
+
+  --radius:    22px;
+  --radius-lg: 30px;
+  --radius-sm: 14px;
+  --maxw: 1180px;
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;scroll-padding-top:92px}
+body{
+  font-family:var(--font-sans);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.6;
+  letter-spacing:-.01em;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body::before{ /* ambient amethyst field — two soft pools, lets frosted surfaces pick up tint */
+  content:"";
+  position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(55% 42% at 84% -6%, rgba(124,92,255,.13), transparent 60%),
+    radial-gradient(45% 38% at 4% 3%,  rgba(167,139,250,.07), transparent 58%),
+    var(--bg);
+}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+::selection{background:var(--amethyst-deep);color:#fff}
+
+h1,h2,h3,.display{
+  font-family:var(--font-display);
+  font-weight:700;line-height:1.04;letter-spacing:-.035em;
+}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:9px;
+  font-size:.78rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--amethyst);
+}
+.eyebrow::before{content:"";width:18px;height:1.5px;background:var(--amethyst);opacity:.7}
+
+.section{padding:130px 0;position:relative}
+.section-head{max-width:680px}
+.section-head h2{font-size:clamp(2.1rem,4.6vw,3.4rem);margin:18px 0 0}
+.section-head p{color:var(--text-muted);font-size:1.12rem;margin-top:18px;max-width:560px}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  font-family:inherit;font-size:1rem;font-weight:600;letter-spacing:-.01em;
+  padding:14px 26px;border-radius:100px;border:1px solid transparent;
+  cursor:pointer;transition:transform .35s var(--ease),background .3s,box-shadow .3s,border-color .3s;
+  white-space:nowrap;
+}
+.btn svg{width:18px;height:18px}
+.btn-primary{
+  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
+  color:var(--on-amethyst);
+  box-shadow:0 8px 30px -8px rgba(124,92,255,.6);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px rgba(124,92,255,.75)}
+.btn-tonal{background:var(--amethyst-ink);color:var(--amethyst-bright);border-color:var(--border-strong)}
+.btn-tonal:hover{background:var(--amethyst-ink-2);transform:translateY(-2px)}
+.btn-ghost{background:transparent;color:var(--text);border-color:var(--border-strong)}
+.btn-ghost:hover{background:var(--surface-2);transform:translateY(-2px)}
+.btn-lg{padding:17px 34px;font-size:1.06rem}
+
+/* ---------- nav ---------- */
+header.nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(13,10,18,.55);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border-bottom:1px solid var(--border);
+}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:70px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:1.18rem;letter-spacing:-.02em}
+.brand .logo{
+  width:30px;height:30px;border-radius:9px;overflow:hidden;
+  background:#fff;
+  display:grid;place-items:center;box-shadow:0 4px 16px -4px rgba(124,92,255,.5);
+}
+.brand .logo img{width:100%;height:100%;object-fit:contain}
+.brand .logo svg{width:18px;height:18px;color:var(--on-amethyst)}
+.nav-links{display:flex;align-items:center;gap:34px}
+.nav-links a.lnk{font-size:.96rem;color:var(--text-muted);font-weight:500;transition:color .2s}
+.nav-links a.lnk:hover{color:var(--text)}
+.nav-cta{display:flex;align-items:center;gap:14px}
+.nav-cta .btn{padding:8px 16px;font-size:.88rem;gap:7px}
+.nav-cta .btn svg{width:15px;height:15px}
+.nav-toggle{display:none;background:none;border:none;color:var(--text);cursor:pointer}
+
+/* ---------- hero ---------- */
+.hero{padding:84px 0 70px;position:relative}
+.hero-grid{display:grid;grid-template-columns:1fr 1.18fr;gap:30px;align-items:center}
+.hero h1{font-size:clamp(2.7rem,6vw,4.7rem);margin:22px 0 0}
+.hero h1 .grad{
+  background:linear-gradient(120deg,var(--amethyst-bright),var(--amethyst) 60%,var(--amethyst-deep));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p.lead{font-size:1.22rem;color:var(--text-muted);margin-top:26px;max-width:520px}
+.hero-cta{display:flex;gap:14px;margin-top:38px;flex-wrap:wrap}
+.hero-meta{display:flex;gap:22px;margin-top:34px;flex-wrap:wrap;color:var(--text-dim);font-size:.9rem}
+.hero-meta span{display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--amethyst);box-shadow:0 0 10px var(--amethyst)}
+
+.hero-art{position:relative;margin-right:-9%}
+.hero-art::before{ /* glow behind the window — soft radial, not a blur layer */
+  content:"";position:absolute;inset:-12% -8% -12% -8%;z-index:0;
+  background:radial-gradient(58% 58% at 58% 42%,rgba(124,92,255,.42),transparent 70%);
+  filter:blur(6px);
+}
+.hero-art img{position:relative;z-index:1;width:122%;max-width:none;filter:drop-shadow(0 40px 80px rgba(0,0,0,.6))}
+.hero-art .float-chip{
+  position:absolute;z-index:2;
+  background:rgba(23,18,31,.86);border:1px solid var(--border-strong);
+  border-radius:14px;padding:11px 15px;display:flex;align-items:center;gap:10px;
+  font-size:.84rem;font-weight:600;
+  box-shadow:0 16px 40px -12px rgba(0,0,0,.7);
+}
+.float-chip .ic{width:30px;height:30px;border-radius:9px;background:var(--amethyst-ink);display:grid;place-items:center;color:var(--amethyst-bright)}
+.float-chip .ic svg{width:16px;height:16px}
+.chip-a{top:8%;left:-4%}
+.chip-b{bottom:11%;right:-3%}
+.chip-b .ic{color:#5ED39A;background:rgba(94,211,154,.13)}
+
+/* logos / trust row */
+.trust{display:flex;gap:14px;flex-wrap:wrap;margin-top:60px;align-items:center}
+.pill{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:9px 16px;border-radius:100px;background:var(--glass);border:1px solid var(--border);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  font-size:.85rem;color:var(--text-muted);font-weight:500;
+}
+.pill svg{width:15px;height:15px;color:var(--amethyst)}
+
+/* ---------- feature rows ---------- */
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin-top:120px}
+.feat:first-of-type{margin-top:0}
+.feat.rev .feat-art{order:2}
+.feat-copy .kicker{
+  display:inline-flex;align-items:center;gap:10px;font-size:.82rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--amethyst);margin-bottom:18px;
+}
+.feat-copy h3{font-size:clamp(1.8rem,3.4vw,2.55rem)}
+.feat-copy p{color:var(--text-muted);font-size:1.1rem;margin-top:16px;max-width:480px}
+.feat-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.tag{
+  font-size:.82rem;font-weight:600;color:var(--amethyst-bright);
+  background:var(--amethyst-ink);border:1px solid var(--border-strong);
+  padding:7px 14px;border-radius:100px;
+}
+.feat-art{position:relative}
+.feat-art img{
+  position:relative;z-index:1;border-radius:18px;
+  filter:drop-shadow(0 30px 60px rgba(0,0,0,.55));
+}
+
+/* ---------- bento ---------- */
+.bento{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:60px}
+.cell{
+  background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  padding:30px;position:relative;overflow:hidden;
+  transition:transform .4s var(--ease),border-color .3s,background .3s;
+}
+.cell:hover{transform:translateY(-4px);border-color:var(--border-strong);background:var(--glass-2)}
+.cell .ico{
+  width:46px;height:46px;border-radius:13px;display:grid;place-items:center;margin-bottom:18px;
+  background:var(--amethyst-ink);color:var(--amethyst-bright);border:1px solid var(--border-strong);
+}
+.cell .ico svg{width:23px;height:23px}
+.cell h4{font-size:1.16rem;font-weight:650;letter-spacing:-.02em}
+.cell p{color:var(--text-muted);font-size:.96rem;margin-top:8px}
+.cell.wide{grid-column:span 2}
+.cell.tall{grid-row:span 2}
+.cell.accent{
+  background:linear-gradient(150deg,rgba(124,92,255,.28),var(--glass));
+  border-color:var(--border-strong);
+}
+.cell.full{grid-column:1 / -1;display:flex;align-items:center;gap:22px}
+.cell.full .ico{margin-bottom:0;flex:0 0 auto}
+.cell.full p{margin-top:4px;max-width:560px}
+
+/* ---------- security band ---------- */
+.security{
+  position:relative;border-radius:var(--radius-lg);overflow:hidden;
+  background:linear-gradient(150deg,rgba(43,30,72,.55),rgba(20,14,32,.5) 60%);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border-strong);
+  padding:74px 64px;
+}
+.security::before{
+  content:"";position:absolute;right:-10%;top:-40%;width:55%;height:180%;
+  background:radial-gradient(circle,rgba(124,92,255,.16),transparent 66%);
+}
+.security .inner{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
+.security h2{font-size:clamp(2rem,4vw,3rem)}
+.security p{color:var(--text-muted);font-size:1.1rem;margin-top:18px;max-width:440px}
+.sec-list{display:flex;flex-direction:column;gap:14px}
+.sec-item{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;background:rgba(13,10,18,.32);border:1px solid var(--border);border-radius:16px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.sec-item .ico{flex:0 0 auto;width:40px;height:40px;border-radius:11px;background:var(--amethyst-ink);display:grid;place-items:center;color:var(--amethyst-bright)}
+.sec-item .ico svg{width:21px;height:21px}
+.sec-item h4{font-size:1.02rem;font-weight:650}
+.sec-item p{font-size:.92rem;margin-top:3px;color:var(--text-dim)}
+
+/* ---------- steps ---------- */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:60px}
+.step{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);padding:34px;position:relative}
+.step .num{
+  font-family:var(--font-display);font-size:3rem;font-weight:700;line-height:1;
+  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.step h4{font-size:1.28rem;font-weight:650;margin-top:18px}
+.step p{color:var(--text-muted);margin-top:10px;font-size:1rem}
+.step-line{position:absolute;top:50px;right:-14px;color:var(--amethyst);opacity:.45}
+.step:last-child .step-line{display:none}
+
+/* ---------- sponsor ---------- */
+.sponsor{
+  position:relative;border-radius:var(--radius-lg);overflow:hidden;text-align:center;
+  background:linear-gradient(160deg,rgba(42,30,72,.62),rgba(22,14,38,.55) 70%);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border-strong);
+  padding:88px 40px;
+}
+.sponsor::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 80% at 50% -10%,rgba(167,139,250,.22),transparent 60%)}
+.sponsor .inner{position:relative;max-width:640px;margin:0 auto}
+.sponsor .heart{
+  width:62px;height:62px;border-radius:18px;margin:0 auto 26px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
+  box-shadow:0 16px 44px -10px rgba(124,92,255,.7);color:var(--on-amethyst);
+}
+.sponsor .heart svg{width:30px;height:30px}
+.sponsor h2{font-size:clamp(2.1rem,4.4vw,3.1rem)}
+.sponsor p{color:var(--text-muted);font-size:1.16rem;margin-top:20px}
+.sponsor p strong{color:var(--text);font-weight:700}
+.sponsor-tiers{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:36px}
+.tier{
+  display:flex;flex-direction:column;align-items:center;
+  min-width:138px;padding:22px 26px;border-radius:18px;
+  background:var(--glass);border:1px solid var(--border);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  transition:transform .35s var(--ease),border-color .3s;
+}
+.tier:hover{transform:translateY(-3px);border-color:var(--border-strong)}
+.tier .amt{font-family:var(--font-display);font-size:1.85rem;font-weight:700;line-height:1}
+.tier .amt small{font-size:.72rem;font-weight:500;color:var(--text-dim);margin-left:3px}
+.tier .lbl{margin-top:9px;font-size:.84rem;font-weight:600;letter-spacing:.02em;color:var(--amethyst-bright)}
+.tier.featured{border-color:var(--border-strong);background:linear-gradient(150deg,rgba(124,92,255,.24),var(--glass))}
+.sponsor-cta{display:flex;gap:14px;justify-content:center;margin-top:30px;flex-wrap:wrap}
+.sponsor-note{margin-top:24px;font-size:.88rem;color:var(--text-dim)}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+.foot-brand p{color:var(--text-dim);font-size:.94rem;margin-top:16px;max-width:280px}
+.foot-col h5{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);font-weight:600}
+.foot-col a{display:block;color:var(--text-muted);margin-top:13px;font-size:.95rem;transition:color .2s}
+.foot-col a:hover{color:var(--amethyst-bright)}
+.foot-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:54px;padding-top:30px;border-top:1px solid var(--border);color:var(--text-dim);font-size:.88rem;flex-wrap:wrap;gap:14px}
+
+/* ---------- scroll reveal ---------- */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+.stagger>*{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.stagger.in>*{opacity:1;transform:none}
+.stagger.in>*:nth-child(2){transition-delay:.08s}
+.stagger.in>*:nth-child(3){transition-delay:.16s}
+.stagger.in>*:nth-child(4){transition-delay:.24s}
+.stagger.in>*:nth-child(5){transition-delay:.32s}
+.stagger.in>*:nth-child(6){transition-delay:.4s}
+.stagger.in>*:nth-child(7){transition-delay:.48s}
+.stagger.in>*:nth-child(8){transition-delay:.56s}
+
+@media (prefers-reduced-motion:reduce){
+  *{scroll-behavior:auto!important}
+  .reveal,.stagger>*{opacity:1!important;transform:none!important;transition:none!important}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:980px){
+  .section{padding:96px 0}
+  .hero-grid{grid-template-columns:1fr;gap:36px}
+  .hero-art{order:-1;max-width:560px;margin-right:0}
+  .hero-art img{width:100%}
+  .feat{grid-template-columns:1fr;gap:34px;margin-top:90px}
+  .feat.rev .feat-art{order:0}
+  .bento{grid-template-columns:repeat(2,1fr)}
+  .cell.tall{grid-row:span 1}
+  .security{padding:48px 30px}
+  .security .inner{grid-template-columns:1fr;gap:34px}
+  .steps{grid-template-columns:1fr}
+  .step-line{display:none}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:34px}
+  .nav-links{display:none}
+}
+@media (max-width:560px){
+  .wrap{padding:0 20px}
+  .bento{grid-template-columns:1fr}
+  .cell.wide{grid-column:span 1}
+  .foot-grid{grid-template-columns:1fr 1fr}
+  .hero-cta .btn,.sponsor-cta .btn{flex:1 1 auto}
+  .float-chip{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="#top" class="brand">
+      <span class="logo"><img src="assets/logo.png" alt="AirBridge logo"></span>
+      AirBridge
+    </a>
+    <nav class="nav-links">
+      <a class="lnk" href="#features">Features</a>
+      <a class="lnk" href="#mirror">Mirror</a>
+      <a class="lnk" href="#security">Security</a>
+      <a class="lnk" href="#how">How it works</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-primary" href="https://github.com/negativepl/airbridge/releases" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        Download
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Local-first · Android ↔ Mac</span>
+      <h1>Your phone and your Mac,<br><span class="grad">on one bridge.</span></h1>
+      <p class="lead">Mirror it, control it, browse its files, answer its texts — everything over your own Wi-Fi. No cloud, no accounts, nothing to set up.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="https://github.com/negativepl/airbridge/releases" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.23 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.27 3.14-2.53.99-1.45 1.4-2.86 1.42-2.93-.03-.01-2.72-1.04-2.75-4.13zM14.6 4.59c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-2.99 1.54-.66.76-1.23 1.98-1.08 3.15 1.14.09 2.3-.58 3.01-1.44z"/></svg>
+          Download for Mac
+        </a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/negativepl/airbridge/releases" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 9v8a1 1 0 0 0 1 1h1v3a1 1 0 0 0 2 0v-3h4v3a1 1 0 0 0 2 0v-3h1a1 1 0 0 0 1-1V9H6zM4 9a1 1 0 0 0-1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0-1-1zm16 0a1 1 0 0 0-1 1v5a1 1 0 0 0 2 0v-5a1 1 0 0 0-1-1zM15.5 5.2l1.3-1.3a.4.4 0 0 0-.6-.57l-1.43 1.45a6 6 0 0 0-4.54 0L8.8 3.33a.4.4 0 1 0-.6.57l1.3 1.3A5.5 5.5 0 0 0 6 9h12a5.5 5.5 0 0 0-2.5-3.8zM9.5 7.5a.62.62 0 1 1 0-1.25.62.62 0 0 1 0 1.25zm5 0a.62.62 0 1 1 0-1.25.62.62 0 0 1 0 1.25z"/></svg>
+          Get for Android
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-art">
+      <img src="assets/home.png" alt="AirBridge for macOS showing a connected Samsung phone with storage, RAM and battery">
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="trust reveal">
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4z"/></svg> End-to-end on your Wi-Fi</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg> Two native apps</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 20h8"/></svg> macOS 26 Tahoe</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8 5 5M17 8l2-3M5 9h14v6a7 7 0 0 1-14 0V9z"/></svg> Android 10+</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg> Every EU language</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FEATURES ================= -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">What it does</span>
+      <h2>One app. Your whole phone, on the desktop.</h2>
+      <p>Native on both sides — Material 3 on Android, AppKit on macOS. No browser, no relay, no middleman.</p>
+    </div>
+
+    <!-- Mirror -->
+    <div class="feat" id="mirror">
+      <div class="feat-copy reveal">
+        <span class="kicker">Screen mirror</span>
+        <h3>See your phone. Control it from your Mac.</h3>
+        <p>A live, low-latency stream of your phone's screen — click and type to drive it. Or flip it around: put your Mac's screen on the phone, or use the phone as a real second display.</p>
+        <div class="feat-chips">
+          <span class="tag">Up to 120 FPS</span>
+          <span class="tag">HEVC (H.265)</span>
+          <span class="tag">Interactive control</span>
+          <span class="tag">Second display</span>
+        </div>
+      </div>
+      <div class="feat-art reveal"><img src="assets/mirror.png" alt="AirBridge Mirror settings: phone mirror, Mac-on-phone and second-display modes with FPS and HEVC options"></div>
+    </div>
+
+    <!-- Files -->
+    <div class="feat rev">
+      <div class="feat-art reveal"><img src="assets/files.png" alt="AirBridge Files: a Finder-style browser of the phone's storage with folder sizes"></div>
+      <div class="feat-copy reveal">
+        <span class="kicker">Files</span>
+        <h3>Your phone's storage, in a Finder-style browser.</h3>
+        <p>Walk through DCIM, Downloads, Music — every folder, with live file counts and sizes. Pull files onto your Mac, or drop files from your Mac straight into any folder on the phone.</p>
+        <div class="feat-chips">
+          <span class="tag">Full file tree</span>
+          <span class="tag">Folder stats</span>
+          <span class="tag">Two-way transfer</span>
+          <span class="tag">Image thumbnails</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="feat">
+      <div class="feat-copy reveal">
+        <span class="kicker">Messages</span>
+        <h3>Read and reply to texts without reaching for your phone.</h3>
+        <p>Your full SMS history, in a clean conversation view. Read the codes, answer the threads, send replies from your keyboard — contact names resolved automatically.</p>
+        <div class="feat-chips">
+          <span class="tag">Full SMS history</span>
+          <span class="tag">Send from Mac</span>
+          <span class="tag">Contact names</span>
+        </div>
+      </div>
+      <div class="feat-art reveal"><img src="assets/messages.png" alt="AirBridge Messages: SMS conversation list and chat view on the Mac"></div>
+    </div>
+
+    <!-- Send -->
+    <div class="feat rev">
+      <div class="feat-art reveal"><img src="assets/send.png" alt="AirBridge Send: drag-and-drop drop zone with pick files and send clipboard"></div>
+      <div class="feat-copy reveal">
+        <span class="kicker">Send &amp; Quick Drop</span>
+        <h3>Move files and clipboard in a single gesture.</h3>
+        <p>Drag onto the window, or hit a global hotkey to summon Quick Drop from anywhere. Push your clipboard with one click. Incoming files land neatly in <code>~/Downloads/AirBridge</code>.</p>
+        <div class="feat-chips">
+          <span class="tag">Drag &amp; drop</span>
+          <span class="tag">Global hotkey</span>
+          <span class="tag">Send clipboard</span>
+          <span class="tag">SHA-256 verified</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= BENTO ================= -->
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">And more</span>
+      <h2>Everything else it quietly handles.</h2>
+    </div>
+    <div class="bento stagger">
+      <div class="cell accent">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg></div>
+        <h4>Device dashboard</h4>
+        <p>Battery, free storage and RAM at a glance the moment you connect — plus your wallpaper, Phone Link style.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></div>
+        <h4>Clipboard sync</h4>
+        <p>Copy here, paste there — text and rich content, both directions.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+        <h4>Send to Mac</h4>
+        <p>Select text in any Android app and push it straight to your Mac.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></div>
+        <h4>Photo gallery</h4>
+        <p>Browse the whole photo library and pull originals at full resolution.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17h.01"/></svg></div>
+        <h4>QR pairing</h4>
+        <p>Scan once. Keys exchanged, devices trusted — no accounts.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a10 10 0 0 1 14 0M2 9a15 15 0 0 1 20 0M8.5 16a5 5 0 0 1 7 0M12 20h.01"/></svg></div>
+        <h4>Auto-discovery</h4>
+        <p>Bonjour / mDNS finds the pair on your network. Zero IP typing.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-2 12h5l-2 8 8-12h-5l3-8z"/></svg></div>
+        <h4>HEVC pipeline</h4>
+        <p>Efficient H.265 — crisp picture, low latency, light on Wi-Fi.</p>
+      </div>
+      <div class="cell">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7M6 4h12"/><circle cx="7" cy="11" r="1"/></svg></div>
+        <h4>Menu bar &amp; login</h4>
+        <p>Always-on status in the menu bar and optional launch at login.</p>
+      </div>
+      <div class="cell full accent">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></div>
+        <div>
+          <h4>Speaks your language</h4>
+          <p>Localized in every EU language — the interface follows your system language automatically, on both the phone and the Mac.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SECURITY ================= -->
+<section class="section" id="security" style="padding-top:0">
+  <div class="wrap">
+    <div class="security reveal">
+      <div class="inner">
+        <div>
+          <span class="eyebrow">Privacy by design</span>
+          <h2>Stays on your Wi-Fi. Full stop.</h2>
+          <p>No relay servers, no analytics, no account to leak. AirBridge talks directly between your two devices and never phones home.</p>
+        </div>
+        <div class="sec-list stagger">
+          <div class="sec-item">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-4z"/></svg></span>
+            <div><h4>Direct on your LAN</h4><p>Traffic never leaves your local network. No internet required.</p></div>
+          </div>
+          <div class="sec-item">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <div><h4>Ed25519 device keys</h4><p>Each device signs every reconnection. Pairing is cryptographic, not a password.</p></div>
+          </div>
+          <div class="sec-item">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V7l8-4z"/></svg></span>
+            <div><h4>SHA-256 transfers</h4><p>Every file is checksum-verified end to end. What you send is what arrives.</p></div>
+          </div>
+          <div class="sec-item">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><path d="m4 4 16 16"/></svg></span>
+            <div><h4>Zero telemetry</h4><p>No tracking, no analytics, no cloud. Your data is nobody's business but yours.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="section" id="how" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Setup in a minute</span>
+      <h2>Three steps, then forget about it.</h2>
+    </div>
+    <div class="steps stagger">
+      <div class="step">
+        <span class="num">01</span>
+        <h4>Scan the QR</h4>
+        <p>Open both apps and scan the code once. Public keys are exchanged and the two devices trust each other.</p>
+        <svg class="step-line" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+      <div class="step">
+        <span class="num">02</span>
+        <h4>They find each other</h4>
+        <p>Bonjour discovery links them automatically whenever they're on the same Wi-Fi. No IP addresses, ever.</p>
+        <svg class="step-line" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+      <div class="step">
+        <span class="num">03</span>
+        <h4>Use everything</h4>
+        <p>Mirror, files, messages, transfers, clipboard. It reconnects on its own each time you come home.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SPONSOR ================= -->
+<section class="section" id="sponsor" style="padding-top:0">
+  <div class="wrap">
+    <div class="sponsor reveal">
+      <div class="inner">
+        <div class="heart">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </div>
+        <h2>AirBridge is built by one developer.</h2>
+        <p>It's <strong>free</strong>, local and private — and it stays that way. If it saves you reaching for your phone a hundred times a day, consider helping keep it alive.</p>
+        <div class="sponsor-tiers">
+          <div class="tier"><span class="amt">$3<small>/mo</small></span><span class="lbl">Coffee</span></div>
+          <div class="tier featured"><span class="amt">$5<small>/mo</small></span><span class="lbl">Supporter</span></div>
+          <div class="tier"><span class="amt">$10<small>/mo</small></span><span class="lbl">Patron</span></div>
+        </div>
+        <div class="sponsor-cta">
+          <a class="btn btn-primary btn-lg" href="#" data-placeholder="github-sponsors">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            GitHub Sponsors
+          </a>
+          <a class="btn btn-tonal btn-lg" href="#" data-placeholder="ko-fi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>
+            Buy me a coffee
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="#top" class="brand">
+          <span class="logo"><img src="assets/logo.png" alt="AirBridge logo"></span>
+          AirBridge
+        </a>
+        <p>The local-first bridge between your Android phone and your Mac. No cloud, no accounts, no compromise.</p>
+      </div>
+      <div class="foot-col">
+        <h5>Product</h5>
+        <a href="#features">Features</a>
+        <a href="#mirror">Mirror</a>
+        <a href="#security">Security</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="foot-col">
+        <h5>Project</h5>
+        <a href="#" data-placeholder="github">GitHub</a>
+        <a href="#sponsor">Sponsor</a>
+        <a href="#" data-placeholder="license">License</a>
+      </div>
+      <div class="foot-col">
+        <h5>Platforms</h5>
+        <a href="#">macOS 26 Tahoe</a>
+        <a href="#">Apple Silicon</a>
+        <a href="#">Android 10+</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 AirBridge · Built with care, runs on your Wi-Fi.</span>
+      <span>Android ↔ Mac</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* scroll reveal */
+(function(){
+  var els=document.querySelectorAll('.reveal,.stagger');
+  if(!('IntersectionObserver'in window)){els.forEach(function(e){e.classList.add('in')});return;}
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);} });
+  },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+  els.forEach(function(e){io.observe(e);});
+})();
+</script>
+</body>
+</html>
