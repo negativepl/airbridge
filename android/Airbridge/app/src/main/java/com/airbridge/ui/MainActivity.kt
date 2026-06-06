@@ -265,20 +265,19 @@ class MainActivity : ComponentActivity() {
                         HorizontalPager(
                             state = pagerState,
                             modifier = Modifier.padding(innerPadding),
-                            beyondBoundsPageCount = 3,
-                            pageContent = { page ->
-                                when (page) {
-                                    0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
-                                    1 -> ScreenShareScreen()
-                                    2 -> SettingsScreen(
-                                        prefs = prefs,
-                                        onThemeChanged = { themeMode = it },
-                                        onScanQr = { showQrScanner = true }
-                                    )
-                                    3 -> AboutScreen()
-                                }
+                            beyondViewportPageCount = 3,
+                        ) { page ->
+                            when (page) {
+                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
+                                1 -> ScreenShareScreen()
+                                2 -> SettingsScreen(
+                                    prefs = prefs,
+                                    onThemeChanged = { themeMode = it },
+                                    onScanQr = { showQrScanner = true }
+                                )
+                                3 -> AboutScreen()
                             }
-                        )
+                        }
                     }
 
                     // Send bottom sheet
