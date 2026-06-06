@@ -36,6 +36,10 @@
     <string name="onboarding_perm_overlay_why">So screen mirroring can start when you request it from your Mac, even while the app is in the background. Without it you have to open the app first</string>
     <string name="onboarding_perm_notiflistener_desc">Notifications on your Mac</string>
     <string name="onboarding_perm_notiflistener_why">So your phone notifications appear natively on your Mac. You choose which apps to show in the Mac settings</string>
+    <string name="onboarding_perm_accessibility_desc">Control from your Mac</string>
+    <string name="onboarding_perm_accessibility_why">So you can control your phone from your Mac when mirroring (taps, typing). Optional — only needed for remote control</string>
+    <string name="onboarding_perm_optional_header">Optional — mirroring &amp; Mac notifications</string>
+    <string name="onboarding_feature_mirror">Mirror your phone screen on your Mac — and back</string>
     <string name="onboarding_perm_allow_btn">Allow</string>
     <string name="onboarding_perm_all_granted">All permissions granted</string>
     <string name="onboarding_next">Next</string>

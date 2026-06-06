@@ -36,6 +36,10 @@
     <string name="onboarding_perm_overlay_why">Aby mirror ekranu mógł wystartować zdalnie z Maca, nawet gdy aplikacja jest w tle. Bez tego trzeba najpierw otworzyć aplikację</string>
     <string name="onboarding_perm_notiflistener_desc">Powiadomienia na Macu</string>
     <string name="onboarding_perm_notiflistener_why">Aby powiadomienia z telefonu pojawiały się natywnie na Macu. Wybierzesz w ustawieniach Maca, które aplikacje pokazywać</string>
+    <string name="onboarding_perm_accessibility_desc">Sterowanie z Maca</string>
+    <string name="onboarding_perm_accessibility_why">Aby sterować telefonem z Maca podczas mirrora (dotyk, pisanie). Opcjonalne — tylko do zdalnego sterowania</string>
+    <string name="onboarding_perm_optional_header">Dodatkowe — mirror i powiadomienia na Macu</string>
+    <string name="onboarding_feature_mirror">Pokaż ekran telefonu na Macu — i odwrotnie</string>
     <string name="onboarding_perm_allow_btn">Zezwól</string>
     <string name="onboarding_perm_all_granted">Wszystkie uprawnienia nadane</string>
     <string name="onboarding_next">Dalej</string>

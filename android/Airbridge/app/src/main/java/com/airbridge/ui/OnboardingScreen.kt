@@ -43,6 +43,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
+import androidx.compose.material.icons.automirrored.rounded.ScreenShare
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Check
@@ -294,6 +296,7 @@ private fun WelcomePage() {
         Spacer(modifier = Modifier.height(16.dp))
         FeatureRow(icon = Icons.AutoMirrored.Rounded.InsertDriveFile, text = stringResource(R.string.onboarding_feature_files))
         Spacer(modifier = Modifier.height(16.dp))
+        FeatureRow(icon = Icons.AutoMirrored.Rounded.ScreenShare, text = stringResource(R.string.onboarding_feature_mirror))
         FeatureRow(icon = Icons.Rounded.Lock, text = stringResource(R.string.onboarding_feature_local))
     }
 }
@@ -382,6 +385,14 @@ private fun PermissionsPage() {
         ActivityResultContracts.StartActivityForResult()
     ) {
         notifListenerGranted = isNotificationListenerEnabled(context)
+    }
+
+    // Accessibility: optional (control phone from Mac during mirroring). Not part of `allGranted`.
+    var accessibilityGranted by remember { mutableStateOf(isMirrorAccessibilityEnabled(context)) }
+    val accessibilityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        accessibilityGranted = isMirrorAccessibilityEnabled(context)
     }
 
     val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
@@ -489,6 +500,15 @@ private fun PermissionsPage() {
             }
         )
         Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.onboarding_perm_optional_header),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
         PermissionRow(
             icon = Icons.Rounded.Tv,
             description = stringResource(R.string.onboarding_perm_overlay_desc),
@@ -510,6 +530,16 @@ private fun PermissionsPage() {
             granted = notifListenerGranted,
             onRequest = {
                 notifListenerLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+        )
+
+        PermissionRow(
+            icon = Icons.Rounded.TouchApp,
+            description = stringResource(R.string.onboarding_perm_accessibility_desc),
+            why = stringResource(R.string.onboarding_perm_accessibility_why),
+            granted = accessibilityGranted,
+            onRequest = {
+                accessibilityLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         )
 
@@ -772,4 +802,13 @@ fun isNotificationListenerEnabled(context: android.content.Context): Boolean {
     ) ?: return false
     val pkg = context.packageName
     return flat.split(":").any { it.startsWith("$pkg/") }
+}
+
+/** Czy usługa dostępności mirrora (sterowanie telefonem z Maca) jest włączona. */
+fun isMirrorAccessibilityEnabled(context: android.content.Context): Boolean {
+    val flat = android.provider.Settings.Secure.getString(
+        context.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    )
+    val comp = "${context.packageName}/${context.packageName}.mirror.MirrorAccessibilityService"
+    return com.airbridge.mirror.accessibilityServiceEnabled(flat, comp)
 }
