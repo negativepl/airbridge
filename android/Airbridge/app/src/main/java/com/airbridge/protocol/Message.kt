@@ -51,7 +51,9 @@ data class DeviceInfo(
     val freeStorageBytes: Long,
     val totalRamBytes: Long,
     val freeRamBytes: Long,
-    val batteryPercent: Int
+    val batteryPercent: Int,
+    val batteryCharging: Boolean = false,
+    val chargeTimeRemainingMs: Long = -1
 )
 
 /** The Mac's own system info — phone acts as a resource monitor for the computer. */
@@ -638,6 +640,8 @@ sealed class Message {
                 put("total_ram_bytes", info.totalRamBytes)
                 put("free_ram_bytes", info.freeRamBytes)
                 put("battery_percent", info.batteryPercent)
+                put("battery_charging", info.batteryCharging)
+                put("charge_time_remaining_ms", info.chargeTimeRemainingMs)
             })
         }.toString()
     }

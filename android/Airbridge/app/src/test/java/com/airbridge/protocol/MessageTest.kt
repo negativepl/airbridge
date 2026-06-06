@@ -97,4 +97,18 @@ class MessageTest {
             )
         }
     }
+
+    @Test fun deviceInfoResponseIncludesChargingFields() {
+        val info = DeviceInfo(
+            name = "Galaxy", model = "SM", manufacturer = "Samsung",
+            androidVersion = "16", sdkInt = 34,
+            totalStorageBytes = 1, freeStorageBytes = 1,
+            totalRamBytes = 1, freeRamBytes = 1, batteryPercent = 80,
+            batteryCharging = true, chargeTimeRemainingMs = 4_800_000
+        )
+        val json = org.json.JSONObject(Message.DeviceInfoResponse(info).toJson())
+        val obj = json.getJSONObject("info")
+        assertEquals(true, obj.getBoolean("battery_charging"))
+        assertEquals(4_800_000L, obj.getLong("charge_time_remaining_ms"))
+    }
 }
