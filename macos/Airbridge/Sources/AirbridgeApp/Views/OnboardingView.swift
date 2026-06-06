@@ -277,17 +277,25 @@ struct OnboardingView: View {
     // MARK: - Page 3: Permissions
 
     private var permissionsPage: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "checkmark.shield")
-                .font(.system(size: 56)).foregroundStyle(.tint)
-                .symbolEffect(.bounce, value: page)
-            Text(isPL ? "Uprawnienia" : "Permissions")
-                .font(.ab(.title2)).fontWeight(.bold)
-            Text(isPL ? "Wszystkie opcjonalne poza siecią — możesz pominąć i wrócić w Ustawieniach."
-                      : "All optional except network — you can skip and return in Settings.")
-                .font(.ab(.subheadline)).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 40) {
+            Spacer(minLength: 40)
 
+            Image(systemName: "checkmark.shield")
+                .font(.system(size: 96, weight: .light))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: page)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 14) {
+                Text(isPL ? "Uprawnienia" : "Permissions")
+                    .font(.abPageTitle)
+                Text(isPL ? "Wszystkie opcjonalne poza siecią — możesz pominąć i wrócić w Ustawieniach."
+                          : "All optional except network — you can skip and return in Settings.")
+                    .font(.ab(.title2)).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(alignment: .leading, spacing: 18) {
             permissionRow(
                 icon: "bell.badge",
                 title: isPL ? "Powiadomienia" : "Notifications",
@@ -322,8 +330,13 @@ struct OnboardingView: View {
                 why: isPL ? "Wykrywanie telefonu w Wi-Fi (systemowo przy 1. połączeniu)" : "Discover your phone on Wi-Fi (granted on first connect)",
                 granted: true,
                 grant: nil)
+            }
+            .frame(maxWidth: 620, alignment: .leading)
+
+            Spacer(minLength: 40)
         }
         .padding(.horizontal, 48)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             accessibilityGranted = AXIsProcessTrusted()
             screenRecordingGranted = CGPreflightScreenCaptureAccess()
@@ -350,7 +363,8 @@ struct OnboardingView: View {
                     .font(.ab(.title3)).foregroundStyle(.green)
             } else if let grant {
                 Button(isPL ? "Przyznaj" : "Grant", action: grant)
-                    .buttonStyle(.bordered).controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
         }
         .frame(maxWidth: .infinity)
