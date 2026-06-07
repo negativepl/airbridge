@@ -532,4 +532,34 @@ final class MessageTests: XCTestCase {
         let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
         XCTAssertEqual(decoded, .notificationPosted(packageName: "a", appName: "A", title: "t", text: "x", timestamp: 1, appIcon: ""))
     }
+
+    // MARK: - authResponse mirror_port (phone-initiated screen sharing)
+
+    func testAuthResponseAcceptedCarriesMirrorPort() throws {
+        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767)
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "auth_response")
+        XCTAssertEqual(json["accepted"] as? Bool, true)
+        XCTAssertEqual(json["mirror_port"] as? Int, 8767)
+    }
+
+    func testAuthResponseRoundTrip_withMirrorPort() throws {
+        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767)
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
+    }
+
+    func testAuthResponseRejected_omitsMirrorPort() throws {
+        let msg = Message.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil)
+        let json = try encode(msg)
+        XCTAssertNil(json["mirror_port"])
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
+    }
+
+    func testAuthResponseLegacy_noMirrorPort() throws {
+        let legacy = #"{"type":"auth_response","accepted":true}"#
+        let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded, .authResponse(accepted: true, reason: nil, mirrorPort: nil))
+    }
 }

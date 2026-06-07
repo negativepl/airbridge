@@ -191,7 +191,7 @@ final class ConnectionService {
     func handleAuthRequest(publicKey: String, signature: String, timestamp: Int64, from connectionId: String) {
         Task {
             guard keyManager.isPairedByKey(publicKey) else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "not_paired"), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
@@ -200,20 +200,25 @@ final class ConnectionService {
             guard let sigData = Data(base64Encoded: signature),
                   let valid = try? KeyManager.verify(message: timestampData, signature: sigData, publicKeyBase64: publicKey),
                   valid else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "invalid_signature"), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "invalid_signature", mirrorPort: nil), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
 
             let now = Int64(Date().timeIntervalSince1970 * 1000)
             guard abs(now - timestamp) < 30_000 else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "expired"), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "expired", mirrorPort: nil), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
 
             await server.markAuthenticated(connectionId)
-            try? await server.sendTo(.authResponse(accepted: true, reason: nil), connectionId: connectionId)
+            // Hand the phone our mirror server port over the application channel so
+            // phone-initiated screen sharing works after every (re)connect — not only
+            // right after a fresh Bonjour/NSD resolve (which is one-shot and lost on
+            // process restart or WebSocket auto-reconnect).
+            let mirrorPort = mirrorService?.actualPort.map { Int($0) }
+            try? await server.sendTo(.authResponse(accepted: true, reason: nil, mirrorPort: mirrorPort), connectionId: connectionId)
 
             let device = keyManager.getPairedDevices().first { $0.publicKeyBase64 == publicKey }
             self.connectedDeviceName = device?.deviceName ?? "Device"

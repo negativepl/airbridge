@@ -34,7 +34,7 @@ public enum Message: Equatable, Sendable {
     case ping(timestamp: Int)
     case pong(timestamp: Int)
     case authRequest(publicKey: String, signature: String, timestamp: Int64)
-    case authResponse(accepted: Bool, reason: String?)
+    case authResponse(accepted: Bool, reason: String?, mirrorPort: Int?)
     case galleryRequest(page: Int, pageSize: Int)
     case galleryResponse(photos: [GalleryPhotoMeta], totalCount: Int, page: Int)
     case galleryThumbnailRequest(photoId: String)
@@ -378,6 +378,7 @@ extension Message: Codable {
         case accepted
         case signature
         case reason
+        case mirrorPort         = "mirror_port"
         case page
         case pageSize           = "page_size"
         case sortBy             = "sort_by"
@@ -481,10 +482,11 @@ extension Message: Codable {
             try container.encode(signature, forKey: .signature)
             try container.encode(timestamp, forKey: .timestamp)
 
-        case .authResponse(let accepted, let reason):
+        case .authResponse(let accepted, let reason, let mirrorPort):
             try container.encode(TypeKey.authResponse.rawValue, forKey: .type)
             try container.encode(accepted, forKey: .accepted)
             try container.encodeIfPresent(reason, forKey: .reason)
+            try container.encodeIfPresent(mirrorPort, forKey: .mirrorPort)
 
         case .galleryRequest(let page, let pageSize):
             try container.encode(TypeKey.galleryRequest.rawValue, forKey: .type)
@@ -761,7 +763,8 @@ extension Message: Codable {
         case .authResponse:
             let accepted = try container.decode(Bool.self, forKey: .accepted)
             let reason = try container.decodeIfPresent(String.self, forKey: .reason)
-            self = .authResponse(accepted: accepted, reason: reason)
+            let mirrorPort = try container.decodeIfPresent(Int.self, forKey: .mirrorPort)
+            self = .authResponse(accepted: accepted, reason: reason, mirrorPort: mirrorPort)
 
         case .galleryRequest:
             let page = try container.decode(Int.self, forKey: .page)

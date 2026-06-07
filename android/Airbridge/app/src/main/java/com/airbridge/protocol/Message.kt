@@ -255,12 +255,14 @@ sealed class Message {
 
     data class AuthResponse(
         val accepted: Boolean,
-        val reason: String? = null
+        val reason: String? = null,
+        val mirrorPort: Int? = null
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "auth_response")
             put("accepted", accepted)
             if (reason != null) put("reason", reason)
+            if (mirrorPort != null) put("mirror_port", mirrorPort)
         }.toString()
     }
 
@@ -753,7 +755,8 @@ sealed class Message {
                 )
                 "auth_response" -> AuthResponse(
                     accepted = obj.getBoolean("accepted"),
-                    reason = if (obj.has("reason")) obj.getString("reason") else null
+                    reason = if (obj.has("reason")) obj.getString("reason") else null,
+                    mirrorPort = if (obj.has("mirror_port")) obj.getInt("mirror_port") else null
                 )
                 "gallery_request" -> GalleryRequest(
                     page = obj.optInt("page", 0),

@@ -2,6 +2,7 @@ package com.airbridge.protocol
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -130,5 +131,29 @@ class MessageTest {
         val legacy = """{"type":"notification_posted","package_name":"a","app_name":"A","title":"t","text":"x","timestamp":1}"""
         val parsed = Message.fromJson(legacy) as Message.NotificationPosted
         assertEquals("", parsed.appIcon)
+    }
+
+    // auth_response mirror_port — phone-initiated screen sharing after every (re)connect.
+
+    @Test fun authResponseCarriesMirrorPort() {
+        val msg = Message.AuthResponse(accepted = true, reason = null, mirrorPort = 8767)
+        val json = JSONObject(msg.toJson())
+        assertEquals("auth_response", json.getString("type"))
+        assertEquals(true, json.getBoolean("accepted"))
+        assertEquals(8767, json.getInt("mirror_port"))
+    }
+
+    @Test fun authResponseRoundTripWithMirrorPort() {
+        val msg = Message.AuthResponse(accepted = true, reason = null, mirrorPort = 8767)
+        val decoded = Message.fromJson(msg.toJson()) as Message.AuthResponse
+        assertEquals(8767, decoded.mirrorPort)
+        assertEquals(true, decoded.accepted)
+    }
+
+    @Test fun authResponseLegacyWithoutMirrorPort() {
+        val legacy = """{"type":"auth_response","accepted":true}"""
+        val decoded = Message.fromJson(legacy) as Message.AuthResponse
+        assertNull(decoded.mirrorPort)
+        assertEquals(true, decoded.accepted)
     }
 }

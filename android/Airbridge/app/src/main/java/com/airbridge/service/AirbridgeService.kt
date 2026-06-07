@@ -653,7 +653,15 @@ class AirbridgeService : Service() {
             }
             is Message.AuthResponse -> {
                 if (message.accepted) {
-                    Log.d(TAG, "Auth accepted — connection authenticated")
+                    Log.d(TAG, "Auth accepted — connection authenticated (mirrorPort=${message.mirrorPort})")
+                    // Refresh the mirror port from the application channel on every
+                    // (re)connect. The NSD/Bonjour record is one-shot and lost on process
+                    // restart or WebSocket auto-reconnect, which left mirrorPort null and
+                    // broke phone-initiated screen sharing ("connect to your Mac").
+                    message.mirrorPort?.let { port ->
+                        currentMirrorPort = port
+                        mirrorPortFlow.value = port
+                    }
                     clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
