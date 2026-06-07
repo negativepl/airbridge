@@ -456,12 +456,15 @@ public actor HttpUploadServer {
         }
 
         let total = Int64(data.count)
+        // Integrity checksum the phone verifies after the download completes.
+        let checksum = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         let encodedFilename = pending.filename
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? pending.filename
         let headers = "HTTP/1.1 200 OK\r\n"
             + "Content-Type: \(pending.mimeType)\r\n"
             + "Content-Length: \(total)\r\n"
             + "X-Filename: \(encodedFilename)\r\n"
+            + "X-Checksum-SHA256: \(checksum)\r\n"
             + "Connection: close\r\n"
             + "\r\n"
         let headerData = Data(headers.utf8)

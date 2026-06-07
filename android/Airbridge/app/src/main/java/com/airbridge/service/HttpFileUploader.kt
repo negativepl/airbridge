@@ -59,8 +59,27 @@ class HttpFileUploader {
 
         Log.d(TAG, "Uploading $filename ($mimeType, $fileSize bytes) to $host:$port")
 
-        // Single pass: stream upload while computing SHA-256 inline
-        val digest = MessageDigest.getInstance("SHA-256")
+        // Pre-compute SHA-256 in a full read pass so the checksum can travel
+        // as a request header (which must be sent before the body) — the Mac
+        // verifies X-Checksum-SHA256 against the bytes it receives. A single
+        // streaming pass can't do this: the digest isn't known until after the
+        // body has already been written. If hashing fails we still upload, just
+        // without the integrity check rather than aborting the transfer.
+        val checksum = try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val buf = ByteArray(BUFFER_SIZE)
+                var read: Int
+                while (stream.read(buf).also { read = it } != -1) {
+                    digest.update(buf, 0, read)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Checksum pre-pass failed, uploading without checksum", e)
+            null
+        }
+
         val body = object : RequestBody() {
             override fun contentType() = mimeType.toMediaType()
             override fun contentLength() = fileSize
@@ -71,7 +90,6 @@ class HttpFileUploader {
                     var totalSent = 0L
                     var read: Int
                     while (stream.read(buf).also { read = it } != -1) {
-                        digest.update(buf, 0, read)
                         sink.write(buf, 0, read)
                         totalSent += read
                         onProgress(totalSent, fileSize)
@@ -86,6 +104,7 @@ class HttpFileUploader {
             .url("http://$host:$port/upload")
             .header("X-Filename", encodedFilename)
             .header("X-Mime-Type", mimeType)
+            .apply { if (checksum != null) header("X-Checksum-SHA256", checksum) }
             .post(body)
             .build()
 

@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -54,17 +55,20 @@ class HttpFileDownloader {
                 return null
             }
             val totalBytes = response.header("Content-Length")?.toLongOrNull() ?: -1L
+            val expectedChecksum = response.header("X-Checksum-SHA256")
             // Sanitize the filename used in the temp-file name (Mac sends it
             // URL-encoded in X-Filename; we already have `filenameHint` from
             // the offer message, so just strip path separators from it).
             val safeName = filenameHint.replace('/', '_').replace('\\', '_')
             val tempFile = File.createTempFile("airbridge_", "_$safeName")
+            val digest = MessageDigest.getInstance("SHA-256")
             response.body?.byteStream()?.use { input ->
                 FileOutputStream(tempFile).use { out ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var totalRead = 0L
                     var read: Int
                     while (input.read(buffer).also { read = it } != -1) {
+                        digest.update(buffer, 0, read)
                         out.write(buffer, 0, read)
                         totalRead += read
                         onProgress(totalRead, totalBytes)
@@ -72,6 +76,18 @@ class HttpFileDownloader {
                 }
             }
             response.close()
+
+            // Verify integrity when the Mac advertised a checksum. A mismatch
+            // means the bytes were corrupted in transit — drop the temp file
+            // and fail the download rather than handing back bad data.
+            if (expectedChecksum != null) {
+                val actual = digest.digest().joinToString("") { "%02x".format(it) }
+                if (!actual.equals(expectedChecksum, ignoreCase = true)) {
+                    Log.e(TAG, "Checksum mismatch: expected $expectedChecksum, got $actual")
+                    tempFile.delete()
+                    return null
+                }
+            }
             Log.d(TAG, "Download complete: ${tempFile.absolutePath}")
             tempFile
         } catch (e: Exception) {
