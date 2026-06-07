@@ -52,14 +52,13 @@ for LPROJ in "$ROOT/macos/Airbridge/Resources"/*.lproj; do
     fi
 done
 
-echo "--- re-signing (ad-hoc) ---"
-codesign --force --deep --sign - "$APP" 2>&1 | tail -5
-
-# Ad-hoc re-sign changes the code signature on every build, which invalidates
-# the TCC Accessibility grant for com.airbridge.macos. Reset it so Quick Drop
-# always starts from a clean slate and the user can re-grant without surprise.
-echo "--- resetting Accessibility TCC ---"
-tccutil reset Accessibility com.airbridge.macos 2>&1 || true
+# Sign with the stable self-signed identity (NOT ad-hoc). The designated
+# requirement is derived from the cert, so it stays identical across builds and
+# the TCC Accessibility grant survives rebuilds — no more re-granting each time.
+echo "--- ensuring signing identity ---"
+"$ROOT/scripts/setup-signing-cert.sh"
+echo "--- re-signing ('AirBridge Signing') ---"
+codesign --force --deep --sign "AirBridge Signing" "$APP" 2>&1 | tail -5
 
 echo "--- launching ---"
 open "$APP"

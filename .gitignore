@@ -22,3 +22,9 @@ local.properties
 *.apk
 *.dmg
 *.hprof
+
+# Signing keys / secrets — never commit (the real cert lives in ~/.airbridge, outside the repo)
+*.p12
+*.pem
+*.key
+*-signing.pass

@@ -61,9 +61,15 @@ for LPROJ in "$ROOT/macos/Airbridge/Resources"/*.lproj; do
     fi
 done
 
-# Ad-hoc code sign so Gatekeeper doesn't show prohibition icon
-codesign --force --deep --sign - "$APP_BUNDLE"
-echo "  App bundle: $APP_BUNDLE"
+# Sign with the stable self-signed identity (NOT ad-hoc) so the bundle's
+# designated requirement is derived from the cert and stays constant across
+# releases. That lets macOS TCC keep the Accessibility grant across app updates
+# instead of dropping it every version (which ad-hoc's cdhash-based requirement
+# did). First launch on a new Mac still needs right-click → Open (unidentified
+# developer); updates afterwards are friction-free.
+"$ROOT/scripts/setup-signing-cert.sh"
+codesign --force --deep --sign "AirBridge Signing" "$APP_BUNDLE"
+echo "  App bundle: $APP_BUNDLE (signed: AirBridge Signing)"
 
 # Create DMG with Applications symlink and compact window
 DMG_PATH="$ROOT/AirBridge.dmg"
