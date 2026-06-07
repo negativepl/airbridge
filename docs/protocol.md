@@ -6,10 +6,10 @@ Airbridge uses a JSON-over-WebSocket protocol for communication between the macO
 
 ## Transport
 
-- **Protocol**: WebSocket (RFC 6455)
-- **Port**: 8765 (default)
-- **Discovery**: Bonjour/mDNS service type `_airbridge._tcp`
-- **File Transfer**: HTTP POST (port 8766 Mac→Android, port 8767 Android→Mac)
+- **Control protocol**: WebSocket (RFC 6455) on port **8765** (default)
+- **Discovery**: Bonjour/mDNS service type `_airbridge._tcp` (TXT record carries `http_port`, `mirror_port`, `pk_fingerprint`)
+- **File Transfer**: HTTP on port **8766** — the phone POSTs uploads (`POST /upload`) and pulls Mac → phone files (`GET /send/{transfer_id}`). The Mac only ever listens; the phone initiates every connection (macOS Local Network Privacy blocks Mac-side outbound TCP to local IPs).
+- **Screen Mirror**: binary WebSocket on port **8767** (advertised as `mirror_port`) — see [Mirror Binary Protocol](#mirror-binary-protocol)
 - **Security**: Ed25519 signature authentication (no TLS — local network only)
 
 ## Message Format
@@ -165,7 +165,7 @@ Sent by the Android device when initiating pairing (scanned QR code).
 |-------|------|-------------|
 | `type` | string | Always `"pair_request"` |
 | `device_name` | string | Human-readable name of the Android device |
-| `public_key` | string | Base64-encoded DER public key (ECDH P-256) |
+| `public_key` | string | Base64-encoded Ed25519 public key |
 | `pairing_token` | string | One-time token from the QR code, proves physical proximity |
 
 ---
@@ -189,8 +189,57 @@ Sent by the macOS device in response to a `pair_request`.
 |-------|------|-------------|
 | `type` | string | Always `"pair_response"` |
 | `device_name` | string | Human-readable name of the macOS device |
-| `public_key` | string | Base64-encoded DER public key (ECDH P-256) |
+| `public_key` | string | Base64-encoded Ed25519 public key |
 | `accepted` | boolean | Whether pairing was accepted (`true`) or rejected (`false`) |
+
+---
+
+## Authentication
+
+After pairing, the phone re-authenticates on every reconnection by signing the current timestamp with its Ed25519 private key. There is no shared-secret handshake — the Mac verifies the signature against the public key stored at pairing time.
+
+### `auth_request`
+
+Sent by the phone immediately after the WebSocket connects.
+
+```json
+{
+  "type": "auth_request",
+  "public_key": "MCowBQYDK2VwAyEA...",
+  "signature": "base64-ed25519-signature",
+  "timestamp": 1712345678901
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Always `"auth_request"` |
+| `public_key` | string | Base64-encoded Ed25519 public key, used to look up the paired device |
+| `signature` | string | Base64 Ed25519 signature over the `timestamp` |
+| `timestamp` | integer | Unix milliseconds; the Mac rejects the request if it is more than **30 seconds** off (replay protection) |
+
+### `auth_response`
+
+Sent by the Mac after verifying (or rejecting) an `auth_request`.
+
+```json
+{
+  "type": "auth_response",
+  "accepted": true,
+  "mirror_port": 8767
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Always `"auth_response"` |
+| `accepted` | boolean | Whether authentication succeeded |
+| `reason` | string | (Optional) failure reason when `accepted` is `false` (e.g. `"not_paired"`, `"expired"`, `"bad_signature"`) |
+| `mirror_port` | integer | (Optional) the mirror WebSocket port — re-supplied here because the Bonjour TXT record is only seen once and is lost across reconnects |
 
 ---
 
@@ -254,14 +303,14 @@ The QR code displayed on the macOS device encodes a JSON object that allows the 
 |-------|------|-------------|
 | `host` | string | IPv4 address of the macOS device on the local network |
 | `port` | integer | WebSocket server port (default: 8765) |
-| `public_key` | string | Base64-encoded DER public key (ECDH P-256) of the macOS device |
-| `pairing_token` | string | One-time random token; expires after successful pairing or timeout (5 minutes) |
+| `public_key` | string | Base64-encoded Ed25519 public key of the macOS device |
+| `pairing_token` | string | One-time random token; cleared after successful pairing |
 | `protocol_version` | integer | Protocol version number; currently `1` |
 
 **Notes:**
 - The QR code payload is compact JSON (no extra whitespace)
-- The `pairing_token` is cryptographically random, at least 64 bits of entropy
-- After pairing, both devices derive a shared secret via ECDH and use it to derive session keys
+- The `pairing_token` proves physical proximity and is one-time use — the Mac clears it once a matching `pair_request` is accepted
+- There is no key exchange / shared secret. Each device keeps a long-lived Ed25519 identity; after pairing, every reconnection is authenticated by the phone signing a fresh timestamp (see [Authentication](#authentication)), which the Mac verifies against the stored public key
 
 ---
 
@@ -280,6 +329,52 @@ The following MIME types are supported for clipboard content:
 ## Protocol Version
 
 Current version: **1**
+
+---
+
+## Complete Message Type List
+
+The sections above detail the representative messages. The full set of **49** control-channel message types is:
+
+| Category | Types |
+|---|---|
+| Clipboard | `clipboard_update` |
+| File Transfer | `file_transfer_offer`, `file_transfer_accept`, `file_transfer_reject`, `file_transfer_start`, `file_chunk`, `file_chunk_ack`, `file_transfer_complete` |
+| Authentication | `pair_request`, `pair_response`, `auth_request`, `auth_response` |
+| Gallery | `gallery_request`, `gallery_response`, `gallery_thumbnail_request`, `gallery_thumbnail_response`, `gallery_preview_request`, `gallery_preview_response`, `gallery_download_request` |
+| SMS | `sms_conversations_request`, `sms_conversations_response`, `sms_messages_request`, `sms_messages_response`, `sms_send_request`, `sms_send_response` |
+| Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response`, `file_delete_request`, `file_delete_response` |
+| Device Info & Monitor | `device_info_request`, `device_info_response`, `wallpaper_request`, `wallpaper_response`, `mac_info_request`, `mac_info_response`, `mac_wallpaper_request`, `mac_wallpaper_response` |
+| Mirror control | `mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error` |
+| Notifications | `notification_posted` |
+| Utility | `ping`, `pong` |
+
+> The `file_transfer_start` / `file_chunk` / `file_chunk_ack` cluster is a legacy WebSocket-chunk transport. The active file transfer path is HTTP (`POST /upload` and `GET /send/{id}` on port 8766).
+
+---
+
+## Mirror Binary Protocol
+
+The screen-mirror channel does **not** use JSON. It is a binary WebSocket (port 8767) where every message is framed as `[1-byte type][payload]`. The control WebSocket only carries the start/stop/error messages (`mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error`); pixels and input flow over this binary channel.
+
+| Byte | Frame | Direction | Purpose |
+|---|---|---|---|
+| `0x01` | `HELLO` | Phone → Mac | Opens the channel; payload begins with the 16-byte pairing token |
+| `0x02` | `HELLO_ACK` | Mac → Phone | Token accepted, channel ready |
+| `0x10` | `VIDEO_CONFIG` | Phone → Mac | H.264 codec config (SPS/PPS) |
+| `0x12` | `VIDEO_CONFIG_HEVC` | Phone → Mac | HEVC codec config (VPS/SPS/PPS) |
+| `0x11` | `VIDEO_FRAME` | Phone → Mac | Encoded video frame |
+| `0x20` | `INPUT_TAP` | Mac → Phone | Tap-to-click coordinate, injected on the phone via AccessibilityService |
+| `0x30` | `STATUS` | Phone → Mac | Stream status (screen off, app backgrounded, accessibility disabled/blocked, encoder error) |
+| `0x40` | `REVERSE_HELLO` | Phone → Mac | Opens reverse mirroring; `mode` selects screen-mirror (0) or phone-shaped virtual display (1) |
+| `0x41` | `REVERSE_INPUT` | Phone → Mac | Pointer event (click, move, drag, right-click) injected on the Mac via CGEvent |
+| `0x42` | `REVERSE_SCROLL` | Phone → Mac | Scroll event injected on the Mac |
+| `0x43` | `REVERSE_TEXT` | Phone → Mac | Text input injected on the Mac |
+| `0x44` | `REVERSE_KEY` | Phone → Mac | Key event injected on the Mac |
+
+In reverse modes the roles flip for video: the Mac encodes its screen and the phone decodes it, while input travels phone → Mac.
+
+A bad pairing token in `HELLO` / `REVERSE_HELLO` causes the connection to be dropped immediately with no response.
 
 ---
 
@@ -320,7 +415,8 @@ Mac (Sender)                     Android (Receiver)
    |                               |
    |<-- file_transfer_accept ------|  [user taps Accept]
    |                               |
-   |=== HTTP POST /upload ========>|  [direct file upload over HTTP]
+   |<-- GET /send/{id} ------------|  [phone pulls the file, port 8766]
+   |=== file bytes + X-Checksum ==>|  [Mac streams; phone verifies SHA-256]
    |                               |  [saves to Downloads/Airbridge]
 ```
 
@@ -335,8 +431,10 @@ If rejected:
 ```
 Android (Sender)                 Mac (Receiver)
    |                               |
-   |=== HTTP POST /upload ========>|  [direct file upload, port 8766]
-   |                               |  [saves to Downloads/Airbridge]
+   |--- file_transfer_offer ------>|  [Mac shows accept/reject popup]
+   |<-- (accept) ------------------|  [user accepts on Mac]
+   |=== POST /upload + X-Checksum >|  [upload over HTTP, port 8766]
+   |                               |  [Mac verifies SHA-256, saves to Downloads/Airbridge]
 ```
 
 ### File Transfer Flow (Legacy WebSocket chunks)

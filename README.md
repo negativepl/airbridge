@@ -39,14 +39,14 @@ This is an open-source alternative to apps like Phone Link, KDE Connect, or Inte
 | **UI** | SwiftUI + Liquid Glass (macOS 26) | Jetpack Compose + Material 3 Expressive |
 | **Networking** | Network.framework (NWListener) | OkHttp WebSocket |
 | **Discovery** | Bonjour / mDNS (NWListener.service) | NSD (NsdManager) |
-| **File Transfer** | HTTP upload (URLSession) | HTTP server (ServerSocket) + HTTP upload (OkHttp) |
+| **File Transfer** | HTTP server (NWListener, GET/POST) | HTTP upload + pull-download (OkHttp) |
 | **Screen Mirror** | VideoToolbox (VTDecompressionSession) + AVSampleBufferDisplayLayer | MediaProjection + MediaCodec (HW H.264/HEVC) |
 | **Remote control** | CGEvent injection (mouse/keyboard) | AccessibilityService (gesture/text injection) |
-| **Crypto** | CryptoKit (Ed25519) | AndroidX Security |
+| **Crypto** | CryptoKit (Ed25519) | java.security (Ed25519) |
 | **Camera** | — | CameraX + ML Kit (QR scanning) |
 | **Architecture** | MVVM, SPM, @Observable | MVVM, Foreground Service, StateFlow |
 | **Min version** | macOS 26 (Tahoe) | Android 10 (API 29) |
-| **Target SDK** | — | API 36 (Android 16) |
+| **Target SDK** | — | API 35 (Android 15) |
 | **Build** | Swift Package Manager | Gradle + Kotlin DSL |
 
 ---
@@ -57,21 +57,21 @@ This is an open-source alternative to apps like Phone Link, KDE Connect, or Inte
 
 AirBridge streams screens **both ways** over a dedicated low-latency video channel, with full interactive control:
 
-- **Phone → Mac (forward)** — Mirror your Android screen into a window on the Mac. Not just view-only: **click, drag, type, and scroll with your Mac's mouse and keyboard** to drive the phone. Input is injected on the phone through an AccessibilityService.
+- **Phone → Mac (forward)** — Mirror your Android screen into a window on the Mac and **tap to click** with your mouse to drive the phone. Taps are injected on the phone through an AccessibilityService. (Full pointer and keyboard control — drag, scroll, type, right-click — is available in the **reverse** direction, below.)
 - **Mac → Phone (reverse)** — Mirror your **Mac's screen onto the phone** and control the Mac with touch: tap to click, drag to move the cursor, two-finger scroll, long-press for right-click, and the soft keyboard for text. Drive your Mac from the couch.
 - **Virtual second display** — In reverse mode, the phone can act as a **second display shaped to the phone's own aspect ratio** instead of mirroring the main screen — a portable extra monitor.
 - **Codecs** — Hardware **H.264** by default, with an optional **HEVC / H.265** toggle for better quality per bit. Decoded with VideoToolbox on the Mac and rendered with no jitter buffer for minimal LAN latency.
-- **Per-mode quality settings** — Each mode (forward, reverse-mirror, reverse-virtual) keeps its **own** resolution, frame rate, bitrate, UI scale, and HEVC preference. Live FPS / Mbps read-outs and a pop-out window are available from the toolbar. An ambient mode keeps the stream gently visible when idle.
+- **Per-mode quality settings** — Each mode (forward, reverse-mirror, reverse-virtual) keeps its **own** resolution, frame rate, bitrate, UI scale, and HEVC preference. Live FPS / Mbps read-outs and a pop-out window are available from the toolbar. A blurred ambient backdrop softly fills the letterbox bars around the stream.
 - **Consent-gated** — On the phone, mirroring starts a foreground service and goes through the system **MediaProjection** permission prompt; nothing is captured without you tapping Allow.
 
 ### Phone File Browser
 
 Browse your phone's **entire storage** from the Mac in a Finder-like view:
 
-- **Navigate the whole filesystem** — Download, Documents, DCIM, WhatsApp, anything. Clickable breadcrumb path lives right in the window toolbar.
+- **Navigate the whole filesystem** — Download, Documents, DCIM, WhatsApp, anything. A clickable breadcrumb path sits at the top of the window.
 - **Thumbnails** — Image files get real JPEG thumbnails generated on the phone; everything else gets a type icon. Folders show a live item/size summary.
 - **Download** — Pull any file to your Mac with one click, over the same fast HTTP transfer path as everything else.
-- **Upload to a chosen folder** — Drag a file from Finder onto a folder in the browser and it lands **exactly there** on the phone (not just the default Downloads).
+- **Upload to a chosen folder** — Drag a file from Finder into the folder you have open in the browser and it lands **right there** on the phone (not just the default Downloads).
 - **Access model** — Uses Android's **All Files Access** (`MANAGE_EXTERNAL_STORAGE`) for full, direct filesystem access. Granted from the onboarding wizard or Settings.
 
 ### Live Mac System Monitor
@@ -94,12 +94,12 @@ You can also send selected text directly from any Android app:
 ### File Transfer
 - **Android → Mac**: Use the Share Sheet or the in-app Send button. Mac shows an accept/reject prompt with file name and size before the transfer starts.
 - **Mac → Android**: Drag & drop files onto the Send tab, or click to select. Android shows an accept/reject notification before any file is transferred.
-- **Quick Drop (macOS)**: Press `Cmd+Shift+D` from anywhere — a drop zone slides down from the top of the screen. Drop a file or folder onto it and it's instantly sent to your phone. Requires Accessibility permission for the global hotkey (configurable in Settings).
+- **Quick Drop (macOS)**: Press the global hotkey from anywhere (default `⌃⌥⌘A`) — a drop zone slides down from the top of the screen. Drop a file or folder onto it and it's instantly sent to your phone. Requires Accessibility permission for the global hotkey (the shortcut is configurable in Settings).
 - **Unified transfer popup**: A single floating "island" at the top of the screen handles every state — waiting for acceptance, sending, complete, or rejected — with smooth in-place transitions. You can cancel a pending transfer with one click while waiting.
 - **Speed**: Direct HTTP transfer over your local network. No chunking, no base64, no cloud relay. Limited only by your Wi-Fi speed.
 
 ### Photo Gallery
-Browse your phone's entire photo library from your Mac. Thumbnails load on scroll in a horizontal strip. Tap any photo to open a full-screen viewer with pinch-to-zoom, pan, and rotation controls. Download originals in full resolution with one click. Photos are sent directly — they don't go through any server.
+Browse your phone's entire photo library from your Mac. Thumbnails load on scroll in a horizontal strip. Tap any photo to open a full-screen viewer with pinch-to-zoom, pan, and rotation controls. Download originals in full resolution with one click. Thumbnails and previews stream over the control WebSocket; full-resolution downloads come over the same HTTP transfer path as files.
 
 ### SMS Messages
 Read all your SMS conversations on your Mac. Send replies directly. Full chat bubble UI with contact name resolution. Short codes (automated messages) are detected and blocked from replying.
@@ -108,10 +108,10 @@ Read all your SMS conversations on your Mac. Send replies directly. Full chat bu
 - **Ed25519 key pairs** — Each device generates a cryptographic identity on first launch.
 - **QR code pairing** — One-time scan to exchange public keys. No accounts, no registration.
 - **Signature authentication** — Every reconnection is verified with a signed timestamp. Replay window: 30 seconds.
-- **Token-gated mirror channel** — The video channel requires the same 16-byte pairing token; a bad token is dropped instantly with no response.
+- **Token-gated mirror channel** — The video channel requires a 16-byte token derived from the paired device's key; a bad token is dropped instantly with no response.
 - **Local only** — All traffic stays on your Wi-Fi network. No internet connection required. No telemetry, no analytics, no tracking.
 - **Open source** — Every line of code is auditable. MIT license.
-- **SHA-256 checksums** — File integrity verified after every transfer.
+- **SHA-256 checksums** — File transfers carry a SHA-256 hash that the receiver verifies when present.
 
 ### Auto-discovery
 No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS (including the mirror port in its TXT record), and Android discovers it automatically using NSD. If your devices are on the same Wi-Fi, they will find each other.
@@ -120,7 +120,7 @@ No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS
 Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing is independent and uses its own key pair.
 
 ### macOS System Integration
-- **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to the main window and a one-click "Mirror Phone".
+- **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to open the main window.
 - **Launch at Login** — Optional auto-start so AirBridge is ready when you log in (configurable in Settings).
 - **Sound on receive** — Audio feedback when a file or clipboard update arrives (configurable in Settings).
 - **Configurable global hotkey** — Record your own keyboard shortcut for Quick Drop in Settings, or use the default.
@@ -165,9 +165,8 @@ Supported platforms:
 | Channel | Port | Direction | Purpose |
 |---|---|---|---|
 | Control WebSocket | **8765** | Phone → Mac | Clipboard, gallery, SMS, files, device info, control |
-| HTTP upload | **8766** | Phone → Mac | File transfer (Android → Mac) |
-| HTTP file server | **8767** | Mac → Phone | File transfer (Mac → Android) |
-| Mirror WebSocket | **8767** (Mac) | Phone → Mac | Screen mirror video + input stream (advertised as `mirror_port`) |
+| HTTP transfer | **8766** | Phone → Mac | File transfer both ways — phone `POST`s uploads and pulls Mac → phone files via `GET /send/{id}` |
+| Mirror WebSocket | **8767** | Phone → Mac | Screen mirror video + input stream (advertised as `mirror_port`) |
 
 1. **Mac** starts a control WebSocket server (8765), an HTTP upload server (8766), and a mirror WebSocket server (8767)
 2. **Mac** advertises itself via Bonjour as `_airbridge._tcp`, publishing `http_port` and `mirror_port` in its TXT record
@@ -193,7 +192,7 @@ Mac → Android follows a consent-based flow:
 3. User taps **Accept** → Android sends `file_transfer_accept` → Mac uploads via HTTP
 4. User taps **Reject** → Android sends `file_transfer_reject` → nothing is transferred
 
-Android → Mac uploads directly via HTTP POST — no confirmation needed (Mac always accepts from paired devices).
+Android → Mac follows the same consent flow in reverse: the phone sends `file_transfer_offer`, the Mac shows an accept/reject popup with the file name and size, and only after you accept does the phone upload via HTTP POST.
 
 ---
 
@@ -270,7 +269,7 @@ UI (Jetpack Compose + Material 3 Expressive)
         └── AirbridgeService (Foreground Service)
               ├── WebSocketClient     — OkHttp WebSocket (control channel)
               ├── HttpFileUploader    — HTTP POST to Mac
-              ├── HttpFileServer      — HTTP server for receiving from Mac
+              ├── HttpFileDownloader  — pulls Mac → phone files over HTTP
               ├── NsdDiscovery        — Bonjour/mDNS discovery (reads mirror_port)
               ├── ClipboardSync       — System clipboard monitoring
               ├── GalleryProvider     — MediaStore queries
@@ -288,7 +287,7 @@ UI (Jetpack Compose + Material 3 Expressive)
 
 ### Protocol
 
-**46 JSON message types** over the control WebSocket, plus a separate **binary video/input protocol** for the mirror channel:
+**49 JSON message types** over the control WebSocket, plus a separate **binary video/input protocol** for the mirror channel:
 
 | Category | Messages |
 |---|---|
@@ -297,12 +296,13 @@ UI (Jetpack Compose + Material 3 Expressive)
 | Authentication | `pair_request`, `pair_response`, `auth_request`, `auth_response` |
 | Gallery | `gallery_request`, `gallery_response`, `gallery_thumbnail_request`, `gallery_thumbnail_response`, `gallery_preview_request`, `gallery_preview_response`, `gallery_download_request` |
 | SMS | `sms_conversations_request`, `sms_conversations_response`, `sms_messages_request`, `sms_messages_response`, `sms_send_request`, `sms_send_response` |
-| Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response` |
+| Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response`, `file_delete_request`, `file_delete_response` |
 | Device Info & Monitor | `device_info_request`, `device_info_response`, `wallpaper_request`, `wallpaper_response`, `mac_info_request`, `mac_info_response`, `mac_wallpaper_request`, `mac_wallpaper_response` |
 | Mirror control | `mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error` |
+| Notifications | `notification_posted` |
 | Utility | `ping`, `pong` |
 
-The mirror video stream is **not** JSON — it's a binary frame protocol (`[1B type][payload]`): `HELLO` / `HELLO_ACK` handshake, `VIDEO_CONFIG` (SPS/PPS or VPS/SPS/PPS for HEVC), `VIDEO_FRAME`, forward input (`INPUT_TAP`, `INPUT_SWIPE`, `INPUT_KEY`, `INPUT_TEXT`), and reverse input (`REVERSE_HELLO`, `REVERSE_INPUT`, `REVERSE_SCROLL`, `REVERSE_TEXT`, `REVERSE_KEY`). See [docs/protocol.md](docs/protocol.md) for the full spec.
+The mirror video stream is **not** JSON — it's a binary frame protocol (`[1B type][payload]`): `HELLO` / `HELLO_ACK` handshake, `VIDEO_CONFIG` (H.264 SPS/PPS) and `VIDEO_CONFIG_HEVC` (VPS/SPS/PPS), `VIDEO_FRAME`, a `STATUS` channel (screen off, app backgrounded, accessibility state, encoder errors), forward input (`INPUT_TAP`), and reverse input (`REVERSE_HELLO`, `REVERSE_INPUT`, `REVERSE_SCROLL`, `REVERSE_TEXT`, `REVERSE_KEY`). See [docs/protocol.md](docs/protocol.md) for the full spec.
 
 ---
 
