@@ -16,6 +16,7 @@ struct OnboardingView: View {
     @State private var direction: Direction = .forward
     @State private var showPairing = false
     @State private var accessibilityGranted = AXIsProcessTrusted()
+    @State private var accessibilityAwaitingRestart = false
     @State private var screenRecordingGranted = CGPreflightScreenCaptureAccess()
     @State private var notificationsAuthorized = false
     @State private var accessibilityPollTimer: Timer?
@@ -312,8 +313,10 @@ struct OnboardingView: View {
                 title: isPL ? "Dostępność" : "Accessibility",
                 why: isPL ? "Skrót Quick Drop i sterowanie telefonem" : "Quick Drop shortcut & controlling your phone",
                 granted: accessibilityGranted,
+                awaitingRestart: accessibilityAwaitingRestart,
                 grant: {
                     hotkeyService.requestAccessibilityAndStart()
+                    accessibilityAwaitingRestart = true
                     startAccessibilityPolling()
                 })
             permissionRow(
@@ -345,7 +348,7 @@ struct OnboardingView: View {
     }
 
     @ViewBuilder
-    private func permissionRow(icon: String, title: String, why: String, granted: Bool, grant: (() -> Void)?) -> some View {
+    private func permissionRow(icon: String, title: String, why: String, granted: Bool, awaitingRestart: Bool = false, grant: (() -> Void)?) -> some View {
         HStack(spacing: 18) {
             Image(systemName: icon)
                 .font(.ab(.title2))
@@ -361,6 +364,12 @@ struct OnboardingView: View {
             if granted {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.ab(.title3)).foregroundStyle(.green)
+            } else if awaitingRestart {
+                // macOS caches AXIsProcessTrusted() per-process — a freshly granted
+                // Accessibility permission only applies after a relaunch.
+                Button(isPL ? "Zrestartuj, aby zastosować" : "Restart to apply") { AppRelauncher.relaunch() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             } else if let grant {
                 Button(isPL ? "Przyznaj" : "Grant", action: grant)
                     .buttonStyle(.borderedProminent)

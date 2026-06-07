@@ -10,6 +10,7 @@ struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
     @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
+    @State private var accessibilityAwaitingRestart = false
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
     @AppStorage("showInDock") private var showInDock = false
@@ -202,9 +203,18 @@ struct SettingsView: View {
                         : (L10n.isPL ? "Brak uprawnień" : "Not granted"))
                         .font(.ab(.body))
                 }
-                if !accessibilityGranted {
+                if !accessibilityGranted && accessibilityAwaitingRestart {
+                    // AXIsProcessTrusted() is cached per-process — a freshly granted
+                    // Accessibility permission only applies after a relaunch.
+                    Button(L10n.isPL ? "Zrestartuj, aby zastosować" : "Restart to apply") {
+                        AppRelauncher.relaunch()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.extraLarge)
+                } else if !accessibilityGranted {
                     Button(L10n.isPL ? "Nadaj" : "Grant") {
                         hotkeyService.requestAccessibilityAndStart()
+                        accessibilityAwaitingRestart = true
                         startAccessibilityPolling()
                     }
                     .buttonStyle(.borderedProminent)
