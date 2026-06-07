@@ -141,7 +141,8 @@ struct OnboardingView: View {
             }
         }
         .padding(.horizontal, 48)
-        .padding(.vertical, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 40)
     }
 
     // MARK: - Page 1: Welcome

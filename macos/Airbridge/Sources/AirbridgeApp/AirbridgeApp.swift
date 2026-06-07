@@ -108,9 +108,9 @@ struct AirbridgeApp: App {
                     )
                 }
             }
-            .frame(minWidth: 900, minHeight: 820)
+            .frame(minWidth: 900, minHeight: 760)
         }
-        .defaultSize(width: 1100, height: 1000)
+        .defaultSize(width: 1100, height: 900)
         .windowResizability(.contentMinSize)
         .commands {
             // Remove "New Window" and related document commands we don't use.
