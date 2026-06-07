@@ -223,7 +223,7 @@ struct OnboardingView: View {
                 .font(.system(size: 96, weight: .light))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: page)
-                .padding(.bottom, 8)
+                .padding(.bottom, -40)
 
             VStack(spacing: 14) {
                 Text(isPL ? "Jak to działa?" : "How it works")
@@ -286,7 +286,7 @@ struct OnboardingView: View {
                 .font(.system(size: 96, weight: .light))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: page)
-                .padding(.bottom, 8)
+                .padding(.bottom, -40)
 
             VStack(spacing: 14) {
                 Text(isPL ? "Uprawnienia" : "Permissions")
