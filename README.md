@@ -138,14 +138,17 @@ Both apps support **English** and **Polish**. The UI language follows your syste
 
 ## Download
 
-> **Pre-release status:** No published binaries are currently available. Build from source — see [Building from Source](#building-from-source) below. Pre-built releases will return once the next round of UX polish is done.
+Grab the latest signed builds from the [**Releases**](https://github.com/negativepl/airbridge/releases/latest) page:
 
-Supported platforms:
+| Platform | File | Requirement |
+|---|---|---|
+| **macOS** | `AirBridge.dmg` | macOS 26 (Tahoe) or newer, Apple Silicon |
+| **Android** | `AirBridge.apk` | Android 10 (API 29) or newer |
 
-| Platform | Requirement |
-|---|---|
-| **macOS** | macOS 26 (Tahoe) or newer, Apple Silicon |
-| **Android** | Android 10 (API 29) or newer |
+> **macOS first launch:** the app is self-signed, so right-click → **Open** once to get past Gatekeeper ("unidentified developer"). Updates afterwards are friction-free — the Accessibility grant survives because the signing identity is stable.
+> **Android:** allow "Install unknown apps" for your browser or file manager to install the APK.
+
+Or build it yourself — see [Building from Source](#building-from-source) below.
 
 > **Why not on Google Play?**
 > AirBridge requires a foreground service to maintain the WebSocket connection and HTTP server while the app is in the background (and a MediaProjection foreground service for screen mirroring). Google Play's [foreground service policies](https://developer.android.com/about/versions/14/changes/fgs-types-required) restrict which apps can use persistent foreground services, and our use case (local network file server + clipboard sync + mirroring) doesn't fit into the allowed foreground service type categories. This is the same reason apps like [LocalSend](https://github.com/localsend/localsend) and [KDE Connect](https://invent.kde.org/network/kdeconnect-android) have limitations with background operation on Android. We chose to prioritize functionality over store compatibility — AirBridge works reliably in the background, which is more important than being on Google Play.
