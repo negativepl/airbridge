@@ -27,19 +27,19 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             ZStack {
                 switch page {
-                case 0: welcomePage.transition(.asymmetric(
+                case 0: scrollablePage { welcomePage }.transition(.asymmetric(
                     insertion: .move(edge: .leading),
                     removal: .move(edge: .leading)
                 ))
-                case 1: howItWorksPage.transition(.asymmetric(
+                case 1: scrollablePage { howItWorksPage }.transition(.asymmetric(
                     insertion: .move(edge: direction == .forward ? .trailing : .leading),
                     removal: .move(edge: direction == .forward ? .leading : .trailing)
                 ))
-                case 2: permissionsPage.transition(.asymmetric(
+                case 2: scrollablePage { permissionsPage }.transition(.asymmetric(
                     insertion: .move(edge: direction == .forward ? .trailing : .leading),
                     removal: .move(edge: direction == .forward ? .leading : .trailing)
                 ))
-                default: connectPage.transition(.asymmetric(
+                default: scrollablePage { connectPage }.transition(.asymmetric(
                     insertion: .move(edge: .trailing),
                     removal: .move(edge: .trailing)
                 ))
@@ -63,6 +63,22 @@ struct OnboardingView: View {
                     showPairing = false
                     onComplete()
                 }
+            }
+        }
+    }
+
+    // MARK: - Scrollable page wrapper
+
+    /// Centers a page's content when it fits the viewport and lets it scroll
+    /// when it doesn't. This keeps the window (and therefore the pinned
+    /// bottom bar with the Next button) at a constant height across pages,
+    /// instead of the window growing for content-heavy pages and shifting
+    /// the button.
+    private func scrollablePage<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
+        GeometryReader { geo in
+            ScrollView(.vertical, showsIndicators: false) {
+                content()
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
         }
     }
@@ -148,8 +164,8 @@ struct OnboardingView: View {
     // MARK: - Page 1: Welcome
 
     private var welcomePage: some View {
-        VStack(spacing: 40) {
-            Spacer(minLength: 40)
+        VStack(spacing: 28) {
+            Spacer(minLength: 24)
 
             if let iconURL = AppResources.bundle.url(forResource: "AppIcon", withExtension: "icns"),
                let icon = NSImage(contentsOf: iconURL) {
@@ -174,7 +190,7 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 featureRow(
                     icon: "doc.on.clipboard",
                     text: isPL
@@ -208,10 +224,10 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: 560, alignment: .leading)
 
-            Spacer(minLength: 40)
+            Spacer(minLength: 24)
         }
         .padding(.horizontal, 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Page 2: How it works
@@ -274,7 +290,7 @@ struct OnboardingView: View {
             Spacer(minLength: 40)
         }
         .padding(.horizontal, 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Page 3: Permissions
@@ -341,7 +357,7 @@ struct OnboardingView: View {
             Spacer(minLength: 40)
         }
         .padding(.horizontal, 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .onAppear {
             accessibilityGranted = AXIsProcessTrusted()
             screenRecordingGranted = CGPreflightScreenCaptureAccess()
@@ -435,7 +451,7 @@ struct OnboardingView: View {
             Spacer(minLength: 40)
         }
         .padding(.horizontal, 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Components

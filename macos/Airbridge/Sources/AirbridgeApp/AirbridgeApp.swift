@@ -108,7 +108,7 @@ struct AirbridgeApp: App {
                     )
                 }
             }
-            .frame(minWidth: 900, minHeight: 760)
+            .frame(minWidth: 900, minHeight: 700)
         }
         .defaultSize(width: 1100, height: 900)
         .windowResizability(.contentMinSize)
