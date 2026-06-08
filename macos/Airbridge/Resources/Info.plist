@@ -4,11 +4,6 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>pl</string>
-	<key>CFBundleLocalizations</key>
-	<array>
-		<string>pl</string>
-		<string>en</string>
-	</array>
 	<key>CFBundleDisplayName</key>
 	<string>AirBridge</string>
 	<key>CFBundleExecutable</key>
@@ -17,27 +12,32 @@
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.airbridge.macos</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>pl</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>AirBridge</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.0</string>
+	<string>2.1.0</string>
 	<key>CFBundleVersion</key>
-	<string>2.0.0</string>
+	<string>2.1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_airbridge._tcp</string>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>AirBridge needs access to your local network to discover and communicate with paired devices over Wi-Fi.</string>
 	<key>NSScreenRecordingUsageDescription</key>
 	<string>AirBridge needs screen recording to show your Mac's screen on your phone (reverse mirroring).</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_airbridge._tcp</string>
-	</array>
 </dict>
 </plist>
