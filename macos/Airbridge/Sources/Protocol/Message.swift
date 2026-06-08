@@ -66,6 +66,9 @@ public enum Message: Equatable, Sendable {
     case reverseMirrorStart(token: String, mode: Int)
     case mirrorStop
     case mirrorError(reason: String)
+    /// Mac -> phone: zadzwoń/znajdź telefon (głośny alarm) i zatrzymaj.
+    case phoneRing
+    case phoneRingStop
     case deviceInfoRequest
     case deviceInfoResponse(info: DeviceInfo)
     /// Mac -> phone: send your wallpaper for the Home hero. phone -> Mac: the
@@ -79,7 +82,8 @@ public enum Message: Equatable, Sendable {
     case macWallpaperResponse(imageBase64: String)
     case folderStatsRequest(path: String)
     case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
-    case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String)
+    case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String, notificationKey: String, canReply: Bool)
+    case notificationReply(notificationKey: String, text: String)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -345,6 +349,8 @@ extension Message: Codable {
         case mirrorStartRequest       = "mirror_start_request"
         case reverseMirrorStart       = "reverse_mirror_start"
         case mirrorStop               = "mirror_stop"
+        case phoneRing                = "phone_ring"
+        case phoneRingStop            = "phone_ring_stop"
         case mirrorError              = "mirror_error"
         case deviceInfoRequest        = "device_info_request"
         case deviceInfoResponse       = "device_info_response"
@@ -357,6 +363,7 @@ extension Message: Codable {
         case folderStatsRequest       = "folder_stats_request"
         case folderStatsResponse      = "folder_stats_response"
         case notificationPosted       = "notification_posted"
+        case notificationReply        = "notification_reply"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -413,6 +420,8 @@ extension Message: Codable {
         case packageName        = "package_name"
         case appName            = "app_name"
         case appIcon            = "app_icon"
+        case notificationKey    = "notification_key"
+        case canReply           = "can_reply"
     }
 
     // MARK: Encode
@@ -626,6 +635,12 @@ extension Message: Codable {
         case .mirrorStop:
             try container.encode(TypeKey.mirrorStop.rawValue, forKey: .type)
 
+        case .phoneRing:
+            try container.encode(TypeKey.phoneRing.rawValue, forKey: .type)
+
+        case .phoneRingStop:
+            try container.encode(TypeKey.phoneRingStop.rawValue, forKey: .type)
+
         case let .mirrorError(reason):
             try container.encode(TypeKey.mirrorError.rawValue, forKey: .type)
             try container.encode(reason, forKey: .reason)
@@ -669,7 +684,7 @@ extension Message: Codable {
             try container.encode(fileCount, forKey: .fileCount)
             try container.encode(totalSize, forKey: .totalSize)
 
-        case .notificationPosted(let packageName, let appName, let title, let text, let timestamp, let appIcon):
+        case .notificationPosted(let packageName, let appName, let title, let text, let timestamp, let appIcon, let notificationKey, let canReply):
             try container.encode(TypeKey.notificationPosted.rawValue, forKey: .type)
             try container.encode(packageName, forKey: .packageName)
             try container.encode(appName, forKey: .appName)
@@ -677,6 +692,13 @@ extension Message: Codable {
             try container.encode(text, forKey: .text)
             try container.encode(timestamp, forKey: .timestamp)
             try container.encode(appIcon, forKey: .appIcon)
+            try container.encode(notificationKey, forKey: .notificationKey)
+            try container.encode(canReply, forKey: .canReply)
+
+        case .notificationReply(let notificationKey, let text):
+            try container.encode(TypeKey.notificationReply.rawValue, forKey: .type)
+            try container.encode(notificationKey, forKey: .notificationKey)
+            try container.encode(text, forKey: .text)
         }
     }
 
@@ -906,6 +928,12 @@ extension Message: Codable {
         case .mirrorStop:
             self = .mirrorStop
 
+        case .phoneRing:
+            self = .phoneRing
+
+        case .phoneRingStop:
+            self = .phoneRingStop
+
         case .mirrorError:
             let reason = try container.decode(String.self, forKey: .reason)
             self = .mirrorError(reason: reason)
@@ -956,7 +984,14 @@ extension Message: Codable {
             let text = try container.decode(String.self, forKey: .text)
             let timestamp = try container.decode(Int64.self, forKey: .timestamp)
             let appIcon = try container.decodeIfPresent(String.self, forKey: .appIcon) ?? ""
-            self = .notificationPosted(packageName: packageName, appName: appName, title: title, text: text, timestamp: timestamp, appIcon: appIcon)
+            let notificationKey = try container.decodeIfPresent(String.self, forKey: .notificationKey) ?? ""
+            let canReply = try container.decodeIfPresent(Bool.self, forKey: .canReply) ?? false
+            self = .notificationPosted(packageName: packageName, appName: appName, title: title, text: text, timestamp: timestamp, appIcon: appIcon, notificationKey: notificationKey, canReply: canReply)
+
+        case .notificationReply:
+            let notificationKey = try container.decode(String.self, forKey: .notificationKey)
+            let text = try container.decode(String.self, forKey: .text)
+            self = .notificationReply(notificationKey: notificationKey, text: text)
         }
     }
 

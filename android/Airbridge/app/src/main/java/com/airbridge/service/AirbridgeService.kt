@@ -65,6 +65,8 @@ class AirbridgeService : Service() {
         const val ACTION_DISCONNECT = "com.airbridge.action.DISCONNECT"
         const val ACTION_ACCEPT_FILE = "com.airbridge.action.ACCEPT_FILE"
         const val ACTION_REJECT_FILE = "com.airbridge.action.REJECT_FILE"
+        const val ACTION_STOP_RING = "com.airbridge.action.STOP_RING"
+        private const val RING_NOTIFICATION_ID = 7
 
         const val EXTRA_HOST = "extra_host"
         const val EXTRA_PORT = "extra_port"
@@ -125,12 +127,12 @@ class AirbridgeService : Service() {
         /** Most z NotificationRelayService: wyślij powiadomienie na Maca, gdy połączony. */
         fun relayNotification(
             packageName: String, appName: String, title: String, text: String,
-            timestamp: Long, appIcon: String
+            timestamp: Long, appIcon: String, notificationKey: String = "", canReply: Boolean = false
         ) {
             val svc = instance ?: return
             if (!svc.webSocketClient.isConnected) return
             svc.webSocketClient.send(
-                Message.NotificationPosted(packageName, appName, title, text, timestamp, appIcon)
+                Message.NotificationPosted(packageName, appName, title, text, timestamp, appIcon, notificationKey, canReply)
             )
         }
 
@@ -288,12 +290,16 @@ class AirbridgeService : Service() {
                 connectedHost.value = null
                 stopSelf()
             }
+            ACTION_STOP_RING -> {
+                stopRinging()
+            }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopRinging()
         instance = null
         clipboardSync.stopListening()
         nsdDiscovery.stopDiscovery()
@@ -989,6 +995,11 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            is Message.NotificationReply -> {
+                val ok = com.airbridge.notification.NotificationRelayService
+                    .sendReply(message.notificationKey, message.text)
+                if (!ok) Log.w(TAG, "NotificationReply: brak akcji dla key=${message.notificationKey}")
+            }
             is Message.MirrorStartRequest -> {
                 val host = connectedHost.value
                 val mirrorPort = currentMirrorPort
@@ -1036,6 +1047,8 @@ class AirbridgeService : Service() {
             is Message.MirrorError -> {
                 Log.w(TAG, "Mac reported mirror error: ${message.reason}")
             }
+            is Message.PhoneRing -> startRinging()
+            is Message.PhoneRingStop -> stopRinging()
             is Message.DeviceInfoRequest -> {
                 serviceScope.launch {
                     try {
@@ -1270,6 +1283,95 @@ class AirbridgeService : Service() {
     }
 
     // --- Notification helpers ---
+
+    // MARK: - Ring (znajdź telefon)
+
+    private var ringtone: android.media.Ringtone? = null
+    private var ringVibrator: android.os.Vibrator? = null
+    private var savedAlarmVolume: Int? = null
+    private val ringHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val ringStopRunnable = Runnable { stopRinging() }
+
+    /** Głośny alarm na STREAM_ALARM (omija tryb cichy) + wibracje, auto-stop po 30 s. */
+    private fun startRinging() {
+        if (ringtone?.isPlaying == true) return
+        try {
+            val audio = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            savedAlarmVolume = audio.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            audio.setStreamVolume(
+                android.media.AudioManager.STREAM_ALARM,
+                audio.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM),
+                0
+            )
+            val uri = android.media.RingtoneManager.getActualDefaultRingtoneUri(this, android.media.RingtoneManager.TYPE_ALARM)
+                ?: android.media.RingtoneManager.getActualDefaultRingtoneUri(this, android.media.RingtoneManager.TYPE_RINGTONE)
+                ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+            ringtone = android.media.RingtoneManager.getRingtone(this, uri)?.apply {
+                audioAttributes = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .build()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
+                play()
+            }
+            startVibration()
+            showRingNotification()
+            ringHandler.removeCallbacks(ringStopRunnable)
+            ringHandler.postDelayed(ringStopRunnable, 30_000)
+            Log.d(TAG, "PhoneRing: started")
+        } catch (e: Exception) {
+            Log.e(TAG, "startRinging failed", e)
+        }
+    }
+
+    private fun startVibration() {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+        }
+        ringVibrator = vibrator
+        val effect = android.os.VibrationEffect.createWaveform(longArrayOf(0, 600, 400), 0)
+        vibrator.vibrate(effect)
+    }
+
+    private fun stopRinging() {
+        ringHandler.removeCallbacks(ringStopRunnable)
+        try { ringtone?.stop() } catch (_: Exception) {}
+        ringtone = null
+        try { ringVibrator?.cancel() } catch (_: Exception) {}
+        ringVibrator = null
+        savedAlarmVolume?.let { vol ->
+            try {
+                val audio = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                audio.setStreamVolume(android.media.AudioManager.STREAM_ALARM, vol, 0)
+            } catch (_: Exception) {}
+        }
+        savedAlarmVolume = null
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(RING_NOTIFICATION_ID)
+        Log.d(TAG, "PhoneRing: stopped")
+    }
+
+    private fun showRingNotification() {
+        val stopPI = android.app.PendingIntent.getService(
+            this, RING_NOTIFICATION_ID,
+            Intent(this, AirbridgeService::class.java).apply { action = ACTION_STOP_RING },
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val stopAction = Notification.Action.Builder(
+            null as android.graphics.drawable.Icon?, "Zatrzymaj", stopPI
+        ).build()
+        val notif = Notification.Builder(this, CHANNEL_FILES_ID)
+            .setContentTitle("AirBridge dzwoni")
+            .setContentText("Dotknij Zatrzymaj, aby wyciszyć")
+            .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setContentIntent(stopPI)
+            .addAction(stopAction)
+            .build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(RING_NOTIFICATION_ID, notif)
+    }
 
     private fun createNotificationChannel() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

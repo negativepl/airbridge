@@ -19,8 +19,21 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
+            if connectionService.isConnected, let info = connectionService.deviceInfo {
+                BatteryRow(percent: info.batteryPercent, charging: info.batteryCharging)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+            }
+
             Divider()
                 .padding(.horizontal, 8)
+
+            if connectionService.isConnected {
+                MenuRow(title: L10n.isPL ? "Zadzwoń na telefon" : "Ring phone",
+                        systemImage: "iphone.radiowaves.left.and.right") {
+                    connectionService.ringPhone()
+                }
+            }
 
             MenuRow(title: L10n.openAirbridge, systemImage: "macwindow") {
                 openWindow(id: "main")
@@ -35,6 +48,42 @@ struct MenuBarView: View {
         }
         .padding(.vertical, 6)
         .frame(width: 260)
+    }
+}
+
+/// Wiersz baterii telefonu w rozwijanym menu paska.
+private struct BatteryRow: View {
+    let percent: Int
+    let charging: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.ab(.subheadline))
+                .frame(width: 18, alignment: .center)
+                .foregroundStyle(charging ? Color.green : Color.primary)
+            Text(label)
+                .font(.ab(.subheadline))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var label: String {
+        if charging {
+            return L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging"
+        }
+        return L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%"
+    }
+
+    private var symbol: String {
+        switch percent {
+        case ...10: return "battery.0"
+        case ...37: return "battery.25"
+        case ...62: return "battery.50"
+        case ...87: return "battery.75"
+        default:    return "battery.100"
+        }
     }
 }
 

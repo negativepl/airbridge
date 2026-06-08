@@ -83,6 +83,7 @@ final class ConnectionService {
         guard !serverStarted else { return }
         serverStarted = true
         statusMessage = L10n.isPL ? "Uruchamianie…" : "Starting…"
+        startDeviceInfoPolling()
 
         Task {
             do {
@@ -153,6 +154,30 @@ final class ConnectionService {
     /// Poproś telefon o świeże DeviceInfo (np. cyklicznie, dla stanu ładowania na żywo).
     func requestDeviceInfo() {
         Task { try? await server.broadcast(.deviceInfoRequest) }
+    }
+
+    /// Globalna pętla odświeżania DeviceInfo (bateria itp.) co 15 s, niezależna od
+    /// otwartego okna — żeby pasek menu miał aktualny stan także przy zamkniętym oknie.
+    private var deviceInfoPollTask: Task<Void, Never>?
+    private func startDeviceInfoPolling() {
+        deviceInfoPollTask?.cancel()
+        deviceInfoPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard let self else { return }
+                if self.isConnected {
+                    try? await self.server.broadcast(.deviceInfoRequest)
+                }
+            }
+        }
+    }
+
+    /// Zadzwoń na telefon (głośny alarm) / zatrzymaj dzwonienie.
+    func ringPhone() {
+        Task { try? await server.broadcast(.phoneRing) }
+    }
+    func stopRingPhone() {
+        Task { try? await server.broadcast(.phoneRingStop) }
     }
 
     // MARK: - Auth Handling

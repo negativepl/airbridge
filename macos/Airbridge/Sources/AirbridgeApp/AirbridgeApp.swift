@@ -47,6 +47,7 @@ struct AirbridgeApp: App {
         pairing.configure(connectionService: connection)
         gallery.configure(connectionService: connection)
         sms.configure(connectionService: connection)
+        notifications.configure(connectionService: connection)
         filesBrowser.configure(connectionService: connection, fileTransferService: fileTransfer)
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
         TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
@@ -162,7 +163,16 @@ struct AirbridgeApp: App {
         MenuBarExtra {
             MenuBarView(connectionService: connectionService, clipboardService: clipboardService)
         } label: {
-            Image(systemName: connectionService.isConnected ? "link.circle.fill" : "link.circle")
+            if connectionService.isConnected, let info = connectionService.deviceInfo {
+                Label {
+                    Text("\(info.batteryCharging ? "⚡" : "")\(info.batteryPercent)%")
+                } icon: {
+                    Image(systemName: "macbook.and.iphone")
+                }
+            } else {
+                Image(systemName: "macbook.and.iphone")
+                    .opacity(connectionService.isConnected ? 1 : 0.5)
+            }
         }
         .menuBarExtraStyle(.window)
     }

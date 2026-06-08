@@ -567,6 +567,18 @@ sealed class Message {
         }.toString()
     }
 
+    data object PhoneRing : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "phone_ring")
+        }.toString()
+    }
+
+    data object PhoneRingStop : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "phone_ring_stop")
+        }.toString()
+    }
+
     /** Mac -> phone: "show MY screen on your phone" (reverse mirror).
      *  mode: 0 = mirror Mac main display, 1 = virtual display shaped to phone. */
     data class ReverseMirrorStart(
@@ -678,7 +690,9 @@ sealed class Message {
         val title: String,
         val text: String,
         val timestamp: Long,
-        val appIcon: String = ""
+        val appIcon: String = "",
+        val notificationKey: String = "",
+        val canReply: Boolean = false
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "notification_posted")
@@ -688,6 +702,19 @@ sealed class Message {
             put("text", text)
             put("timestamp", timestamp)
             put("app_icon", appIcon)
+            put("notification_key", notificationKey)
+            put("can_reply", canReply)
+        }.toString()
+    }
+
+    data class NotificationReply(
+        val notificationKey: String,
+        val text: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "notification_reply")
+            put("notification_key", notificationKey)
+            put("text", text)
         }.toString()
     }
 
@@ -908,6 +935,8 @@ sealed class Message {
                     token = obj.getString("token")
                 )
                 "mirror_stop" -> MirrorStop
+                "phone_ring" -> PhoneRing
+                "phone_ring_stop" -> PhoneRingStop
                 "reverse_mirror_start" -> ReverseMirrorStart(
                     token = obj.getString("token"),
                     mode = if (obj.has("mode")) obj.getInt("mode") else 0
@@ -946,7 +975,13 @@ sealed class Message {
                     title = obj.getString("title"),
                     text = obj.getString("text"),
                     timestamp = obj.getLong("timestamp"),
-                    appIcon = obj.optString("app_icon", "")
+                    appIcon = obj.optString("app_icon", ""),
+                    notificationKey = obj.optString("notification_key", ""),
+                    canReply = obj.optBoolean("can_reply", false)
+                )
+                "notification_reply" -> NotificationReply(
+                    notificationKey = obj.getString("notification_key"),
+                    text = obj.getString("text")
                 )
                 else -> throw IllegalArgumentException("Unknown message type: $type")
             }
