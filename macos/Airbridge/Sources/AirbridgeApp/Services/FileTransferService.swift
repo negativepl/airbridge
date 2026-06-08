@@ -37,6 +37,10 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     /// files at once — accept/reject must cover every offer, not just the last).
     @ObservationIgnored private var pendingOfferIds: [String] = []
     @ObservationIgnored private var pendingOffersTotalSize: Int64 = 0
+    /// Gdy ustawione, najbliższy przychodzący plik o tej nazwie idzie do cache
+    /// podglądu (a nie do Downloads) i wywołuje completion z URL-em. Korelacja po
+    /// nazwie wystarcza, bo apka prowadzi jeden transfer naraz.
+    @ObservationIgnored private var pendingPreview: (filename: String, cacheURL: URL, onProgress: (Double) -> Void, completion: (URL?) -> Void)?
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
@@ -374,13 +378,30 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                 // "Plik wysłany!" text. It's reset at the end with everything
                 // else instead.
 
-                do {
-                    let _ = try self.saveToDownloads(filename: filename, data: data)
-                    self.playReceiveSound()
-                } catch {
-                    #if DEBUG
-                    print("[FileTransferService] HTTP file save failed: \(error)")
-                    #endif
+                if let preview = self.pendingPreview, preview.filename == filename {
+                    self.pendingPreview = nil
+                    do {
+                        try FileManager.default.createDirectory(
+                            at: preview.cacheURL.deletingLastPathComponent(),
+                            withIntermediateDirectories: true)
+                        try data.write(to: preview.cacheURL)
+                        self.playReceiveSound()
+                        preview.completion(preview.cacheURL)
+                    } catch {
+                        #if DEBUG
+                        print("[FileTransferService] preview cache save failed: \(error)")
+                        #endif
+                        preview.completion(nil)
+                    }
+                } else {
+                    do {
+                        let _ = try self.saveToDownloads(filename: filename, data: data)
+                        self.playReceiveSound()
+                    } catch {
+                        #if DEBUG
+                        print("[FileTransferService] HTTP file save failed: \(error)")
+                        #endif
+                    }
                 }
 
                 TransferPopup.shared.hide()
@@ -395,8 +416,15 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         let onProgress: @Sendable (String, Int, Int) -> Void = { [weak self] filename, bytesReceived, totalBytes in
             Task { @MainActor in
                 guard let self else { return }
-                self.fileTransferFileName = filename
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
+
+                // Transfer-podgląd: postęp ląduje w oknie podglądu, BEZ globalnego popovera.
+                if let preview = self.pendingPreview, preview.filename == filename {
+                    preview.onProgress(progress)
+                    return
+                }
+
+                self.fileTransferFileName = filename
                 self.fileTransferProgress = progress
 
                 if !self.isReceivingFile {
@@ -418,6 +446,30 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         }
 
         await connectionService.httpServer.setCallbacks(onFileReceived: onFileReceived, onProgress: onProgress)
+    }
+
+    // MARK: - Preview
+
+    /// Następny przychodzący plik `filename` zapisz do `cacheURL` zamiast do Downloads
+    /// i wywołaj `completion` (URL = sukces, nil = błąd). Nadpisuje wcześniejsze oczekiwanie.
+    func requestPreview(filename: String, saveTo cacheURL: URL,
+                        onProgress: @escaping (Double) -> Void,
+                        completion: @escaping (URL?) -> Void) {
+        pendingPreview = (filename, cacheURL, onProgress, completion)
+    }
+
+    /// Anuluje oczekujący podgląd (np. gdy użytkownik zamknie okno przed pobraniem).
+    func cancelPendingPreview() {
+        pendingPreview = nil
+    }
+
+    /// Kopiuje już pobrany plik (np. z cache podglądu) do Downloads — bez ponownego transferu.
+    @discardableResult
+    func saveToDownloads(fileAt sourceURL: URL, filename: String) -> URL? {
+        guard let data = try? Data(contentsOf: sourceURL) else { return nil }
+        let url = try? saveToDownloads(filename: filename, data: data)
+        if url != nil { playReceiveSound() }
+        return url
     }
 
     // MARK: - File Saving

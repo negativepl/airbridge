@@ -3,6 +3,7 @@ package com.airbridge.files
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
 import android.util.Base64
@@ -170,18 +171,17 @@ class FilesProvider(
         return Triple(dirCount, fileCount, totalSize)
     }
 
-    /** Thumbnail dla obrazów (skala 400px, JPEG q75, base64). null dla nie-obrazów. */
+    /** Thumbnail dla obrazów i filmów (skala 400px, JPEG q75, base64). null dla pozostałych typów. */
     fun getThumbnail(relPath: String): String? {
         val file = File(root, relPath)
         if (!file.exists() || file.isDirectory) return null
-        if (!mimeFromName(file.name).startsWith("image/")) return null
+        val mime = mimeFromName(file.name)
+        val bitmap = when {
+            mime.startsWith("image/") -> decodeImageBitmap(file)
+            mime.startsWith("video/") -> decodeVideoFrame(file)
+            else -> null
+        } ?: return null
         return try {
-            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(file.absolutePath, opts)
-            var sample = 1
-            while (opts.outWidth / sample > 800 || opts.outHeight / sample > 800) sample *= 2
-            val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts) ?: return null
             val scale = 400f / maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
             val scaled = if (scale < 1f)
                 Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
@@ -194,6 +194,30 @@ class FilesProvider(
         } catch (e: Exception) {
             Log.e("FilesProvider", "getThumbnail failed for $relPath", e)
             null
+        }
+    }
+
+    /** Dekoduje obraz z down-samplingiem (~800px) by nie ładować pełnej bitmapy do RAM. */
+    private fun decodeImageBitmap(file: File): Bitmap? {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, opts)
+        var sample = 1
+        while (opts.outWidth / sample > 800 || opts.outHeight / sample > 800) sample *= 2
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
+    }
+
+    /** Wyciąga reprezentatywną klatkę filmu (getFrameAtTime(-1)). null gdy się nie uda. */
+    private fun decodeVideoFrame(file: File): Bitmap? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            retriever.getFrameAtTime(-1)
+        } catch (e: Exception) {
+            Log.e("FilesProvider", "decodeVideoFrame failed for ${file.name}", e)
+            null
+        } finally {
+            try { retriever.release() } catch (_: Exception) {}
         }
     }
 

@@ -31,6 +31,14 @@ final class FilesBrowserService: MessageHandler {
     private(set) var thumbnails: [String: NSImage] = [:]   // relativePath -> thumb
     private(set) var folderStats: [String: FolderStats] = [:]  // relativePath -> stats
 
+    // MARK: - Preview (QuickLook)
+    /// Czy pokazać okno podglądu. Bindowane do .sheet w widoku.
+    var isPreviewPresented: Bool = false
+    private(set) var previewURL: URL? = nil       // gotowy plik w cache (nil = jeszcze pobieram)
+    private(set) var previewName: String = ""
+    private(set) var previewFailed: Bool = false
+    private(set) var previewProgress: Double = 0  // 0…1 w trakcie pobierania do podglądu
+
     private(set) var searchQuery: String = ""
     /// Komunikat błędu ostatniego usuwania (nil = brak). UI pokazuje alert i czyści.
     var deleteError: String? = nil
@@ -143,7 +151,7 @@ final class FilesBrowserService: MessageHandler {
         open(path: segments.joined(separator: "/"))
     }
 
-    /// Wejście do folderu lub pobranie pliku.
+    /// Wejście do folderu lub podgląd pliku w aplikacji (QuickLook).
     func activate(_ entry: FileEntry) {
         if entry.isDirectory {
             if !searchQuery.isEmpty {
@@ -152,8 +160,60 @@ final class FilesBrowserService: MessageHandler {
             }
             open(path: entry.relativePath)
         } else {
-            download(entry)
+            preview(entry)
         }
+    }
+
+    // MARK: - Preview
+
+    /// Ścieżka w cache podglądu. Klucz = data modyfikacji + ścieżka (unika kolizji nazw
+    /// i nieaktualnego cache), rozszerzenie zachowane na końcu — QuickLook po nim dobiera podgląd.
+    private func previewCacheURL(for entry: FileEntry) -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("airbridge-preview-cache", isDirectory: true)
+        let safePath = entry.relativePath.replacingOccurrences(of: "/", with: "_")
+        return dir.appendingPathComponent("\(entry.modified)-\(safePath)")
+    }
+
+    /// Otwiera podgląd: z cache jeśli plik już pobrany, inaczej pobiera raz do cache.
+    func preview(_ entry: FileEntry) {
+        guard !entry.isDirectory else { return }
+        previewName = entry.name
+        previewFailed = false
+        previewProgress = 0
+        isPreviewPresented = true
+
+        let cacheURL = previewCacheURL(for: entry)
+        if FileManager.default.fileExists(atPath: cacheURL.path) {
+            previewURL = cacheURL
+            return
+        }
+        previewURL = nil
+        fileTransferService?.requestPreview(
+            filename: entry.name,
+            saveTo: cacheURL,
+            onProgress: { [weak self] p in self?.previewProgress = p },
+            completion: { [weak self] saved in
+                guard let self else { return }
+                if let saved { self.previewURL = saved } else { self.previewFailed = true }
+            }
+        )
+        download(entry)
+    }
+
+    /// Zapisuje aktualnie podglądany plik do Downloads (reużywa pobranych bajtów z cache).
+    func saveCurrentPreviewToDownloads() {
+        guard let url = previewURL else { return }
+        fileTransferService?.saveToDownloads(fileAt: url, filename: previewName)
+    }
+
+    /// Zamyka podgląd i anuluje ewentualne oczekujące pobranie.
+    func dismissPreview() {
+        isPreviewPresented = false
+        previewURL = nil
+        previewName = ""
+        previewFailed = false
+        fileTransferService?.cancelPendingPreview()
     }
 
     func loadNextPage() {
@@ -167,7 +227,7 @@ final class FilesBrowserService: MessageHandler {
 
     func requestThumbnail(_ entry: FileEntry) {
         guard !entry.isDirectory,
-              entry.mimeType.hasPrefix("image/"),
+              entry.mimeType.hasPrefix("image/") || entry.mimeType.hasPrefix("video/"),
               thumbnails[entry.relativePath] == nil,
               !requestedThumbnails.contains(entry.relativePath),
               let connectionService else { return }
