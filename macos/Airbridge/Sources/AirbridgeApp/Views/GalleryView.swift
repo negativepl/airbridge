@@ -1,11 +1,19 @@
 import SwiftUI
 import Protocol
 
+enum GalleryViewMode: String {
+    case filmstrip   // poziomy rząd dużych zdjęć (oryginalny)
+    case grid        // pionowa gęsta siatka małych miniatur, grupowana po dacie
+}
+
 struct GalleryView: View {
     let galleryService: GalleryService
     let connectionService: ConnectionService
 
     @State private var selectedPhoto: GalleryPhotoMeta?
+    @AppStorage("gallery.viewMode") private var viewModeRaw: String = GalleryViewMode.filmstrip.rawValue
+
+    private var viewMode: GalleryViewMode { GalleryViewMode(rawValue: viewModeRaw) ?? .filmstrip }
 
     var body: some View {
         Group {
@@ -16,7 +24,7 @@ struct GalleryView: View {
             } else if galleryService.photos.isEmpty {
                 emptyView
             } else {
-                groupedGallery
+                if viewMode == .grid { gridGallery } else { filmstripGallery }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,7 +87,9 @@ struct GalleryView: View {
         }
     }
 
-    private var groupedGallery: some View {
+    // MARK: - Filmstrip (poziomy, oryginalny)
+
+    private var filmstripGallery: some View {
         GeometryReader { geo in
             let rowHeight = max(200, geo.size.height - 20)
             ScrollView(.horizontal, showsIndicators: true) {
@@ -106,6 +116,141 @@ struct GalleryView: View {
                 }
                 .padding(10)
             }
+        }
+    }
+
+    // MARK: - Grid (pionowy, gęsta siatka po dacie)
+
+    private var gridGallery: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 108, maximum: 160), spacing: 6)],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                ForEach(photoGroups) { group in
+                    Section {
+                        ForEach(group.photos) { photo in
+                            GalleryGridCell(photo: photo, galleryService: galleryService) {
+                                selectedPhoto = photo
+                            }
+                            .onAppear {
+                                if photo.id == galleryService.photos.last?.id {
+                                    galleryService.loadNextPage()
+                                }
+                            }
+                        }
+                    } header: {
+                        GalleryDateSectionHeader(title: group.title)
+                    }
+                }
+            }
+            .padding(12)
+
+            if galleryService.isLoading {
+                ProgressView().padding(.vertical, 12)
+            }
+        }
+    }
+
+    /// Grupuje zdjęcia po dniu zrobienia (najnowsze u góry). Grupowanie w widoku.
+    private var photoGroups: [GalleryDateGroup] {
+        let cal = Calendar.current
+        var order: [Date] = []
+        var byDay: [Date: [GalleryPhotoMeta]] = [:]
+        for p in galleryService.photos {
+            let day = cal.startOfDay(for: Date(timeIntervalSince1970: Double(p.dateTaken) / 1000))
+            if byDay[day] == nil { order.append(day) }
+            byDay[day, default: []].append(p)
+        }
+        return order.sorted(by: >).map { day in
+            GalleryDateGroup(
+                id: Self.dayKeyFormatter.string(from: day),
+                title: Self.sectionTitle(for: day),
+                photos: byDay[day] ?? []
+            )
+        }
+    }
+
+    private static let dayKeyFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    }()
+
+    private static let sectionDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: L10n.isPL ? "pl_PL" : "en_US")
+        f.setLocalizedDateFormatFromTemplate("d MMMM yyyy")
+        return f
+    }()
+
+    private static func sectionTitle(for day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return L10n.isPL ? "Dziś" : "Today" }
+        if cal.isDateInYesterday(day) { return L10n.isPL ? "Wczoraj" : "Yesterday" }
+        return sectionDateFormatter.string(from: day)
+    }
+}
+
+/// Sekcja galerii: zdjęcia z danego dnia.
+private struct GalleryDateGroup: Identifiable {
+    let id: String
+    let title: String
+    let photos: [GalleryPhotoMeta]
+}
+
+/// Nagłówek dnia w gridzie galerii — natywny, pogrubiony tekst (jak w Zdjęciach),
+/// bez szarego paska. Przewija się z treścią.
+private struct GalleryDateSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.ab(.title3, weight: .semibold))
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+    }
+}
+
+/// Kwadratowy kafel siatki galerii. Te same miniatury i cache co filmstrip.
+private struct GalleryGridCell: View {
+    let photo: GalleryPhotoMeta
+    let galleryService: GalleryService
+    let onTap: () -> Void
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        // Color.clear wymusza kwadrat na całą szerokość kolumny; obraz wypełnia
+        // overlay i jest przycinany — dzięki temu kafle nigdy nie rozpychają siatki.
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                } else {
+                    Rectangle().fill(.secondary.opacity(0.15))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(Rectangle())
+            .animation(.easeOut(duration: 0.2), value: image == nil)
+            .onTapGesture { onTap() }
+            .onAppear { loadImage() }
+            .onChange(of: galleryService.thumbnailImages[photo.id]) { _, newImage in
+                image = newImage
+            }
+    }
+
+    private func loadImage() {
+        if let cached = galleryService.thumbnailImages[photo.id] {
+            image = cached
+        } else {
+            galleryService.requestThumbnail(photoId: photo.id)
         }
     }
 }
