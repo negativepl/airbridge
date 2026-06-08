@@ -73,7 +73,7 @@ struct SettingsView: View {
         accessibilityPollTimer?.invalidate()
         accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             let granted = AXIsProcessTrusted()
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 accessibilityGranted = granted
                 if granted {
                     accessibilityPollTimer?.invalidate()
@@ -133,12 +133,23 @@ struct SettingsView: View {
     }
 
     private var notificationsSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Powiadomienia" : "Notifications"), systemImage: "bell.badge") {
-            Toggle(L10n.isPL ? "Pokazuj powiadomienia z telefonu" : "Show phone notifications", isOn: Binding(
-                get: { notificationService.enabled },
-                set: { notificationService.setEnabled($0) }
-            ))
-            .font(.ab(.body))
+        GlassSection {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    SectionHeader(title: LocalizedStringKey(L10n.isPL ? "Powiadomienia" : "Notifications"),
+                                  systemImage: "bell.badge")
+                    Text(L10n.isPL ? "Powiadomienia pojawiają się na żywo, w miarę jak telefon je otrzymuje."
+                                   : "Notifications appear live, as your phone receives them.")
+                        .font(.ab(.subheadline)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Toggle("", isOn: Binding(
+                    get: { notificationService.enabled },
+                    set: { notificationService.setEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
 
             if notificationService.knownApps.isEmpty {
                 Text(L10n.isPL ? "Powiadomienia pojawią się tu, gdy telefon je przyśle."
