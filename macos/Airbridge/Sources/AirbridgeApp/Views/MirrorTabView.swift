@@ -38,20 +38,18 @@ struct MirrorTabView: View {
 
     private var poppedOutView: some View {
         EmptyStateContainer {
-            VStack(spacing: 16) {
-                EmptyStateView(
-                    systemImage: "rectangle.on.rectangle",
-                    title: L10n.isPL ? "Udostępnianie w osobnym oknie" : "Sharing in a separate window",
-                    subtitle: L10n.isPL
-                        ? "Stream odtwarza się w wydzielonym oknie."
-                        : "The stream is playing in its own window."
-                )
+            EmptyStateView(
+                systemImage: "rectangle.on.rectangle",
+                title: L10n.isPL ? "Udostępnianie w osobnym oknie" : "Sharing in a separate window",
+                subtitle: L10n.isPL
+                    ? "Stream odtwarza się w wydzielonym oknie."
+                    : "The stream is playing in its own window."
+            ) {
                 Button(L10n.isPL ? "Pokaż tutaj" : "Show here") {
                     dismissWindow(id: "mirror")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.bottom, 80)
             }
         }
     }

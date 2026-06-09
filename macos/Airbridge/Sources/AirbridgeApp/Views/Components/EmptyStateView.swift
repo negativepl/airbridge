@@ -13,11 +13,26 @@ import SwiftUI
 ///
 /// Pass `pulseIcon: true` to make the icon slowly pulse via symbolEffect
 /// (for idle states like "no activity yet").
-struct EmptyStateView: View {
+struct EmptyStateView<Actions: View>: View {
     let systemImage: String
     let title: String
     let subtitle: String
     var pulseIcon: Bool = false
+    @ViewBuilder var actions: Actions
+
+    init(
+        systemImage: String,
+        title: String,
+        subtitle: String,
+        pulseIcon: Bool = false,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.systemImage = systemImage
+        self.title = title
+        self.subtitle = subtitle
+        self.pulseIcon = pulseIcon
+        self.actions = actions()
+    }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -35,8 +50,25 @@ struct EmptyStateView: View {
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // Akcje (np. Odśwież) wchodzą w wyśrodkowany blok jak w natywnym
+            // ContentUnavailableView — bez ręcznych paddingów rozjeżdżających
+            // pion tytułu między zakładkami.
+            actions
+                .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension EmptyStateView where Actions == EmptyView {
+    init(systemImage: String, title: String, subtitle: String, pulseIcon: Bool = false) {
+        self.init(
+            systemImage: systemImage,
+            title: title,
+            subtitle: subtitle,
+            pulseIcon: pulseIcon
+        ) { EmptyView() }
     }
 }
 

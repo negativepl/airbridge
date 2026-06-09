@@ -69,20 +69,18 @@ struct GalleryView: View {
 
     private var emptyView: some View {
         EmptyStateContainer {
-            VStack(spacing: 20) {
-                EmptyStateView(
-                    systemImage: "photo.on.rectangle",
-                    title: L10n.isPL ? "Brak zdjęć" : "No Photos",
-                    subtitle: L10n.isPL
-                        ? "Nie znaleziono zdjęć na telefonie."
-                        : "No photos found on your phone."
-                )
+            EmptyStateView(
+                systemImage: "photo.on.rectangle",
+                title: L10n.isPL ? "Brak zdjęć" : "No Photos",
+                subtitle: L10n.isPL
+                    ? "Nie znaleziono zdjęć na telefonie."
+                    : "No photos found on your phone."
+            ) {
                 Button(L10n.isPL ? "Odśwież" : "Refresh") {
                     galleryService.clearAndReload()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.bottom, 80)
             }
         }
     }

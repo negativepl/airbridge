@@ -293,18 +293,16 @@ struct FilesBrowserView: View {
 
     private var permissionEmptyState: some View {
         EmptyStateContainer {
-            VStack(spacing: 20) {
-                EmptyStateView(
-                    systemImage: "folder.badge.questionmark",
-                    title: L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant file access on your phone",
-                    subtitle: L10n.isPL
-                        ? "Na telefonie otwórz AirBridge → wizard uprawnień → „Pliki” i zezwól na dostęp do Pamięci wewnętrznej."
-                        : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage."
-                )
+            EmptyStateView(
+                systemImage: "folder.badge.questionmark",
+                title: L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant file access on your phone",
+                subtitle: L10n.isPL
+                    ? "Na telefonie otwórz AirBridge → wizard uprawnień → „Pliki” i zezwól na dostęp do Pamięci wewnętrznej."
+                    : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage."
+            ) {
                 Button(L10n.isPL ? "Odśwież" : "Refresh") { filesBrowserService.reload() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .padding(.bottom, 80)
             }
         }
     }
