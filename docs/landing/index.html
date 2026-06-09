@@ -9,42 +9,38 @@
 <style>
 /* ============================================================
    AirBridge — landing
-   Pro-dark Material 3 Expressive · graphite-violet + amethyst
+   Pro-dark Material 3 Expressive · pure monochrome (black & white)
    ============================================================ */
 
 :root{
-  /* surfaces — graphite base, amethyst stays an accent only */
-  --bg:        #0D0D10;
-  --bg-2:      #121217;
-  --surface:   #18181D;
-  --surface-2: #201F26;
-  --surface-3: #2A2932;
+  /* surfaces — neutral black, no colour tint anywhere */
+  --bg:        #0A0A0B;
+  --bg-2:      #0F0F11;
+  --surface:   #161618;
+  --surface-2: #1E1E21;
+  --surface-3: #28282C;
 
-  /* translucent material — frosted glass, M3 Expressive surfaces (graphite) */
-  --glass:    rgba(32,31,38,.5);
-  --glass-2:  rgba(46,44,54,.56);
-  --glass-hi: rgba(58,54,72,.5);
-  --blur:     saturate(150%) blur(20px);
+  /* translucent material — frosted glass over neutral graphite */
+  --glass:    rgba(255,255,255,.045);
+  --glass-2:  rgba(255,255,255,.075);
+  --glass-hi: rgba(255,255,255,.11);
+  --blur:     saturate(140%) blur(20px);
 
-  /* lines */
-  --border:        rgba(167,139,250,.13);
-  --border-strong: rgba(167,139,250,.28);
+  /* lines — soft white hairlines */
+  --border:        rgba(255,255,255,.10);
+  --border-strong: rgba(255,255,255,.22);
 
-  /* text — neutral graphite greys */
-  --text:       #F2F2F4;
-  --text-muted: #ACABB3;
-  --text-dim:   #76747E;
+  /* text — neutral greys on black */
+  --text:       #F5F5F6;
+  --text-muted: #A6A6AC;
+  --text-dim:   #6C6C73;
 
-  /* amethyst — brand / Android */
-  --amethyst:        #A78BFA;
-  --amethyst-bright: #C7B5FF;
-  --amethyst-deep:   #7C5CFF;
-  --amethyst-ink:    #2A2139;
-  --amethyst-ink-2:  #382C50;
-  --on-amethyst:     #18102A;
-
-  /* native macOS blue — only ever referenced for the "native" story */
-  --mac-blue: #0A84FF;
+  /* the only "accent": pure white + its tints */
+  --white:        #FFFFFF;
+  --white-dim:    #D8D8DC;
+  --on-white:     #0A0A0B;        /* black text on a white surface */
+  --ink:          #16161A;        /* tonal chip fill */
+  --ink-2:        #202024;
 
   /* native Apple system font — San Francisco */
   --font-sans:    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
@@ -68,17 +64,17 @@ body{
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
 }
-body::before{ /* ambient amethyst field — two soft pools, lets frosted surfaces pick up tint */
+body::before{ /* ambient field — soft neutral light pools, no colour */
   content:"";
   position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(55% 42% at 84% -6%, rgba(124,92,255,.13), transparent 60%),
-    radial-gradient(45% 38% at 4% 3%,  rgba(167,139,250,.07), transparent 58%),
+    radial-gradient(55% 42% at 84% -6%, rgba(255,255,255,.07), transparent 60%),
+    radial-gradient(45% 38% at 4% 3%,  rgba(255,255,255,.04), transparent 58%),
     var(--bg);
 }
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
-::selection{background:var(--amethyst-deep);color:#fff}
+::selection{background:var(--white);color:var(--on-white)}
 
 h1,h2,h3,.display{
   font-family:var(--font-display);
@@ -89,9 +85,9 @@ h1,h2,h3,.display{
 .eyebrow{
   display:inline-flex;align-items:center;gap:9px;
   font-size:.78rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--amethyst);
+  color:var(--text-muted);
 }
-.eyebrow::before{content:"";width:18px;height:1.5px;background:var(--amethyst);opacity:.7}
+.eyebrow::before{content:"";width:18px;height:1.5px;background:var(--white);opacity:.7}
 
 .section{padding:130px 0;position:relative}
 .section-head{max-width:680px}
@@ -108,13 +104,13 @@ h1,h2,h3,.display{
 }
 .btn svg{width:18px;height:18px}
 .btn-primary{
-  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
-  color:var(--on-amethyst);
-  box-shadow:0 8px 30px -8px rgba(124,92,255,.6);
+  background:var(--white);
+  color:var(--on-white);
+  box-shadow:0 8px 30px -10px rgba(255,255,255,.5);
 }
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px rgba(124,92,255,.75)}
-.btn-tonal{background:var(--amethyst-ink);color:var(--amethyst-bright);border-color:var(--border-strong)}
-.btn-tonal:hover{background:var(--amethyst-ink-2);transform:translateY(-2px)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -10px rgba(255,255,255,.7)}
+.btn-tonal{background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.btn-tonal:hover{background:var(--surface-3);transform:translateY(-2px)}
 .btn-ghost{background:transparent;color:var(--text);border-color:var(--border-strong)}
 .btn-ghost:hover{background:var(--surface-2);transform:translateY(-2px)}
 .btn-lg{padding:17px 34px;font-size:1.06rem}
@@ -122,7 +118,7 @@ h1,h2,h3,.display{
 /* ---------- nav ---------- */
 header.nav{
   position:sticky;top:0;z-index:100;
-  background:rgba(13,10,18,.55);
+  background:rgba(10,10,11,.6);
   backdrop-filter:var(--blur);
   -webkit-backdrop-filter:var(--blur);
   border-bottom:1px solid var(--border);
@@ -131,10 +127,10 @@ header.nav{
 .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:1.18rem;letter-spacing:-.02em}
 .brand .logo{
   width:30px;height:30px;border-radius:9px;overflow:hidden;
-  display:grid;place-items:center;box-shadow:0 4px 16px -4px rgba(124,92,255,.5);
+  display:grid;place-items:center;background:var(--white);
+  box-shadow:0 4px 16px -6px rgba(255,255,255,.4);
 }
 .brand .logo img{width:100%;height:100%;object-fit:cover}
-.brand .logo svg{width:18px;height:18px;color:var(--on-amethyst)}
 .nav-links{display:flex;align-items:center;gap:34px}
 .nav-links a.lnk{font-size:.96rem;color:var(--text-muted);font-weight:500;transition:color .2s}
 .nav-links a.lnk:hover{color:var(--text)}
@@ -148,34 +144,34 @@ header.nav{
 .hero-grid{display:grid;grid-template-columns:1fr 1.18fr;gap:30px;align-items:center}
 .hero h1{font-size:clamp(2.7rem,6vw,4.7rem);margin:22px 0 0}
 .hero h1 .grad{
-  background:linear-gradient(120deg,var(--amethyst-bright),var(--amethyst) 60%,var(--amethyst-deep));
+  background:linear-gradient(120deg,#FFFFFF,#BFBFC4 70%,#8A8A90);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
 .hero p.lead{font-size:1.22rem;color:var(--text-muted);margin-top:26px;max-width:520px}
 .hero-cta{display:flex;gap:14px;margin-top:38px;flex-wrap:wrap}
 .hero-meta{display:flex;gap:22px;margin-top:34px;flex-wrap:wrap;color:var(--text-dim);font-size:.9rem}
 .hero-meta span{display:flex;align-items:center;gap:8px}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--amethyst);box-shadow:0 0 10px var(--amethyst)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--white);box-shadow:0 0 10px rgba(255,255,255,.6)}
 
 .hero-art{position:relative;margin-right:-9%}
-.hero-art::before{ /* glow behind the window — soft radial, not a blur layer */
+.hero-art::before{ /* soft neutral glow behind the window */
   content:"";position:absolute;inset:-12% -8% -12% -8%;z-index:0;
-  background:radial-gradient(58% 58% at 58% 42%,rgba(124,92,255,.42),transparent 70%);
+  background:radial-gradient(58% 58% at 58% 42%,rgba(255,255,255,.16),transparent 70%);
   filter:blur(6px);
 }
-.hero-art img{position:relative;z-index:1;width:122%;max-width:none;filter:drop-shadow(0 40px 80px rgba(0,0,0,.6))}
+.hero-art img{position:relative;z-index:1;width:122%;max-width:none;filter:drop-shadow(0 40px 80px rgba(0,0,0,.65))}
 .hero-art .float-chip{
   position:absolute;z-index:2;
-  background:rgba(23,18,31,.86);border:1px solid var(--border-strong);
+  background:rgba(20,20,22,.86);border:1px solid var(--border-strong);
   border-radius:14px;padding:11px 15px;display:flex;align-items:center;gap:10px;
   font-size:.84rem;font-weight:600;
   box-shadow:0 16px 40px -12px rgba(0,0,0,.7);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
 }
-.float-chip .ic{width:30px;height:30px;border-radius:9px;background:var(--amethyst-ink);display:grid;place-items:center;color:var(--amethyst-bright)}
+.float-chip .ic{width:30px;height:30px;border-radius:9px;background:var(--surface-3);display:grid;place-items:center;color:var(--white)}
 .float-chip .ic svg{width:16px;height:16px}
 .chip-a{top:8%;left:-4%}
 .chip-b{bottom:11%;right:-3%}
-.chip-b .ic{color:#5ED39A;background:rgba(94,211,154,.13)}
 
 /* logos / trust row */
 .trust{display:flex;gap:14px;flex-wrap:wrap;margin-top:60px;align-items:center}
@@ -185,7 +181,7 @@ header.nav{
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
   font-size:.85rem;color:var(--text-muted);font-weight:500;
 }
-.pill svg{width:15px;height:15px;color:var(--amethyst)}
+.pill svg{width:15px;height:15px;color:var(--white)}
 
 /* ---------- feature rows ---------- */
 .feat{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin-top:120px}
@@ -193,21 +189,90 @@ header.nav{
 .feat.rev .feat-art{order:2}
 .feat-copy .kicker{
   display:inline-flex;align-items:center;gap:10px;font-size:.82rem;font-weight:600;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--amethyst);margin-bottom:18px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:18px;
 }
+.feat-copy .kicker::before{content:"";width:16px;height:1.5px;background:var(--white);opacity:.7}
 .feat-copy h3{font-size:clamp(1.8rem,3.4vw,2.55rem)}
 .feat-copy p{color:var(--text-muted);font-size:1.1rem;margin-top:16px;max-width:480px}
 .feat-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
 .tag{
-  font-size:.82rem;font-weight:600;color:var(--amethyst-bright);
-  background:var(--amethyst-ink);border:1px solid var(--border-strong);
+  font-size:.82rem;font-weight:600;color:var(--text);
+  background:var(--surface-2);border:1px solid var(--border-strong);
   padding:7px 14px;border-radius:100px;
 }
 .feat-art{position:relative}
 .feat-art img{
   position:relative;z-index:1;border-radius:18px;
-  filter:drop-shadow(0 30px 60px rgba(0,0,0,.55));
+  filter:drop-shadow(0 30px 60px rgba(0,0,0,.6));
 }
+
+/* ---------- phone gallery ---------- */
+.phones{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:26px;margin-top:64px;
+}
+.phone-card{display:flex;flex-direction:column;align-items:center;text-align:center}
+.phone{
+  position:relative;width:100%;max-width:230px;aspect-ratio:9/19.3;
+  border-radius:34px;padding:8px;
+  background:linear-gradient(160deg,#222226,#0E0E10);
+  border:1px solid var(--border-strong);
+  box-shadow:0 30px 60px -18px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);
+  transition:transform .45s var(--ease);
+}
+.phone-card:hover .phone{transform:translateY(-8px)}
+.phone::before{ /* punch-hole camera */
+  content:"";position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  width:8px;height:8px;border-radius:50%;background:#000;z-index:3;
+  box-shadow:0 0 0 2px rgba(255,255,255,.05);
+}
+.phone-screen{
+  position:relative;width:100%;height:100%;border-radius:27px;overflow:hidden;
+  background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 12px,transparent 12px 24px),
+    linear-gradient(180deg,#18181B,#0C0C0E);
+  display:grid;place-items:center;
+}
+.phone-screen::after{ /* placeholder label, shown until a screenshot covers it */
+  content:attr(data-ph);
+  position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;
+  color:var(--text-dim);font-size:.84rem;font-weight:600;letter-spacing:.04em;
+  padding:0 16px;text-align:center;
+}
+.phone-screen img{position:relative;z-index:2;width:100%;height:100%;object-fit:cover;background:#0C0C0E}
+.phone-cap{margin-top:18px;font-size:.96rem;font-weight:650;color:var(--text)}
+.phone-cap small{display:block;margin-top:4px;font-size:.84rem;font-weight:500;color:var(--text-dim)}
+
+/* ---------- notch popover ---------- */
+.notch-band{
+  position:relative;border-radius:var(--radius-lg);overflow:hidden;
+  background:linear-gradient(150deg,#161618,#0A0A0B 70%);
+  border:1px solid var(--border-strong);
+  padding:72px 56px;
+}
+.notch-band::before{
+  content:"";position:absolute;left:50%;top:-30%;width:70%;height:120%;transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(255,255,255,.10),transparent 64%);pointer-events:none;
+}
+.notch-inner{position:relative;display:grid;grid-template-columns:1fr 1.15fr;gap:54px;align-items:center}
+.notch-band h2{font-size:clamp(2rem,4vw,3rem)}
+.notch-band p{color:var(--text-muted);font-size:1.1rem;margin-top:18px;max-width:440px}
+.notch-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+
+/* slot for a screen-recording of the real notch notification (drop in assets/notch.mp4) */
+.notch-video{
+  position:relative;width:100%;aspect-ratio:16/10;border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--border-strong);
+  background:
+    repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 14px,transparent 14px 28px),
+    linear-gradient(180deg,#161619,#0B0B0D);
+  box-shadow:0 40px 80px -28px rgba(0,0,0,.8);
+  display:grid;place-items:center;
+}
+.notch-video::after{
+  content:attr(data-ph);position:absolute;inset:0;display:grid;place-content:center;
+  color:var(--text-dim);font-size:.92rem;font-weight:600;letter-spacing:.02em;text-align:center;padding:0 28px;line-height:1.5;
+}
+.notch-video video{position:relative;z-index:2;width:100%;height:100%;object-fit:cover;background:#0B0B0D}
 
 /* ---------- bento ---------- */
 .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:60px}
@@ -220,7 +285,7 @@ header.nav{
 .cell:hover{transform:translateY(-4px);border-color:var(--border-strong);background:var(--glass-2)}
 .cell .ico{
   width:46px;height:46px;border-radius:13px;display:grid;place-items:center;margin-bottom:18px;
-  background:var(--amethyst-ink);color:var(--amethyst-bright);border:1px solid var(--border-strong);
+  background:var(--surface-2);color:var(--white);border:1px solid var(--border-strong);
 }
 .cell .ico svg{width:23px;height:23px}
 .cell h4{font-size:1.16rem;font-weight:650;letter-spacing:-.02em}
@@ -228,9 +293,10 @@ header.nav{
 .cell.wide{grid-column:span 2}
 .cell.tall{grid-row:span 2}
 .cell.accent{
-  background:linear-gradient(150deg,rgba(124,92,255,.28),var(--glass));
+  background:linear-gradient(150deg,rgba(255,255,255,.10),var(--glass));
   border-color:var(--border-strong);
 }
+.cell.accent .ico{background:var(--white);color:var(--on-white)}
 .cell.full{grid-column:1 / -1;display:flex;align-items:center;gap:22px}
 .cell.full .ico{margin-bottom:0;flex:0 0 auto}
 .cell.full p{margin-top:4px;max-width:560px}
@@ -238,21 +304,20 @@ header.nav{
 /* ---------- security band ---------- */
 .security{
   position:relative;border-radius:var(--radius-lg);overflow:hidden;
-  background:linear-gradient(150deg,rgba(43,30,72,.55),rgba(20,14,32,.5) 60%);
-  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  background:linear-gradient(150deg,#1A1A1D,#0C0C0E 60%);
   border:1px solid var(--border-strong);
   padding:74px 64px;
 }
 .security::before{
   content:"";position:absolute;right:-10%;top:-40%;width:55%;height:180%;
-  background:radial-gradient(circle,rgba(124,92,255,.16),transparent 66%);
+  background:radial-gradient(circle,rgba(255,255,255,.08),transparent 66%);
 }
 .security .inner{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
 .security h2{font-size:clamp(2rem,4vw,3rem)}
 .security p{color:var(--text-muted);font-size:1.1rem;margin-top:18px;max-width:440px}
 .sec-list{display:flex;flex-direction:column;gap:14px}
-.sec-item{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;background:rgba(13,10,18,.32);border:1px solid var(--border);border-radius:16px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
-.sec-item .ico{flex:0 0 auto;width:40px;height:40px;border-radius:11px;background:var(--amethyst-ink);display:grid;place-items:center;color:var(--amethyst-bright)}
+.sec-item{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;background:rgba(0,0,0,.32);border:1px solid var(--border);border-radius:16px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.sec-item .ico{flex:0 0 auto;width:40px;height:40px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;color:var(--white);border:1px solid var(--border-strong)}
 .sec-item .ico svg{width:21px;height:21px}
 .sec-item h4{font-size:1.02rem;font-weight:650}
 .sec-item p{font-size:.92rem;margin-top:3px;color:var(--text-dim)}
@@ -262,28 +327,26 @@ header.nav{
 .step{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);padding:34px;position:relative}
 .step .num{
   font-family:var(--font-display);font-size:3rem;font-weight:700;line-height:1;
-  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  color:var(--white);
 }
 .step h4{font-size:1.28rem;font-weight:650;margin-top:18px}
 .step p{color:var(--text-muted);margin-top:10px;font-size:1rem}
-.step-line{position:absolute;top:50px;right:-14px;color:var(--amethyst);opacity:.45}
+.step-line{position:absolute;top:50px;right:-14px;color:var(--text-muted);opacity:.45}
 .step:last-child .step-line{display:none}
 
 /* ---------- sponsor ---------- */
 .sponsor{
   position:relative;border-radius:var(--radius-lg);overflow:hidden;text-align:center;
-  background:linear-gradient(160deg,rgba(42,30,72,.62),rgba(22,14,38,.55) 70%);
-  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  background:linear-gradient(160deg,#1A1A1D,#0B0B0D 70%);
   border:1px solid var(--border-strong);
   padding:88px 40px;
 }
-.sponsor::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 80% at 50% -10%,rgba(167,139,250,.22),transparent 60%)}
+.sponsor::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 80% at 50% -10%,rgba(255,255,255,.12),transparent 60%)}
 .sponsor .inner{position:relative;max-width:640px;margin:0 auto}
 .sponsor .heart{
   width:62px;height:62px;border-radius:18px;margin:0 auto 26px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--amethyst-bright),var(--amethyst-deep));
-  box-shadow:0 16px 44px -10px rgba(124,92,255,.7);color:var(--on-amethyst);
+  background:var(--white);
+  box-shadow:0 16px 44px -12px rgba(255,255,255,.5);color:var(--on-white);
 }
 .sponsor .heart svg{width:30px;height:30px}
 .sponsor h2{font-size:clamp(2.1rem,4.4vw,3.1rem)}
@@ -300,8 +363,8 @@ header.nav{
 .tier:hover{transform:translateY(-3px);border-color:var(--border-strong)}
 .tier .amt{font-family:var(--font-display);font-size:1.85rem;font-weight:700;line-height:1}
 .tier .amt small{font-size:.72rem;font-weight:500;color:var(--text-dim);margin-left:3px}
-.tier .lbl{margin-top:9px;font-size:.84rem;font-weight:600;letter-spacing:.02em;color:var(--amethyst-bright)}
-.tier.featured{border-color:var(--border-strong);background:linear-gradient(150deg,rgba(124,92,255,.24),var(--glass))}
+.tier .lbl{margin-top:9px;font-size:.84rem;font-weight:600;letter-spacing:.02em;color:var(--text-muted)}
+.tier.featured{border-color:var(--border-strong);background:linear-gradient(150deg,rgba(255,255,255,.12),var(--glass))}
 .sponsor-cta{display:flex;gap:14px;justify-content:center;margin-top:30px;flex-wrap:wrap}
 .sponsor-note{margin-top:24px;font-size:.88rem;color:var(--text-dim)}
 
@@ -311,7 +374,7 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
 .foot-brand p{color:var(--text-dim);font-size:.94rem;margin-top:16px;max-width:280px}
 .foot-col h5{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);font-weight:600}
 .foot-col a{display:block;color:var(--text-muted);margin-top:13px;font-size:.95rem;transition:color .2s}
-.foot-col a:hover{color:var(--amethyst-bright)}
+.foot-col a:hover{color:var(--white)}
 .foot-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:54px;padding-top:30px;border-top:1px solid var(--border);color:var(--text-dim);font-size:.88rem;flex-wrap:wrap;gap:14px}
 
 /* ---------- scroll reveal ---------- */
@@ -340,10 +403,13 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
   .hero-art img{width:100%}
   .feat{grid-template-columns:1fr;gap:34px;margin-top:90px}
   .feat.rev .feat-art{order:0}
+  .phones{grid-template-columns:repeat(2,1fr);gap:30px;max-width:540px;margin-left:auto;margin-right:auto}
+  .notch-inner{grid-template-columns:1fr;gap:40px}
   .bento{grid-template-columns:repeat(2,1fr)}
   .cell.tall{grid-row:span 1}
   .security{padding:48px 30px}
   .security .inner{grid-template-columns:1fr;gap:34px}
+  .notch-band{padding:48px 30px}
   .steps{grid-template-columns:1fr}
   .step-line{display:none}
   .foot-grid{grid-template-columns:1fr 1fr;gap:34px}
@@ -351,6 +417,7 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
 }
 @media (max-width:560px){
   .wrap{padding:0 20px}
+  .phones{grid-template-columns:1fr;max-width:280px}
   .bento{grid-template-columns:1fr}
   .cell.wide{grid-column:span 1}
   .foot-grid{grid-template-columns:1fr 1fr}
@@ -370,9 +437,11 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
     </a>
     <nav class="nav-links">
       <a class="lnk" href="#features">Features</a>
-      <a class="lnk" href="#mirror">Mirror</a>
+      <a class="lnk" href="#phone">On your phone</a>
+      <a class="lnk" href="#notch">Notch</a>
       <a class="lnk" href="#security">Security</a>
       <a class="lnk" href="#how">How it works</a>
+      <a class="lnk" href="#sponsor">Price</a>
     </nav>
     <div class="nav-cta">
       <a class="btn btn-primary" href="https://github.com/negativepl/airbridge/releases" target="_blank" rel="noopener">
@@ -415,7 +484,6 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg> Two native apps</span>
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 20h8"/></svg> macOS 26 Tahoe</span>
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8 5 5M17 8l2-3M5 9h14v6a7 7 0 0 1-14 0V9z"/></svg> Android 10+</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg> Every EU language</span>
     </div>
   </div>
 </section>
@@ -494,6 +562,58 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
   </div>
 </section>
 
+<!-- ================= ON YOUR PHONE ================= -->
+<!-- Drop real Android screenshots into assets/phone-1.png … phone-4.png to replace the placeholders -->
+<section class="section" id="phone" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">On your phone</span>
+      <h2>The other half of the bridge.</h2>
+      <p>A clean Material 3 companion on Android — pair once, then it lives quietly in the background and reconnects on its own.</p>
+    </div>
+    <div class="phones stagger">
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen" data-src="phone-1.png" data-ph="phone-1.png"></div></div>
+        <span class="phone-cap">Pairing<small>Scan the QR, keys exchanged</small></span>
+      </div>
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen" data-src="phone-2.png" data-ph="phone-2.png"></div></div>
+        <span class="phone-cap">Connected<small>Status, mirror &amp; controls</small></span>
+      </div>
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen" data-src="phone-3.png" data-ph="phone-3.png"></div></div>
+        <span class="phone-cap">Send to Mac<small>Share sheet, one tap</small></span>
+      </div>
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen" data-src="phone-4.png" data-ph="phone-4.png"></div></div>
+        <span class="phone-cap">Settings<small>Background service &amp; trust</small></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= NOTCH NOTIFICATION ================= -->
+<!-- Drop a screen-recording of the real notch alert into assets/notch.mp4 to replace the placeholder -->
+<section class="section" id="notch" style="padding-top:0">
+  <div class="wrap">
+    <div class="notch-band reveal">
+      <div class="notch-inner">
+        <div>
+          <span class="eyebrow">Live from the notch</span>
+          <h2>Your phone's alerts, right out of the notch.</h2>
+          <p>When your phone wants to send you a file, a glass notification glides out of the notch — accept it with one click and it lands on your Mac. No window to open, no app to hunt for. It just appears, then tucks back in.</p>
+          <div class="notch-chips">
+            <span class="tag">Incoming file alerts</span>
+            <span class="tag">One-click accept</span>
+            <span class="tag">Lives in the notch</span>
+          </div>
+        </div>
+        <div class="notch-video" data-src="notch.mp4" data-ph="🎬 assets/notch.mp4 — wrzuć tu nagranie notyfikacji z notcha"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ================= BENTO ================= -->
 <section class="section" style="padding-top:0">
   <div class="wrap">
@@ -541,13 +661,6 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7M6 4h12"/><circle cx="7" cy="11" r="1"/></svg></div>
         <h4>Menu bar &amp; login</h4>
         <p>Always-on status in the menu bar and optional launch at login.</p>
-      </div>
-      <div class="cell full accent">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></div>
-        <div>
-          <h4>Speaks your language</h4>
-          <p>Localized in every EU language — the interface follows your system language automatically, on both the phone and the Mac.</p>
-        </div>
       </div>
     </div>
   </div>
@@ -661,9 +774,11 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
       <div class="foot-col">
         <h5>Product</h5>
         <a href="#features">Features</a>
-        <a href="#mirror">Mirror</a>
+        <a href="#phone">On your phone</a>
+        <a href="#notch">Notch</a>
         <a href="#security">Security</a>
         <a href="#how">How it works</a>
+        <a href="#sponsor">Price</a>
       </div>
       <div class="foot-col">
         <h5>Project</h5>
@@ -694,6 +809,28 @@ footer{border-top:1px solid var(--border);padding:70px 0 50px;margin-top:40px}
     entries.forEach(function(en){ if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);} });
   },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
   els.forEach(function(e){io.observe(e);});
+})();
+
+/* swap placeholder slots for real screenshots when the files exist */
+(function(){
+  function mount(box, src, alt){
+    var img=new Image();
+    img.onload=function(){ img.alt=alt||''; box.appendChild(img); };
+    img.src=src;
+  }
+  document.querySelectorAll('.phone-screen[data-src]').forEach(function(box){
+    var cap=box.closest('.phone-card') && box.closest('.phone-card').querySelector('.phone-cap');
+    mount(box, 'assets/'+box.getAttribute('data-src'), cap ? cap.firstChild.textContent : 'Android screenshot');
+  });
+  // swap the notch placeholder for a looping screen-recording when assets/notch.mp4 exists
+  var nv=document.querySelector('.notch-video[data-src]');
+  if(nv){
+    var v=document.createElement('video');
+    v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;
+    v.setAttribute('muted','');v.setAttribute('playsinline','');v.setAttribute('preload','metadata');
+    v.onloadeddata=function(){ nv.appendChild(v); v.play().catch(function(){}); };
+    v.src='assets/'+nv.getAttribute('data-src');
+  }
 })();
 </script>
 </body>
