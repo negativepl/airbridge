@@ -16,14 +16,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,7 +83,7 @@ fun PairingSuccessScreen(
                 Box(
                     modifier = Modifier
                         .size(140.dp)
-                        .clip(CircleShape)
+                        .clip(MaterialShapes.Cookie12Sided.toShape())
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
@@ -116,7 +117,7 @@ fun PairingSuccessScreen(
                     modifier = Modifier
                         .size(140.dp)
                         .scale(checkScale)
-                        .clip(CircleShape)
+                        .clip(MaterialShapes.Sunny.toShape())
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {

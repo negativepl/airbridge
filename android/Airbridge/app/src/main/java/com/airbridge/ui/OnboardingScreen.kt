@@ -56,8 +56,10 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -259,7 +261,7 @@ private fun WelcomePage() {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(MaterialShapes.Cookie12Sided.toShape())
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_launcher_background),
@@ -418,7 +420,7 @@ private fun PermissionsPage() {
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(CircleShape)
+                .clip(MaterialShapes.Clover8Leaf.toShape())
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
@@ -742,7 +744,7 @@ private fun WifiSymbol() {
     Box(
         modifier = Modifier
             .size(140.dp)
-            .clip(CircleShape)
+            .clip(MaterialShapes.Cookie9Sided.toShape())
             .background(primaryContainer),
         contentAlignment = Alignment.Center
     ) {
@@ -782,7 +784,7 @@ private fun QrSymbol() {
     Box(
         modifier = Modifier
             .size(140.dp)
-            .clip(CircleShape)
+            .clip(MaterialShapes.Sunny.toShape())
             .background(primaryContainer),
         contentAlignment = Alignment.Center
     ) {
