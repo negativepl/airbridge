@@ -261,6 +261,10 @@ struct TransferPopupView: View {
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
+        // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
+        // renderować się w ciemnym schemacie niezależnie od motywu systemu —
+        // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
+        .environment(\.colorScheme, .dark)
         // No shell "bump" on state change — scaling the whole island (even
         // anchored top) momentarily moved its edges and flashed a sliver of
         // desktop above the notch. The per-state content morph (blur + scale,
