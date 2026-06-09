@@ -14,15 +14,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,28 +31,31 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.ScreenShare
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Photo
+import androidx.compose.material.icons.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -140,7 +142,7 @@ class MainActivity : ComponentActivity() {
                     val hasPairedDevices = remember(onboardingCompleted) {
                         com.airbridge.security.PairedDeviceStore(this@MainActivity).getAll().isNotEmpty()
                     }
-                    var showSendSheet by remember { mutableStateOf(false) }
+                    var fabMenuExpanded by remember { mutableStateOf(false) }
                     var pendingFileUri by remember { mutableStateOf<Uri?>(null) }
                     var pendingIsPhoto by remember { mutableStateOf(false) }
                     val context = LocalContext.current
@@ -164,6 +166,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold(
                         bottomBar = {
                             Box {
@@ -194,7 +197,7 @@ class MainActivity : ComponentActivity() {
                                     // Empty space for FAB
                                     NavigationBarItem(
                                         selected = false,
-                                        onClick = { showSendSheet = true },
+                                        onClick = { },
                                         icon = { Spacer(Modifier.size(24.dp)) },
                                         label = { },
                                         enabled = false
@@ -217,48 +220,6 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
 
-                                // FAB centered over the bar
-                                Column(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .offset(y = (-14).dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    FloatingActionButton(
-                                        onClick = { if (hasPairedDevices) showSendSheet = true },
-                                        modifier = Modifier.size(64.dp),
-                                        shape = CircleShape,
-                                        containerColor = if (hasPairedDevices)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = if (hasPairedDevices)
-                                            MaterialTheme.colorScheme.onPrimary
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                        elevation = FloatingActionButtonDefaults.elevation(
-                                            defaultElevation = 0.dp,
-                                            pressedElevation = 0.dp,
-                                            focusedElevation = 0.dp,
-                                            hoveredElevation = 0.dp
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.FileUpload,
-                                            contentDescription = stringResource(R.string.nav_send),
-                                            modifier = Modifier.size(26.dp)
-                                        )
-                                    }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        text = stringResource(R.string.nav_send),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (hasPairedDevices)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    )
-                                }
                             }
                         }
                     ) { innerPadding ->
@@ -280,77 +241,72 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Send bottom sheet
-                    if (showSendSheet) {
-                        ModalBottomSheet(
-                            onDismissRequest = { showSendSheet = false },
-                            sheetState = rememberModalBottomSheetState()
+                        FloatingActionButtonMenu(
+                            expanded = fabMenuExpanded,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            button = {
+                                ToggleFloatingActionButton(
+                                    checked = fabMenuExpanded,
+                                    onCheckedChange = { if (hasPairedDevices) fabMenuExpanded = it }
+                                ) {
+                                    val icon by remember {
+                                        derivedStateOf {
+                                            if (checkedProgress > 0.5f) Icons.Rounded.Close
+                                            else Icons.Rounded.FileUpload
+                                        }
+                                    }
+                                    Icon(icon, contentDescription = stringResource(R.string.nav_send))
+                                }
+                            }
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.send_to_mac),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                                // Send file
-                                SendOption(
-                                    icon = Icons.AutoMirrored.Rounded.InsertDriveFile,
-                                    label = stringResource(R.string.action_send_file),
-                                    onClick = {
-                                        showSendSheet = false
-                                        filePickerLauncher.launch(arrayOf("*/*"))
-                                    }
-                                )
-
-                                // Send photo
-                                SendOption(
-                                    icon = Icons.Rounded.Photo,
-                                    label = stringResource(R.string.action_send_photo),
-                                    onClick = {
-                                        showSendSheet = false
-                                        photoPickerLauncher.launch(
-                                            ActivityResultContracts.PickVisualMedia
-                                                .ImageAndVideo.let {
-                                                    androidx.activity.result.PickVisualMediaRequest(it)
-                                                }
-                                        )
-                                    }
-                                )
-
-                                // Send clipboard
-                                SendOption(
-                                    icon = Icons.Rounded.ContentPaste,
-                                    label = stringResource(R.string.action_send_clipboard),
-                                    onClick = {
-                                        showSendSheet = false
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = clipboard.primaryClip
-                                        if (clip != null && clip.itemCount > 0) {
-                                            val text = clip.getItemAt(0).coerceToText(context).toString()
-                                            if (text.isNotEmpty()) {
-                                                viewModel.sendClipboard(text)
-                                                Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                            FloatingActionButtonMenuItem(
+                                onClick = {
+                                    fabMenuExpanded = false
+                                    filePickerLauncher.launch(arrayOf("*/*"))
+                                },
+                                icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                text = { Text(stringResource(R.string.action_send_file)) }
+                            )
+                            FloatingActionButtonMenuItem(
+                                onClick = {
+                                    fabMenuExpanded = false
+                                    photoPickerLauncher.launch(
+                                        ActivityResultContracts.PickVisualMedia
+                                            .ImageAndVideo.let {
+                                                androidx.activity.result.PickVisualMediaRequest(it)
                                             }
+                                    )
+                                },
+                                icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                                text = { Text(stringResource(R.string.action_send_photo)) }
+                            )
+                            FloatingActionButtonMenuItem(
+                                onClick = {
+                                    fabMenuExpanded = false
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = clipboard.primaryClip
+                                    if (clip != null && clip.itemCount > 0) {
+                                        val text = clip.getItemAt(0).coerceToText(context).toString()
+                                        if (text.isNotEmpty()) {
+                                            viewModel.sendClipboard(text)
+                                            Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
                                         }
+                                    } else {
+                                        Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
                                     }
-                                )
-
-                                Spacer(modifier = Modifier.height(32.dp))
-                            }
+                                },
+                                icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                text = { Text(stringResource(R.string.action_send_clipboard)) }
+                            )
                         }
-                    }
+                    } // end Box
+
                     // File/photo confirmation sheet
                     if (pendingFileUri != null) {
                         ModalBottomSheet(
@@ -536,42 +492,5 @@ private fun SendConfirmationSheet(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-    }
-}
-
-@Composable
-private fun SendOption(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }
