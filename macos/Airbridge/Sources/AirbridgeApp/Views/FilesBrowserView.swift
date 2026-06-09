@@ -28,12 +28,19 @@ struct FilesBrowserView: View {
                 notConnectedView
             } else {
                 VStack(spacing: 0) {
-                    breadcrumbBar
-                    toolbarBar
-                    Divider()
                     content
+                    Divider()
+                    pathBar
                 }
+                .searchable(
+                    text: $searchText,
+                    placement: .toolbar,
+                    prompt: L10n.isPL ? "Szukaj wszędzie" : "Search everywhere"
+                )
             }
+        }
+        .onChange(of: searchText) { _, new in
+            filesBrowserService.setSearchQuery(new)
         }
         .onAppear {
             filesBrowserService.loadPersistedSort()
@@ -103,54 +110,41 @@ struct FilesBrowserView: View {
         }
     }
 
-    private var breadcrumbBar: some View {
-        HStack(spacing: 6) {
-            Button { filesBrowserService.open(path: "") } label: {
-                Image(systemName: "internaldrive")
-                    .imageScale(.large)
+    /// Ścieżka jak pasek dolny Findera — kompaktowa, na materiale paska,
+    /// klikalne segmenty.
+    private var pathBar: some View {
+        HStack(spacing: 4) {
+            Button {
+                filesBrowserService.open(path: "")
+            } label: {
+                Label(L10n.isPL ? "Telefon" : "Phone", systemImage: "smartphone")
+                    .labelStyle(.titleAndIcon)
             }
             .buttonStyle(.borderless)
 
             ForEach(Array(filesBrowserService.breadcrumbs.enumerated()), id: \.offset) { index, segment in
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                Button(segment) {
+                Image(systemName: "chevron.compact.right")
+                    .foregroundStyle(.tertiary)
+                Button {
                     let path = filesBrowserService.breadcrumbs.prefix(index + 1).joined(separator: "/")
                     filesBrowserService.open(path: path)
+                } label: {
+                    if index == filesBrowserService.breadcrumbs.count - 1 {
+                        Label(segment, systemImage: "folder.fill")
+                    } else {
+                        Text(segment)
+                    }
                 }
                 .buttonStyle(.borderless)
             }
 
             Spacer()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-    }
-
-    private var toolbarBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(L10n.isPL ? "Szukaj wszędzie" : "Search everywhere", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .onChange(of: searchText) { _, new in
-                        filesBrowserService.setSearchQuery(new)
-                    }
-                if !searchText.isEmpty {
-                    Button { searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            .frame(minWidth: 120, maxWidth: 280)
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 6)
+        .font(.ab(.caption))
+        .lineLimit(1)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(.bar)
     }
 
     @ViewBuilder

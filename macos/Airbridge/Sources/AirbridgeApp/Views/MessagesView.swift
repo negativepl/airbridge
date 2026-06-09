@@ -240,6 +240,7 @@ struct MessagesView: View {
             VStack(alignment: isSent ? .trailing : .leading, spacing: 3) {
                 Text(msg.body)
                     .font(.ab(.body))
+                    .foregroundStyle(isSent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .glassEffect(

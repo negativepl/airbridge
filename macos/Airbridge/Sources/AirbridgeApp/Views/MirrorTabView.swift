@@ -118,14 +118,6 @@ struct MirrorTabView: View {
                     showUIScale: true,
                     action: { startReverse(mode: 1) }
                 )
-
-                Text(L10n.isPL
-                    ? "Ustawienia działają od następnego startu danego trybu. Niżej = gładziej i mniejsze opóźnienie; wyżej = ostrzej."
-                    : "Settings apply on the next start of each mode. Lower = smoother and lower latency; higher = sharper.")
-                    .font(.ab(.footnote))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .topLeading)
