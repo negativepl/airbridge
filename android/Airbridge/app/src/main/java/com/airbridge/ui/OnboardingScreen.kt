@@ -69,7 +69,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -427,7 +426,7 @@ private fun PermissionsPage() {
                 imageVector = if (allGranted) Icons.Rounded.Check else Icons.Rounded.Lock,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = if (allGranted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                tint = if (allGranted) MaterialTheme.colorScheme.success else MaterialTheme.colorScheme.primary
             )
         }
 
@@ -564,14 +563,14 @@ private fun PermissionsPage() {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,
-                    tint = Color(0xFF4CAF50),
+                    tint = MaterialTheme.colorScheme.success,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.onboarding_perm_all_granted),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF4CAF50),
+                    color = MaterialTheme.colorScheme.success,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -599,7 +598,7 @@ private fun PermissionRow(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
-                tint = if (granted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (granted) MaterialTheme.colorScheme.success else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
@@ -613,7 +612,7 @@ private fun PermissionRow(
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,
-                    tint = Color(0xFF4CAF50),
+                    tint = MaterialTheme.colorScheme.success,
                     modifier = Modifier.size(20.dp)
                 )
             }
