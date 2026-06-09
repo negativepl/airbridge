@@ -14,6 +14,7 @@ import android.util.Log
 import com.airbridge.clipboard.ClipboardSync
 import com.airbridge.discovery.NsdDiscovery
 import com.airbridge.files.FilesProvider
+import com.airbridge.network.NetworkMonitor
 import com.airbridge.gallery.GalleryProvider
 import com.airbridge.protocol.ContentType
 import com.airbridge.protocol.Message
@@ -145,6 +146,7 @@ class AirbridgeService : Service() {
     private lateinit var webSocketClient: WebSocketClient
     private lateinit var clipboardSync: ClipboardSync
     private lateinit var nsdDiscovery: NsdDiscovery
+    private lateinit var networkMonitor: NetworkMonitor
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val httpFileUploader = HttpFileUploader()
     private val httpFileDownloader = HttpFileDownloader()
@@ -167,6 +169,7 @@ class AirbridgeService : Service() {
         webSocketClient = WebSocketClient()
         clipboardSync = ClipboardSync(this)
         nsdDiscovery = NsdDiscovery(this)
+        networkMonitor = NetworkMonitor(this) { onNetworkChanged() }
         galleryProvider = GalleryProvider(contentResolver)
         smsProvider = SmsProvider(applicationContext)
         keyManager = com.airbridge.security.KeyManager(this)
@@ -176,6 +179,20 @@ class AirbridgeService : Service() {
         setupClipboardSync()
         setupNsdDiscovery()
         setupHttpFileServer()
+        networkMonitor.start()
+    }
+
+    /**
+     * Called when the device switches to a different network (e.g. work Wi-Fi
+     * -> home Wi-Fi). The cached host is now on an unreachable network, so we
+     * forget it and re-run discovery to find the peer's new address.
+     */
+    private fun onNetworkChanged() {
+        Log.d(TAG, "Network changed — forgetting stale host and restarting discovery")
+        webSocketClient.forgetHost()
+        connectedHost.value = null
+        isConnected.value = false
+        nsdDiscovery.restart()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -301,6 +318,7 @@ class AirbridgeService : Service() {
         super.onDestroy()
         stopRinging()
         instance = null
+        networkMonitor.stop()
         clipboardSync.stopListening()
         nsdDiscovery.stopDiscovery()
         webSocketClient.disconnect()
@@ -346,6 +364,12 @@ class AirbridgeService : Service() {
 
         webSocketClient.onMessage = { message ->
             handleIncomingMessage(message)
+        }
+
+        webSocketClient.onReconnectExhausted = {
+            Log.d(TAG, "Reconnect exhausted — restarting discovery to find peer's new address")
+            connectedHost.value = null
+            nsdDiscovery.restart()
         }
     }
 

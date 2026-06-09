@@ -19,13 +19,21 @@ class WebSocketClient {
 
     companion object {
         private const val TAG = "WebSocketClient"
-        private const val RECONNECT_DELAY_MS = 3000L
         private const val PING_INTERVAL_SECONDS = 15L
     }
 
     var onMessage: ((Message) -> Unit)? = null
     var onConnected: (() -> Unit)? = null
     var onDisconnected: (() -> Unit)? = null
+
+    /**
+     * Invoked when reconnecting to the cached host has failed enough times that
+     * the host is presumed stale (e.g. the peer moved to another network).
+     * The service should re-run discovery to find the peer's new address.
+     */
+    var onReconnectExhausted: (() -> Unit)? = null
+
+    private val reconnectPolicy = ReconnectPolicy()
 
     var isConnected: Boolean = false
         private set
@@ -42,13 +50,23 @@ class WebSocketClient {
         .build()
 
     private val listener = object : WebSocketListener() {
+        // Listener jest wspólny dla kolejnych socketów. Eventy z socketa innego
+        // niż aktualny (zombie po reconnect/zmianie sieci) MUSZĄ być ignorowane:
+        // zombie dublował każdą wiadomość (drugi upload pliku, popover) i
+        // nadpisywał isConnected świeżemu połączeniu.
+        private fun isCurrent(webSocket: WebSocket): Boolean =
+            webSocket === this@WebSocketClient.webSocket
+
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            if (!isCurrent(webSocket)) return
             Log.d(TAG, "WebSocket connected")
             isConnected = true
+            reconnectPolicy.onSuccess()
             onConnected?.invoke()
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (!isCurrent(webSocket)) return
             try {
                 val message = Message.fromJson(text)
                 if (message is Message.Ping) {
@@ -67,11 +85,13 @@ class WebSocketClient {
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            if (!isCurrent(webSocket)) return
             Log.d(TAG, "WebSocket closed: $code $reason")
             handleDisconnect()
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if (!isCurrent(webSocket)) return
             Log.e(TAG, "WebSocket failure", t)
             handleDisconnect()
         }
@@ -80,24 +100,46 @@ class WebSocketClient {
     private fun handleDisconnect() {
         isConnected = false
         onDisconnected?.invoke()
-        if (shouldReconnect) {
-            scheduleReconnect()
+        if (!shouldReconnect) return
+        when (val decision = reconnectPolicy.onFailure()) {
+            is ReconnectDecision.Retry -> scheduleReconnect(decision.delayMs)
+            ReconnectDecision.Rediscover -> {
+                Log.d(TAG, "Reconnect exhausted for cached host — requesting re-discovery")
+                reconnectPolicy.onSuccess() // reset for the next host
+                currentHost = null
+                onReconnectExhausted?.invoke()
+            }
         }
     }
 
-    private fun scheduleReconnect() {
+    private fun scheduleReconnect(delayMs: Long) {
         val host = currentHost ?: return
         val port = currentPort
         scope.launch {
-            delay(RECONNECT_DELAY_MS)
-            if (shouldReconnect && !isConnected) {
-                Log.d(TAG, "Attempting reconnect to $host:$port")
+            delay(delayMs)
+            if (shouldReconnect && !isConnected && currentHost == host) {
+                Log.d(TAG, "Attempting reconnect to $host:$port (delay ${delayMs}ms)")
                 connect(host, port)
             }
         }
     }
 
+    /**
+     * Forget the cached host so pending/future reconnect attempts stop targeting
+     * a stale address. Closes any live socket. Discovery must supply a new host.
+     */
+    fun forgetHost() {
+        currentHost = null
+        reconnectPolicy.onSuccess()
+        webSocket?.cancel()
+        webSocket = null
+        isConnected = false
+    }
+
     fun connect(host: String, port: Int) {
+        // Nigdy nie trzymamy dwóch socketów naraz — Mac broadcastuje do
+        // wszystkich swoich połączeń, więc zombie = każda wiadomość 2x.
+        webSocket?.cancel()
         currentHost = host
         currentPort = port
         val request = Request.Builder()

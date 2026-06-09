@@ -18,11 +18,17 @@ class NsdDiscovery(private val context: Context) {
     @Volatile
     private var isDiscovering = false
 
+    // NsdManager requires a distinct DiscoveryListener instance per
+    // discoverServices() call — a stopped listener cannot be reused. We create
+    // a fresh one on each startDiscovery() so discovery can be restarted (e.g.
+    // after a Wi-Fi change) to find the peer on the new network.
+    private var activeListener: NsdManager.DiscoveryListener? = null
+
     private val nsdManager: NsdManager by lazy {
         context.getSystemService(Context.NSD_SERVICE) as NsdManager
     }
 
-    private val discoveryListener = object : NsdManager.DiscoveryListener {
+    private fun createDiscoveryListener() = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(TAG, "Discovery start failed: error $errorCode")
         }
@@ -76,16 +82,26 @@ class NsdDiscovery(private val context: Context) {
             Log.d(TAG, "Discovery already running — skipping")
             return
         }
-        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        val listener = createDiscoveryListener()
+        activeListener = listener
+        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
     }
 
     fun stopDiscovery() {
+        val listener = activeListener ?: return
         if (!isDiscovering) return
         try {
-            nsdManager.stopServiceDiscovery(discoveryListener)
+            nsdManager.stopServiceDiscovery(listener)
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping discovery", e)
         }
+        activeListener = null
         isDiscovering = false
+    }
+
+    /** Restart discovery with a fresh listener — used after a network change. */
+    fun restart() {
+        stopDiscovery()
+        startDiscovery()
     }
 }

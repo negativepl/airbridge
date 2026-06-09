@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import SwiftUI
 import Protocol
 import AirbridgeSecurity
@@ -53,6 +54,7 @@ final class ConnectionService {
     var mirrorService: MirrorService?
     var pairingService: PairingService?
     private var serverStarted = false
+    @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
 
     // MARK: - Message Handlers
 
@@ -90,18 +92,9 @@ final class ConnectionService {
         Task {
             do {
                 try await httpServer.start()
-                let httpPort = await httpServer.actualPort ?? 8766
-
-                let deviceName = Host.current().localizedName ?? "Mac"
-                let identity = try keyManager.getOrCreateIdentity()
-                let fingerprint = keyManager.fingerprintOf(identity.publicKeyBase64)
-                let mPort = mirrorService?.actualPort
-                try await server.start(bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
-
-                await configureServerCallbacks()
-
+                try await advertiseServer()
                 keyManager.migrateFromSingleDevice()
-
+                startNetworkMonitor()
                 statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
             } catch {
                 statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
@@ -110,7 +103,50 @@ final class ConnectionService {
         }
     }
 
+    /// (Re)start the WebSocket listener and (re)register the Bonjour service so
+    /// it advertises on the Mac's current network address.
+    private func advertiseServer() async throws {
+        let httpPort = await httpServer.actualPort ?? 8766
+        let deviceName = Host.current().localizedName ?? "Mac"
+        let identity = try keyManager.getOrCreateIdentity()
+        let fingerprint = keyManager.fingerprintOf(identity.publicKeyBase64)
+        let mPort = mirrorService?.actualPort
+        try await server.start(bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
+        await configureServerCallbacks()
+    }
+
+    private func startNetworkMonitor() {
+        guard pathMonitor == nil else { return }
+        let monitor = NetworkChangeMonitor { [weak self] in
+            Task { @MainActor in self?.handleNetworkChange() }
+        }
+        pathMonitor = monitor
+        monitor.start()
+    }
+
+    /// The Mac moved to a different network: re-advertise Bonjour on the new IP
+    /// so the phone can rediscover us. The phone is the side that reconnects.
+    private func handleNetworkChange() {
+        guard serverStarted, !manuallyDisconnected else { return }
+        statusMessage = L10n.isPL ? "Zmiana sieci — ponowne rozgłaszanie…" : "Network changed — re-advertising…"
+        Task {
+            await server.stop()
+            do {
+                try await advertiseServer()
+                isConnected = false
+                connectedDeviceName = ""
+                deviceInfo = nil
+                phoneWallpaper = nil
+                statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+            } catch {
+                statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
     func stopServer() {
+        pathMonitor?.stop()
+        pathMonitor = nil
         Task {
             await server.stop()
             await httpServer.stop()
