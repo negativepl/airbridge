@@ -41,7 +41,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -246,12 +246,9 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = { transferProgress ?: 0f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
+                        modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
                     )
