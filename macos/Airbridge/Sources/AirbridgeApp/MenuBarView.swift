@@ -1,4 +1,5 @@
 import SwiftUI
+import Protocol
 
 struct MenuBarView: View {
     let connectionService: ConnectionService
@@ -9,20 +10,24 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 StatusIndicator(state: connectionService.isConnected ? .connected : .disconnected, size: 12)
+                    .frame(width: 18, alignment: .center)
                 if connectionService.isConnected {
                     Text("\(L10n.connectedToDevice) \(connectionService.connectedDeviceName)")
-                        .font(.subheadline)
+                        .font(.ab(.subheadline))
                 } else {
-                    Text(L10n.notConnected).font(.subheadline).foregroundStyle(.secondary)
+                    Text(L10n.notConnected).font(.ab(.subheadline)).foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 18)
             .padding(.vertical, 8)
 
             if connectionService.isConnected, let info = connectionService.deviceInfo {
-                BatteryRow(percent: info.batteryPercent, charging: info.batteryCharging)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 4)
+                Divider()
+                    .padding(.horizontal, 8)
+
+                BatteryRow(percent: info.batteryPercent, charging: info.batteryCharging, chargeTimeRemainingMs: info.chargeTimeRemainingMs)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 4)
             }
 
             Divider()
@@ -65,6 +70,7 @@ struct MenuBarView: View {
 private struct BatteryRow: View {
     let percent: Int
     let charging: Bool
+    let chargeTimeRemainingMs: Int64
 
     var body: some View {
         HStack(spacing: 8) {
@@ -81,6 +87,10 @@ private struct BatteryRow: View {
 
     private var label: String {
         if charging {
+            if chargeTimeRemainingMs > 0 {
+                let t = formatChargeTime(chargeTimeRemainingMs, isPL: L10n.isPL)
+                return L10n.isPL ? "Bateria \(percent)% • \(t) do pełna" : "Battery \(percent)% • \(t) to full"
+            }
             return L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging"
         }
         return L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%"

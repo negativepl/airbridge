@@ -522,7 +522,8 @@ final class MessageTests: XCTestCase {
     func testNotificationPostedRoundTrip() throws {
         let msg = Message.notificationPosted(packageName: "com.whatsapp", appName: "WhatsApp",
                                              title: "Mama", text: "Zadzwoń",
-                                             timestamp: 1_700_000_000_000, appIcon: "QQ==")
+                                             timestamp: 1_700_000_000_000, appIcon: "QQ==",
+                                             notificationKey: "k1", canReply: true)
         let data = try JSONEncoder().encode(msg)
         XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
     }
@@ -530,7 +531,7 @@ final class MessageTests: XCTestCase {
     func testNotificationPostedLegacyNoIcon() throws {
         let legacy = #"{"type":"notification_posted","package_name":"a","app_name":"A","title":"t","text":"x","timestamp":1}"#
         let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
-        XCTAssertEqual(decoded, .notificationPosted(packageName: "a", appName: "A", title: "t", text: "x", timestamp: 1, appIcon: ""))
+        XCTAssertEqual(decoded, .notificationPosted(packageName: "a", appName: "A", title: "t", text: "x", timestamp: 1, appIcon: "", notificationKey: "", canReply: false))
     }
 
     // MARK: - authResponse mirror_port (phone-initiated screen sharing)

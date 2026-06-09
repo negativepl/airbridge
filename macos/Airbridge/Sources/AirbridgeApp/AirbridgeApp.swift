@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Protocol
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -28,6 +29,12 @@ struct AirbridgeApp: App {
     @State private var mirrorService: MirrorService
 
     init() {
+        // Jeśli AirBridge już działa (np. LaunchServices odpalił drugą kopię po
+        // kliknięciu powiadomienia), aktywuj istniejącą instancję i zakończ tę —
+        // ZANIM wystartują serwery, inaczej drugi proces zbinduje port 8765 i
+        // poleci `NWError 48 Address already in use`.
+        InstanceGuard.terminateIfAlreadyRunning()
+
         UserDefaults.standard.register(defaults: ["playSound": true])
 
         let connection = ConnectionService()
@@ -81,6 +88,16 @@ struct AirbridgeApp: App {
     }
 
     @AppStorage("onboardingCompleted") private var onboardingCompleted = false
+
+    /// Tekst baterii w ikonie paska menu. Przy ładowaniu ze znanym czasem
+    /// dokłada pozostały czas do pełna, np. „⚡85% · 45 min".
+    private func menuBarBatteryText(_ info: DeviceInfo) -> String {
+        let base = "\(info.batteryCharging ? "⚡" : "")\(info.batteryPercent)%"
+        if info.batteryCharging, info.chargeTimeRemainingMs > 0 {
+            return "\(base) · \(formatChargeTime(info.chargeTimeRemainingMs, isPL: L10n.isPL))"
+        }
+        return base
+    }
 
     var body: some Scene {
         Window("AirBridge", id: "main") {
@@ -165,7 +182,7 @@ struct AirbridgeApp: App {
         } label: {
             if connectionService.isConnected, let info = connectionService.deviceInfo {
                 Label {
-                    Text("\(info.batteryCharging ? "⚡" : "")\(info.batteryPercent)%")
+                    Text(menuBarBatteryText(info))
                 } icon: {
                     Image(systemName: "macbook.and.iphone")
                 }

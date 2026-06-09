@@ -68,7 +68,7 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
     }
 
     func handleMessage(_ message: Message) {
-        guard case let .notificationPosted(packageName, appName, title, text, _, appIcon, notificationKey, canReply) = message else { return }
+        guard case let .notificationPosted(packageName, appName, title, text, _, _, notificationKey, canReply) = message else { return }
 
         if knownApps[packageName] != appName {
             knownApps[packageName] = appName
@@ -83,9 +83,9 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
         content.body = text
         content.sound = .default
 
-        if !appIcon.isEmpty, let attachment = Self.iconAttachment(base64: appIcon) {
-            content.attachments = [attachment]
-        }
+        // Ikony apki z telefonu NIE doklejamy jako attachment — macOS po rozwinięciu
+        // banera renderuje załącznik na całą szerokość (wielki, bezsensowny obrazek).
+        // Źródło i tak identyfikuje `subtitle = appName`.
 
         // Powiadomienia z akcją reply (np. WhatsApp): dołącz natywne pole odpowiedzi.
         if canReply, !notificationKey.isEmpty {
@@ -126,19 +126,5 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
     private func sendReply(notificationKey: String, text: String) {
         guard let connectionService, !text.isEmpty else { return }
         Task { try? await connectionService.broadcast(.notificationReply(notificationKey: notificationKey, text: text)) }
-    }
-
-    /// Zapisz base64 PNG do pliku temp i zrób UNNotificationAttachment.
-    private static func iconAttachment(base64: String) -> UNNotificationAttachment? {
-        guard let data = Data(base64Encoded: base64) else { return nil }
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("airbridge-notif-icons", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent("\(UUID().uuidString).png")
-        do {
-            try data.write(to: url)
-            return try UNNotificationAttachment(identifier: UUID().uuidString, url: url, options: nil)
-        } catch {
-            return nil
-        }
     }
 }
