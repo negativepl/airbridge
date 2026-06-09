@@ -54,6 +54,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -66,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -260,10 +262,11 @@ class MainActivity : ComponentActivity() {
                                         }
                                         val icon = if (showingClose) Icons.Rounded.Close else Icons.Rounded.FileUpload
                                         Icon(
-                                            icon,
+                                            painter = rememberVectorPainter(icon),
                                             contentDescription = stringResource(
                                                 if (showingClose) R.string.fab_close_menu else R.string.nav_send
-                                            )
+                                            ),
+                                            modifier = Modifier.animateIcon({ checkedProgress })
                                         )
                                     }
                                 }
