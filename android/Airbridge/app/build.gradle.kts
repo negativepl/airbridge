@@ -30,6 +30,10 @@ android {
         }
     }
     buildFeatures { compose = true }
+    testOptions {
+        // android.util.Log w czystych unit testach: no-op zamiast "not mocked".
+        unitTests.isReturnDefaultValues = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
