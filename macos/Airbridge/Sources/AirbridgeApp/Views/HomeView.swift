@@ -67,6 +67,20 @@ struct HomeView: View {
         return .connecting
     }
 
+    /// Przyjazna nazwa telefonu (marketingowa z DeviceInfo, np. "Galaxy Z Fold7"),
+    /// z fallbackiem do nazwy z parowania zanim przyjdzie device_info.
+    private func connectedName(_ vm: HomeViewModel) -> String {
+        if let name = vm.deviceInfo?.name, !name.isEmpty { return name }
+        return vm.deviceName
+    }
+
+    private func connectedDetail(_ vm: HomeViewModel) -> String {
+        var parts: [String] = []
+        if let model = vm.deviceInfo?.model, !model.isEmpty { parts.append(model) }
+        if let ip = vm.localIP { parts.append(ip) }
+        return parts.joined(separator: " · ")
+    }
+
     private func connectionCard(_ vm: HomeViewModel) -> some View {
         GlassSection {
             HStack(spacing: 14) {
@@ -76,7 +90,9 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Group {
                         if vm.isConnected {
-                            Text(vm.deviceName)
+                            Text(L10n.isPL
+                                ? "Połączono z \(connectedName(vm))"
+                                : "Connected to \(connectedName(vm))")
                         } else if !vm.hasPairedDevices {
                             Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
                         } else if isDisconnected {
@@ -89,8 +105,8 @@ struct HomeView: View {
                     .contentTransition(.interpolate)
 
                     Group {
-                        if vm.isConnected, let ip = vm.localIP {
-                            Text(ip).contentTransition(.numericText())
+                        if vm.isConnected {
+                            Text(connectedDetail(vm)).contentTransition(.numericText())
                         } else if !vm.hasPairedDevices {
                             Text(L10n.isPL ? "Sparuj telefon aby rozpocząć" : "Pair your phone to get started")
                         } else if isDisconnected {
@@ -234,11 +250,11 @@ struct HomeView: View {
             }
         }
         .font(.ab(.caption2, weight: .semibold))
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.primary.opacity(0.15), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
     }
 

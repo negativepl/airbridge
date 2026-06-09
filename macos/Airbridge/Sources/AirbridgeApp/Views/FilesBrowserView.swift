@@ -148,53 +148,9 @@ struct FilesBrowserView: View {
             .frame(minWidth: 120, maxWidth: 280)
 
             Spacer()
-
-            sortMenu
-
-            Picker("", selection: Binding(
-                get: { viewMode },
-                set: { viewModeRaw = $0.rawValue }
-            )) {
-                Image(systemName: "list.bullet")
-                    .accessibilityLabel(L10n.isPL ? "Widok listy" : "List view").tag(FileViewMode.list)
-                Image(systemName: "square.grid.2x2")
-                    .accessibilityLabel(L10n.isPL ? "Widok siatki" : "Grid view").tag(FileViewMode.grid)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .accessibilityLabel(L10n.isPL ? "Tryb widoku" : "View mode")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            Picker(L10n.isPL ? "Sortuj wg" : "Sort by",
-                   selection: Binding(get: { filesBrowserService.sortBy },
-                                      set: { filesBrowserService.sortBy = $0 })) {
-                Text(L10n.isPL ? "Nazwa" : "Name").tag(FileSortKey.name)
-                Text(L10n.isPL ? "Rozmiar" : "Size").tag(FileSortKey.size)
-                Text(L10n.isPL ? "Data modyfikacji" : "Date modified").tag(FileSortKey.modified)
-                Text(L10n.isPL ? "Typ" : "Type").tag(FileSortKey.type)
-            }
-            Divider()
-            Picker(L10n.isPL ? "Kierunek" : "Order",
-                   selection: Binding(get: { filesBrowserService.sortAscending },
-                                      set: { filesBrowserService.sortAscending = $0 })) {
-                Text(L10n.isPL ? "Rosnąco" : "Ascending").tag(true)
-                Text(L10n.isPL ? "Malejąco" : "Descending").tag(false)
-            }
-            Divider()
-            Toggle(L10n.isPL ? "Foldery na początku" : "Folders first",
-                   isOn: Binding(get: { filesBrowserService.foldersFirst },
-                                 set: { filesBrowserService.foldersFirst = $0 }))
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .accessibilityLabel(L10n.isPL ? "Opcje sortowania" : "Sort options")
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
     }
 
     @ViewBuilder

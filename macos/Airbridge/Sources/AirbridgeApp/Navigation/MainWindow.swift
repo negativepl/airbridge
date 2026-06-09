@@ -5,6 +5,7 @@ struct MainWindow: View {
     @State private var selectedTab: NavigationItem = .home
     @Environment(\.openWindow) private var openWindow
     @AppStorage("gallery.viewMode") private var galleryViewModeRaw: String = GalleryViewMode.filmstrip.rawValue
+    @AppStorage("files.viewMode") private var filesViewModeRaw: String = FileViewMode.list.rawValue
 
     let connectionService: ConnectionService
     let clipboardService: ClipboardService
@@ -116,6 +117,22 @@ struct MainWindow: View {
             }
             if selectedTab == .files {
                 ToolbarItem(placement: .primaryAction) {
+                    Picker("", selection: Binding(
+                        get: { FileViewMode(rawValue: filesViewModeRaw) ?? .list },
+                        set: { filesViewModeRaw = $0.rawValue }
+                    )) {
+                        Image(systemName: "list.bullet")
+                            .accessibilityLabel(L10n.isPL ? "Widok listy" : "List view").tag(FileViewMode.list)
+                        Image(systemName: "square.grid.2x2")
+                            .accessibilityLabel(L10n.isPL ? "Widok siatki" : "Grid view").tag(FileViewMode.grid)
+                    }
+                    .pickerStyle(.segmented)
+                    .help(L10n.isPL ? "Tryb widoku" : "View mode")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    filesSortMenu
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         filesBrowserService.reload()
                     } label: {
@@ -152,5 +169,35 @@ struct MainWindow: View {
                 }
             }
         }
+    }
+
+    // Sortowanie Plików jako natywny element toolbara (jak picker widoku) —
+    // okno samo nada mu styl i glass-grouping.
+    private var filesSortMenu: some View {
+        Menu {
+            Picker(L10n.isPL ? "Sortuj wg" : "Sort by",
+                   selection: Binding(get: { filesBrowserService.sortBy },
+                                      set: { filesBrowserService.sortBy = $0 })) {
+                Text(L10n.isPL ? "Nazwa" : "Name").tag(FileSortKey.name)
+                Text(L10n.isPL ? "Rozmiar" : "Size").tag(FileSortKey.size)
+                Text(L10n.isPL ? "Data modyfikacji" : "Date modified").tag(FileSortKey.modified)
+                Text(L10n.isPL ? "Typ" : "Type").tag(FileSortKey.type)
+            }
+            Divider()
+            Picker(L10n.isPL ? "Kierunek" : "Order",
+                   selection: Binding(get: { filesBrowserService.sortAscending },
+                                      set: { filesBrowserService.sortAscending = $0 })) {
+                Text(L10n.isPL ? "Rosnąco" : "Ascending").tag(true)
+                Text(L10n.isPL ? "Malejąco" : "Descending").tag(false)
+            }
+            Divider()
+            Toggle(L10n.isPL ? "Foldery na początku" : "Folders first",
+                   isOn: Binding(get: { filesBrowserService.foldersFirst },
+                                 set: { filesBrowserService.foldersFirst = $0 }))
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .accessibilityLabel(L10n.isPL ? "Opcje sortowania" : "Sort options")
+        }
+        .help(L10n.isPL ? "Opcje sortowania" : "Sort options")
     }
 }

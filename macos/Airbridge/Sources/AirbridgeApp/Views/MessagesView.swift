@@ -113,28 +113,32 @@ struct MessagesView: View {
     }
 
     private func conversationRow(_ convo: SmsConversationMeta) -> some View {
-        Button {
+        // Na zaznaczeniu tło robi się akcentowe (glass tint) — tekst musi
+        // przejść na biel jak w natywnym zaznaczeniu listy, nie zostać .primary.
+        let isSelected = selectedConversation?.id == convo.id
+        return Button {
             selectedConversation = convo
             smsService.loadMessages(threadId: convo.threadId)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.secondary))
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(convo.displayName)
                             .font(.ab(.body, weight: .semibold))
+                            .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                             .lineLimit(1)
                         Spacer()
                         Text(formatDate(convo.date))
                             .font(.ab(.caption))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
                     }
                     Text(convo.snippet)
                         .font(.ab(.subheadline))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
                         .lineLimit(2)
                 }
             }
@@ -145,7 +149,7 @@ struct MessagesView: View {
         }
         .buttonStyle(.plain)
         .glassEffect(
-            selectedConversation?.id == convo.id
+            isSelected
                 ? .regular.tint(.accentColor).interactive()
                 : .regular.interactive(),
             in: .rect(cornerRadius: 12, style: .continuous)
