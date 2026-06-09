@@ -38,10 +38,10 @@ import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -349,9 +349,8 @@ private fun ConnectingCard(deviceName: String?) {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(48.dp),
-                strokeWidth = 4.dp
+            LoadingIndicator(
+                modifier = Modifier.size(64.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
@@ -511,10 +510,9 @@ private fun DeviceCard(
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 3.dp
+                            LoadingIndicator(
+                                modifier = Modifier.size(56.dp),
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
 
