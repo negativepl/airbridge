@@ -139,6 +139,7 @@
     <string name="share_sheet_multiple_files">Plików: %1$d</string>
 
     <!-- Navigation -->
+    <string name="fab_close_menu">Zamknij menu</string>
     <string name="nav_home">Główna</string>
     <string name="nav_history">Historia</string>
     <string name="nav_screen_sharing">Ekran</string>

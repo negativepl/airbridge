@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -167,145 +168,150 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
-                    Scaffold(
-                        bottomBar = {
-                            Box {
-                                NavigationBar {
-                                    // First 2 tabs (Home, History)
-                                    val navBarColors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                                    )
-                                    navItems.take(2).forEachIndexed { index, item ->
-                                        NavigationBarItem(
-                                            selected = pagerState.targetPage == index,
-                                            onClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                coroutineScope.launch {
-                                                    pagerState.animateScrollToPage(index)
-                                                }
-                                            },
-                                            icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
-                                            label = { Text(stringResource(item.labelRes), maxLines = 1) },
-                                            colors = navBarColors
+                        Scaffold(
+                            bottomBar = {
+                                Box {
+                                    NavigationBar {
+                                        // First 2 tabs (Home, History)
+                                        val navBarColors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                            unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
                                         )
-                                    }
+                                        navItems.take(2).forEachIndexed { index, item ->
+                                            NavigationBarItem(
+                                                selected = pagerState.targetPage == index,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(index)
+                                                    }
+                                                },
+                                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
+                                                label = { Text(stringResource(item.labelRes), maxLines = 1) },
+                                                colors = navBarColors
+                                            )
+                                        }
 
-                                    // Empty space for FAB
-                                    NavigationBarItem(
-                                        selected = false,
-                                        onClick = { },
-                                        icon = { Spacer(Modifier.size(24.dp)) },
-                                        label = { },
-                                        enabled = false
-                                    )
-
-                                    // Last 2 tabs (Settings, About)
-                                    navItems.drop(2).forEachIndexed { index, item ->
+                                        // Empty space for FAB
                                         NavigationBarItem(
-                                            selected = pagerState.targetPage == index + 2,
-                                            onClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                coroutineScope.launch {
-                                                    pagerState.animateScrollToPage(index + 2)
-                                                }
-                                            },
-                                            icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
-                                            label = { Text(stringResource(item.labelRes), maxLines = 1) },
-                                            colors = navBarColors
+                                            selected = false,
+                                            onClick = { },
+                                            icon = { Spacer(Modifier.size(24.dp)) },
+                                            label = { },
+                                            enabled = false
                                         )
-                                    }
-                                }
 
-                            }
-                        }
-                    ) { innerPadding ->
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.padding(innerPadding),
-                            beyondViewportPageCount = 3,
-                        ) { page ->
-                            when (page) {
-                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
-                                1 -> ScreenShareScreen()
-                                2 -> SettingsScreen(
-                                    prefs = prefs,
-                                    onThemeChanged = { themeMode = it },
-                                    onScanQr = { showQrScanner = true }
-                                )
-                                3 -> AboutScreen()
-                            }
-                        }
-                    }
-
-                        FloatingActionButtonMenu(
-                            expanded = fabMenuExpanded,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(bottom = 20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            button = {
-                                ToggleFloatingActionButton(
-                                    checked = fabMenuExpanded,
-                                    onCheckedChange = { if (hasPairedDevices) fabMenuExpanded = it }
-                                ) {
-                                    val icon by remember {
-                                        derivedStateOf {
-                                            if (checkedProgress > 0.5f) Icons.Rounded.Close
-                                            else Icons.Rounded.FileUpload
+                                        // Last 2 tabs (Settings, About)
+                                        navItems.drop(2).forEachIndexed { index, item ->
+                                            NavigationBarItem(
+                                                selected = pagerState.targetPage == index + 2,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(index + 2)
+                                                    }
+                                                },
+                                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
+                                                label = { Text(stringResource(item.labelRes), maxLines = 1) },
+                                                colors = navBarColors
+                                            )
                                         }
                                     }
-                                    Icon(icon, contentDescription = stringResource(R.string.nav_send))
                                 }
                             }
-                        ) {
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    fabMenuExpanded = false
-                                    filePickerLauncher.launch(arrayOf("*/*"))
-                                },
-                                icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                                text = { Text(stringResource(R.string.action_send_file)) }
-                            )
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    fabMenuExpanded = false
-                                    photoPickerLauncher.launch(
-                                        ActivityResultContracts.PickVisualMedia
-                                            .ImageAndVideo.let {
-                                                androidx.activity.result.PickVisualMediaRequest(it)
-                                            }
+                        ) { innerPadding ->
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.padding(innerPadding),
+                                beyondViewportPageCount = 3,
+                            ) { page ->
+                                when (page) {
+                                    0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
+                                    1 -> ScreenShareScreen()
+                                    2 -> SettingsScreen(
+                                        prefs = prefs,
+                                        onThemeChanged = { themeMode = it },
+                                        onScanQr = { showQrScanner = true }
                                     )
-                                },
-                                icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
-                                text = { Text(stringResource(R.string.action_send_photo)) }
-                            )
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    fabMenuExpanded = false
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = clipboard.primaryClip
-                                    if (clip != null && clip.itemCount > 0) {
-                                        val text = clip.getItemAt(0).coerceToText(context).toString()
-                                        if (text.isNotEmpty()) {
-                                            viewModel.sendClipboard(text)
-                                            Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                    3 -> AboutScreen()
+                                }
+                            }
+                        }
+
+                        if (hasPairedDevices) {
+                            BackHandler(fabMenuExpanded) { fabMenuExpanded = false }
+                            FloatingActionButtonMenu(
+                                expanded = fabMenuExpanded,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                button = {
+                                    ToggleFloatingActionButton(
+                                        checked = fabMenuExpanded,
+                                        onCheckedChange = { fabMenuExpanded = it }
+                                    ) {
+                                        val showingClose by remember {
+                                            derivedStateOf { checkedProgress > 0.5f }
+                                        }
+                                        val icon = if (showingClose) Icons.Rounded.Close else Icons.Rounded.FileUpload
+                                        Icon(
+                                            icon,
+                                            contentDescription = stringResource(
+                                                if (showingClose) R.string.fab_close_menu else R.string.nav_send
+                                            )
+                                        )
+                                    }
+                                }
+                            ) {
+                                FloatingActionButtonMenuItem(
+                                    onClick = {
+                                        fabMenuExpanded = false
+                                        filePickerLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                    text = { Text(stringResource(R.string.action_send_file)) }
+                                )
+                                FloatingActionButtonMenuItem(
+                                    onClick = {
+                                        fabMenuExpanded = false
+                                        photoPickerLauncher.launch(
+                                            ActivityResultContracts.PickVisualMedia
+                                                .ImageAndVideo.let {
+                                                    androidx.activity.result.PickVisualMediaRequest(it)
+                                                }
+                                        )
+                                    },
+                                    icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                                    text = { Text(stringResource(R.string.action_send_photo)) }
+                                )
+                                FloatingActionButtonMenuItem(
+                                    onClick = {
+                                        fabMenuExpanded = false
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = clipboard.primaryClip
+                                        if (clip != null && clip.itemCount > 0) {
+                                            val text = clip.getItemAt(0).coerceToText(context).toString()
+                                            if (text.isNotEmpty()) {
+                                                viewModel.sendClipboard(text)
+                                                Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                            }
                                         } else {
                                             Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
                                         }
-                                    } else {
-                                        Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                                text = { Text(stringResource(R.string.action_send_clipboard)) }
-                            )
+                                    },
+                                    icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                    text = { Text(stringResource(R.string.action_send_clipboard)) }
+                                )
+                            }
                         }
-                    } // end Box
+                    }
 
                     // File/photo confirmation sheet
                     if (pendingFileUri != null) {

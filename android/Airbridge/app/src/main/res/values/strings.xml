@@ -139,6 +139,7 @@
     <string name="share_sheet_multiple_files">%1$d files</string>
 
     <!-- Navigation -->
+    <string name="fab_close_menu">Close menu</string>
     <string name="nav_home">Home</string>
     <string name="nav_history">History</string>
     <string name="nav_screen_sharing">Screen</string>
