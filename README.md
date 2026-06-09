@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/macOS-26+-black?logo=apple" />
   <img src="https://img.shields.io/badge/Android-10+-3DDC84?logo=android&logoColor=white" />
   <img src="https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white" />
-  <img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white" />
+  <img src="https://img.shields.io/badge/Kotlin-2.3-7F52FF?logo=kotlin&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-blue" />
   <img src="https://img.shields.io/github/v/release/negativepl/airbridge" />
 </p>
@@ -35,7 +35,7 @@ This is an open-source alternative to apps like Phone Link, KDE Connect, or Inte
 
 | | macOS | Android |
 |---|---|---|
-| **Language** | Swift 6.2 (strict concurrency) | Kotlin 2.0 |
+| **Language** | Swift 6.2 (strict concurrency) | Kotlin 2.3 |
 | **UI** | SwiftUI + Liquid Glass (macOS 26) | Jetpack Compose + Material 3 Expressive |
 | **Networking** | Network.framework (NWListener) | OkHttp WebSocket |
 | **Discovery** | Bonjour / mDNS (NWListener.service) | NSD (NsdManager) |
@@ -46,8 +46,8 @@ This is an open-source alternative to apps like Phone Link, KDE Connect, or Inte
 | **Camera** | — | CameraX + ML Kit (QR scanning) |
 | **Architecture** | MVVM, SPM, @Observable | MVVM, Foreground Service, StateFlow |
 | **Min version** | macOS 26 (Tahoe) | Android 10 (API 29) |
-| **Target SDK** | — | API 35 (Android 15) |
-| **Build** | Swift Package Manager | Gradle + Kotlin DSL |
+| **Target SDK** | — | API 35 (Android 15), compileSdk 37 |
+| **Build** | Swift Package Manager | Gradle 9 + AGP 9 (built-in Kotlin) |
 
 ---
 
@@ -127,6 +127,8 @@ Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing
 - **Download folder** — Choose where incoming files are saved (configurable in Settings).
 
 ### Android Extras
+- **Material 3 Expressive UI** — The whole app runs on `MaterialExpressiveTheme` with spring-based motion, Material You dynamic color (wallpaper palette on Android 12+), a wavy progress indicator for transfers, a shape-morphing loading indicator while connecting, a connected button group for theme selection, and expressive `MaterialShapes` icon containers.
+- **FAB send menu** — The Send button expands into a native expressive FAB menu (File / Photo / Clipboard) with a morphing icon.
 - **Share Sheet integration** — Share files or photos from any app directly to AirBridge. The app appears as a share target and lets you pick which paired device to send to.
 - **Theme selection** — Choose between System, Light, or Dark theme in Settings.
 - **Onboarding wizard** — First-launch setup guides you through permissions (including All Files Access and Accessibility) and pairing with animated explanations.
@@ -285,7 +287,8 @@ UI (Jetpack Compose + Material 3 Expressive)
               └── MirrorAccessibilityService — Injects Mac-driven input on the phone
 ```
 
-- **compileSdk 36** (Android 16) with `Notification.ProgressStyle`
+- **compileSdk 37** (Android 16) with `Notification.ProgressStyle`
+- **AGP 9 / Gradle 9** with AGP's built-in Kotlin (no standalone `kotlin-android` plugin)
 - **R8/ProGuard** minification — release APK is ~25 MB (vs 83 MB debug)
 
 ### Protocol
@@ -374,7 +377,7 @@ AirBridge is built to feel native on both platforms — not like a cross-platfor
 
 **macOS** — The app is written in SwiftUI targeting **Xcode 26 and macOS Tahoe**. It uses **Liquid Glass** effects throughout the UI (glass cards, glass buttons, native sidebar via `TabView(.sidebarAdaptable)`). The file transfer notification uses a custom **floating island popup** that slides down from the notch area, inspired by Dynamic Island — showing transfer progress, speed, and ETA in real time. Mirrored video is decoded with VideoToolbox and rendered directly into an `AVSampleBufferDisplayLayer` for near-zero added latency.
 
-**Android** — The app is written in **Jetpack Compose with Material 3** (Material Expressive). It uses native notification channels, `Notification.ProgressStyle` (API 36) for transfer progress, the Android text selection menu ("Send to Mac") for clipboard sharing, and hardware `MediaCodec` for low-latency screen encoding. The onboarding wizard follows Material 3 patterns with animated page transitions and per-permission explanations.
+**Android** — The app is written in **Jetpack Compose with Material 3 Expressive**: `MaterialExpressiveTheme` brings spring-physics motion to every component, transfers show a wavy progress indicator, connecting states use the shape-morphing `LoadingIndicator`, the Send FAB expands into a native FAB menu, theme selection is a connected toggle-button group, and onboarding hero icons sit in expressive `MaterialShapes` containers — the same component language Android 16 uses system-wide, with Material You dynamic color throughout. Beyond the UI it uses native notification channels, `Notification.ProgressStyle` for transfer progress, the Android text selection menu ("Send to Mac") for clipboard sharing, and hardware `MediaCodec` for low-latency screen encoding.
 
 Both apps share the same protocol but have completely independent, platform-native implementations. No shared runtime, no React Native, no Flutter — just Swift and Kotlin.
 
