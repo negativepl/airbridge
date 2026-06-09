@@ -29,10 +29,20 @@ struct MenuBarView: View {
                 .padding(.horizontal, 8)
 
             if connectionService.isConnected {
-                MenuRow(title: L10n.isPL ? "Zadzwoń na telefon" : "Ring phone",
-                        systemImage: "iphone.radiowaves.left.and.right") {
-                    connectionService.ringPhone()
+                if connectionService.isRinging {
+                    MenuRow(title: L10n.isPL ? "Zatrzymaj dzwonienie" : "Stop ringing",
+                            systemImage: "bell.slash") {
+                        connectionService.stopRingPhone()
+                    }
+                } else {
+                    MenuRow(title: L10n.isPL ? "Zadzwoń na telefon" : "Ring phone",
+                            systemImage: "iphone.radiowaves.left.and.right") {
+                        connectionService.ringPhone()
+                    }
                 }
+
+                Divider()
+                    .padding(.horizontal, 8)
             }
 
             MenuRow(title: L10n.openAirbridge, systemImage: "macwindow") {

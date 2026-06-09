@@ -35,6 +35,8 @@ final class ConnectionService {
     private(set) var connectedClientIP: String?
     private(set) var statusMessage: String = "Idle"
     private var manuallyDisconnected: Bool = false
+    /// Czy telefon aktualnie dzwoni (sterowanie przyciskiem „Zadzwoń/Zatrzymaj" w pasku menu).
+    private(set) var isRinging: Bool = false
 
     // MARK: - Dependencies
 
@@ -173,11 +175,31 @@ final class ConnectionService {
     }
 
     /// Zadzwoń na telefon (głośny alarm) / zatrzymaj dzwonienie.
+    @ObservationIgnored private var ringResetTask: Task<Void, Never>?
+
     func ringPhone() {
+        isRinging = true
         Task { try? await server.broadcast(.phoneRing) }
+        // Telefon sam wycisza się po 30 s — zsynchronizuj przycisk nawet gdyby
+        // potwierdzenie PhoneRingStop nie dotarło.
+        ringResetTask?.cancel()
+        ringResetTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.isRinging = false
+        }
     }
+
     func stopRingPhone() {
+        isRinging = false
+        ringResetTask?.cancel()
         Task { try? await server.broadcast(.phoneRingStop) }
+    }
+
+    /// Telefon zgłosił, że dzwonek ucichł (przycisk na telefonie / auto-stop).
+    private func handlePhoneRingStopped() {
+        isRinging = false
+        ringResetTask?.cancel()
     }
 
     // MARK: - Auth Handling
@@ -306,6 +328,8 @@ final class ConnectionService {
             Task { try? await server.broadcast(.macWallpaperResponse(imageBase64: image)) }
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
+        case .phoneRingStop:
+            handlePhoneRingStopped()
         default:
             break
         }

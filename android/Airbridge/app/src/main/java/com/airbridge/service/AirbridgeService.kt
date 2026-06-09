@@ -1286,15 +1286,22 @@ class AirbridgeService : Service() {
 
     // MARK: - Ring (znajdź telefon)
 
-    private var ringtone: android.media.Ringtone? = null
+    private var ringPlayer: android.media.MediaPlayer? = null
     private var ringVibrator: android.os.Vibrator? = null
     private var savedAlarmVolume: Int? = null
     private val ringHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val ringStopRunnable = Runnable { stopRinging() }
 
-    /** Głośny alarm na STREAM_ALARM (omija tryb cichy) + wibracje, auto-stop po 30 s. */
+    /**
+     * Głośny alarm na STREAM_ALARM (omija tryb cichy) + wibracje, auto-stop po 30 s.
+     *
+     * Odtwarzamy przez [android.media.MediaPlayer], NIE przez RingtoneManager:
+     * `Ringtone.stop()` na zapętlonym alarmie potrafi nie zatrzymać dźwięku na
+     * One UI (Samsung), więc przycisk „Zatrzymaj" był nieskuteczny. MediaPlayer
+     * daje deterministyczne stop()/release().
+     */
     private fun startRinging() {
-        if (ringtone?.isPlaying == true) return
+        if (ringPlayer?.isPlaying == true) return
         try {
             val audio = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
             savedAlarmVolume = audio.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
@@ -1306,12 +1313,18 @@ class AirbridgeService : Service() {
             val uri = android.media.RingtoneManager.getActualDefaultRingtoneUri(this, android.media.RingtoneManager.TYPE_ALARM)
                 ?: android.media.RingtoneManager.getActualDefaultRingtoneUri(this, android.media.RingtoneManager.TYPE_RINGTONE)
                 ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-            ringtone = android.media.RingtoneManager.getRingtone(this, uri)?.apply {
-                audioAttributes = android.media.AudioAttributes.Builder()
-                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                    .build()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
-                play()
+            ringPlayer = android.media.MediaPlayer().apply {
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@AirbridgeService, uri)
+                isLooping = true
+                setOnErrorListener { _, _, _ -> stopRinging(); true }
+                prepare()
+                start()
             }
             startVibration()
             showRingNotification()
@@ -1320,6 +1333,7 @@ class AirbridgeService : Service() {
             Log.d(TAG, "PhoneRing: started")
         } catch (e: Exception) {
             Log.e(TAG, "startRinging failed", e)
+            stopRinging()
         }
     }
 
@@ -1336,9 +1350,11 @@ class AirbridgeService : Service() {
     }
 
     private fun stopRinging() {
+        val wasRinging = ringPlayer != null || savedAlarmVolume != null
         ringHandler.removeCallbacks(ringStopRunnable)
-        try { ringtone?.stop() } catch (_: Exception) {}
-        ringtone = null
+        try { ringPlayer?.stop() } catch (_: Exception) {}
+        try { ringPlayer?.release() } catch (_: Exception) {}
+        ringPlayer = null
         try { ringVibrator?.cancel() } catch (_: Exception) {}
         ringVibrator = null
         savedAlarmVolume?.let { vol ->
@@ -1349,6 +1365,11 @@ class AirbridgeService : Service() {
         }
         savedAlarmVolume = null
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(RING_NOTIFICATION_ID)
+        // Powiadom Maca, że dzwonek ucichł (przycisk na telefonie, auto-stop po 30 s
+        // lub żądanie z Maca) — żeby przycisk w pasku menu wrócił do „Zadzwoń".
+        if (wasRinging) {
+            try { webSocketClient.send(Message.PhoneRingStop) } catch (_: Exception) {}
+        }
         Log.d(TAG, "PhoneRing: stopped")
     }
 
