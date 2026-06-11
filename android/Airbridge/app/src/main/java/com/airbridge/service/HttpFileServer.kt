@@ -76,7 +76,7 @@ class HttpFileServer(private val port: Int = 8767) {
             // Read request line byte-by-byte (avoid BufferedReader stealing binary data)
             val requestLine = readLine(input)
             if (!requestLine.startsWith("POST /upload")) {
-                sendResponse(client, 404, "Not Found")
+                sendResponse(client, 404, """{"status":"error","message":"not found"}""")
                 return
             }
 
@@ -141,9 +141,22 @@ class HttpFileServer(private val port: Int = 8767) {
     }
 
     private fun sendResponse(client: Socket, code: Int, body: String) {
-        val status = if (code == 200) "OK" else "Error"
-        val response = "HTTP/1.1 $code $status\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body"
-        client.getOutputStream().write(response.toByteArray())
-        client.getOutputStream().flush()
+        val status = when (code) {
+            200 -> "OK"
+            400 -> "Bad Request"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            500 -> "Internal Server Error"
+            else -> "Error"
+        }
+        val bodyBytes = body.toByteArray(Charsets.UTF_8)
+        val headers = "HTTP/1.1 $code $status\r\n" +
+            "Content-Type: application/json\r\n" +
+            "Content-Length: ${bodyBytes.size}\r\n" +
+            "Connection: close\r\n\r\n"
+        val output = client.getOutputStream()
+        output.write(headers.toByteArray(Charsets.UTF_8))
+        output.write(bodyBytes)
+        output.flush()
     }
 }
