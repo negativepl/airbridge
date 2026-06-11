@@ -162,6 +162,7 @@ public actor WebSocketServer {
             conn.cancel()
         }
         connections.removeAll()
+        authenticatedConnections.removeAll()
         actualPort = nil
         guard let listener else { return }
         self.listener = nil
@@ -344,6 +345,10 @@ public actor WebSocketServer {
 
     private func removeConnection(id: String) {
         connections.removeValue(forKey: id)
+        // Also drop the authentication state. Connection IDs are derived from
+        // host:port, so a later connection can legitimately reuse the same ID;
+        // leaving it here would let that new client skip authentication.
+        authenticatedConnections.remove(id)
         onClientDisconnected?(id)
     }
 

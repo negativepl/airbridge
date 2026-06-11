@@ -87,4 +87,85 @@ final class WebSocketServerTests: XCTestCase {
         task.cancel(with: .normalClosure, reason: Data())
         await server.stop()
     }
+
+    // MARK: - Test 3: Disconnected client loses its authenticated status
+
+    func testDisconnectedClientIsNoLongerAuthenticated() async throws {
+        let server = WebSocketServer(port: 0)
+
+        // Capture the connection ID and disconnection via callbacks.
+        let connectedID = IDBox()
+        let disconnected = IDBox()
+        await server.setCallbacks(
+            onMessage: nil,
+            onClientConnected: { id in connectedID.set(id) },
+            onClientDisconnected: { id in disconnected.set(id) }
+        )
+
+        try await server.start()
+        let port = await server.actualPort
+        XCTAssertNotNil(port)
+        guard let port else { return }
+
+        let url = URL(string: "ws://127.0.0.1:\(port)")!
+        let task = URLSession.shared.webSocketTask(with: url)
+        task.resume()
+
+        try await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+        guard let id = connectedID.get() else {
+            XCTFail("Client never connected")
+            await server.stop()
+            return
+        }
+
+        await server.markAuthenticated(id)
+        let authedBefore = await server.isAuthenticated(id)
+        XCTAssertTrue(authedBefore)
+
+        // Abruptly drop the client and wait for the server to notice.
+        task.cancel(with: .abnormalClosure, reason: Data())
+        for _ in 0..<20 where disconnected.get() == nil {
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+        }
+        XCTAssertEqual(disconnected.get(), id, "Server should report the disconnect")
+
+        let authedAfter = await server.isAuthenticated(id)
+        XCTAssertFalse(authedAfter, "Auth state must be cleared on disconnect — the host:port ID can be reused by a new client")
+
+        await server.stop()
+    }
+
+    // MARK: - Test 4: stop() clears authenticated connections
+
+    func testStopClearsAuthenticatedConnections() async throws {
+        let server = WebSocketServer(port: 0)
+        try await server.start()
+
+        await server.markAuthenticated("127.0.0.1:12345")
+        let authedBefore = await server.isAuthenticated("127.0.0.1:12345")
+        XCTAssertTrue(authedBefore)
+
+        await server.stop()
+
+        let authedAfter = await server.isAuthenticated("127.0.0.1:12345")
+        XCTAssertFalse(authedAfter, "stop() must not leak auth state into a later start()")
+    }
+}
+
+/// Tiny thread-safe box for capturing a value from a @Sendable callback.
+private final class IDBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: String?
+
+    func set(_ newValue: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if value == nil { value = newValue }
+    }
+
+    func get() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
 }
