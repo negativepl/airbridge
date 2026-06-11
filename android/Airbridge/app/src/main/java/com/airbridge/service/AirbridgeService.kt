@@ -423,11 +423,14 @@ class AirbridgeService : Service() {
     private var lastProgressNotifUpdate = 0L
 
     private fun setupHttpFileServer() {
-        // NOTE: httpFileServer is the LEGACY inbound-POST path for Mac→phone
-        // file sends. Kept alive as a no-op fallback; the active path is now
-        // phone-pulls-from-Mac via HttpFileDownloader (see handleAcceptFile).
-        // Both paths converge on updateTransferProgress / finalizeReceivedFile
-        // so the notification UX is identical.
+        // Deliberately NOT started: the Mac cannot initiate outbound TCP to
+        // the phone (macOS Local Network Privacy silently blocks it for
+        // self-signed apps), so this inbound-POST server can never have a
+        // client. Mac→phone file sends use the inverted pull path instead:
+        // the phone fetches via GET /send/{id} from the Mac's HTTP server
+        // (see HttpFileDownloader / ACTION_ACCEPT_FILE). The class and the
+        // callback wiring below are kept for protocol symmetry — both paths
+        // converge on updateTransferProgress / finalizeReceivedFile.
         httpFileServer.onProgress = { filename, bytesReceived, totalBytes ->
             updateTransferProgress(filename, bytesReceived.toLong(), totalBytes.toLong())
         }
@@ -439,7 +442,6 @@ class AirbridgeService : Service() {
         httpFileServer.isAllowedSender = { remote ->
             connectedHost.value?.let { isSameHost(remote, it) } ?: false
         }
-        httpFileServer.start()
     }
 
     /** Compares an incoming socket address with the connected Mac's host. */
