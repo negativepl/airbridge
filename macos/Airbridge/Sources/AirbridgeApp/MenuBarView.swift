@@ -57,8 +57,10 @@ struct MenuBarView: View {
 
             MenuRow(title: L10n.quit, systemImage: "xmark.circle") {
                 clipboardService.stopMonitoring()
-                connectionService.stopServer()
-                NSApplication.shared.terminate(nil)
+                Task {
+                    await connectionService.stopServer()
+                    NSApplication.shared.terminate(nil)
+                }
             }
         }
         .padding(.vertical, 6)

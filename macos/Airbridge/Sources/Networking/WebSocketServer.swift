@@ -61,6 +61,9 @@ public actor WebSocketServer {
     // Continuation used to signal that the listener reached .ready
     private var readyContinuation: CheckedContinuation<Void, Error>?
 
+    // Continuation used to signal that the listener reached .cancelled
+    private var stopContinuation: CheckedContinuation<Void, Never>?
+
     // MARK: - Init
 
     public init(port: UInt16 = 8765) {
@@ -152,14 +155,20 @@ public actor WebSocketServer {
     }
 
     /// Stops the listener and cancels all active connections.
-    public func stop() {
+    /// Suspends until the listener has fully cancelled and released its port,
+    /// so a subsequent `start()` can re-bind without hitting "address in use".
+    public func stop() async {
         for (_, conn) in connections {
             conn.cancel()
         }
         connections.removeAll()
-        listener?.cancel()
-        listener = nil
         actualPort = nil
+        guard let listener else { return }
+        self.listener = nil
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.stopContinuation = continuation
+            listener.cancel()
+        }
     }
 
     // MARK: - Broadcast
@@ -237,6 +246,11 @@ public actor WebSocketServer {
             #if DEBUG
             print("[WebSocketServer] Listener failed: \(error)")
             #endif
+
+        case .cancelled:
+            let cont = stopContinuation
+            stopContinuation = nil
+            cont?.resume()
 
         default:
             break

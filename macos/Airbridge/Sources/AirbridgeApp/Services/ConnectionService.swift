@@ -84,22 +84,24 @@ final class ConnectionService {
     // MARK: - Server Lifecycle
 
     func startServer() {
+        Task { await startServerNow() }
+    }
+
+    private func startServerNow() async {
         guard !serverStarted else { return }
         serverStarted = true
         statusMessage = L10n.isPL ? "Uruchamianie…" : "Starting…"
         startDeviceInfoPolling()
 
-        Task {
-            do {
-                try await httpServer.start()
-                try await advertiseServer()
-                keyManager.migrateFromSingleDevice()
-                startNetworkMonitor()
-                statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
-            } catch {
-                statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
-                serverStarted = false
-            }
+        do {
+            try await httpServer.start()
+            try await advertiseServer()
+            keyManager.migrateFromSingleDevice()
+            startNetworkMonitor()
+            statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+        } catch {
+            statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
+            serverStarted = false
         }
     }
 
@@ -124,46 +126,67 @@ final class ConnectionService {
         monitor.start()
     }
 
+    // Serializes server restarts: only one runs at a time. A restart request
+    // arriving mid-restart collapses into a single catch-up pass (no queue).
+    @ObservationIgnored private var isRestarting = false
+    @ObservationIgnored private var restartPending = false
+
     /// The Mac moved to a different network: re-advertise Bonjour on the new IP
     /// so the phone can rediscover us. The phone is the side that reconnects.
     private func handleNetworkChange() {
         guard serverStarted, !manuallyDisconnected else { return }
         statusMessage = L10n.isPL ? "Zmiana sieci — ponowne rozgłaszanie…" : "Network changed — re-advertising…"
+        if isRestarting {
+            restartPending = true
+            return
+        }
+        isRestarting = true
         Task {
-            await server.stop()
-            do {
-                try await advertiseServer()
-                isConnected = false
-                connectedDeviceName = ""
-                deviceInfo = nil
-                phoneWallpaper = nil
-                statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
-            } catch {
-                statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
-            }
+            defer { isRestarting = false }
+            repeat {
+                restartPending = false
+                guard serverStarted, !manuallyDisconnected else { break }
+                await server.stop()
+                // Reset connection state before trying to come back up, so the UI
+                // never shows "Connected" on a dead server if advertising fails.
+                resetConnectionState()
+                do {
+                    try await advertiseServer()
+                    statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+                } catch {
+                    statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
+                }
+            } while restartPending
         }
     }
 
-    func stopServer() {
+    /// Stops both servers and returns only after their listeners have fully
+    /// released their ports, so a follow-up start can re-bind immediately.
+    func stopServer() async {
         pathMonitor?.stop()
         pathMonitor = nil
-        Task {
-            await server.stop()
-            await httpServer.stop()
-        }
-        isConnected = false
-        connectedDeviceName = ""
-        deviceInfo = nil
-        phoneWallpaper = nil
+        resetConnectionState()
         statusMessage = L10n.isPL ? "Zatrzymano" : "Stopped"
         serverStarted = false
+        await server.stop()
+        await httpServer.stop()
     }
 
     func reconnect() {
         manuallyDisconnected = false
-        stopServer()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.startServer()
+        if isRestarting {
+            restartPending = true
+            return
+        }
+        isRestarting = true
+        Task {
+            defer { isRestarting = false }
+            await stopServer()
+            try? await Task.sleep(for: .milliseconds(500))
+            await startServerNow()
+            // A network change that arrived mid-restart is already satisfied:
+            // startServerNow() advertised on the current network.
+            restartPending = false
         }
     }
 
@@ -172,11 +195,15 @@ final class ConnectionService {
         Task {
             await server.disconnectAllClients()
         }
+        resetConnectionState()
+        statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
+    }
+
+    private func resetConnectionState() {
         isConnected = false
         connectedDeviceName = ""
         deviceInfo = nil
         phoneWallpaper = nil
-        statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
     }
 
     // MARK: - Broadcasting

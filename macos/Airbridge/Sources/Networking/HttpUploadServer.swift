@@ -44,6 +44,9 @@ public actor HttpUploadServer {
     /// Continuation used to signal that the listener reached `.ready`.
     private var readyContinuation: CheckedContinuation<Void, Error>?
 
+    /// Continuation used to signal that the listener reached `.cancelled`.
+    private var stopContinuation: CheckedContinuation<Void, Never>?
+
     /// Files registered for outgoing download via `GET /send/{transferId}`.
     /// Keyed by transferId — Mac registers the file when it wants to send it
     /// to the phone, phone fetches via GET, callbacks fire as bytes leave.
@@ -111,15 +114,21 @@ public actor HttpUploadServer {
     }
 
     /// Stops the listener and cancels all active connections.
-    public func stop() {
+    /// Suspends until the listener has fully cancelled and released its port,
+    /// so a subsequent `start()` can re-bind without hitting "address in use".
+    public func stop() async {
         for (_, conn) in connections {
             conn.cancel()
         }
         connections.removeAll()
-        listener?.cancel()
-        listener = nil
         actualPort = nil
         pendingOutgoingFiles.removeAll()
+        guard let listener else { return }
+        self.listener = nil
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.stopContinuation = continuation
+            listener.cancel()
+        }
     }
 
     // MARK: - Outgoing File Registration
@@ -167,6 +176,11 @@ public actor HttpUploadServer {
             let cont = readyContinuation
             readyContinuation = nil
             cont?.resume(throwing: error)
+
+        case .cancelled:
+            let cont = stopContinuation
+            stopContinuation = nil
+            cont?.resume()
 
         default:
             break
