@@ -726,6 +726,10 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.AuthResponse -> {
+                if (message.protocolVersion != Message.PROTOCOL_VERSION) {
+                    Log.w(TAG, "Protocol version mismatch: Mac speaks ${message.protocolVersion}, " +
+                        "we speak ${Message.PROTOCOL_VERSION}")
+                }
                 if (message.accepted) {
                     Log.d(TAG, "Auth accepted — connection authenticated (mirrorPort=${message.mirrorPort})")
                     // Refresh the mirror port from the application channel on every

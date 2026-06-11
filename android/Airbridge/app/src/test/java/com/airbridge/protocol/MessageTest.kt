@@ -156,4 +156,88 @@ class MessageTest {
         assertNull(decoded.mirrorPort)
         assertEquals(true, decoded.accepted)
     }
+
+    // protocol_version in the auth handshake — missing field means a v1 peer.
+
+    @Test fun authRequestEncodesProtocolVersion() {
+        val msg = Message.AuthRequest(publicKey = "pk==", signature = "sig==", timestamp = 42L)
+        val json = JSONObject(msg.toJson())
+        assertEquals(Message.PROTOCOL_VERSION, json.getInt("protocol_version"))
+    }
+
+    @Test fun authRequestRoundTripWithProtocolVersion() {
+        val msg = Message.AuthRequest(publicKey = "pk==", signature = "sig==", timestamp = 42L, protocolVersion = 2)
+        val decoded = Message.fromJson(msg.toJson()) as Message.AuthRequest
+        assertEquals(msg, decoded)
+    }
+
+    @Test fun authRequestLegacyWithoutProtocolVersionDefaultsTo1() {
+        val legacy = """{"type":"auth_request","public_key":"pk==","signature":"sig==","timestamp":42}"""
+        val decoded = Message.fromJson(legacy) as Message.AuthRequest
+        assertEquals(1, decoded.protocolVersion)
+    }
+
+    @Test fun authResponseLegacyWithoutProtocolVersionDefaultsTo1() {
+        val legacy = """{"type":"auth_response","accepted":true}"""
+        val decoded = Message.fromJson(legacy) as Message.AuthResponse
+        assertEquals(1, decoded.protocolVersion)
+    }
+
+    @Test fun authResponseRoundTripWithProtocolVersion() {
+        val msg = Message.AuthResponse(accepted = true, reason = null, mirrorPort = 8767, protocolVersion = 2)
+        val decoded = Message.fromJson(msg.toJson()) as Message.AuthResponse
+        assertEquals(msg, decoded)
+    }
+
+    // mac_info_response / mac_wallpaper_response — full payload serialization
+    // (these used to drop everything but "type").
+
+    @Test fun macInfoResponseRoundTrip() {
+        val info = MacInfo(
+            name = "MBP", model = "MacBook Pro", chip = "Apple M3 Pro",
+            osVersion = "macOS 26.0", cpuCores = 12, cpuLoadPercent = 37,
+            totalRamBytes = 18_000_000_000, usedRamBytes = 9_000_000_000,
+            totalStorageBytes = 512_000_000_000, freeStorageBytes = 128_000_000_000,
+            batteryPercent = 80, batteryCharging = true, onACPower = true,
+            uptimeSeconds = 3600
+        )
+        val decoded = Message.fromJson(Message.MacInfoResponse(info).toJson()) as Message.MacInfoResponse
+        assertEquals(info, decoded.info)
+    }
+
+    @Test fun macWallpaperResponseUsesImageKeyAndRoundTrips() {
+        val msg = Message.MacWallpaperResponse(imageBase64 = "QkFTRTY0")
+        val json = JSONObject(msg.toJson())
+        assertEquals("QkFTRTY0", json.getString("image"))
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    // Decoders added for symmetry — every type a side can emit can also be parsed.
+
+    @Test fun folderStatsResponseRoundTrip() {
+        val msg = Message.FolderStatsResponse(path = "DCIM/Camera", dirCount = 3, fileCount = 120, totalSize = 1_234_567L)
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    @Test fun deviceInfoResponseRoundTrip() {
+        val info = DeviceInfo(
+            name = "Galaxy", model = "SM", manufacturer = "Samsung",
+            androidVersion = "16", sdkInt = 34,
+            totalStorageBytes = 1, freeStorageBytes = 1,
+            totalRamBytes = 1, freeRamBytes = 1, batteryPercent = 80,
+            batteryCharging = true, chargeTimeRemainingMs = 4_800_000
+        )
+        val decoded = Message.fromJson(Message.DeviceInfoResponse(info).toJson()) as Message.DeviceInfoResponse
+        assertEquals(info, decoded.info)
+    }
+
+    @Test fun wallpaperResponseRoundTrip() {
+        val msg = Message.WallpaperResponse(imageBase64 = "QkFTRTY0")
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    @Test fun macInfoAndWallpaperRequestsRoundTrip() {
+        assertEquals(Message.MacInfoRequest, Message.fromJson(Message.MacInfoRequest.toJson()))
+        assertEquals(Message.MacWallpaperRequest, Message.fromJson(Message.MacWallpaperRequest.toJson()))
+    }
 }

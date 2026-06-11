@@ -537,7 +537,7 @@ final class MessageTests: XCTestCase {
     // MARK: - authResponse mirror_port (phone-initiated screen sharing)
 
     func testAuthResponseAcceptedCarriesMirrorPort() throws {
-        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767)
+        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767, protocolVersion: ProtocolConstants.version)
         let json = try encode(msg)
         XCTAssertEqual(json["type"] as? String, "auth_response")
         XCTAssertEqual(json["accepted"] as? Bool, true)
@@ -545,13 +545,13 @@ final class MessageTests: XCTestCase {
     }
 
     func testAuthResponseRoundTrip_withMirrorPort() throws {
-        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767)
+        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: 8767, protocolVersion: ProtocolConstants.version)
         let data = try JSONEncoder().encode(msg)
         XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
     }
 
     func testAuthResponseRejected_omitsMirrorPort() throws {
-        let msg = Message.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil)
+        let msg = Message.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil, protocolVersion: ProtocolConstants.version)
         let json = try encode(msg)
         XCTAssertNil(json["mirror_port"])
         let data = try JSONEncoder().encode(msg)
@@ -561,6 +561,56 @@ final class MessageTests: XCTestCase {
     func testAuthResponseLegacy_noMirrorPort() throws {
         let legacy = #"{"type":"auth_response","accepted":true}"#
         let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
-        XCTAssertEqual(decoded, .authResponse(accepted: true, reason: nil, mirrorPort: nil))
+        XCTAssertEqual(decoded, .authResponse(accepted: true, reason: nil, mirrorPort: nil, protocolVersion: 1))
+    }
+
+    // MARK: - protocol_version in the auth handshake
+
+    func testAuthRequestEncodesProtocolVersion() throws {
+        let msg = Message.authRequest(publicKey: "pk==", signature: "sig==", timestamp: 1_700_000_000_000, protocolVersion: ProtocolConstants.version)
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "auth_request")
+        XCTAssertEqual(json["protocol_version"] as? Int, ProtocolConstants.version)
+    }
+
+    func testAuthRequestRoundTrip_withProtocolVersion() throws {
+        let msg = Message.authRequest(publicKey: "pk==", signature: "sig==", timestamp: 42, protocolVersion: 2)
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
+    }
+
+    func testAuthRequestLegacy_noProtocolVersion_defaultsTo1() throws {
+        let legacy = #"{"type":"auth_request","public_key":"pk==","signature":"sig==","timestamp":42}"#
+        let decoded = try JSONDecoder().decode(Message.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded, .authRequest(publicKey: "pk==", signature: "sig==", timestamp: 42, protocolVersion: 1))
+    }
+
+    func testAuthResponseEncodesProtocolVersion() throws {
+        let msg = Message.authResponse(accepted: true, reason: nil, mirrorPort: nil, protocolVersion: ProtocolConstants.version)
+        let json = try encode(msg)
+        XCTAssertEqual(json["protocol_version"] as? Int, ProtocolConstants.version)
+    }
+
+    // MARK: - macInfoResponse / macWallpaperResponse payloads
+
+    func testMacInfoResponseRoundTrip() throws {
+        let info = MacInfo(name: "MBP", model: "MacBook Pro", chip: "Apple M3 Pro",
+                           osVersion: "macOS 26.0", cpuCores: 12, cpuLoadPercent: 37,
+                           totalRamBytes: 18_000_000_000, usedRamBytes: 9_000_000_000,
+                           totalStorageBytes: 512_000_000_000, freeStorageBytes: 128_000_000_000,
+                           batteryPercent: 80, batteryCharging: true, onACPower: true,
+                           uptimeSeconds: 3600)
+        let msg = Message.macInfoResponse(info: info)
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
+    }
+
+    func testMacWallpaperResponseUsesImageKey() throws {
+        let msg = Message.macWallpaperResponse(imageBase64: "QkFTRTY0")
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "mac_wallpaper_response")
+        XCTAssertEqual(json["image"] as? String, "QkFTRTY0")
+        let data = try JSONEncoder().encode(msg)
+        XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
     }
 }

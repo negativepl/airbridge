@@ -45,7 +45,7 @@ public final class PairingManager: @unchecked Sendable {
             port: port,
             publicKey: identity.publicKeyBase64,
             pairingToken: token,
-            protocolVersion: 1
+            protocolVersion: ProtocolConstants.version
         )
     }
 

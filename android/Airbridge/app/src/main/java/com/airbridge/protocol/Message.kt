@@ -243,26 +243,30 @@ sealed class Message {
     data class AuthRequest(
         val publicKey: String,
         val signature: String,
-        val timestamp: Long
+        val timestamp: Long,
+        val protocolVersion: Int = PROTOCOL_VERSION
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "auth_request")
             put("public_key", publicKey)
             put("signature", signature)
             put("timestamp", timestamp)
+            put("protocol_version", protocolVersion)
         }.toString()
     }
 
     data class AuthResponse(
         val accepted: Boolean,
         val reason: String? = null,
-        val mirrorPort: Int? = null
+        val mirrorPort: Int? = null,
+        val protocolVersion: Int = PROTOCOL_VERSION
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "auth_response")
             put("accepted", accepted)
             if (reason != null) put("reason", reason)
             if (mirrorPort != null) put("mirror_port", mirrorPort)
+            put("protocol_version", protocolVersion)
         }.toString()
     }
 
@@ -627,7 +631,25 @@ sealed class Message {
     }
 
     data class MacInfoResponse(val info: MacInfo) : Message() {
-        override fun toJson(): String = JSONObject().apply { put("type", "mac_info_response") }.toString()
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_info_response")
+            put("info", JSONObject().apply {
+                put("name", info.name)
+                put("model", info.model)
+                put("chip", info.chip)
+                put("os_version", info.osVersion)
+                put("cpu_cores", info.cpuCores)
+                put("cpu_load_percent", info.cpuLoadPercent)
+                put("total_ram_bytes", info.totalRamBytes)
+                put("used_ram_bytes", info.usedRamBytes)
+                put("total_storage_bytes", info.totalStorageBytes)
+                put("free_storage_bytes", info.freeStorageBytes)
+                put("battery_percent", info.batteryPercent)
+                put("battery_charging", info.batteryCharging)
+                put("on_ac_power", info.onACPower)
+                put("uptime_seconds", info.uptimeSeconds)
+            })
+        }.toString()
     }
 
     data object MacWallpaperRequest : Message() {
@@ -635,7 +657,10 @@ sealed class Message {
     }
 
     data class MacWallpaperResponse(val imageBase64: String) : Message() {
-        override fun toJson(): String = JSONObject().apply { put("type", "mac_wallpaper_response") }.toString()
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_wallpaper_response")
+            put("image", imageBase64)
+        }.toString()
     }
 
     data class DeviceInfoResponse(
@@ -719,6 +744,11 @@ sealed class Message {
     }
 
     companion object {
+        /** Version of the Airbridge wire protocol this build speaks. Included in
+         *  the pairing QR payload and the auth handshake; peers that omit the
+         *  field are treated as version 1. */
+        const val PROTOCOL_VERSION = 1
+
         fun fromJson(json: String): Message {
             val obj = JSONObject(json)
             return when (val type = obj.getString("type")) {
@@ -778,12 +808,14 @@ sealed class Message {
                 "auth_request" -> AuthRequest(
                     publicKey = obj.getString("public_key"),
                     signature = obj.getString("signature"),
-                    timestamp = obj.getLong("timestamp")
+                    timestamp = obj.getLong("timestamp"),
+                    protocolVersion = obj.optInt("protocol_version", 1)
                 )
                 "auth_response" -> AuthResponse(
                     accepted = obj.getBoolean("accepted"),
                     reason = if (obj.has("reason")) obj.getString("reason") else null,
-                    mirrorPort = if (obj.has("mirror_port")) obj.getInt("mirror_port") else null
+                    mirrorPort = if (obj.has("mirror_port")) obj.getInt("mirror_port") else null,
+                    protocolVersion = obj.optInt("protocol_version", 1)
                 )
                 "gallery_request" -> GalleryRequest(
                     page = obj.optInt("page", 0),
@@ -945,7 +977,27 @@ sealed class Message {
                     reason = obj.getString("reason")
                 )
                 "device_info_request" -> DeviceInfoRequest
+                "device_info_response" -> {
+                    val o = obj.getJSONObject("info")
+                    DeviceInfoResponse(DeviceInfo(
+                        name = o.getString("name"),
+                        model = o.getString("model"),
+                        manufacturer = o.getString("manufacturer"),
+                        androidVersion = o.getString("android_version"),
+                        sdkInt = o.getInt("sdk_int"),
+                        totalStorageBytes = o.getLong("total_storage_bytes"),
+                        freeStorageBytes = o.getLong("free_storage_bytes"),
+                        totalRamBytes = o.getLong("total_ram_bytes"),
+                        freeRamBytes = o.getLong("free_ram_bytes"),
+                        batteryPercent = o.getInt("battery_percent"),
+                        batteryCharging = o.optBoolean("battery_charging", false),
+                        chargeTimeRemainingMs = o.optLong("charge_time_remaining_ms", -1)
+                    ))
+                }
                 "wallpaper_request" -> WallpaperRequest
+                "wallpaper_response" -> WallpaperResponse(obj.getString("image"))
+                "mac_info_request" -> MacInfoRequest
+                "mac_wallpaper_request" -> MacWallpaperRequest
                 "mac_info_response" -> {
                     val o = obj.getJSONObject("info")
                     MacInfoResponse(MacInfo(
@@ -968,6 +1020,12 @@ sealed class Message {
                 "mac_wallpaper_response" -> MacWallpaperResponse(obj.getString("image"))
                 "folder_stats_request" -> FolderStatsRequest(
                     path = obj.getString("path")
+                )
+                "folder_stats_response" -> FolderStatsResponse(
+                    path = obj.getString("path"),
+                    dirCount = obj.getInt("dir_count"),
+                    fileCount = obj.getInt("file_count"),
+                    totalSize = obj.getLong("total_size")
                 )
                 "notification_posted" -> NotificationPosted(
                     packageName = obj.getString("package_name"),

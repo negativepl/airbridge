@@ -341,10 +341,16 @@ final class ConnectionService {
         }
     }
 
-    func handleAuthRequest(publicKey: String, signature: String, timestamp: Int64, from connectionId: String) {
+    func handleAuthRequest(publicKey: String, signature: String, timestamp: Int64, protocolVersion: Int, from connectionId: String) {
         Task {
+            // Signal-only for now: log the mismatch but keep accepting. Rejecting
+            // is a future decision for when the protocol actually diverges.
+            if protocolVersion != ProtocolConstants.version {
+                NSLog("[ConnectionService] Protocol version mismatch: phone speaks \(protocolVersion), we speak \(ProtocolConstants.version)")
+            }
+
             guard keyManager.isPairedByKey(publicKey) else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "not_paired", mirrorPort: nil, protocolVersion: ProtocolConstants.version), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
@@ -353,14 +359,14 @@ final class ConnectionService {
             guard let sigData = Data(base64Encoded: signature),
                   let valid = try? KeyManager.verify(message: timestampData, signature: sigData, publicKeyBase64: publicKey),
                   valid else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "invalid_signature", mirrorPort: nil), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "invalid_signature", mirrorPort: nil, protocolVersion: ProtocolConstants.version), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
 
             let now = Int64(Date().timeIntervalSince1970 * 1000)
             guard abs(now - timestamp) < 30_000 else {
-                try? await server.sendTo(.authResponse(accepted: false, reason: "expired", mirrorPort: nil), connectionId: connectionId)
+                try? await server.sendTo(.authResponse(accepted: false, reason: "expired", mirrorPort: nil, protocolVersion: ProtocolConstants.version), connectionId: connectionId)
                 await server.disconnectClient(connectionId)
                 return
             }
@@ -371,7 +377,7 @@ final class ConnectionService {
             // right after a fresh Bonjour/NSD resolve (which is one-shot and lost on
             // process restart or WebSocket auto-reconnect).
             let mirrorPort = mirrorService?.actualPort.map { Int($0) }
-            try? await server.sendTo(.authResponse(accepted: true, reason: nil, mirrorPort: mirrorPort), connectionId: connectionId)
+            try? await server.sendTo(.authResponse(accepted: true, reason: nil, mirrorPort: mirrorPort, protocolVersion: ProtocolConstants.version), connectionId: connectionId)
 
             let device = keyManager.getPairedDevices().first { $0.publicKeyBase64 == publicKey }
             self.connectedDeviceName = device?.deviceName ?? "Device"
@@ -391,8 +397,8 @@ final class ConnectionService {
 
     private func handleMessage(_ message: Message, from connectionId: String) {
         switch message {
-        case .authRequest(let publicKey, let signature, let timestamp):
-            handleAuthRequest(publicKey: publicKey, signature: signature, timestamp: timestamp, from: connectionId)
+        case .authRequest(let publicKey, let signature, let timestamp, let protocolVersion):
+            handleAuthRequest(publicKey: publicKey, signature: signature, timestamp: timestamp, protocolVersion: protocolVersion, from: connectionId)
 
         case .pairRequest(let deviceName, let publicKey, let pairingToken):
             handlePairRequest(deviceName: deviceName, publicKey: publicKey, token: pairingToken, from: connectionId)

@@ -1,5 +1,15 @@
 import Foundation
 
+// MARK: - ProtocolConstants
+
+/// Constants shared across the Airbridge wire protocol.
+public enum ProtocolConstants {
+    /// Version of the wire protocol this build speaks. Included in the pairing
+    /// QR payload and the auth handshake; peers that omit the field are
+    /// treated as version 1.
+    public static let version = 1
+}
+
 // MARK: - ContentType
 
 /// MIME types supported for clipboard content.
@@ -33,8 +43,8 @@ public enum Message: Equatable, Sendable {
     case pairResponse(deviceName: String, publicKey: String, accepted: Bool)
     case ping(timestamp: Int)
     case pong(timestamp: Int)
-    case authRequest(publicKey: String, signature: String, timestamp: Int64)
-    case authResponse(accepted: Bool, reason: String?, mirrorPort: Int?)
+    case authRequest(publicKey: String, signature: String, timestamp: Int64, protocolVersion: Int)
+    case authResponse(accepted: Bool, reason: String?, mirrorPort: Int?, protocolVersion: Int)
     case galleryRequest(page: Int, pageSize: Int)
     case galleryResponse(photos: [GalleryPhotoMeta], totalCount: Int, page: Int)
     case galleryThumbnailRequest(photoId: String)
@@ -386,6 +396,7 @@ extension Message: Codable {
         case signature
         case reason
         case mirrorPort         = "mirror_port"
+        case protocolVersion    = "protocol_version"
         case page
         case pageSize           = "page_size"
         case sortBy             = "sort_by"
@@ -485,17 +496,19 @@ extension Message: Codable {
             try container.encode(TypeKey.pong.rawValue, forKey: .type)
             try container.encode(timestamp, forKey: .timestamp)
 
-        case .authRequest(let publicKey, let signature, let timestamp):
+        case .authRequest(let publicKey, let signature, let timestamp, let protocolVersion):
             try container.encode(TypeKey.authRequest.rawValue, forKey: .type)
             try container.encode(publicKey, forKey: .publicKey)
             try container.encode(signature, forKey: .signature)
             try container.encode(timestamp, forKey: .timestamp)
+            try container.encode(protocolVersion, forKey: .protocolVersion)
 
-        case .authResponse(let accepted, let reason, let mirrorPort):
+        case .authResponse(let accepted, let reason, let mirrorPort, let protocolVersion):
             try container.encode(TypeKey.authResponse.rawValue, forKey: .type)
             try container.encode(accepted, forKey: .accepted)
             try container.encodeIfPresent(reason, forKey: .reason)
             try container.encodeIfPresent(mirrorPort, forKey: .mirrorPort)
+            try container.encode(protocolVersion, forKey: .protocolVersion)
 
         case .galleryRequest(let page, let pageSize):
             try container.encode(TypeKey.galleryRequest.rawValue, forKey: .type)
@@ -780,13 +793,17 @@ extension Message: Codable {
             let publicKey = try container.decode(String.self, forKey: .publicKey)
             let signature = try container.decode(String.self, forKey: .signature)
             let timestamp = try container.decode(Int64.self, forKey: .timestamp)
-            self = .authRequest(publicKey: publicKey, signature: signature, timestamp: timestamp)
+            // Older peers do not send protocol_version — treat them as v1.
+            let protocolVersion = try container.decodeIfPresent(Int.self, forKey: .protocolVersion) ?? 1
+            self = .authRequest(publicKey: publicKey, signature: signature, timestamp: timestamp, protocolVersion: protocolVersion)
 
         case .authResponse:
             let accepted = try container.decode(Bool.self, forKey: .accepted)
             let reason = try container.decodeIfPresent(String.self, forKey: .reason)
             let mirrorPort = try container.decodeIfPresent(Int.self, forKey: .mirrorPort)
-            self = .authResponse(accepted: accepted, reason: reason, mirrorPort: mirrorPort)
+            // Older peers do not send protocol_version — treat them as v1.
+            let protocolVersion = try container.decodeIfPresent(Int.self, forKey: .protocolVersion) ?? 1
+            self = .authResponse(accepted: accepted, reason: reason, mirrorPort: mirrorPort, protocolVersion: protocolVersion)
 
         case .galleryRequest:
             let page = try container.decode(Int.self, forKey: .page)
@@ -1025,7 +1042,7 @@ public struct QRPayload: Codable, Equatable, Sendable {
         port: Int,
         publicKey: String,
         pairingToken: String,
-        protocolVersion: Int = 1
+        protocolVersion: Int = ProtocolConstants.version
     ) {
         self.host = host
         self.port = port
