@@ -24,8 +24,10 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class NotificationRelayService : NotificationListenerService() {
 
-    // Ikony apek nie zmieniają się — licz raz per pakiet.
-    private val iconCache = HashMap<String, String>()
+    // Ikony apek nie zmieniają się — licz raz per pakiet. ConcurrentHashMap, bo
+    // onNotificationPosted może przychodzić z różnych wątków binder poola
+    // (worst case przy wyścigu: podwójne zakodowanie ikony — akceptowalne).
+    private val iconCache = ConcurrentHashMap<String, String>()
 
     override fun onListenerConnected() {
         instance = this
