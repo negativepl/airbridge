@@ -52,6 +52,10 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { refreshNotificationStatus() }
+        .onDisappear {
+            accessibilityPollTimer?.invalidate()
+            accessibilityPollTimer = nil
+        }
         .sheet(isPresented: $showPairing) {
             PairingView(
                 pairingService: pairingService,
@@ -408,7 +412,8 @@ struct OnboardingView: View {
     private func startAccessibilityPolling() {
         accessibilityPollTimer?.invalidate()
         accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            if AXIsProcessTrusted() {
+            guard AXIsProcessTrusted() else { return }
+            Task { @MainActor in
                 accessibilityGranted = true
                 accessibilityPollTimer?.invalidate()
                 accessibilityPollTimer = nil

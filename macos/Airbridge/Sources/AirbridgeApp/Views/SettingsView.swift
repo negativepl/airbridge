@@ -51,6 +51,10 @@ struct SettingsView: View {
         .onDisappear {
             accessibilityPollTimer?.invalidate()
             accessibilityPollTimer = nil
+            // Leaving the view mid-recording must always remove the local
+            // NSEvent monitor, or it would keep intercepting key events.
+            isRecordingShortcut = false
+            stopRecordingShortcut()
         }
         .onChange(of: connectionService.isConnected) { _, _ in
             pairingService.refreshPairedDevices()

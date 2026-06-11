@@ -53,18 +53,19 @@ struct HomeView: View {
         }
     }
 
+    /// User disconnected manually (phase-driven, no string matching).
     private var isDisconnected: Bool {
-        viewModel.statusMessage.contains("Rozłączono") || viewModel.statusMessage.contains("Disconnected")
+        viewModel.phase == .disconnected
     }
 
     private func indicatorState(_ vm: HomeViewModel) -> StatusIndicator.State {
-        if vm.isConnected { return .connected }
         if !vm.hasPairedDevices { return .disconnected }
-        if isDisconnected { return .disconnected }
-        if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Failed") || vm.statusMessage.contains("Błąd") {
-            return .error
+        switch vm.phase {
+        case .connected: return .connected
+        case .disconnected, .stopped: return .disconnected
+        case .error: return .error
+        case .starting, .listening: return .connecting
         }
-        return .connecting
     }
 
     /// Przyjazna nazwa telefonu (marketingowa z DeviceInfo, np. "Galaxy Z Fold7"),
@@ -139,7 +140,7 @@ struct HomeView: View {
             Button(L10n.pairDevice) { showPairing = true }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.extraLarge)
-        } else if vm.statusMessage.contains("failed") || vm.statusMessage.contains("Błąd") {
+        } else if vm.phase == .error {
             Button(L10n.reconnect) { vm.reconnect() }
                 .buttonStyle(.borderedProminent)
                 .tint(.orange)

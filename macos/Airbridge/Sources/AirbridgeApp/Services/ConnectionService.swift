@@ -15,6 +15,23 @@ protocol MessageHandler: AnyObject {
 
 /// Manages WebSocket + HTTP server lifecycle, Bonjour advertisement,
 /// authentication, and message routing to registered handlers.
+/// Machine-readable connection state. Views must branch on this instead of
+/// string-matching `statusMessage`, which is display-only text.
+enum ConnectionPhase: Equatable {
+    /// Server is starting or restarting (launch, reconnect, network change).
+    case starting
+    /// Server is advertising and waiting for the phone to connect.
+    case listening
+    /// A paired phone is connected and authenticated.
+    case connected
+    /// User disconnected manually; waiting for an explicit reconnect.
+    case disconnected
+    /// Server was stopped (app quitting or mid-restart).
+    case stopped
+    /// Server failed to start.
+    case error
+}
+
 @Observable
 @MainActor
 final class ConnectionService {
@@ -28,6 +45,8 @@ final class ConnectionService {
     private(set) var phoneWallpaper: Data?
     private(set) var connectedClientIP: String?
     private(set) var statusMessage: String = "Idle"
+    /// Kept in sync with every `statusMessage`/`isConnected` change.
+    private(set) var phase: ConnectionPhase = .starting
     private var manuallyDisconnected: Bool = false
     /// Czy telefon aktualnie dzwoni (sterowanie przyciskiem „Zadzwoń/Zatrzymaj" w pasku menu).
     private(set) var isRinging: Bool = false
@@ -87,6 +106,7 @@ final class ConnectionService {
         guard !serverStarted else { return }
         serverStarted = true
         statusMessage = L10n.isPL ? "Uruchamianie…" : "Starting…"
+        phase = .starting
         startDeviceInfoPolling()
 
         do {
@@ -103,8 +123,10 @@ final class ConnectionService {
             keyManager.migrateFromSingleDevice()
             startNetworkMonitor()
             statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+            phase = .listening
         } catch {
             statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
+            phase = .error
             serverStarted = false
         }
     }
@@ -152,6 +174,7 @@ final class ConnectionService {
     private func handleNetworkChange() {
         guard serverStarted, !manuallyDisconnected else { return }
         statusMessage = L10n.isPL ? "Zmiana sieci — ponowne rozgłaszanie…" : "Network changed — re-advertising…"
+        phase = .starting
         if isRestarting {
             restartPending = true
             return
@@ -167,8 +190,10 @@ final class ConnectionService {
                 do {
                     try await advertiseServer()
                     statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+                    phase = .listening
                 } catch {
                     statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
+                    phase = .error
                 }
             }
         }
@@ -181,6 +206,7 @@ final class ConnectionService {
         pathMonitor = nil
         resetConnectionState()
         statusMessage = L10n.isPL ? "Zatrzymano" : "Stopped"
+        phase = .stopped
         serverStarted = false
         await server.stop()
         await httpServer.stop()
@@ -209,6 +235,7 @@ final class ConnectionService {
         }
         resetConnectionState()
         statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
+        phase = .disconnected
     }
 
     private func resetConnectionState() {
@@ -281,6 +308,8 @@ final class ConnectionService {
 
     func handlePairRequest(deviceName: String, publicKey: String, token: String, from connectionId: String) {
         guard pairingManager.validateToken(token) else {
+            // Phase intentionally unchanged: the server keeps listening and the
+            // phone may simply retry pairing with a fresh token.
             statusMessage = L10n.isPL ? "Parowanie odrzucone: nieprawidłowy token" : "Pairing rejected: invalid token"
             return
         }
@@ -290,6 +319,7 @@ final class ConnectionService {
         setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
         statusMessage = L10n.isPL ? "Sparowano z \(deviceName)" : "Paired with \(deviceName)"
         isConnected = true
+        phase = .connected
 
         Task {
             await server.markAuthenticated(connectionId)
@@ -347,6 +377,7 @@ final class ConnectionService {
             self.setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
             self.isConnected = true
             self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
+            self.phase = .connected
 
             // Pull richer device info (exact name, storage, RAM, battery) and
             // the wallpaper for the Home screen.
@@ -432,6 +463,7 @@ final class ConnectionService {
                     self.deviceInfo = nil
                     self.phoneWallpaper = nil
                     self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+                    self.phase = .listening
                 }
             }
         }

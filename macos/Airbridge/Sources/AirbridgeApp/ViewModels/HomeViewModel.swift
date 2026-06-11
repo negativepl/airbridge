@@ -14,7 +14,9 @@ final class HomeViewModel {
 
     var isConnected: Bool { connectionService.isConnected }
     var deviceName: String { connectionService.connectedDeviceName }
+    /// Display-only text; branch on `phase` for state logic.
     var statusMessage: String { connectionService.statusMessage }
+    var phase: ConnectionPhase { connectionService.phase }
     var localIP: String? { connectionService.getLocalIPAddress() }
 
     var isTransferring: Bool { fileTransferService.fileTransferProgress > 0 }
