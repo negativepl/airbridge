@@ -13,6 +13,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 
+# Build logs are created with mktemp below; initialize before the trap so the
+# EXIT cleanup never references unset variables (set -u) and logs are removed
+# on success, failure, and interruption alike.
+BUILD_LOG=""
+ANDROID_BUILD_LOG=""
+trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG"' EXIT
+
 # Read version from gradle
 VERSION=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
 TAG="v$VERSION"
@@ -35,7 +42,6 @@ if ! swift build -c release > "$BUILD_LOG" 2>&1; then
     tail -30 "$BUILD_LOG"
     exit 1
 fi
-rm -f "$BUILD_LOG"
 echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
@@ -123,7 +129,13 @@ echo "  DMG: $DMG_PATH"
 # 2. Build Android
 echo "--- Building Android ---"
 cd "$ROOT/android/Airbridge"
-./gradlew assembleRelease 2>&1 | tail -3
+ANDROID_BUILD_LOG="$(mktemp -t airbridge-android-build)"
+if ! ./gradlew assembleRelease > "$ANDROID_BUILD_LOG" 2>&1; then
+    echo "  Android build FAILED — last 30 lines of $ANDROID_BUILD_LOG:"
+    tail -30 "$ANDROID_BUILD_LOG"
+    exit 1
+fi
+echo "  Android build succeeded"
 
 APK_RELEASE="$ROOT/android/Airbridge/app/build/outputs/apk/release/app-release.apk"
 APK_DEBUG="$ROOT/android/Airbridge/app/build/outputs/apk/debug/app-debug.apk"
@@ -133,7 +145,11 @@ if [ -f "$APK_RELEASE" ]; then
     APK_PATH="$APK_RELEASE"
 else
     echo "  Release APK not found (needs signing), building debug..."
-    ./gradlew assembleDebug 2>&1 | tail -3
+    if ! ./gradlew assembleDebug > "$ANDROID_BUILD_LOG" 2>&1; then
+        echo "  Android debug build FAILED — last 30 lines of $ANDROID_BUILD_LOG:"
+        tail -30 "$ANDROID_BUILD_LOG"
+        exit 1
+    fi
     APK_PATH="$APK_DEBUG"
 fi
 
