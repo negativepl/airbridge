@@ -142,8 +142,17 @@ class AirbridgeService : Service() {
         }
 
         @Volatile
-        var pendingPairRequest: Triple<String, String, String>? = null  // (deviceName, publicKey, token)
+        var pendingPairRequest: PendingPairRequest? = null
     }
+
+    /** Pairing data captured from a scanned QR code, consumed once the WebSocket connects. */
+    data class PendingPairRequest(
+        val deviceName: String,
+        val phonePublicKeyBase64: String,
+        val pairingToken: String,
+        /** The Mac's public key as scanned from the QR code — trust anchor for PairResponse. */
+        val expectedMacPublicKeyBase64: String
+    )
 
     private val deviceId: String = UUID.randomUUID().toString()
 
@@ -162,6 +171,14 @@ class AirbridgeService : Service() {
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
     private var currentMirrorPort: Int? = null
+
+    /**
+     * The Mac's public key from the scanned QR code, set when a PairRequest is
+     * sent and verified against the key carried by the PairResponse. A mismatch
+     * means an active MITM substituted its own key during pairing.
+     */
+    @Volatile
+    private var expectedMacPublicKey: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -343,7 +360,8 @@ class AirbridgeService : Service() {
             val pending = pendingPairRequest
             if (pending != null) {
                 pendingPairRequest = null
-                sendPairRequest(pending.first, pending.second, pending.third)
+                expectedMacPublicKey = pending.expectedMacPublicKeyBase64
+                sendPairRequest(pending.deviceName, pending.phonePublicKeyBase64, pending.pairingToken)
             } else {
                 // Normal reconnect — send auth handshake
                 val timestamp = System.currentTimeMillis()
@@ -394,6 +412,13 @@ class AirbridgeService : Service() {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** SHA-256 hex fingerprint of a base64-encoded raw public key. */
+    private fun publicKeyFingerprint(publicKeyBase64: String): String {
+        val keyBytes = android.util.Base64.decode(publicKeyBase64, android.util.Base64.NO_WRAP)
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        return digest.digest(keyBytes).joinToString("") { "%02x".format(it) }
     }
 
     private fun setupNsdDiscovery() {
@@ -751,16 +776,30 @@ class AirbridgeService : Service() {
             }
             is Message.PairResponse -> {
                 connectedDeviceName.value = message.deviceName
+                val expectedKey = expectedMacPublicKey
+                expectedMacPublicKey = null
                 if (message.accepted) {
+                    // Verify the key in the PairResponse against the key scanned
+                    // from the Mac's QR code. A mismatch (or a PairResponse with
+                    // no pairing in progress) means an active MITM may be
+                    // substituting its own key — reject and disconnect.
+                    if (expectedKey == null || expectedKey != message.publicKey) {
+                        Log.e(TAG, "PairResponse public key does not match the QR-scanned key — rejecting pairing (possible MITM)")
+                        // Drop the entry stored optimistically at QR-scan time;
+                        // pairing did not complete, leave no trusted key behind.
+                        expectedKey?.let { pairedDeviceStore.remove(publicKeyFingerprint(it)) }
+                        connectedDeviceName.value = null
+                        webSocketClient.shouldReconnect = false
+                        webSocketClient.disconnect()
+                        isConnected.value = false
+                        return
+                    }
                     // Update stored device name with Mac's actual name
-                    val macPubKeyBytes = android.util.Base64.decode(message.publicKey, android.util.Base64.NO_WRAP)
-                    val digest = java.security.MessageDigest.getInstance("SHA-256")
-                    val fp = digest.digest(macPubKeyBytes).joinToString("") { "%02x".format(it) }
                     pairedDeviceStore.add(
                         com.airbridge.security.PairedDevice(
                             deviceName = message.deviceName,
                             publicKeyBase64 = message.publicKey,
-                            publicKeyFingerprint = fp,
+                            publicKeyFingerprint = publicKeyFingerprint(message.publicKey),
                             pairedAt = System.currentTimeMillis()
                         )
                     )

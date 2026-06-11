@@ -100,11 +100,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         context.getSharedPreferences("airbridge_prefs", android.content.Context.MODE_PRIVATE)
             .edit().putString("mirror_token", payload.pairingToken).apply()
 
-        // Set pending pair request for when WebSocket connects
-        AirbridgeService.pendingPairRequest = Triple(
-            android.os.Build.MODEL,
-            keyManager.getRawPublicKeyBase64(),
-            payload.pairingToken
+        // Set pending pair request for when WebSocket connects. The Mac's key
+        // from the QR is carried along so the service can verify that the
+        // PairResponse presents the same key (MITM protection during pairing).
+        AirbridgeService.pendingPairRequest = AirbridgeService.PendingPairRequest(
+            deviceName = android.os.Build.MODEL,
+            phonePublicKeyBase64 = keyManager.getRawPublicKeyBase64(),
+            pairingToken = payload.pairingToken,
+            expectedMacPublicKeyBase64 = payload.publicKey
         )
 
         // Connect to Mac
