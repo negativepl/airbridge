@@ -326,7 +326,9 @@ struct OnboardingView: View {
                 granted: notificationsAuthorized,
                 grant: {
                     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
-                        refreshNotificationStatus()
+                        Task { @MainActor in
+                            refreshNotificationStatus()
+                        }
                     }
                 })
             permissionRow(
@@ -403,7 +405,7 @@ struct OnboardingView: View {
     private func refreshNotificationStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let authorized = settings.authorizationStatus == .authorized
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 notificationsAuthorized = authorized
             }
         }

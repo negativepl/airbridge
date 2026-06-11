@@ -308,8 +308,9 @@ final class ConnectionService {
 
     func handlePairRequest(deviceName: String, publicKey: String, token: String, from connectionId: String) {
         guard pairingManager.validateToken(token) else {
-            // Phase intentionally unchanged: the server keeps listening and the
-            // phone may simply retry pairing with a fresh token.
+            // The server keeps listening and the phone may simply retry
+            // pairing with a fresh token.
+            phase = .listening
             statusMessage = L10n.isPL ? "Parowanie odrzucone: nieprawidłowy token" : "Pairing rejected: invalid token"
             return
         }
