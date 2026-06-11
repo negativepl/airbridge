@@ -31,6 +31,12 @@ class ScreenEncoder(
     private var configEmitted = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var started = false
+    /**
+     * Set before the codec is torn down. MediaCodec callbacks arrive on a codec
+     * thread, so without this guard a callback could call releaseOutputBuffer
+     * on an already-released codec (IllegalStateException / native crash).
+     */
+    @Volatile private var stopped = false
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             stop()
@@ -40,6 +46,7 @@ class ScreenEncoder(
     fun start() {
         if (started) return
         started = true
+        stopped = false
         val format = MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, bitrateBps)
@@ -68,26 +75,34 @@ class ScreenEncoder(
         codec.setCallback(object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(c: MediaCodec, idx: Int) { /* Surface input, ignored */ }
             override fun onOutputBufferAvailable(c: MediaCodec, idx: Int, info: MediaCodec.BufferInfo) {
-                val buf: ByteBuffer = c.getOutputBuffer(idx) ?: return run { c.releaseOutputBuffer(idx, false) }
-                buf.position(info.offset); buf.limit(info.offset + info.size)
-                val payload = ByteArray(info.size); buf.get(payload)
+                if (stopped) return
+                try {
+                    val buf: ByteBuffer = c.getOutputBuffer(idx) ?: return run { c.releaseOutputBuffer(idx, false) }
+                    buf.position(info.offset); buf.limit(info.offset + info.size)
+                    val payload = ByteArray(info.size); buf.get(payload)
 
-                if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
-                    extractParamSets(payload)
-                    maybeEmitConfig()
-                } else if (info.size > 0) {
-                    onMessage(MirrorMessage.VideoFrame(
-                        presentationTimestampUs = info.presentationTimeUs.toULong(),
-                        naluBytes = payload
-                    ))
+                    if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
+                        extractParamSets(payload)
+                        maybeEmitConfig()
+                    } else if (info.size > 0) {
+                        onMessage(MirrorMessage.VideoFrame(
+                            presentationTimestampUs = info.presentationTimeUs.toULong(),
+                            naluBytes = payload
+                        ))
+                    }
+                    c.releaseOutputBuffer(idx, false)
+                } catch (e: IllegalStateException) {
+                    // stop() raced this callback and released the codec — drop the buffer.
+                    if (!stopped) Log.w(TAG, "output buffer callback failed", e)
                 }
-                c.releaseOutputBuffer(idx, false)
             }
             override fun onError(c: MediaCodec, e: MediaCodec.CodecException) {
+                if (stopped) return
                 Log.e(TAG, "MediaCodec error", e)
                 onMessage(MirrorMessage.Status(MirrorStatusCode.ENCODER_ERROR))
             }
             override fun onOutputFormatChanged(c: MediaCodec, format: MediaFormat) {
+                if (stopped) return
                 if (useHEVC) {
                     // HEVC packs VPS+SPS+PPS into csd-0.
                     format.getByteBuffer("csd-0")?.let { extractParamSets(it.toBytes()) }
@@ -114,10 +129,11 @@ class ScreenEncoder(
 
     fun stop() {
         if (!started && encoder == null && virtualDisplay == null) return
+        stopped = true   // before teardown, so in-flight callbacks bail out
         started = false
         virtualDisplay?.release(); virtualDisplay = null
         encoder?.runCatching { stop() }
-        encoder?.release(); encoder = null
+        encoder?.runCatching { release() }; encoder = null
         runCatching { mediaProjection.unregisterCallback(projectionCallback) }
         configEmitted = false; pendingVps = null; pendingSps = null; pendingPps = null
     }

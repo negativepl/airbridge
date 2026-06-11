@@ -20,8 +20,15 @@ class ScreenDecoder(
     private val onVideoSize: (width: Int, height: Int) -> Unit = { _, _ -> }
 ) {
 
-    private var codec: MediaCodec? = null
+    @Volatile private var codec: MediaCodec? = null
     private var configured = false
+    /**
+     * Set (under [lock]) before the codec is torn down. Callbacks arrive on a
+     * codec thread and [onFrame] on the network thread, so without this guard
+     * they could touch an already-released codec (IllegalStateException /
+     * native crash) or leak a codec created by a late config message.
+     */
+    @Volatile private var stopped = false
 
     private val lock = Object()
     private val pendingFrames = ArrayDeque<Pair<ByteArray, Long>>()   // (annexB, ptsUs)
@@ -52,7 +59,7 @@ class ScreenDecoder(
     }
 
     private fun claimConfigured(): Boolean = synchronized(lock) {
-        if (configured) return false
+        if (configured || stopped) return false
         configured = true
         true
     }
@@ -65,20 +72,25 @@ class ScreenDecoder(
         val c = MediaCodec.createDecoderByType(mime)
         c.setCallback(object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+                if (stopped) return
                 val frame = synchronized(lock) {
+                    if (stopped) return
                     val f = pendingFrames.removeFirstOrNull()
                     if (f == null) { freeInputs.addLast(index); null } else f
                 } ?: return
                 feed(codec, index, frame.first, frame.second)
             }
             override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
+                if (stopped) return
                 // render = true draws the decoded frame onto the Surface.
                 runCatching { codec.releaseOutputBuffer(index, info.size > 0) }
             }
             override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
+                if (stopped) return
                 Log.e(TAG, "decoder error", e)
             }
             override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+                if (stopped) return
                 Log.d(TAG, "output format: $format")
                 // Crop-corrected display dimensions for correct aspect ratio.
                 val w = if (format.containsKey("crop-right") && format.containsKey("crop-left"))
@@ -92,11 +104,20 @@ class ScreenDecoder(
         })
         c.configure(format, surface, null, 0)
         c.start()
-        codec = c
+        synchronized(lock) {
+            if (stopped) {
+                // stop() raced the (network-thread) config — don't leak the codec.
+                c.runCatching { stop() }
+                c.runCatching { release() }
+                return
+            }
+            codec = c
+        }
     }
 
     /** A decoded Annex-B access unit from the Mac. */
     fun onFrame(annexB: ByteArray, ptsUs: Long) {
+        if (stopped) return
         val c = codec ?: return
         val index = synchronized(lock) {
             val i = freeInputs.removeFirstOrNull()
@@ -113,10 +134,16 @@ class ScreenDecoder(
     }
 
     fun stop() {
-        synchronized(lock) { pendingFrames.clear(); freeInputs.clear() }
-        codec?.runCatching { stop() }
-        codec?.release()
-        codec = null
+        // Claim the codec under the lock so callbacks see `stopped` before the
+        // codec is touched; release it outside the lock (stop() can block on
+        // the codec thread, which may be waiting for [lock]).
+        val c = synchronized(lock) {
+            stopped = true
+            pendingFrames.clear(); freeInputs.clear()
+            codec.also { codec = null }
+        }
+        c?.runCatching { stop() }
+        c?.runCatching { release() }
     }
 
     private fun withStartCode(nalu: ByteArray): ByteArray =
