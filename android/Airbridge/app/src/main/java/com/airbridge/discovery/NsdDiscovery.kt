@@ -156,15 +156,29 @@ class NsdDiscovery(private val context: Context) {
             isPerforming = true
             next
         }
-        while (true) {
-            executeCall(call)
-            call = synchronized(this) {
-                val next = pendingCalls.removeFirstOrNull()
-                if (next == null) {
-                    isPerforming = false
-                    return
+        // The normal exit clears isPerforming atomically with the empty-queue
+        // check; clearing it again in `finally` could race a drainer that took
+        // over in between and strand its queue entry, so the finally fires
+        // only when the loop exits exceptionally (executeCall guards against
+        // Exceptions itself, but Errors would otherwise kill the drainer for
+        // the rest of the process lifetime).
+        var completedNormally = false
+        try {
+            while (true) {
+                executeCall(call)
+                call = synchronized(this) {
+                    val next = pendingCalls.removeFirstOrNull()
+                    if (next == null) {
+                        isPerforming = false
+                        completedNormally = true
+                        return
+                    }
+                    next
                 }
-                next
+            }
+        } finally {
+            if (!completedNormally) {
+                synchronized(this) { isPerforming = false }
             }
         }
     }
@@ -173,7 +187,18 @@ class NsdDiscovery(private val context: Context) {
     private fun executeCall(call: NsdCall) {
         when (call) {
             is NsdCall.Start ->
-                nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, call.listener)
+                try {
+                    nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, call.listener)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error starting discovery", e)
+                    // The start never reached NsdManager, so no callback will
+                    // ever arrive for this listener — clear it from the class
+                    // state so future starts aren't skipped as "already
+                    // running". finishStop also dispatches a pendingStart;
+                    // its drainCalls sees isPerforming and bails, so the drain
+                    // loop we are already inside executes it next, in order.
+                    finishStop(call.listener)
+                }
             is NsdCall.Stop ->
                 try {
                     nsdManager.stopServiceDiscovery(call.listener)
