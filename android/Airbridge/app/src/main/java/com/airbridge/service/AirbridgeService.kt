@@ -29,24 +29,6 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-data class FileTransferState(
-    val transferId: String,
-    val filename: String,
-    val totalSize: Long,
-    val totalChunks: Int,
-    val chunks: MutableMap<Int, ByteArray> = mutableMapOf()
-) {
-    val isComplete: Boolean get() = chunks.size == totalChunks
-    val progress: Float get() = if (totalChunks == 0) 1f else chunks.size.toFloat() / totalChunks
-    fun assemble(): ByteArray {
-        val out = java.io.ByteArrayOutputStream(totalSize.toInt())
-        for (i in 0 until totalChunks) {
-            out.write(chunks[i] ?: throw IllegalStateException("Missing chunk $i"))
-        }
-        return out.toByteArray()
-    }
-}
-
 data class ActivityItem(
     val type: String, // "clipboard_sent", "clipboard_received", "file_sent", "file_received", "ping"
     val description: String,
@@ -164,7 +146,6 @@ class AirbridgeService : Service() {
     private val httpFileUploader = HttpFileUploader()
     private val httpFileDownloader = HttpFileDownloader()
     private val httpFileServer = HttpFileServer()
-    private val activeTransfers = ConcurrentHashMap<String, FileTransferState>()
     private lateinit var galleryProvider: GalleryProvider
     private val filesProvider by lazy { FilesProvider(contentResolver) }
     private lateinit var smsProvider: SmsProvider
@@ -816,107 +797,6 @@ class AirbridgeService : Service() {
             }
             is Message.FileTransferReject -> {
                 pendingOutgoingOffers.remove(message.transferId)?.complete(false)
-            }
-            is Message.FileTransferStart -> {
-                Log.d(TAG, "FileTransferStart: ${message.filename} (${message.totalChunks} chunks)")
-                activeTransfers[message.transferId] = FileTransferState(
-                    transferId = message.transferId,
-                    filename = message.filename,
-                    totalSize = message.totalSize,
-                    totalChunks = message.totalChunks
-                )
-                transferFileName.value = message.filename
-                transferIsSending.value = false
-                transferProgress.value = 0f
-
-                // Show receiving notification with file info
-                val sizeText = when {
-                    message.totalSize > 1024 * 1024 -> String.format("%.1f MB", message.totalSize / (1024.0 * 1024.0))
-                    message.totalSize > 1024 -> String.format("%.0f KB", message.totalSize / 1024.0)
-                    else -> "${message.totalSize} B"
-                }
-                val sender = connectedDeviceName.value ?: "Mac"
-                val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
-                    .setContentText("${message.filename} · $sizeText")
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setContentIntent(openAppPendingIntent())
-                    .setProgress(100, 0, false)
-                    .setOngoing(true)
-                    .setOnlyAlertOnce(true)
-                    .build()
-                manager.notify(4, notif)
-            }
-            is Message.FileChunk -> {
-                val transfer = activeTransfers[message.transferId] ?: return
-                val chunkData = android.util.Base64.decode(message.data, android.util.Base64.NO_WRAP)
-                transfer.chunks[message.chunkIndex] = chunkData
-                transferProgress.value = transfer.progress
-                webSocketClient.send(Message.FileChunkAck(message.transferId, message.chunkIndex))
-
-                // Update progress notification
-                val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val progress = (transfer.progress * 100).toInt()
-                val sender = connectedDeviceName.value ?: "Mac"
-                val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
-                    .setContentText(transfer.filename)
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setContentIntent(openAppPendingIntent())
-                    .setProgress(100, progress, false)
-                    .setOngoing(true)
-                    .setOnlyAlertOnce(true)
-                    .build()
-                manager.notify(4, notif)
-            }
-            is Message.FileTransferComplete -> {
-                val transfer = activeTransfers.remove(message.transferId) ?: return
-                serviceScope.launch {
-                    try {
-                        val data = transfer.assemble()
-                        val prefs = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
-                        val folder = prefs.getString("download_folder", null)
-                            ?: android.os.Environment.getExternalStoragePublicDirectory(
-                                android.os.Environment.DIRECTORY_DOWNLOADS
-                            ).absolutePath + "/AirBridge"
-                        val dir = java.io.File(folder)
-                        if (!dir.exists()) dir.mkdirs()
-                        // Filename comes from the network — sanitize against traversal.
-                        val file = com.airbridge.files.SafeFileName.resolveIn(dir, transfer.filename)
-                        if (file == null) {
-                            Log.w(TAG, "Rejected unsafe received filename")
-                            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(4)
-                            transferProgress.value = null
-                            transferFileName.value = null
-                            return@launch
-                        }
-                        file.writeBytes(data)
-                        Log.d(TAG, "File received: ${file.absolutePath}")
-                        addActivity(ActivityItem("file_received", transfer.filename, System.currentTimeMillis()))
-                        transferProgress.value = null
-                        transferFileName.value = null
-
-                        // Cancel progress notification, show completion
-                        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        manager.cancel(4)
-                        val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                            .setContentTitle(getString(com.airbridge.R.string.notification_title_file_received))
-                            .setContentText(transfer.filename)
-                            .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                            .setContentIntent(openAppPendingIntent())
-                            .setAutoCancel(true)
-                            .build()
-                        manager.notify(3, notif)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "File save failed", e)
-                        transferProgress.value = null
-                        transferFileName.value = null
-                    }
-                }
-            }
-            is Message.FileChunkAck -> {
-                // ACK from Android → Mac transfers
             }
             is Message.Pong -> {
                 addActivity(ActivityItem("ping", "Pong!", System.currentTimeMillis()))
