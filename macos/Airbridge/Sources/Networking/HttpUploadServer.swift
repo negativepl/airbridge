@@ -19,7 +19,10 @@ public actor HttpUploadServer {
     // MARK: - Callbacks
 
     /// Called when a complete file has been received (on actor context).
-    public var onFileReceived: (@Sendable (String, String, String, Data) -> Void)?
+    /// Arguments: filename, mimeType, SHA-256 hex checksum, and the URL of a
+    /// temporary file holding the uploaded bytes. The callback OWNS the temp
+    /// file — it must move or delete it.
+    public var onFileReceived: (@Sendable (String, String, String, URL) -> Void)?
 
     /// Called periodically as body bytes arrive.
     /// Marked nonisolated(unsafe) so it can be called from receive callbacks
@@ -28,7 +31,7 @@ public actor HttpUploadServer {
 
     /// Sets both callbacks at once.
     public func setCallbacks(
-        onFileReceived: (@Sendable (String, String, String, Data) -> Void)?,
+        onFileReceived: (@Sendable (String, String, String, URL) -> Void)?,
         onProgress: (@Sendable (String, Int, Int) -> Void)?
     ) {
         self.onFileReceived = onFileReceived
@@ -374,62 +377,127 @@ public actor HttpUploadServer {
         let mimeType = headers["x-mime-type"] ?? "application/octet-stream"
         let expectedChecksum = headers["x-checksum-sha256"]
 
-        // Stream the body
+        // Open the temp-file sink and feed it whatever body bytes arrived
+        // together with the headers, then stream the rest from the socket.
+        let sink: UploadSink
+        do {
+            sink = try UploadSink()
+            if !bodyPrefix.isEmpty {
+                // The prefix can contain pipelined bytes past the declared
+                // Content-Length — never write more than the body itself.
+                try sink.append(bodyPrefix.prefix(contentLength))
+            }
+        } catch {
+            sendErrorResponse(on: connection, status: 500, message: "Temp file create failed: \(error)")
+            return
+        }
+
         streamBody(
             on: connection,
             filename: filename,
             mimeType: mimeType,
             expectedChecksum: expectedChecksum,
             contentLength: contentLength,
-            accumulated: bodyPrefix
+            sink: sink
         )
     }
 
     // MARK: - Private — Body Streaming
 
-    /// Recursively receives body data until `contentLength` bytes have been read.
+    /// Incremental sink for an uploaded body: bytes are appended to a temp
+    /// file and hashed as they arrive, so the server never holds more than a
+    /// single network read in memory (vs. accumulating the whole body, which
+    /// OOMs on multi-GB files).
+    ///
+    /// `@unchecked Sendable`: all mutations happen in the serialized receive
+    /// callback chain of a single `NWConnection` (one callback schedules the
+    /// next), so there is never concurrent access.
+    private final class UploadSink: @unchecked Sendable {
+        let tempURL: URL
+        private let handle: FileHandle
+        private var hasher = SHA256()
+        private(set) var bytesWritten: Int = 0
+
+        init() throws {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("airbridge-upload-\(UUID().uuidString).tmp")
+            guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            self.handle = try FileHandle(forWritingTo: url)
+            self.tempURL = url
+        }
+
+        func append(_ data: Data) throws {
+            try handle.write(contentsOf: data)
+            hasher.update(data: data)
+            bytesWritten += data.count
+        }
+
+        /// Closes the file and returns the hex SHA-256 of everything written.
+        func finish() throws -> String {
+            try handle.close()
+            return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        }
+
+        /// Closes and deletes the temp file (error paths).
+        func discard() {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+    }
+
+    /// Recursively receives body data until `contentLength` bytes have been
+    /// written to the sink.
     private nonisolated func streamBody(
         on connection: NWConnection,
         filename: String,
         mimeType: String,
         expectedChecksum: String?,
         contentLength: Int,
-        accumulated: Data
+        sink: UploadSink
     ) {
         // Report progress — call directly, not via actor hop
-        let count = accumulated.count
-        self.onProgress?(filename, count, contentLength)
+        self.onProgress?(filename, sink.bytesWritten, contentLength)
 
-        if accumulated.count >= contentLength {
-            // We have all the data
-            let fileData = accumulated.prefix(contentLength)
+        if sink.bytesWritten >= contentLength {
             Task {
                 await self.finalizeUpload(
                     on: connection,
                     filename: filename,
                     mimeType: mimeType,
                     expectedChecksum: expectedChecksum,
-                    data: Data(fileData)
+                    sink: sink
                 )
             }
             return
         }
 
-        let remaining = contentLength - accumulated.count
+        let remaining = contentLength - sink.bytesWritten
         connection.receive(minimumIncompleteLength: 1, maximumLength: min(remaining, 1_048_576)) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
+            guard let self else {
+                sink.discard()
+                return
+            }
 
             if let error {
+                sink.discard()
                 self.sendErrorResponse(on: connection, status: 500, message: "Receive error: \(error)")
                 return
             }
 
-            var updated = accumulated
-            if let data {
-                updated.append(data)
+            if let data, !data.isEmpty {
+                do {
+                    try sink.append(data)
+                } catch {
+                    sink.discard()
+                    self.sendErrorResponse(on: connection, status: 500, message: "Temp file write failed: \(error)")
+                    return
+                }
             }
 
-            if isComplete && updated.count < contentLength {
+            if isComplete && sink.bytesWritten < contentLength {
+                sink.discard()
                 self.sendErrorResponse(on: connection, status: 400, message: "Connection closed before full body received")
                 return
             }
@@ -440,7 +508,7 @@ public actor HttpUploadServer {
                 mimeType: mimeType,
                 expectedChecksum: expectedChecksum,
                 contentLength: contentLength,
-                accumulated: updated
+                sink: sink
             )
         }
     }
@@ -451,13 +519,20 @@ public actor HttpUploadServer {
         filename: String,
         mimeType: String,
         expectedChecksum: String?,
-        data: Data
+        sink: UploadSink
     ) {
-        let digest = SHA256.hash(data: data)
-        let computedChecksum = digest.map { String(format: "%02x", $0) }.joined()
+        let computedChecksum: String
+        do {
+            computedChecksum = try sink.finish()
+        } catch {
+            sink.discard()
+            sendErrorResponse(on: connection, status: 500, message: "Temp file finalize failed: \(error)")
+            return
+        }
 
         if let expected = expectedChecksum, !expected.isEmpty {
             guard computedChecksum.lowercased() == expected.lowercased() else {
+                sink.discard()
                 sendErrorResponse(
                     on: connection,
                     status: 400,
@@ -467,9 +542,14 @@ public actor HttpUploadServer {
             }
         }
 
-        onFileReceived?(filename, mimeType, computedChecksum, data)
+        if let onFileReceived {
+            // Ownership of the temp file passes to the callback.
+            onFileReceived(filename, mimeType, computedChecksum, sink.tempURL)
+        } else {
+            sink.discard()
+        }
 
-        let json = "{\"status\":\"ok\",\"bytes_received\":\(data.count)}"
+        let json = "{\"status\":\"ok\",\"bytes_received\":\(sink.bytesWritten)}"
         sendResponse(on: connection, status: 200, statusText: "OK", body: json)
     }
 
@@ -498,108 +578,116 @@ public actor HttpUploadServer {
 
     // MARK: - Private — Outgoing (GET /send/{id}) File Streaming
 
+    /// Disk-read / socket-write chunk size for the outgoing path (1 MB).
+    private static let outgoingChunkSize = 1_048_576
+
     /// Look up a registered outgoing file by transferId and stream it back
-    /// to the connecting peer. Fires the file's onProgress/onComplete
-    /// callbacks as bytes leave the box. Unregisters the entry on finish.
+    /// to the connecting peer straight from disk — the file is never loaded
+    /// into memory as a whole (a multi-GB video would OOM). Fires the file's
+    /// onProgress/onComplete callbacks as bytes leave the box. Unregisters
+    /// the entry immediately.
     private func serveOutgoingFile(on connection: NWConnection, transferId: String) {
         guard let pending = pendingOutgoingFiles[transferId] else {
             sendErrorResponse(on: connection, status: 404, message: "Unknown transferId")
             return
         }
 
-        // Load the full file into memory. This mirrors how the POST /upload
-        // path handles bodies (see `streamBody` which accumulates all bytes
-        // before finalizing) — keeps the two paths symmetric. Real disk
-        // streaming can be a later optimization if large-file users hit it.
-        guard let data = try? Data(contentsOf: pending.fileURL) else {
-            sendErrorResponse(on: connection, status: 500, message: "File read failed")
-            pending.onComplete(false)
-            pendingOutgoingFiles.removeValue(forKey: transferId)
-            return
-        }
-
-        let total = Int64(data.count)
-        // Integrity checksum the phone verifies after the download completes.
-        let checksum = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        let encodedFilename = pending.filename
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? pending.filename
-        let headers = "HTTP/1.1 200 OK\r\n"
-            + "Content-Type: \(pending.mimeType)\r\n"
-            + "Content-Length: \(total)\r\n"
-            + "X-Filename: \(encodedFilename)\r\n"
-            + "X-Checksum-SHA256: \(checksum)\r\n"
-            + "Connection: close\r\n"
-            + "\r\n"
-        let headerData = Data(headers.utf8)
-
-        // Capture the per-transfer callbacks so the nonisolated streaming
-        // helper can invoke them without hopping back onto the actor for
-        // every chunk. After capture, remove the registration — from here
+        // Capture everything locally and remove the registration — from here
         // on, only our local references matter.
+        let fileURL = pending.fileURL
+        let filename = pending.filename
+        let mimeType = pending.mimeType
         let onProgress = pending.onProgress
         let onComplete = pending.onComplete
         pendingOutgoingFiles.removeValue(forKey: transferId)
 
-        // Send headers first, then kick off the chunk streamer.
-        connection.send(content: headerData, completion: .contentProcessed { error in
-            if error != nil {
+        // All file I/O runs off the actor so a multi-GB transfer never blocks
+        // other HTTP requests.
+        Task.detached(priority: .userInitiated) {
+            guard let total = Self.fileSize(at: fileURL),
+                  // Integrity checksum the phone verifies after the download
+                  // completes. Computed by streaming the file once up front.
+                  let checksum = Self.sha256OfFile(at: fileURL),
+                  let handle = try? FileHandle(forReadingFrom: fileURL) else {
+                self.sendErrorResponse(on: connection, status: 500, message: "File read failed")
                 onComplete(false)
-                connection.cancel()
                 return
             }
-            // Report 0% before any body bytes — lets the UI switch out of
-            // "waiting for accept" into "transferring" immediately.
-            onProgress(0, total)
-            HttpUploadServer.streamOutgoingChunks(
-                on: connection,
-                data: data,
-                sent: 0,
-                total: total,
-                onProgress: onProgress,
-                onComplete: onComplete
-            )
-        })
+            defer { try? handle.close() }
+
+            let encodedFilename = filename
+                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? filename
+            let headers = "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: \(mimeType)\r\n"
+                + "Content-Length: \(total)\r\n"
+                + "X-Filename: \(encodedFilename)\r\n"
+                + "X-Checksum-SHA256: \(checksum)\r\n"
+                + "Connection: close\r\n"
+                + "\r\n"
+
+            do {
+                try await Self.send(Data(headers.utf8), on: connection)
+                // Report 0% before any body bytes — lets the UI switch out of
+                // "waiting for accept" into "transferring" immediately.
+                onProgress(0, total)
+
+                var sent: Int64 = 0
+                while sent < total {
+                    // Never read past the advertised Content-Length, even if
+                    // the file grew after the size was taken.
+                    let readSize = Int(min(Int64(Self.outgoingChunkSize), total - sent))
+                    let chunk = try autoreleasepool { try handle.read(upToCount: readSize) }
+                    guard let chunk, !chunk.isEmpty else {
+                        // File shrank under us — Content-Length can't be
+                        // satisfied; drop the connection so the peer notices.
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
+                    // Backpressure: wait for the previous chunk to be handed
+                    // to the transport before reading the next one.
+                    try await Self.send(chunk, on: connection)
+                    sent += Int64(chunk.count)
+                    onProgress(sent, total)
+                }
+                onComplete(true)
+                connection.cancel()
+            } catch {
+                onComplete(false)
+                connection.cancel()
+            }
+        }
     }
 
-    /// Recursively sends `data` in 64 KB chunks and fires `onProgress` after
-    /// each chunk. On final chunk, fires `onComplete(true)` and cancels the
-    /// connection. On any send error, fires `onComplete(false)`.
-    private static func streamOutgoingChunks(
-        on connection: NWConnection,
-        data: Data,
-        sent: Int64,
-        total: Int64,
-        onProgress: @escaping @Sendable (Int64, Int64) -> Void,
-        onComplete: @escaping @Sendable (Bool) -> Void
-    ) {
-        if sent >= total {
-            onComplete(true)
-            connection.cancel()
-            return
+    /// Sends one buffer and suspends until the transport has consumed it
+    /// (`contentProcessed`) — this is what bounds memory to a single chunk.
+    private static func send(_ data: Data, on connection: NWConnection) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.send(content: data, completion: .contentProcessed { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            })
         }
-        let chunkSize: Int64 = 64 * 1024
-        let remaining = total - sent
-        let size = Int(min(chunkSize, remaining))
-        let start = Int(sent)
-        let chunk = data.subdata(in: start..<(start + size))
+    }
 
-        connection.send(content: chunk, completion: .contentProcessed { error in
-            if error != nil {
-                onComplete(false)
-                connection.cancel()
-                return
-            }
-            let newSent = sent + Int64(size)
-            onProgress(newSent, total)
-            HttpUploadServer.streamOutgoingChunks(
-                on: connection,
-                data: data,
-                sent: newSent,
-                total: total,
-                onProgress: onProgress,
-                onComplete: onComplete
-            )
-        })
+    private static func fileSize(at url: URL) -> Int64? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? NSNumber else { return nil }
+        return size.int64Value
+    }
+
+    /// Streaming SHA-256 of a file — reads in chunks, never the whole file.
+    private static func sha256OfFile(at url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            guard let chunk = try? autoreleasepool(invoking: { try handle.read(upToCount: outgoingChunkSize) }),
+                  !chunk.isEmpty else { break }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Private — HTTP Responses (cont.)

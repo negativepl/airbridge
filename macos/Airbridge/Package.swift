@@ -11,7 +11,6 @@ let package = Package(
         .library(name: "Protocol", targets: ["Protocol"]),
         .library(name: "Networking", targets: ["Networking"]),
         .library(name: "Clipboard", targets: ["Clipboard"]),
-        .library(name: "FileTransfer", targets: ["FileTransfer"]),
         .library(name: "Pairing", targets: ["Pairing"]),
         // Named "AirbridgeSecurity" to avoid collision with Apple's Security.framework
         .library(name: "AirbridgeSecurity", targets: ["AirbridgeSecurity"]),
@@ -26,7 +25,6 @@ let package = Package(
                 "Protocol",
                 "Networking",
                 "Clipboard",
-                "FileTransfer",
                 "Pairing",
                 "AirbridgeSecurity",
                 "Mirror",
@@ -58,12 +56,6 @@ let package = Package(
             name: "Clipboard",
             dependencies: ["Protocol"],
             path: "Sources/Clipboard"
-        ),
-
-        .target(
-            name: "FileTransfer",
-            dependencies: ["Protocol", "Networking"],
-            path: "Sources/FileTransfer"
         ),
 
         .target(
@@ -106,12 +98,6 @@ let package = Package(
             name: "ClipboardTests",
             dependencies: ["Clipboard"],
             path: "Tests/ClipboardTests"
-        ),
-
-        .testTarget(
-            name: "FileTransferTests",
-            dependencies: ["FileTransfer"],
-            path: "Tests/FileTransferTests"
         ),
 
         .testTarget(

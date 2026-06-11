@@ -3,13 +3,12 @@ import AppKit
 import SwiftUI
 import Protocol
 import AirbridgeSecurity
-import FileTransfer
 import Networking
 
-/// Handles file sending (chunking) and receiving (HTTP upload), with progress tracking.
+/// Handles file sending and receiving (both over HTTP), with progress tracking.
 @Observable
 @MainActor
-final class FileTransferService: MessageHandler, BinaryChunkHandler {
+final class FileTransferService: MessageHandler {
 
     // MARK: - Observable State
 
@@ -26,8 +25,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
     // MARK: - Private
 
-    @ObservationIgnored private let fileChunker = FileChunker()
-    @ObservationIgnored private var activeAssemblers: [String: FileAssembler] = [:]
     @ObservationIgnored private var transferStartTime: Date?
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
@@ -53,12 +50,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
 
     func handleMessage(_ message: Message) {
         switch message {
-        case .fileTransferStart(_, let transferId, let filename, _, let totalSize, let totalChunks):
-            handleFileTransferStart(transferId: transferId, filename: filename, totalSize: totalSize, totalChunks: totalChunks)
-        case .fileChunk(let transferId, let chunkIndex, let data):
-            handleFileChunk(transferId: transferId, chunkIndex: chunkIndex, data: data)
-        case .fileTransferComplete(let transferId, let checksumSHA256):
-            handleFileTransferComplete(transferId: transferId, checksum: checksumSHA256)
         case .fileTransferOffer(let transferId, let filename, _, let fileSize, _):
             handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize)
         case .fileTransferAccept:
@@ -136,25 +127,6 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
             isRejected = false
             fileTransferFileName = ""
             isReceivingFile = false
-        }
-    }
-
-    // MARK: - BinaryChunkHandler
-
-    func handleBinaryChunk(_ data: Data) {
-        guard data.count > 40 else { return }
-        let transferId = String(data: data[0..<36], encoding: .ascii) ?? ""
-        let chunkIndex = Int(data[36]) << 24 | Int(data[37]) << 16 | Int(data[38]) << 8 | Int(data[39])
-        let chunkData = data[40...]
-
-        guard let assembler = activeAssemblers[transferId] else { return }
-        assembler.addChunk(index: chunkIndex, data: Data(chunkData))
-        fileTransferProgress = assembler.progress
-
-        Task {
-            try? await connectionService?.broadcast(
-                Message.fileChunkAck(transferId: transferId, chunkIndex: chunkIndex)
-            )
         }
     }
 
@@ -329,47 +301,20 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         }
     }
 
-    // MARK: - Receiving (WebSocket chunks)
-
-    private func handleFileTransferStart(transferId: String, filename: String, totalSize: Int, totalChunks: Int) {
-        let assembler = FileAssembler(
-            transferId: transferId,
-            filename: filename,
-            totalSize: totalSize,
-            totalChunks: totalChunks,
-            checksumSHA256: ""
-        )
-        activeAssemblers[transferId] = assembler
-        fileTransferProgress = 0
-        fileTransferFileName = filename
-    }
-
-    private func handleFileChunk(transferId: String, chunkIndex: Int, data: String) {
-        guard let assembler = activeAssemblers[transferId],
-              let chunkData = Data(base64Encoded: data) else { return }
-        assembler.addChunk(index: chunkIndex, data: chunkData)
-        fileTransferProgress = assembler.progress
-
-        Task {
-            try? await connectionService?.broadcast(
-                Message.fileChunkAck(transferId: transferId, chunkIndex: chunkIndex)
-            )
-        }
-    }
-
-    private func handleFileTransferComplete(transferId: String, checksum: String) {
-        guard let assembler = activeAssemblers.removeValue(forKey: transferId) else { return }
-        saveReceivedFile(assembler: assembler)
-    }
-
     // MARK: - HTTP Upload Callbacks
 
     private func setupHttpCallbacks() async {
         guard let connectionService else { return }
 
-        let onFileReceived: @Sendable (String, String, String, Data) -> Void = { [weak self] filename, _, _, data in
+        // The server hands over a temp file URL (ownership included — we must
+        // move or delete it). Streaming to disk on the server side keeps
+        // multi-GB uploads out of RAM; here we only move files around.
+        let onFileReceived: @Sendable (String, String, String, URL) -> Void = { [weak self] filename, _, _, tempURL in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self else {
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return
+                }
                 self.fileTransferProgress = 1.0
                 // Keep `isReceivingFile = true` until the whole complete
                 // sequence has played. Flipping it false here made the popup
@@ -384,23 +329,28 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
                         try FileManager.default.createDirectory(
                             at: preview.cacheURL.deletingLastPathComponent(),
                             withIntermediateDirectories: true)
-                        try data.write(to: preview.cacheURL)
+                        if FileManager.default.fileExists(atPath: preview.cacheURL.path) {
+                            try FileManager.default.removeItem(at: preview.cacheURL)
+                        }
+                        try FileManager.default.moveItem(at: tempURL, to: preview.cacheURL)
                         self.playReceiveSound()
                         preview.completion(preview.cacheURL)
                     } catch {
                         #if DEBUG
                         print("[FileTransferService] preview cache save failed: \(error)")
                         #endif
+                        try? FileManager.default.removeItem(at: tempURL)
                         preview.completion(nil)
                     }
                 } else {
                     do {
-                        let _ = try self.saveToDownloads(filename: filename, data: data)
+                        let _ = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
                         self.playReceiveSound()
                     } catch {
                         #if DEBUG
                         print("[FileTransferService] HTTP file save failed: \(error)")
                         #endif
+                        try? FileManager.default.removeItem(at: tempURL)
                     }
                 }
 
@@ -466,26 +416,24 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
     /// Kopiuje już pobrany plik (np. z cache podglądu) do Downloads — bez ponownego transferu.
     @discardableResult
     func saveToDownloads(fileAt sourceURL: URL, filename: String) -> URL? {
-        guard let data = try? Data(contentsOf: sourceURL) else { return nil }
-        let url = try? saveToDownloads(filename: filename, data: data)
-        if url != nil { playReceiveSound() }
-        return url
+        do {
+            let fileURL = try downloadsDestination(filename: filename)
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try FileManager.default.removeItem(at: fileURL)
+            }
+            // Copy on the filesystem — never pull the file through RAM.
+            try FileManager.default.copyItem(at: sourceURL, to: fileURL)
+            playReceiveSound()
+            return fileURL
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - File Saving
 
-    private func saveReceivedFile(assembler: FileAssembler) {
-        do {
-            let data = try assembler.assemble()
-            _ = try saveToDownloads(filename: assembler.filename, data: data)
-            fileTransferProgress = 0
-            playReceiveSound()
-        } catch {
-            fileTransferProgress = 0
-        }
-    }
-
-    private func saveToDownloads(filename: String, data: Data) throws -> URL {
+    /// Resolves (and creates) the destination in the configured Downloads folder.
+    private func downloadsDestination(filename: String) throws -> URL {
         let folderPath = UserDefaults.standard.string(forKey: "downloadFolder") ?? "~/Downloads/AirBridge"
         let expandedPath = NSString(string: folderPath).expandingTildeInPath
         let downloadsURL = URL(fileURLWithPath: expandedPath)
@@ -494,7 +442,16 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         guard let fileURL = SafeFileName.resolvedURL(in: downloadsURL, filename: filename) else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
-        try data.write(to: fileURL)
+        return fileURL
+    }
+
+    /// Moves an already-downloaded temp file into Downloads (no RAM round-trip).
+    private func saveToDownloads(filename: String, movingFrom tempURL: URL) throws -> URL {
+        let fileURL = try downloadsDestination(filename: filename)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+        }
+        try FileManager.default.moveItem(at: tempURL, to: fileURL)
         return fileURL
     }
 

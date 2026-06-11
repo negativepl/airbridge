@@ -4,7 +4,6 @@ import SwiftUI
 import Protocol
 import AirbridgeSecurity
 import Clipboard
-import FileTransfer
 import Networking
 import Pairing
 
@@ -12,12 +11,6 @@ import Pairing
 @MainActor
 protocol MessageHandler: AnyObject {
     func handleMessage(_ message: Message)
-}
-
-/// Protocol for handling binary WebSocket frames (raw file chunks).
-@MainActor
-protocol BinaryChunkHandler: AnyObject {
-    func handleBinaryChunk(_ data: Data)
 }
 
 /// Manages WebSocket + HTTP server lifecycle, Bonjour advertisement,
@@ -387,8 +380,7 @@ final class ConnectionService {
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
-        case .fileTransferStart, .fileChunk, .fileChunkAck, .fileTransferComplete,
-             .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
+        case .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
             fileTransferHandler?.handleMessage(message)
         case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse:
             galleryHandler?.handleMessage(message)
@@ -425,14 +417,6 @@ final class ConnectionService {
                 self?.handleMessage(message, from: connectionId)
             }
         }
-        let onBinaryMessage: @Sendable (Data) -> Void = { [weak self] data in
-            Task { @MainActor in
-                guard let self else { return }
-                if let handler = self.fileTransferHandler {
-                    (handler as? BinaryChunkHandler)?.handleBinaryChunk(data)
-                }
-            }
-        }
         let onConnect: @Sendable (String) -> Void = { _ in }
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
@@ -453,7 +437,6 @@ final class ConnectionService {
         }
         await server.setCallbacks(
             onMessage: onMessage,
-            onBinaryMessage: onBinaryMessage,
             onClientConnected: onConnect,
             onClientDisconnected: onDisconnect
         )
