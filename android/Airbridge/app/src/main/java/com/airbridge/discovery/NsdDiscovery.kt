@@ -115,29 +115,48 @@ class NsdDiscovery(private val context: Context) {
         }
     }
 
-    @Synchronized
-    fun startDiscovery() {
-        if (isStopping) {
-            // The previous discovery is still shutting down — starting now
-            // would run two discoveries in parallel and the old listener could
-            // keep delivering onServiceFound. Defer until the stop completes.
-            Log.d(TAG, "Stop still in flight — deferring discovery start")
-            pendingStart = true
-            return
-        }
-        if (activeListener != null) {
-            Log.d(TAG, "Discovery already running — skipping")
-            return
-        }
-        val listener = createDiscoveryListener()
-        activeListener = listener
-        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
+    // Calling into NsdManager while holding the NsdDiscovery lock — on the
+    // thread of its own callbacks, no less — is a fragile, potentially
+    // deadlock-prone window. Lock-held helpers therefore only mutate state and
+    // return which NsdManager call to make; the call itself runs after the
+    // lock is released. The listener instance is created under the lock and
+    // passed out, so the unlocked call targets exactly the instance the lock
+    // approved even if state changes in between.
+    private sealed interface NsdCall {
+        class Start(val listener: NsdManager.DiscoveryListener) : NsdCall
+        class Stop(val listener: NsdManager.DiscoveryListener) : NsdCall
+        object None : NsdCall
     }
 
-    @Synchronized
+    /** Performs the NsdManager call decided under the lock. Must be called WITHOUT the lock held. */
+    private fun perform(call: NsdCall) {
+        when (call) {
+            is NsdCall.Start ->
+                nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, call.listener)
+            is NsdCall.Stop ->
+                try {
+                    nsdManager.stopServiceDiscovery(call.listener)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error stopping discovery", e)
+                    // The stop request never reached NsdManager — complete the
+                    // cycle here so a pending restart isn't stuck forever.
+                    finishStop(call.listener)
+                }
+            NsdCall.None -> Unit
+        }
+    }
+
+    fun startDiscovery() {
+        perform(synchronized(this) { startLocked() })
+    }
+
     fun stopDiscovery() {
-        pendingStart = false
-        stopLocked()
+        perform(
+            synchronized(this) {
+                pendingStart = false
+                stopLocked()
+            }
+        )
     }
 
     /**
@@ -146,48 +165,65 @@ class NsdDiscovery(private val context: Context) {
      * stopped (onDiscoveryStopped / onStopDiscoveryFailed); starting earlier
      * would let the old listener race the new one with duplicate finds.
      */
-    @Synchronized
     fun restart() {
-        pendingStart = true
-        stopLocked()
+        perform(
+            synchronized(this) {
+                pendingStart = true
+                stopLocked()
+            }
+        )
     }
 
     /** Must be called with the NsdDiscovery lock held. */
-    private fun stopLocked() {
+    private fun startLocked(): NsdCall {
+        if (isStopping) {
+            // The previous discovery is still shutting down — starting now
+            // would run two discoveries in parallel and the old listener could
+            // keep delivering onServiceFound. Defer until the stop completes.
+            Log.d(TAG, "Stop still in flight — deferring discovery start")
+            pendingStart = true
+            return NsdCall.None
+        }
+        if (activeListener != null) {
+            Log.d(TAG, "Discovery already running — skipping")
+            return NsdCall.None
+        }
+        val listener = createDiscoveryListener()
+        activeListener = listener
+        return NsdCall.Start(listener)
+    }
+
+    /** Must be called with the NsdDiscovery lock held. */
+    private fun stopLocked(): NsdCall {
         val listener = activeListener
         if (listener == null) {
             // Nothing to stop — if a (re)start was requested, run it now.
             if (pendingStart) {
                 pendingStart = false
-                startDiscovery()
+                return startLocked()
             }
-            return
+            return NsdCall.None
         }
-        if (isStopping) return // stop already in flight; pendingStart applies when it completes
+        if (isStopping) return NsdCall.None // stop already in flight; pendingStart applies when it completes
         isStopping = true
-        try {
-            nsdManager.stopServiceDiscovery(listener)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping discovery", e)
-            // The stop request never reached NsdManager — complete the cycle
-            // here so a pending restart isn't stuck forever.
-            finishStopLocked(listener)
-        }
+        return NsdCall.Stop(listener)
     }
 
     /** Completes a stop cycle for [listener]; calls from stale listeners are no-ops. */
     private fun finishStop(listener: NsdManager.DiscoveryListener) {
-        synchronized(this) { finishStopLocked(listener) }
+        perform(synchronized(this) { finishStopLocked(listener) })
     }
 
-    private fun finishStopLocked(listener: NsdManager.DiscoveryListener) {
-        if (listener !== activeListener) return
+    /** Must be called with the NsdDiscovery lock held. */
+    private fun finishStopLocked(listener: NsdManager.DiscoveryListener): NsdCall {
+        if (listener !== activeListener) return NsdCall.None
         activeListener = null
         isDiscovering = false
         isStopping = false
         if (pendingStart) {
             pendingStart = false
-            startDiscovery()
+            return startLocked()
         }
+        return NsdCall.None
     }
 }
