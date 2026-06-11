@@ -29,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,7 +82,8 @@ fun SettingsScreen(
 
         val context = LocalContext.current
         val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
-        var pairedDevices by remember { mutableStateOf(pairedDeviceStore.getAll()) }
+        val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
+        val pairedDevices = remember(pairedDevicesRevision) { pairedDeviceStore.getAll() }
 
         if (pairedDevices.isEmpty()) {
             Text(
@@ -105,7 +107,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault())
+                            text = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
                                 .format(java.util.Date(device.pairedAt)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -113,7 +115,6 @@ fun SettingsScreen(
                     }
                     TextButton(onClick = {
                         pairedDeviceStore.remove(device.publicKeyFingerprint)
-                        pairedDevices = pairedDeviceStore.getAll()
                     }) {
                         Text(
                             text = stringResource(R.string.pairing_remove),
@@ -295,6 +296,44 @@ fun SettingsScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = CardShape,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_vibrate),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.settings_vibrate_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = vibrateOnSync,
+                        onCheckedChange = {
+                            vibrateOnSync = it
+                            prefs.edit().putBoolean("vibrate_on_sync", it).apply()
+                        }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Connection section
@@ -332,48 +371,6 @@ fun SettingsScreen(
                         onCheckedChange = {
                             autoConnect = it
                             prefs.edit().putBoolean("auto_connect", it).apply()
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Notifications section
-            SectionHeader(text = stringResource(R.string.settings_notifications))
-            Spacer(modifier = Modifier.height(8.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = CardShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.settings_vibrate),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.settings_vibrate_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = vibrateOnSync,
-                        onCheckedChange = {
-                            vibrateOnSync = it
-                            prefs.edit().putBoolean("vibrate_on_sync", it).apply()
                         }
                     )
                 }

@@ -2,6 +2,10 @@ package com.airbridge.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,6 +17,13 @@ data class PairedDevice(
 )
 
 class PairedDeviceStore(context: Context) {
+
+    companion object {
+        // Bumped on every mutation so Compose UI can re-read the store reactively
+        // (the SharedPreferences-backed store is not otherwise observable).
+        private val _revision = MutableStateFlow(0)
+        val revision: StateFlow<Int> = _revision.asStateFlow()
+    }
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("airbridge_paired_devices", Context.MODE_PRIVATE)
@@ -64,5 +75,6 @@ class PairedDeviceStore(context: Context) {
             })
         }
         prefs.edit().putString("devices", arr.toString()).apply()
+        _revision.update { it + 1 }
     }
 }

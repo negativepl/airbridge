@@ -82,7 +82,8 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
 
     val context = LocalContext.current
     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
-    val hasPairedDevices = remember { pairedDeviceStore.getAll().isNotEmpty() }
+    val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
+    val hasPairedDevices = remember(pairedDevicesRevision) { pairedDeviceStore.getAll().isNotEmpty() }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -270,11 +271,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                         }
 
                         // Speed + ETA
-                        val speedText = when {
-                            transferSpeedBps > 1024 * 1024 -> String.format("%.1f MB/s", transferSpeedBps / (1024.0 * 1024.0))
-                            transferSpeedBps > 1024 -> String.format("%.0f KB/s", transferSpeedBps / 1024.0)
-                            else -> ""
-                        }
+                        val speedText = formatTransferSpeed(transferSpeedBps)
                         val etaText = when {
                             transferEtaSeconds > 60 -> "${transferEtaSeconds / 60} min ${transferEtaSeconds % 60} s"
                             transferEtaSeconds > 0 -> "${transferEtaSeconds} s"
@@ -309,11 +306,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                         )
                     } else {
                         // Collapsed — small speed text
-                        val speedText = when {
-                            transferSpeedBps > 1024 * 1024 -> String.format("%.1f MB/s", transferSpeedBps / (1024.0 * 1024.0))
-                            transferSpeedBps > 1024 -> String.format("%.0f KB/s", transferSpeedBps / 1024.0)
-                            else -> ""
-                        }
+                        val speedText = formatTransferSpeed(transferSpeedBps)
                         if (speedText.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -604,7 +597,7 @@ private fun DeviceCard(
 // ── Recent Transfer Row ──
 
 @Composable
-private fun RecentTransferRow(item: ActivityItem, now: Long) {
+private fun RecentTransferRow(item: ActivityItem, now: Long, deviceName: String) {
     val icon = when {
         item.type.contains("clipboard") -> Icons.Rounded.ContentPaste
         item.type.contains("file") -> Icons.AutoMirrored.Rounded.InsertDriveFile
@@ -617,7 +610,6 @@ private fun RecentTransferRow(item: ActivityItem, now: Long) {
     else
         MaterialTheme.colorScheme.tertiary
 
-    val deviceName = AirbridgeService.connectedDeviceName.value ?: "Mac"
     val label = when (item.type) {
         "clipboard_sent" -> stringResource(R.string.clipboard_sent_to_mac)
         "clipboard_received" -> stringResource(R.string.clipboard_received_from, deviceName)

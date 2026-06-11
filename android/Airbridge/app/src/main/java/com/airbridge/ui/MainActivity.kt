@@ -57,6 +57,7 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -142,7 +143,8 @@ class MainActivity : ComponentActivity() {
 
                     val pagerState = rememberPagerState(pageCount = { 4 })
                     val coroutineScope = rememberCoroutineScope()
-                    val hasPairedDevices = remember(onboardingCompleted) {
+                    val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
+                    val hasPairedDevices = remember(pairedDevicesRevision) {
                         com.airbridge.security.PairedDeviceStore(this@MainActivity).getAll().isNotEmpty()
                     }
                     var fabMenuExpanded by remember { mutableStateOf(false) }
