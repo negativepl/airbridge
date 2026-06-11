@@ -313,6 +313,27 @@ public struct MacInfo: Codable, Equatable, Sendable {
         self.batteryPercent = batteryPercent; self.batteryCharging = batteryCharging
         self.onACPower = onACPower; self.uptimeSeconds = uptimeSeconds
     }
+
+    /// Tolerant decoding mirroring the Android decoder (Message.kt), which
+    /// reads these fields with optInt/optBoolean/optLong and defaults. Encoding
+    /// stays synthesized so every field is always sent.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        model = try c.decode(String.self, forKey: .model)
+        chip = try c.decode(String.self, forKey: .chip)
+        osVersion = try c.decode(String.self, forKey: .osVersion)
+        cpuCores = try c.decode(Int.self, forKey: .cpuCores)
+        cpuLoadPercent = try c.decodeIfPresent(Int.self, forKey: .cpuLoadPercent) ?? 0
+        totalRamBytes = try c.decode(Int64.self, forKey: .totalRamBytes)
+        usedRamBytes = try c.decode(Int64.self, forKey: .usedRamBytes)
+        totalStorageBytes = try c.decode(Int64.self, forKey: .totalStorageBytes)
+        freeStorageBytes = try c.decode(Int64.self, forKey: .freeStorageBytes)
+        batteryPercent = try c.decode(Int.self, forKey: .batteryPercent)
+        batteryCharging = try c.decodeIfPresent(Bool.self, forKey: .batteryCharging) ?? false
+        onACPower = try c.decodeIfPresent(Bool.self, forKey: .onACPower) ?? false
+        uptimeSeconds = try c.decodeIfPresent(Int64.self, forKey: .uptimeSeconds) ?? 0
+    }
 }
 
 // MARK: - Codable
