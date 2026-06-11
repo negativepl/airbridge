@@ -1204,7 +1204,7 @@ class AirbridgeService : Service() {
                     // Update notification every 500ms
                     if (now - lastNotifUpdate >= 500) {
                         lastNotifUpdate = now
-                        val speedText = com.airbridge.ui.formatTransferSpeed(speed)
+                        val speedText = com.airbridge.util.formatTransferSpeed(speed)
                         updateTransferNotification((progress * 100).toInt(), speedText)
                     }
                 }

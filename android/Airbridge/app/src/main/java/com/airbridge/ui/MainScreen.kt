@@ -26,14 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.DesktopMac
 import androidx.compose.material.icons.rounded.LaptopMac
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,8 +59,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
-import com.airbridge.service.ActivityItem
 import com.airbridge.service.AirbridgeService
+import com.airbridge.util.formatTransferSpeed
 import kotlinx.coroutines.delay
 
 
@@ -73,7 +69,6 @@ import kotlinx.coroutines.delay
 fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
     val isConnected by viewModel.isConnected.collectAsState()
     val connectedDeviceName by viewModel.connectedDeviceName.collectAsState()
-    val recentActivity by viewModel.recentActivity.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
     val transferFileName by viewModel.transferFileName.collectAsState()
     val transferSpeedBps by viewModel.transferSpeedBps.collectAsState()
@@ -84,14 +79,6 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
     val hasPairedDevices = remember(pairedDevicesRevision) { pairedDeviceStore.getAll().isNotEmpty() }
-
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            now = System.currentTimeMillis()
-        }
-    }
 
     if (!hasPairedDevices) {
         Column(
@@ -589,61 +576,6 @@ private fun DeviceCard(
                 }
             }
         }
-    }
-}
-
-// ── Recent Transfer Row ──
-
-// ── Recent Transfer Row ──
-
-@Composable
-private fun RecentTransferRow(item: ActivityItem, now: Long, deviceName: String) {
-    val icon = when {
-        item.type.contains("clipboard") -> Icons.Rounded.ContentPaste
-        item.type.contains("file") -> Icons.AutoMirrored.Rounded.InsertDriveFile
-        else -> Icons.Rounded.Sensors
-    }
-
-    val isSent = item.type.contains("sent")
-    val iconTint = if (isSent)
-        MaterialTheme.colorScheme.primary
-    else
-        MaterialTheme.colorScheme.tertiary
-
-    val label = when (item.type) {
-        "clipboard_sent" -> stringResource(R.string.clipboard_sent_to_mac)
-        "clipboard_received" -> stringResource(R.string.clipboard_received_from, deviceName)
-        "file_sent" -> stringResource(R.string.file_sent_to_mac)
-        "file_received" -> stringResource(R.string.file_received_from, deviceName)
-        "ping" -> if (item.description == "Ping") stringResource(R.string.ping_sent) else stringResource(R.string.pong_received)
-        else -> item.description
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = iconTint
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = formatTimeAgo(item.timestamp, now),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline
-        )
     }
 }
 

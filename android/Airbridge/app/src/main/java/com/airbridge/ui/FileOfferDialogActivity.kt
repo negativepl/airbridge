@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import com.airbridge.service.AirbridgeService
+import java.util.Locale
 
 /**
  * Transient activity that shows a dialog-style accept/reject prompt when the
@@ -50,8 +51,8 @@ class FileOfferDialogActivity : ComponentActivity() {
         val sender = intent.getStringExtra(EXTRA_SENDER) ?: "Mac"
 
         val sizeText = when {
-            fileSize > 1024 * 1024 -> String.format("%.1f MB", fileSize / (1024.0 * 1024.0))
-            fileSize > 1024 -> String.format("%.0f KB", fileSize / 1024.0)
+            fileSize > 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f MB", fileSize / (1024.0 * 1024.0))
+            fileSize > 1024 -> String.format(Locale.getDefault(), "%.0f KB", fileSize / 1024.0)
             else -> "$fileSize B"
         }
 

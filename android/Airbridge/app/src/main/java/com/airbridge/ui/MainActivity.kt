@@ -79,6 +79,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.airbridge.R
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -143,9 +144,10 @@ class MainActivity : ComponentActivity() {
 
                     val pagerState = rememberPagerState(pageCount = { 4 })
                     val coroutineScope = rememberCoroutineScope()
+                    val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(this@MainActivity) }
                     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
                     val hasPairedDevices = remember(pairedDevicesRevision) {
-                        com.airbridge.security.PairedDeviceStore(this@MainActivity).getAll().isNotEmpty()
+                        pairedDeviceStore.getAll().isNotEmpty()
                     }
                     var fabMenuExpanded by remember { mutableStateOf(false) }
                     var pendingFileUri by remember { mutableStateOf<Uri?>(null) }
@@ -384,7 +386,7 @@ private fun SendConfirmationSheet(
         when {
             fileSize < 1024 -> "$fileSize B"
             fileSize < 1024 * 1024 -> "${fileSize / 1024} KB"
-            else -> String.format("%.1f MB", fileSize / (1024.0 * 1024.0))
+            else -> String.format(Locale.getDefault(), "%.1f MB", fileSize / (1024.0 * 1024.0))
         }
     }
 
