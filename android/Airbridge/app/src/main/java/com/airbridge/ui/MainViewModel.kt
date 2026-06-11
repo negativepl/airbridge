@@ -81,9 +81,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val pairedDeviceStore = com.airbridge.security.PairedDeviceStore(context)
 
         // Compute fingerprint of Mac's public key (raw key from QR)
-        val macPubKeyBytes = android.util.Base64.decode(payload.publicKey, android.util.Base64.NO_WRAP)
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val fingerprint = digest.digest(macPubKeyBytes).joinToString("") { "%02x".format(it) }
+        val fingerprint = com.airbridge.security.KeyManager.fingerprintOf(payload.publicKey)
 
         // Store paired device
         pairedDeviceStore.add(

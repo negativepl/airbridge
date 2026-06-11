@@ -12,6 +12,15 @@ import java.util.UUID
 
 class KeyManager(context: Context) {
 
+    companion object {
+        /** SHA-256 hex fingerprint of a base64-encoded raw public key. */
+        fun fingerprintOf(publicKeyBase64: String): String {
+            val keyBytes = Base64.decode(publicKeyBase64, Base64.NO_WRAP)
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            return digest.digest(keyBytes).joinToString("") { "%02x".format(it) }
+        }
+    }
+
     private val prefs: SharedPreferences =
         context.getSharedPreferences("airbridge_keys", Context.MODE_PRIVATE)
 
@@ -41,12 +50,7 @@ class KeyManager(context: Context) {
         return Base64.encodeToString(getRawPublicKeyBytes(), Base64.NO_WRAP)
     }
 
-    fun getPublicKeyFingerprint(): String {
-        val rawBytes = getRawPublicKeyBytes()
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(rawBytes)
-        return hash.joinToString("") { "%02x".format(it) }
-    }
+    fun getPublicKeyFingerprint(): String = fingerprintOf(getRawPublicKeyBase64())
 
     fun sign(data: ByteArray): String {
         val privKeyBase64 = prefs.getString("private_key_base64", null)

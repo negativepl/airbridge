@@ -380,6 +380,7 @@ class AirbridgeService : Service() {
         webSocketClient.onDisconnected = {
             Log.d(TAG, "WebSocket disconnected")
             clipboardSync.stopListening()
+            expectedMacPublicKey = null
             isConnected.value = false
             connectedSince.value = null
             macInfo.value = null
@@ -412,13 +413,6 @@ class AirbridgeService : Service() {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    /** SHA-256 hex fingerprint of a base64-encoded raw public key. */
-    private fun publicKeyFingerprint(publicKeyBase64: String): String {
-        val keyBytes = android.util.Base64.decode(publicKeyBase64, android.util.Base64.NO_WRAP)
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        return digest.digest(keyBytes).joinToString("") { "%02x".format(it) }
     }
 
     private fun setupNsdDiscovery() {
@@ -775,7 +769,6 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.PairResponse -> {
-                connectedDeviceName.value = message.deviceName
                 val expectedKey = expectedMacPublicKey
                 expectedMacPublicKey = null
                 if (message.accepted) {
@@ -787,19 +780,20 @@ class AirbridgeService : Service() {
                         Log.e(TAG, "PairResponse public key does not match the QR-scanned key — rejecting pairing (possible MITM)")
                         // Drop the entry stored optimistically at QR-scan time;
                         // pairing did not complete, leave no trusted key behind.
-                        expectedKey?.let { pairedDeviceStore.remove(publicKeyFingerprint(it)) }
+                        expectedKey?.let { pairedDeviceStore.remove(com.airbridge.security.KeyManager.fingerprintOf(it)) }
                         connectedDeviceName.value = null
                         webSocketClient.shouldReconnect = false
                         webSocketClient.disconnect()
                         isConnected.value = false
                         return
                     }
+                    connectedDeviceName.value = message.deviceName
                     // Update stored device name with Mac's actual name
                     pairedDeviceStore.add(
                         com.airbridge.security.PairedDevice(
                             deviceName = message.deviceName,
                             publicKeyBase64 = message.publicKey,
-                            publicKeyFingerprint = publicKeyFingerprint(message.publicKey),
+                            publicKeyFingerprint = com.airbridge.security.KeyManager.fingerprintOf(message.publicKey),
                             pairedAt = System.currentTimeMillis()
                         )
                     )
@@ -808,6 +802,7 @@ class AirbridgeService : Service() {
                     connectedSince.value = System.currentTimeMillis()
                     // pairing status tracked via StateFlow
                 } else {
+                    connectedDeviceName.value = null
                     isConnected.value = false
                     // pair rejection tracked via StateFlow
                 }
