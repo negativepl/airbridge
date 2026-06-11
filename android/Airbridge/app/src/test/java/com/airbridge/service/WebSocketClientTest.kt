@@ -11,6 +11,7 @@ import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,22 +38,25 @@ class WebSocketClientTest {
     }
 
     @Test
-    fun `connect while already connected cancels the previous socket`() {
-        val server = MockWebServer()
+    fun `connect to a different host cancels the previous socket`() {
+        // Dwa serwery = dwa różne host:port, jak po zmianie sieci.
+        val serverA = MockWebServer()
+        val serverB = MockWebServer()
         val first = ServerSocketRecorder()
         val second = ServerSocketRecorder()
-        server.enqueue(MockResponse().withWebSocketUpgrade(first))
-        server.enqueue(MockResponse().withWebSocketUpgrade(second))
-        server.start()
+        serverA.enqueue(MockResponse().withWebSocketUpgrade(first))
+        serverB.enqueue(MockResponse().withWebSocketUpgrade(second))
+        serverA.start()
+        serverB.start()
 
         val client = WebSocketClient()
         client.shouldReconnect = false
         try {
-            client.connect(server.hostName, server.port)
+            client.connect(serverA.hostName, serverA.port)
             assertTrue("first socket should open", first.opened.await(5, TimeUnit.SECONDS))
 
             // Drugi connect (np. discovery po zmianie sieci) — stary socket musi paść.
-            client.connect(server.hostName, server.port)
+            client.connect(serverB.hostName, serverB.port)
             assertTrue("second socket should open", second.opened.await(5, TimeUnit.SECONDS))
             assertTrue(
                 "first (stale) socket should be cancelled by the second connect",
@@ -64,18 +68,60 @@ class WebSocketClientTest {
             runCatching { client.disconnect() }
             runCatching { first.socket?.close(1000, null) }
             runCatching { second.socket?.close(1000, null) }
-            runCatching { server.shutdown() }
+            runCatching { serverA.shutdown() }
+            runCatching { serverB.shutdown() }
         }
     }
 
     @Test
-    fun `message from stale socket is not delivered`() {
+    fun `duplicate connect to the same host and port is ignored`() {
         val server = MockWebServer()
         val first = ServerSocketRecorder()
         val second = ServerSocketRecorder()
         server.enqueue(MockResponse().withWebSocketUpgrade(first))
         server.enqueue(MockResponse().withWebSocketUpgrade(second))
         server.start()
+
+        val client = WebSocketClient()
+        client.shouldReconnect = false
+        val connected = CountDownLatch(1)
+        client.onConnected = { connected.countDown() }
+        try {
+            client.connect(server.hostName, server.port)
+            assertTrue("first socket should open", first.opened.await(5, TimeUnit.SECONDS))
+            assertTrue("client should report connected", connected.await(5, TimeUnit.SECONDS))
+
+            // Duplikat (race discovery vs reconnect po zmianie sieci) — ma być
+            // zignorowany: bez drugiego socketa i bez zrywania żywego.
+            client.connect(server.hostName, server.port)
+
+            assertFalse(
+                "duplicate connect must not open a second socket",
+                second.opened.await(1, TimeUnit.SECONDS)
+            )
+            assertFalse(
+                "live socket must not be cancelled by a duplicate connect",
+                first.closed.await(500, TimeUnit.MILLISECONDS)
+            )
+            assertTrue("client should stay connected", client.isConnected)
+        } finally {
+            runCatching { client.disconnect() }
+            runCatching { first.socket?.close(1000, null) }
+            runCatching { second.socket?.close(1000, null) }
+            runCatching { server.shutdown() }
+        }
+    }
+
+    @Test
+    fun `message from stale socket is not delivered`() {
+        val serverA = MockWebServer()
+        val serverB = MockWebServer()
+        val first = ServerSocketRecorder()
+        val second = ServerSocketRecorder()
+        serverA.enqueue(MockResponse().withWebSocketUpgrade(first))
+        serverB.enqueue(MockResponse().withWebSocketUpgrade(second))
+        serverA.start()
+        serverB.start()
 
         val received = AtomicInteger(0)
         val gotMessage = CountDownLatch(1)
@@ -86,13 +132,13 @@ class WebSocketClientTest {
             gotMessage.countDown()
         }
         try {
-            client.connect(server.hostName, server.port)
+            client.connect(serverA.hostName, serverA.port)
             assertTrue(first.opened.await(5, TimeUnit.SECONDS))
-            client.connect(server.hostName, server.port)
+            client.connect(serverB.hostName, serverB.port)
             assertTrue(second.opened.await(5, TimeUnit.SECONDS))
 
-            // Mac broadcastuje do WSZYSTKICH swoich połączeń — emulacja:
-            // oba serwerowe sockety wysyłają tę samą wiadomość.
+            // Oba serwerowe sockety wysyłają tę samą wiadomość — dotrzeć ma
+            // tylko ta z aktualnego połączenia.
             val json = Message.Pong(timestamp = 123L).toJson()
             first.socket?.send(json)
             second.socket?.send(json)
@@ -107,7 +153,8 @@ class WebSocketClientTest {
             runCatching { client.disconnect() }
             runCatching { first.socket?.close(1000, null) }
             runCatching { second.socket?.close(1000, null) }
-            runCatching { server.shutdown() }
+            runCatching { serverA.shutdown() }
+            runCatching { serverB.shutdown() }
         }
     }
 

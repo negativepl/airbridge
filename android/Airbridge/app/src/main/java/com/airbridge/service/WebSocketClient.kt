@@ -98,6 +98,9 @@ class WebSocketClient {
     }
 
     private fun handleDisconnect() {
+        // The socket is dead — clear the reference so connect() can tell a
+        // live/opening socket apart from a defunct one.
+        webSocket = null
         isConnected = false
         onDisconnected?.invoke()
         if (!shouldReconnect) return
@@ -137,9 +140,18 @@ class WebSocketClient {
     }
 
     fun connect(host: String, port: Int) {
+        // Guard: discovery i reconnect potrafią zawołać connect() niemal
+        // równocześnie (np. po zmianie sieci). Drugi connect do tego samego
+        // hosta:portu, gdy socket żyje albo właśnie się otwiera, jest zbędny.
+        val existing = webSocket
+        if (existing != null && host == currentHost && port == currentPort) {
+            val state = if (isConnected) "already connected" else "connection attempt in progress"
+            Log.d(TAG, "connect($host:$port) ignored — $state")
+            return
+        }
         // Nigdy nie trzymamy dwóch socketów naraz — Mac broadcastuje do
         // wszystkich swoich połączeń, więc zombie = każda wiadomość 2x.
-        webSocket?.cancel()
+        existing?.cancel()
         currentHost = host
         currentPort = port
         val request = Request.Builder()

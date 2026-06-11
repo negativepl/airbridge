@@ -186,6 +186,10 @@ class AirbridgeService : Service() {
      * Called when the device switches to a different network (e.g. work Wi-Fi
      * -> home Wi-Fi). The cached host is now on an unreachable network, so we
      * forget it and re-run discovery to find the peer's new address.
+     *
+     * Runs on the main thread — NetworkMonitor registers its callback with a
+     * main-looper Handler, so NsdManager calls and client state mutations here
+     * never happen on a binder thread.
      */
     private fun onNetworkChanged() {
         Log.d(TAG, "Network changed — forgetting stale host and restarting discovery")

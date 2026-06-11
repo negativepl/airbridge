@@ -3,6 +3,8 @@ package com.airbridge.network
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 
 /**
@@ -10,6 +12,11 @@ import android.util.Log
  * different network (e.g. moving from work Wi-Fi to home Wi-Fi). The first
  * network seen after [start] is treated as the baseline and does NOT trigger a
  * change callback — only a switch to a genuinely different [Network] does.
+ *
+ * All callbacks — including [onNetworkChanged] — are delivered on the main
+ * thread (the callback is registered with a main-looper Handler). Without it,
+ * ConnectivityManager would invoke them on a binder thread, and the service's
+ * reaction touches NsdManager and WebSocketClient state.
  */
 class NetworkMonitor(
     context: Context,
@@ -51,7 +58,7 @@ class NetworkMonitor(
 
     fun start() {
         try {
-            connectivityManager.registerDefaultNetworkCallback(callback)
+            connectivityManager.registerDefaultNetworkCallback(callback, Handler(Looper.getMainLooper()))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register network callback", e)
         }
