@@ -35,12 +35,23 @@ class WebSocketClient {
 
     private val reconnectPolicy = ReconnectPolicy()
 
+    // All of the fields below are written from OkHttp WebSocket callback
+    // threads / IO coroutines and read from other threads (main thread,
+    // binder threads), so they must be @Volatile for cross-thread visibility.
+    @Volatile
     var isConnected: Boolean = false
         private set
 
+    @Volatile
     private var webSocket: WebSocket? = null
+
+    @Volatile
     private var currentHost: String? = null
+
+    @Volatile
     private var currentPort: Int = 0
+
+    @Volatile
     var shouldReconnect: Boolean = true
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())

@@ -23,9 +23,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 data class FileTransferState(
     val transferId: String,
@@ -92,7 +94,9 @@ class AirbridgeService : Service() {
         val transferSpeedHistory = MutableStateFlow<List<Float>>(emptyList())  // normalized 0-1 speed samples
 
         fun addActivity(item: ActivityItem) {
-            recentActivity.value = (listOf(item) + recentActivity.value).take(10)
+            // Atomic read-modify-write: callers run on arbitrary threads
+            // (WebSocket callbacks, IO coroutines, main thread).
+            recentActivity.update { (listOf(item) + it).take(10) }
         }
 
         // Reference to running instance for AccessibilityService to send clipboard
@@ -151,7 +155,7 @@ class AirbridgeService : Service() {
     private val httpFileUploader = HttpFileUploader()
     private val httpFileDownloader = HttpFileDownloader()
     private val httpFileServer = HttpFileServer()
-    private val activeTransfers = mutableMapOf<String, FileTransferState>()
+    private val activeTransfers = ConcurrentHashMap<String, FileTransferState>()
     private lateinit var galleryProvider: GalleryProvider
     private val filesProvider by lazy { FilesProvider(contentResolver) }
     private lateinit var smsProvider: SmsProvider
@@ -414,8 +418,8 @@ class AirbridgeService : Service() {
         }
     }
 
-    private val pendingOffers = mutableMapOf<String, Message.FileTransferOffer>() // transferId -> offer
-    private val pendingOutgoingOffers = mutableMapOf<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
+    private val pendingOffers = ConcurrentHashMap<String, Message.FileTransferOffer>() // transferId -> offer
+    private val pendingOutgoingOffers = ConcurrentHashMap<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
     private var lastProgressNotifUpdate = 0L
 
     private fun setupHttpFileServer() {
@@ -1233,10 +1237,12 @@ class AirbridgeService : Service() {
                     if (now - lastSampleTime >= 200) {
                         lastSampleTime = now
                         val normalized = (speed.toFloat() / peakSpeed).coerceIn(0f, 1f)
-                        val history = transferSpeedHistory.value.toMutableList()
-                        history.add(normalized)
-                        if (history.size > 60) history.removeAt(0)
-                        transferSpeedHistory.value = history
+                        transferSpeedHistory.update { prev ->
+                            val history = prev.toMutableList()
+                            history.add(normalized)
+                            if (history.size > 60) history.removeAt(0)
+                            history
+                        }
                     }
 
                     // Update notification every 500ms

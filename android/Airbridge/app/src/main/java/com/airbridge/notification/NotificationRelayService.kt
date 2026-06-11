@@ -15,6 +15,7 @@ import android.util.Base64
 import android.util.Log
 import com.airbridge.service.AirbridgeService
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Czyta powiadomienia systemowe i (po odsianiu szumu) przekazuje je na Maca przez
@@ -120,8 +121,10 @@ class NotificationRelayService : NotificationListenerService() {
         private var instance: NotificationRelayService? = null
 
         /** key (sbn.key) → akcja reply z RemoteInput. Trzymane, bo PendingIntenta
-         *  nie da się serializować — odpalamy go po stronie telefonu na żądanie. */
-        private val replyActions = HashMap<String, Notification.Action>()
+         *  nie da się serializować — odpalamy go po stronie telefonu na żądanie.
+         *  ConcurrentHashMap: pisane z wątku binder listenera, czytane z wątku
+         *  WebSocketa (sendReply). */
+        private val replyActions = ConcurrentHashMap<String, Notification.Action>()
 
         /** Most z AirbridgeService: wpisany na Macu tekst → odpal reply na telefonie. */
         fun sendReply(notificationKey: String, text: String): Boolean {
