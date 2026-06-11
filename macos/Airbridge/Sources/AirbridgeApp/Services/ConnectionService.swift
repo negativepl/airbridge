@@ -51,6 +51,9 @@ final class ConnectionService {
     }
     @ObservationIgnored let server = WebSocketServer(port: 8765)
     @ObservationIgnored let httpServer = HttpUploadServer(port: 8766)
+    /// Thread-safe mirror of `connectedClientIP` readable from the HTTP
+    /// server's actor context (the sender validator closure).
+    @ObservationIgnored private let allowedUploadSender = AllowedSenderStore()
     var mirrorService: MirrorService?
     var pairingService: PairingService?
     private var serverStarted = false
@@ -94,6 +97,14 @@ final class ConnectionService {
         startDeviceInfoPolling()
 
         do {
+            // Only the currently connected (paired + authenticated) phone may
+            // talk to the upload server; with no phone connected, reject all.
+            // Installed before start() so there is no allow-all window.
+            let allowed = allowedUploadSender
+            await httpServer.setSenderValidator { remoteHost in
+                guard let host = allowed.host else { return false }
+                return HttpUploadServer.normalizeHost(remoteHost) == HttpUploadServer.normalizeHost(host)
+            }
             try await httpServer.start()
             try await advertiseServer()
             keyManager.migrateFromSingleDevice()
@@ -283,7 +294,7 @@ final class ConnectionService {
 
         pairingManager.completePairing(deviceName: deviceName, publicKey: publicKey)
         connectedDeviceName = deviceName
-        connectedClientIP = connectionId.components(separatedBy: ":").first
+        setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
         statusMessage = L10n.isPL ? "Sparowano z \(deviceName)" : "Paired with \(deviceName)"
         isConnected = true
 
@@ -340,7 +351,7 @@ final class ConnectionService {
 
             let device = keyManager.getPairedDevices().first { $0.publicKeyBase64 == publicKey }
             self.connectedDeviceName = device?.deviceName ?? "Device"
-            self.connectedClientIP = connectionId.components(separatedBy: ":").first
+            self.setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
             self.isConnected = true
             self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
 
@@ -428,6 +439,10 @@ final class ConnectionService {
                 guard let self else { return }
                 let stillConnected = await self.server.isConnected
                 self.isConnected = stillConnected
+                if !stillConnected {
+                    // No phone connected → the upload server accepts nobody.
+                    self.setConnectedClientIP(nil)
+                }
                 if !stillConnected && !self.manuallyDisconnected {
                     self.connectedDeviceName = ""
                     self.deviceInfo = nil
@@ -456,6 +471,22 @@ final class ConnectionService {
         connectedClientIP
     }
 
+    /// Updates `connectedClientIP` and its thread-safe mirror used by the
+    /// HTTP upload server's sender validator.
+    private func setConnectedClientIP(_ ip: String?) {
+        connectedClientIP = ip
+        allowedUploadSender.host = ip
+    }
+
+    /// A connectionId has the form "host:port". For IPv6 the host itself
+    /// contains colons ("fe80::1%en0:8765"), so take everything before the
+    /// LAST colon instead of splitting on the first one.
+    private static func hostPart(ofConnectionId id: String) -> String? {
+        guard let idx = id.lastIndex(of: ":") else { return id }
+        let host = String(id[..<idx])
+        return host.isEmpty ? nil : host
+    }
+
     func getLocalIPAddress() -> String? {
         var address: String?
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
@@ -480,5 +511,19 @@ final class ConnectionService {
             }
         }
         return address
+    }
+}
+
+// MARK: - AllowedSenderStore
+
+/// Lock-protected holder for the connected phone's IP. The MainActor-bound
+/// `ConnectionService` writes it; the `HttpUploadServer` actor reads it from
+/// the sender-validator closure, so it must be `Sendable` and thread-safe.
+final class AllowedSenderStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _host: String?
+    var host: String? {
+        get { lock.withLock { _host } }
+        set { lock.withLock { _host = newValue } }
     }
 }

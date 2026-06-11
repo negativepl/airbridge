@@ -35,6 +35,25 @@ public actor HttpUploadServer {
         self.onProgress = onProgress
     }
 
+    /// Validator deciding whether an incoming connection's remote host
+    /// (e.g. "192.168.1.7") is allowed to talk to this server. Connections
+    /// from any other host are dropped before a single request byte is read.
+    /// While `nil` (validator not installed yet), ALL connections are
+    /// rejected — an unconfigured server accepts nobody.
+    private var isAllowedSender: (@Sendable (String) -> Bool)?
+
+    /// Installs the sender validator (see `isAllowedSender`).
+    public func setSenderValidator(_ validator: (@Sendable (String) -> Bool)?) {
+        self.isAllowedSender = validator
+    }
+
+    /// Normalizes a host string for comparison: strips the IPv6 zone index
+    /// ("%en0") and lowercases.
+    public static func normalizeHost(_ host: String) -> String {
+        let stripped = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+        return stripped.lowercased()
+    }
+
     // MARK: - Private State
 
     private let port: UInt16
@@ -205,6 +224,15 @@ public actor HttpUploadServer {
     // MARK: - Private — Connection Handling
 
     private func handleNewConnection(_ connection: NWConnection) {
+        // Sender check: only the currently connected peer may upload/download.
+        // Unknown or disallowed remote hosts — and every connection while no
+        // validator is installed — are dropped before any parsing.
+        guard let validator = isAllowedSender,
+              let remoteHost = Self.remoteHost(of: connection),
+              validator(remoteHost) else {
+            connection.cancel()
+            return
+        }
         let id = ObjectIdentifier(connection)
         connections[id] = connection
         connection.stateUpdateHandler = { @Sendable [weak self] state in
@@ -217,6 +245,12 @@ public actor HttpUploadServer {
 
     private func removeConnection(id: ObjectIdentifier) {
         connections.removeValue(forKey: id)
+    }
+
+    /// Extracts the remote host string from an inbound connection's endpoint.
+    private static func remoteHost(of connection: NWConnection) -> String? {
+        guard case .hostPort(let host, _) = connection.endpoint else { return nil }
+        return "\(host)"
     }
 
     // MARK: - Private — HTTP Parsing

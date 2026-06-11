@@ -490,7 +490,10 @@ final class FileTransferService: MessageHandler, BinaryChunkHandler {
         let expandedPath = NSString(string: folderPath).expandingTildeInPath
         let downloadsURL = URL(fileURLWithPath: expandedPath)
         try FileManager.default.createDirectory(at: downloadsURL, withIntermediateDirectories: true)
-        let fileURL = downloadsURL.appendingPathComponent(filename)
+        // Filename comes from the network — sanitize against path traversal.
+        guard let fileURL = SafeFileName.resolvedURL(in: downloadsURL, filename: filename) else {
+            throw CocoaError(.fileWriteInvalidFileName)
+        }
         try data.write(to: fileURL)
         return fileURL
     }

@@ -45,7 +45,7 @@ class ClipboardSync(private val context: Context) {
                 else -> ContentType.PLAIN_TEXT
             }
 
-            Log.d(TAG, "Clipboard changed locally: '${text.take(50)}' type=$contentType")
+            Log.d(TAG, "Clipboard changed locally (${text.length} chars) type=$contentType")
             onClipboardChanged?.invoke(contentType, text)
         } catch (e: Exception) {
             Log.e(TAG, "Error handling clipboard change", e)

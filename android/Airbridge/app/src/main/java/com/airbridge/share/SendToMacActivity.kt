@@ -26,7 +26,7 @@ class SendToMacActivity : ComponentActivity() {
             return
         }
 
-        Log.d(TAG, "Received text: '${text.take(50)}'")
+        Log.d(TAG, "Received text (${text.length} chars)")
 
         // Send via AirbridgeService static method
         AirbridgeService.sendClipboardToMac(ContentType.PLAIN_TEXT, text)

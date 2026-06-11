@@ -116,7 +116,7 @@ class AirbridgeService : Service() {
             )
             svc.webSocketClient.send(msg)
             addActivity(ActivityItem("clipboard_sent", "", System.currentTimeMillis()))
-            Log.d(TAG, "Sent clipboard to Mac: '${data.take(50)}'")
+            Log.d(TAG, "Sent clipboard to Mac (${data.length} chars)")
         }
 
         fun sendPing() {
@@ -228,7 +228,7 @@ class AirbridgeService : Service() {
                     Log.d(TAG, "File transfer requested: $uri")
                     handleSendFile(uri)
                 } else if (!text.isNullOrEmpty()) {
-                    Log.d(TAG, "Text share requested: '${text.take(50)}'")
+                    Log.d(TAG, "Text share requested (${text.length} chars)")
                     sendClipboardToMac(ContentType.PLAIN_TEXT, text)
                 }
             }
@@ -434,7 +434,24 @@ class AirbridgeService : Service() {
         httpFileServer.onFileReceived = { filename, _, tempFile ->
             finalizeReceivedFile(filename, tempFile)
         }
+        // Only the currently connected Mac may POST files; with no Mac
+        // connected, everything in the LAN gets rejected.
+        httpFileServer.isAllowedSender = { remote ->
+            connectedHost.value?.let { isSameHost(remote, it) } ?: false
+        }
         httpFileServer.start()
+    }
+
+    /** Compares an incoming socket address with the connected Mac's host. */
+    private fun isSameHost(remote: java.net.InetAddress, allowedHost: String): Boolean {
+        // Strip the IPv6 zone index ("%wlan0") on both sides before comparing.
+        val remoteAddr = remote.hostAddress?.substringBefore('%') ?: return false
+        if (remoteAddr.equals(allowedHost.substringBefore('%'), ignoreCase = true)) return true
+        return try {
+            java.net.InetAddress.getAllByName(allowedHost).any { it == remote }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /// Shared progress updater used by BOTH inbound POST (legacy
@@ -495,7 +512,15 @@ class AirbridgeService : Service() {
                     ).absolutePath + "/AirBridge"
                 val dir = File(folder)
                 if (!dir.exists()) dir.mkdirs()
-                val file = File(dir, filename)
+                // Filename comes from the network — sanitize against traversal.
+                val file = com.airbridge.files.SafeFileName.resolveIn(dir, filename)
+                if (file == null) {
+                    Log.w(TAG, "Rejected unsafe received filename")
+                    tempFile.delete()
+                    transferProgress.value = null
+                    transferFileName.value = null
+                    return@launch
+                }
                 tempFile.copyTo(file, overwrite = true)
                 tempFile.delete()
                 Log.d(TAG, "File received: ${file.absolutePath}")
@@ -546,7 +571,16 @@ class AirbridgeService : Service() {
         serviceScope.launch {
             try {
                 val mime = mimeType.ifBlank { "application/octet-stream" }
-                val created = filesProvider.createFile(destinationDir, filename, mime)
+                // Filename comes from the network — keep only a safe segment.
+                val safeName = com.airbridge.files.SafeFileName.sanitize(filename)
+                if (safeName == null) {
+                    Log.w(TAG, "Rejected unsafe received filename")
+                    tempFile.delete()
+                    transferProgress.value = null
+                    transferFileName.value = null
+                    return@launch
+                }
+                val created = filesProvider.createFile(destinationDir, safeName, mime)
                 if (created == null) {
                     Log.e(TAG, "createFile failed for $destinationDir/$filename — falling back to Downloads")
                     finalizeReceivedFile(filename, tempFile)
@@ -680,7 +714,7 @@ class AirbridgeService : Service() {
                     Log.d(TAG, "Ignoring own clipboard update")
                     return
                 }
-                Log.d(TAG, "Received clipboard: type=${message.contentType.value} data='${message.data.take(50)}'")
+                Log.d(TAG, "Received clipboard: type=${message.contentType.value} (${message.data.length} chars)")
                 if (message.contentType == ContentType.PLAIN_TEXT || message.contentType == ContentType.HTML) {
                     val hash = sha256(message.data)
                     lastRemoteClipHash = hash
@@ -814,7 +848,15 @@ class AirbridgeService : Service() {
                             ).absolutePath + "/AirBridge"
                         val dir = java.io.File(folder)
                         if (!dir.exists()) dir.mkdirs()
-                        val file = java.io.File(dir, transfer.filename)
+                        // Filename comes from the network — sanitize against traversal.
+                        val file = com.airbridge.files.SafeFileName.resolveIn(dir, transfer.filename)
+                        if (file == null) {
+                            Log.w(TAG, "Rejected unsafe received filename")
+                            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(4)
+                            transferProgress.value = null
+                            transferFileName.value = null
+                            return@launch
+                        }
                         file.writeBytes(data)
                         Log.d(TAG, "File received: ${file.absolutePath}")
                         addActivity(ActivityItem("file_received", transfer.filename, System.currentTimeMillis()))
@@ -870,16 +912,14 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.GalleryPreviewRequest -> {
-                Log.e(TAG, "!!! GalleryPreviewRequest RECEIVED: photoId=${message.photoId} maxSize=${message.maxSize}")
+                Log.d(TAG, "GalleryPreviewRequest: photoId=${message.photoId} maxSize=${message.maxSize}")
                 serviceScope.launch {
                     val data = galleryProvider.getPreview(message.photoId, message.maxSize)
                     if (data != null) {
-                        Log.e(TAG, "!!! preview data ready, length=${data.length}, sending response")
                         val response = Message.GalleryPreviewResponse(message.photoId, data)
                         webSocketClient.send(response)
-                        Log.e(TAG, "!!! GalleryPreviewResponse sent")
                     } else {
-                        Log.e(TAG, "!!! getPreview returned null for ${message.photoId}")
+                        Log.d(TAG, "getPreview returned null for ${message.photoId}")
                     }
                 }
             }

@@ -1,9 +1,11 @@
 package com.airbridge.service
 
 import android.util.Log
+import com.airbridge.files.SafeFileName
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +22,14 @@ class HttpFileServer(private val port: Int = 8767) {
     private var serverSocket: ServerSocket? = null
     var onFileReceived: ((filename: String, mimeType: String, file: File) -> Unit)? = null
     var onProgress: ((filename: String, bytesReceived: Int, totalBytes: Int) -> Unit)? = null
+
+    /**
+     * Decides whether the remote address may POST to this server. The owner
+     * (AirbridgeService) wires this to "is it the currently connected Mac?".
+     * Default: reject everything — an unconfigured server accepts nobody.
+     */
+    var isAllowedSender: (InetAddress) -> Boolean = { false }
+
     var actualPort: Int = port
         private set
 
@@ -52,6 +62,15 @@ class HttpFileServer(private val port: Int = 8767) {
 
     private fun handleClient(client: Socket) {
         try {
+            // Only the currently connected Mac may upload; anyone else in the
+            // LAN gets a 403 before a single request byte is processed.
+            val remote = client.inetAddress
+            if (remote == null || !isAllowedSender(remote)) {
+                Log.w(TAG, "Rejected upload from unauthorized address ${remote?.hostAddress}")
+                sendResponse(client, 403, """{"status":"error","message":"forbidden"}""")
+                return
+            }
+
             val input = client.getInputStream()
 
             // Read request line byte-by-byte (avoid BufferedReader stealing binary data)
@@ -73,9 +92,12 @@ class HttpFileServer(private val port: Int = 8767) {
             }
 
             val contentLength = headers["content-length"]?.toLongOrNull() ?: 0L
-            val filename = headers["x-filename"]?.let {
-                java.net.URLDecoder.decode(it, "UTF-8")
-            } ?: "file"
+            // X-Filename is attacker-controlled input — keep only a safe last
+            // path segment so it can never traverse outside the target dir.
+            val filename = headers["x-filename"]
+                ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                ?.let { SafeFileName.sanitize(it) }
+                ?: "file"
             val mimeType = headers["x-mime-type"] ?: "application/octet-stream"
 
             Log.d(TAG, "Receiving: $filename ($mimeType, $contentLength bytes)")
