@@ -131,6 +131,7 @@ class ScreenDecoder(
         buf.clear()
         buf.put(data)
         runCatching { codec.queueInputBuffer(index, 0, data.size, ptsUs, 0) }
+            .onFailure { if (!stopped) Log.w(TAG, "queueInputBuffer failed, input index lost", it) }
     }
 
     fun stop() {

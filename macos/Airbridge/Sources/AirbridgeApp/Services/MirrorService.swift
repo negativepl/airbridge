@@ -136,7 +136,12 @@ public final class MirrorService {
     /// stream only ever holds the newest few frames.
     public func makeSampleBufferStream() -> AsyncStream<CMSampleBuffer> {
         let id = UUID()
-        return AsyncStream(bufferingPolicy: .bufferingNewest(8)) { continuation in
+        return AsyncStream(bufferingPolicy: .bufferingNewest(2)) { continuation in
+            // `onTermination` requires a plain `@Sendable` closure; a
+            // `@MainActor` closure doesn't convert ("loses global actor"), so
+            // hop back to the main actor with a Task. The brief async window
+            // before cleanup is harmless: yielding to a finished continuation
+            // is a no-op.
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor in self?.sampleSubscribers[id] = nil }
             }
