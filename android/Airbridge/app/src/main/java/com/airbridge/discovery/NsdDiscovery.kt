@@ -128,8 +128,49 @@ class NsdDiscovery(private val context: Context) {
         object None : NsdCall
     }
 
-    /** Performs the NsdManager call decided under the lock. Must be called WITHOUT the lock held. */
-    private fun perform(call: NsdCall) {
+    // Decisions are NsdManager calls that must reach NsdManager in the order
+    // they were made. Executing each decision right after releasing the lock
+    // is not enough: between the unlock and the call, another thread can take
+    // the lock, decide, and execute first — e.g. a Start decided by finishStop
+    // could be overtaken by a Stop for the same listener, leaving a ghost
+    // discovery running with the class state already cleared. So decisions are
+    // appended to a FIFO queue under the state lock, and a single drainer
+    // (guarded by isPerforming) executes them outside the lock in order.
+    private val pendingCalls = ArrayDeque<NsdCall>()
+    private var isPerforming = false
+
+    /** Must be called with the NsdDiscovery lock held. */
+    private fun enqueueLocked(call: NsdCall) {
+        if (call != NsdCall.None) pendingCalls.addLast(call)
+    }
+
+    /**
+     * Executes queued NsdManager calls in FIFO order. Must be called WITHOUT
+     * the lock held. Only one thread drains at a time; others return
+     * immediately and the active drainer picks up whatever they enqueued.
+     */
+    private fun drainCalls() {
+        var call = synchronized(this) {
+            if (isPerforming) return // an active drainer will execute our entry
+            val next = pendingCalls.removeFirstOrNull() ?: return
+            isPerforming = true
+            next
+        }
+        while (true) {
+            executeCall(call)
+            call = synchronized(this) {
+                val next = pendingCalls.removeFirstOrNull()
+                if (next == null) {
+                    isPerforming = false
+                    return
+                }
+                next
+            }
+        }
+    }
+
+    /** Performs a single NsdManager call. Must be called WITHOUT the lock held. */
+    private fun executeCall(call: NsdCall) {
         when (call) {
             is NsdCall.Start ->
                 nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, call.listener)
@@ -140,6 +181,9 @@ class NsdDiscovery(private val context: Context) {
                     Log.e(TAG, "Error stopping discovery", e)
                     // The stop request never reached NsdManager — complete the
                     // cycle here so a pending restart isn't stuck forever.
+                    // finishStop enqueues any follow-up Start; its drainCalls
+                    // sees isPerforming and bails, so the drain loop we are
+                    // already inside executes it next, still in FIFO order.
                     finishStop(call.listener)
                 }
             NsdCall.None -> Unit
@@ -147,16 +191,16 @@ class NsdDiscovery(private val context: Context) {
     }
 
     fun startDiscovery() {
-        perform(synchronized(this) { startLocked() })
+        synchronized(this) { enqueueLocked(startLocked()) }
+        drainCalls()
     }
 
     fun stopDiscovery() {
-        perform(
-            synchronized(this) {
-                pendingStart = false
-                stopLocked()
-            }
-        )
+        synchronized(this) {
+            pendingStart = false
+            enqueueLocked(stopLocked())
+        }
+        drainCalls()
     }
 
     /**
@@ -166,12 +210,11 @@ class NsdDiscovery(private val context: Context) {
      * would let the old listener race the new one with duplicate finds.
      */
     fun restart() {
-        perform(
-            synchronized(this) {
-                pendingStart = true
-                stopLocked()
-            }
-        )
+        synchronized(this) {
+            pendingStart = true
+            enqueueLocked(stopLocked())
+        }
+        drainCalls()
     }
 
     /** Must be called with the NsdDiscovery lock held. */
@@ -211,7 +254,8 @@ class NsdDiscovery(private val context: Context) {
 
     /** Completes a stop cycle for [listener]; calls from stale listeners are no-ops. */
     private fun finishStop(listener: NsdManager.DiscoveryListener) {
-        perform(synchronized(this) { finishStopLocked(listener) })
+        synchronized(this) { enqueueLocked(finishStopLocked(listener)) }
+        drainCalls()
     }
 
     /** Must be called with the NsdDiscovery lock held. */
