@@ -29,7 +29,13 @@ fi
 # 1. Build macOS
 echo "--- Building macOS ---"
 cd "$ROOT/macos/Airbridge"
-swift build -c release 2>&1 | grep "error:" && { echo "  macOS build FAILED"; exit 1; } || true
+BUILD_LOG="$(mktemp -t airbridge-macos-build)"
+if ! swift build -c release > "$BUILD_LOG" 2>&1; then
+    echo "  macOS build FAILED — last 30 lines of $BUILD_LOG:"
+    tail -30 "$BUILD_LOG"
+    exit 1
+fi
+rm -f "$BUILD_LOG"
 echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
@@ -139,6 +145,15 @@ echo "  APK: $ROOT/AirBridge.apk"
 echo ""
 echo "--- Creating GitHub Release $TAG ---"
 
+# Changelog base: the tag immediately preceding $TAG; fall back to the last
+# 10 commits when there is no earlier tag.
+PREV_TAG="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
+if [ -n "$PREV_TAG" ]; then
+    CHANGELOG="$(git log --oneline "$PREV_TAG..$TAG" --no-decorate)"
+else
+    CHANGELOG="$(git log --oneline -10 --no-decorate "$TAG")"
+fi
+
 NOTES="$(cat <<EOF
 ## AirBridge $TAG
 
@@ -147,7 +162,7 @@ NOTES="$(cat <<EOF
 - **Android**: AirBridge.apk
 
 ### Changes since last release
-$(git log --oneline v1.0.0..HEAD --no-decorate 2>/dev/null || git log --oneline -10 --no-decorate)
+$CHANGELOG
 EOF
 )"
 
