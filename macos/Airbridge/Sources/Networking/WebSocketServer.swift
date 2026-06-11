@@ -165,6 +165,10 @@ public actor WebSocketServer {
         actualPort = nil
         guard let listener else { return }
         self.listener = nil
+        // If the listener already reached .cancelled on its own (e.g. after a
+        // failure), no further stateUpdateHandler call will arrive — waiting
+        // on a continuation here would hang forever.
+        if case .cancelled = listener.state { return }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.stopContinuation = continuation
             listener.cancel()
@@ -243,11 +247,22 @@ public actor WebSocketServer {
             let cont = readyContinuation
             readyContinuation = nil
             cont?.resume(throwing: error)
+            // A cancelled listener may surface .failed instead of .cancelled;
+            // at that point the stop is effectively done — release any waiter
+            // so stop() cannot hang.
+            let stopCont = stopContinuation
+            stopContinuation = nil
+            stopCont?.resume()
             #if DEBUG
             print("[WebSocketServer] Listener failed: \(error)")
             #endif
 
         case .cancelled:
+            // stop() arrived while start() was still waiting for .ready:
+            // the start did not succeed, so fail it instead of leaking it.
+            let readyCont = readyContinuation
+            readyContinuation = nil
+            readyCont?.resume(throwing: CancellationError())
             let cont = stopContinuation
             stopContinuation = nil
             cont?.resume()

@@ -131,6 +131,18 @@ final class ConnectionService {
     @ObservationIgnored private var isRestarting = false
     @ObservationIgnored private var restartPending = false
 
+    /// Runs one restart `pass`, then repeats it as long as another restart
+    /// request (network change / reconnect) arrived mid-pass, so no request
+    /// is ever dropped. Callers must set `isRestarting = true` before
+    /// spawning the task that awaits this.
+    private func runRestartCatchingUp(_ pass: @MainActor () async -> Void) async {
+        defer { isRestarting = false }
+        repeat {
+            restartPending = false
+            await pass()
+        } while restartPending
+    }
+
     /// The Mac moved to a different network: re-advertise Bonjour on the new IP
     /// so the phone can rediscover us. The phone is the side that reconnects.
     private func handleNetworkChange() {
@@ -142,10 +154,8 @@ final class ConnectionService {
         }
         isRestarting = true
         Task {
-            defer { isRestarting = false }
-            repeat {
-                restartPending = false
-                guard serverStarted, !manuallyDisconnected else { break }
+            await runRestartCatchingUp {
+                guard serverStarted, !manuallyDisconnected else { return }
                 await server.stop()
                 // Reset connection state before trying to come back up, so the UI
                 // never shows "Connected" on a dead server if advertising fails.
@@ -156,7 +166,7 @@ final class ConnectionService {
                 } catch {
                     statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
                 }
-            } while restartPending
+            }
         }
     }
 
@@ -180,13 +190,11 @@ final class ConnectionService {
         }
         isRestarting = true
         Task {
-            defer { isRestarting = false }
-            await stopServer()
-            try? await Task.sleep(for: .milliseconds(500))
-            await startServerNow()
-            // A network change that arrived mid-restart is already satisfied:
-            // startServerNow() advertised on the current network.
-            restartPending = false
+            await runRestartCatchingUp {
+                await stopServer()
+                try? await Task.sleep(for: .milliseconds(500))
+                await startServerNow()
+            }
         }
     }
 
