@@ -412,11 +412,23 @@ public actor HttpUploadServer {
     /// `@unchecked Sendable`: all mutations happen in the serialized receive
     /// callback chain of a single `NWConnection` (one callback schedules the
     /// next), so there is never concurrent access.
+    ///
+    /// Lifecycle contract:
+    /// - happy path:      `append`* → `finish()` → ownership of the temp file
+    ///   passes to the caller (or `deleteTempFile()` on rejection, e.g.
+    ///   checksum mismatch).
+    /// - abort path:      `append`* → `discard()`.
+    /// `finish()` closes the file handle exactly once; `discard()` is safe to
+    /// call at any point (before or after `finish()`) and never double-closes.
     private final class UploadSink: @unchecked Sendable {
         let tempURL: URL
         private let handle: FileHandle
         private var hasher = SHA256()
         private(set) var bytesWritten: Int = 0
+
+        /// True once the handle has been closed (or a close was attempted).
+        /// Guards against double-closing in `discard()`.
+        private var isFinished = false
 
         init() throws {
             let url = FileManager.default.temporaryDirectory
@@ -434,16 +446,30 @@ public actor HttpUploadServer {
             bytesWritten += data.count
         }
 
-        /// Closes the file and returns the hex SHA-256 of everything written.
+        /// Closes the file handle and returns the hex SHA-256 of everything
+        /// written. Call at most once. The handle counts as closed even if
+        /// the close throws, so a subsequent `discard()` won't close again.
         func finish() throws -> String {
+            defer { isFinished = true }
             try handle.close()
             return hasher.finalize().map { String(format: "%02x", $0) }.joined()
         }
 
-        /// Closes and deletes the temp file (error paths).
-        func discard() {
-            try? handle.close()
+        /// Deletes the temp file WITHOUT touching the handle. Only valid
+        /// after `finish()` — e.g. when the upload is rejected post-hash
+        /// (checksum mismatch) or nobody claims the file.
+        func deleteTempFile() {
             try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        /// Abort path: closes the handle if it is still open, then deletes
+        /// the temp file. Idempotent and safe at any point in the lifecycle.
+        func discard() {
+            if !isFinished {
+                isFinished = true
+                try? handle.close()
+            }
+            deleteTempFile()
         }
     }
 
@@ -532,7 +558,7 @@ public actor HttpUploadServer {
 
         if let expected = expectedChecksum, !expected.isEmpty {
             guard computedChecksum.lowercased() == expected.lowercased() else {
-                sink.discard()
+                sink.deleteTempFile()
                 sendErrorResponse(
                     on: connection,
                     status: 400,
@@ -546,7 +572,8 @@ public actor HttpUploadServer {
             // Ownership of the temp file passes to the callback.
             onFileReceived(filename, mimeType, computedChecksum, sink.tempURL)
         } else {
-            sink.discard()
+            // finish() already closed the handle — nobody wants the file.
+            sink.deleteTempFile()
         }
 
         let json = "{\"status\":\"ok\",\"bytes_received\":\(sink.bytesWritten)}"
@@ -603,7 +630,13 @@ public actor HttpUploadServer {
 
         // All file I/O runs off the actor so a multi-GB transfer never blocks
         // other HTTP requests.
-        Task.detached(priority: .userInitiated) {
+        //
+        // The strong `self` capture is deliberate: it only serves to call
+        // `sendErrorResponse` (nonisolated) — no actor-isolated state is
+        // touched, and keeping the server alive for the duration of an
+        // in-flight transfer is desired. `onProgress`/`onComplete` are plain
+        // @Sendable closures with no isolation requirements either.
+        Task.detached(priority: .userInitiated) { [self] in
             guard let total = Self.fileSize(at: fileURL),
                   // Integrity checksum the phone verifies after the download
                   // completes. Computed by streaming the file once up front.

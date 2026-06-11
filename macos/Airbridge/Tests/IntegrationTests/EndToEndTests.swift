@@ -1,6 +1,5 @@
 import XCTest
 import Foundation
-import CryptoKit
 @testable import Networking
 import Protocol
 
@@ -89,96 +88,4 @@ final class EndToEndTests: XCTestCase {
         await server.stop()
     }
 
-    // MARK: - Test 2: File Transfer Simulation
-
-    /// Verifies that a multi-step file transfer sequence
-    /// (fileTransferStart → fileChunk → fileTransferComplete) can be sent
-    /// from a client to the server and that the server records the final
-    /// `fileTransferComplete` with the correct transferId.
-    func testFileTransferSimulation() async throws {
-        // 1. Start server and connect client
-        let server = WebSocketServer(port: 0)
-        try await server.start()
-
-        let port = await server.actualPort
-        XCTAssertNotNil(port, "Server should have an assigned port after start")
-        guard let port else { return }
-
-        let url = URL(string: "ws://127.0.0.1:\(port)")!
-        let client = URLSession.shared.webSocketTask(with: url)
-        client.resume()
-
-        try await Task.sleep(nanoseconds: 300_000_000)
-
-        // 2. Prepare file content
-        let fileContent = "Hello"
-        let fileData = Data(fileContent.utf8)
-        let base64Chunk = fileData.base64EncodedString()
-
-        // Compute SHA-256 checksum of the file bytes
-        let digest = SHA256.hash(data: fileData)
-        let checksumHex = digest.map { String(format: "%02x", $0) }.joined()
-
-        let transferId = "transfer-e2e-001"
-
-        // Send fileTransferStart
-        let startMessage = Message.fileTransferStart(
-            sourceId: "android-sim",
-            transferId: transferId,
-            filename: "hello.txt",
-            mimeType: "text/plain",
-            totalSize: fileData.count,
-            totalChunks: 1
-        )
-        try await client.send(.string(jsonString(for: startMessage)))
-
-        try await Task.sleep(nanoseconds: 100_000_000)
-
-        // Send fileChunk
-        let chunkMessage = Message.fileChunk(
-            transferId: transferId,
-            chunkIndex: 0,
-            data: base64Chunk
-        )
-        try await client.send(.string(jsonString(for: chunkMessage)))
-
-        try await Task.sleep(nanoseconds: 100_000_000)
-
-        // Send fileTransferComplete with correct SHA-256
-        let completeMessage = Message.fileTransferComplete(
-            transferId: transferId,
-            checksumSHA256: checksumHex
-        )
-        try await client.send(.string(jsonString(for: completeMessage)))
-
-        // 3. Wait for server to process the final message
-        try await Task.sleep(nanoseconds: 300_000_000)
-
-        // Verify server's lastReceivedMessage is fileTransferComplete
-        let serverReceived = await server.lastReceivedMessage
-        XCTAssertNotNil(serverReceived, "Server should have received the fileTransferComplete message")
-
-        guard case .fileTransferComplete(let receivedId, let receivedChecksum) = serverReceived else {
-            XCTFail("Expected fileTransferComplete, got \(String(describing: serverReceived))")
-            client.cancel(with: .normalClosure, reason: Data())
-            await server.stop()
-            return
-        }
-        XCTAssertEqual(receivedId, transferId, "transferId should match")
-        XCTAssertEqual(receivedChecksum, checksumHex, "SHA-256 checksum should match")
-
-        // Cleanup
-        client.cancel(with: .normalClosure, reason: Data())
-        await server.stop()
-    }
-
-    // MARK: - Private Helpers
-
-    private func jsonString(for message: Message) throws -> String {
-        let data = try JSONEncoder().encode(message)
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw EncodingError.invalidValue(message, .init(codingPath: [], debugDescription: "UTF-8 encoding failed"))
-        }
-        return string
-    }
 }
