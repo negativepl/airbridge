@@ -61,8 +61,8 @@ public final class MirrorService {
     /// True while we're sending OUR screen to the phone (reverse mirror).
     public private(set) var isReverseStreaming: Bool = false
     /// True while the standalone Mirror window is showing the stream. The tab
-    /// must not render simultaneously — the frame stream has a single consumer,
-    /// so two renderers would split frames. The tab shows a placeholder instead.
+    /// shows a placeholder instead of rendering the same stream twice (frames
+    /// are fanned out per renderer, so this is a UX choice, not a constraint).
     public var presentedInWindow: Bool = false
     public private(set) var actualPort: UInt16?
     public private(set) var remoteScreenWidth: CGFloat = 540
@@ -124,10 +124,25 @@ public final class MirrorService {
         max(videoWidth, 1) / max(videoHeight, 1)
     }
 
-    /// AsyncStream of decoded CMSampleBuffers; consume from `@MainActor` context only.
-    public let sampleBufferStream: AsyncStream<CMSampleBuffer>
-    private let _continuation: AsyncStream<UncheckedSampleBuffer>.Continuation
-    private let _innerStream: AsyncStream<UncheckedSampleBuffer>
+    /// Live decoded-frame subscribers. Each renderer obtains its own stream via
+    /// `makeSampleBufferStream()`; frames are fanned out to all of them. A
+    /// subscriber that stops consuming (its task is cancelled / its iterator is
+    /// dropped) unregisters itself via `onTermination`, so closed renderers
+    /// don't kill the feed for renderers opened later.
+    private var sampleSubscribers: [UUID: AsyncStream<CMSampleBuffer>.Continuation] = [:]
+
+    /// A fresh AsyncStream of decoded CMSampleBuffers for one renderer.
+    /// Consume from `@MainActor` context only. Bounded buffer: an unconsumed
+    /// stream only ever holds the newest few frames.
+    public func makeSampleBufferStream() -> AsyncStream<CMSampleBuffer> {
+        let id = UUID()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(8)) { continuation in
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor in self?.sampleSubscribers[id] = nil }
+            }
+            sampleSubscribers[id] = continuation
+        }
+    }
 
     private let server: WebSocketServer
     private var pairingTokenProvider: () -> Data?
@@ -163,22 +178,6 @@ public final class MirrorService {
             loadedQuality[slot.rawValue] = Self.load(slot) ?? fallback
         }
         self.quality = loadedQuality
-
-        // Build the inner stream that can safely cross concurrency boundaries.
-        var cont: AsyncStream<UncheckedSampleBuffer>.Continuation!
-        let inner = AsyncStream<UncheckedSampleBuffer> { cont = $0 }
-        self._continuation = cont
-        self._innerStream = inner
-
-        // Map to the public CMSampleBuffer stream (consumed exclusively on @MainActor).
-        self.sampleBufferStream = AsyncStream<CMSampleBuffer> { outerCont in
-            Task { @MainActor in
-                for await box in inner {
-                    outerCont.yield(box.value)
-                }
-                outerCont.finish()
-            }
-        }
     }
 
     public func setPairingTokenProvider(_ provider: @escaping () -> Data?) {
@@ -207,6 +206,7 @@ public final class MirrorService {
         stopReverseMirror()
         actualPort = nil
         isStreaming = false
+        decoder?.invalidate()
         decoder = nil
         frameCounter = 0
         decodedFramesPerSecond = 0
@@ -232,7 +232,9 @@ public final class MirrorService {
                 if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 60) {
                     MirrorDebugLog.write("decoded sample #\(self.frameCounter)")
                 }
-                self._continuation.yield(box)
+                for continuation in self.sampleSubscribers.values {
+                    continuation.yield(box.value)
+                }
             }
         }
     }
@@ -274,6 +276,7 @@ public final class MirrorService {
                 let dims = try dec.configure(sps: sps, pps: pps)
                 videoWidth = CGFloat(dims.width)
                 videoHeight = CGFloat(dims.height)
+                self.decoder?.invalidate()   // drain + free the replaced decoder's VT session
                 self.decoder = dec
                 self.isStreaming = true
 
@@ -283,6 +286,7 @@ public final class MirrorService {
                 let dims = try dec.configureHEVC(vps: vps, sps: sps, pps: pps)
                 videoWidth = CGFloat(dims.width)
                 videoHeight = CGFloat(dims.height)
+                self.decoder?.invalidate()   // drain + free the replaced decoder's VT session
                 self.decoder = dec
                 self.isStreaming = true
 
@@ -338,6 +342,7 @@ public final class MirrorService {
     private func handleDisconnect() {
         stopReverseMirror()
         isStreaming = false
+        decoder?.invalidate()
         decoder = nil
         frameCounter = 0
         decodedFramesPerSecond = 0

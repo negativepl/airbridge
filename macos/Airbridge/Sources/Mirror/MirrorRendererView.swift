@@ -95,16 +95,21 @@ public final class MirrorRendererLayerView: NSView {
 public struct MirrorRendererView: NSViewRepresentable {
     public final class Coordinator {
         weak var view: MirrorRendererLayerView?
+        var consumeTask: Task<Void, Never>?
     }
 
-    private let stream: AsyncStream<CMSampleBuffer>
+    private let makeStream: @MainActor () -> AsyncStream<CMSampleBuffer>
     private let ambient: Bool
 
+    /// `streamFactory` is invoked once per created NSView (in `makeNSView`),
+    /// not per SwiftUI body evaluation, so each renderer holds exactly one
+    /// live subscription that is torn down in `dismantleNSView`.
+    ///
     /// `ambient: true` fills letterbox bars with a blurred glow of the screen
     /// (for the tab, where the area is wider than the phone). Pass `false` for
     /// the pop-out window, which resizes to the phone aspect — pure video.
-    public init(stream: AsyncStream<CMSampleBuffer>, ambient: Bool = true) {
-        self.stream = stream
+    public init(streamFactory: @escaping @MainActor () -> AsyncStream<CMSampleBuffer>, ambient: Bool = true) {
+        self.makeStream = streamFactory
         self.ambient = ambient
     }
 
@@ -112,14 +117,24 @@ public struct MirrorRendererView: NSViewRepresentable {
 
     public func makeNSView(context: Context) -> MirrorRendererLayerView {
         let view = MirrorRendererLayerView(frame: .zero, ambient: ambient)
-        context.coordinator.view = view
-        Task { @MainActor in
+        let coordinator = context.coordinator
+        coordinator.view = view
+        let stream = makeStream()
+        coordinator.consumeTask = Task { @MainActor in
             for await sample in stream {
-                context.coordinator.view?.enqueue(sample)
+                coordinator.view?.enqueue(sample)
             }
         }
         return view
     }
 
     public func updateNSView(_ nsView: MirrorRendererLayerView, context: Context) {}
+
+    public static func dismantleNSView(_ nsView: MirrorRendererLayerView, coordinator: Coordinator) {
+        // Without this the consume task outlives the view; reopening the
+        // mirror window would leave two tasks competing for frames.
+        coordinator.consumeTask?.cancel()
+        coordinator.consumeTask = nil
+        coordinator.view = nil
+    }
 }

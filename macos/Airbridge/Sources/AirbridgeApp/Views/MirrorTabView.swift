@@ -60,7 +60,7 @@ struct MirrorTabView: View {
         GeometryReader { proxy in
             ZStack {
                 Color.black
-                MirrorRendererView(stream: mirrorService.sampleBufferStream)
+                MirrorRendererView(streamFactory: mirrorService.makeSampleBufferStream)
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)

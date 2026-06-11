@@ -170,6 +170,10 @@ public final class VideoDecoder: @unchecked Sendable {
     }
 
     private func createSession(formatDescription: CMVideoFormatDescription) throws {
+        // Reconfiguration: tear down the old session first, otherwise the
+        // hardware decoder slot it holds leaks until deinit.
+        invalidate()
+
         let attrs: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
             kCVPixelBufferIOSurfacePropertiesKey as String: [:]
@@ -239,7 +243,22 @@ public final class VideoDecoder: @unchecked Sendable {
         self.session = session
     }
 
+    /// Tears down the decompression session. Blocks until all in-flight
+    /// asynchronous frames have been emitted BEFORE invalidating — the output
+    /// callback holds `self` via an unretained refCon, so a callback arriving
+    /// after the decoder is freed would be a use-after-free. After this
+    /// returns no further output callbacks can fire.
+    ///
+    /// Call explicitly when replacing/discarding a decoder; `deinit` also
+    /// calls it as a safety net.
+    public func invalidate() {
+        guard let session else { return }
+        self.session = nil
+        VTDecompressionSessionWaitForAsynchronousFrames(session)
+        VTDecompressionSessionInvalidate(session)
+    }
+
     deinit {
-        if let session { VTDecompressionSessionInvalidate(session) }
+        invalidate()
     }
 }

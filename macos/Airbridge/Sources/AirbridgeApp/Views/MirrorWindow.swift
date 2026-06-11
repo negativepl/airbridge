@@ -13,7 +13,7 @@ struct MirrorWindow: View {
         GeometryReader { proxy in
             ZStack {
                 Color.black.ignoresSafeArea()
-                MirrorRendererView(stream: mirrorService.sampleBufferStream, ambient: true)
+                MirrorRendererView(streamFactory: mirrorService.makeSampleBufferStream, ambient: true)
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
