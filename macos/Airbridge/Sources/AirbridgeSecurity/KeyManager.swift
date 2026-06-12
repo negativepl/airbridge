@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Security
 
 // MARK: - Errors
 
@@ -64,15 +65,59 @@ final class FileStorage: Storage, @unchecked Sendable {
     }
 }
 
+// MARK: - KeychainStorage
+
+/// Keychain-backed Storage (kSecClassGenericPassword). One item per account.
+final class KeychainStorage: Storage, @unchecked Sendable {
+    private let service: String
+
+    init(service: String = "com.airbridge.macos") {
+        self.service = service
+    }
+
+    private func baseQuery(account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
+
+    func load(account: String) -> Data? {
+        var query = baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess else { return nil }
+        return item as? Data
+    }
+
+    func save(_ data: Data, account: String) {
+        let query = baseQuery(account: account)
+        if SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess {
+            SecItemUpdate(query as CFDictionary,
+                          [kSecValueData as String: data] as CFDictionary)
+        } else {
+            var add = query
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(add as CFDictionary, nil)
+        }
+    }
+
+    func delete(account: String) {
+        SecItemDelete(baseQuery(account: account) as CFDictionary)
+    }
+}
+
 // MARK: - KeyManager
 
 /// Manages Ed25519 key pairs and paired-device storage.
-/// Use `.ephemeral()` for in-memory (test) storage and `.persistent()` for Keychain-backed production storage.
+/// Use `.ephemeral()` for in-memory (test) storage and `.persistent()` for
+/// Keychain-backed production storage (legacy file data is migrated on first use).
 public final class KeyManager: Sendable {
 
     // MARK: Keychain account names
 
-    private enum Account {
+    enum Account {
         static let privateKey = "private_key"
         static let deviceId = "device_id"
         static let pairedDevice = "paired_device"
@@ -95,9 +140,25 @@ public final class KeyManager: Sendable {
         KeyManager(storage: InMemoryStorage())
     }
 
-    /// Creates a `KeyManager` backed by files in Application Support.
+    /// Copies each account from `legacy` into `target` (only when target has no
+    /// value yet), then removes the legacy copy. Idempotent.
+    static func migrate(from legacy: any Storage, to target: any Storage, accounts: [String]) {
+        for account in accounts {
+            guard target.load(account: account) == nil,
+                  let data = legacy.load(account: account) else { continue }
+            target.save(data, account: account)
+            legacy.delete(account: account)
+        }
+    }
+
+    /// Creates a `KeyManager` backed by the Keychain, migrating any legacy
+    /// file-based data from Application Support on first use.
     public static func persistent() -> KeyManager {
-        KeyManager(storage: FileStorage())
+        let keychain = KeychainStorage()
+        migrate(from: FileStorage(), to: keychain,
+                accounts: [Account.privateKey, Account.deviceId,
+                           Account.pairedDevice, pairedDevicesAccount])
+        return KeyManager(storage: keychain)
     }
 
     // MARK: Identity
