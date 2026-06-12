@@ -77,9 +77,24 @@ One shared factory used by all four network clients (`WebSocketClient`, `HttpFil
 
 **macOS (`AirbridgeSecurity/KeyManager.swift`):**
 
-- New `KeychainStorage` implementing the existing `Storage` protocol via `kSecClassGenericPassword` (service `com.airbridge.macos`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`).
-- `Storage.persistent()` returns `KeychainStorage` (making the existing doc comment true). One-time migration: for each known account (`private_key`, `device_id`, `pairedDevices`), if the Keychain has no entry but the legacy file exists → copy into Keychain, delete the file.
-- The TLS identity (section 1) lives in the Keychain as a `SecIdentity`, managed by `TLSIdentityManager`.
+> **Amended 2026-06-12 (post-implementation):** the Keychain turned out to be
+> unusable for this app. securityd stamps every item with a partition ID; for
+> code that is not Apple-anchored (our self-signed "AirBridge Signing" cert)
+> that ID is `cdhash:<hash>`, which changes on every rebuild — so every
+> `dev-install.sh` re-sign invalidated access and macOS prompted for the login
+> keychain password on each read. This holds for both the legacy keychain
+> (even with an any-application ACL: the partition check is independent of the
+> ACL — verified empirically and against the securityd sources) and the data
+> protection keychain (`errSecMissingEntitlement` without an Apple-issued
+> application identifier). Final design: **hardened FileStorage** — secrets in
+> `~/Library/Application Support/AirBridge/` with directory `0700` and files
+> `0600`, plus an in-memory private-key cache so `sign()` reads storage once.
+> Threat-model equivalent to an any-application keychain ACL; the only
+> prompt-free model available to a self-signed app. `KeychainStorage` remains
+> in the codebase (tested, unused in production) for the day the app gets a
+> real Developer ID.
+
+- The TLS identity PKCS#12 blob (section 1) is stored through the same hardened `FileStorage`, managed by `TLSIdentityManager`.
 
 ### 6. Compatibility & failure behavior
 
