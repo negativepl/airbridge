@@ -20,6 +20,7 @@ object KeyCrypto {
     }
 
     fun decrypt(key: SecretKey, blob: ByteArray): ByteArray {
+        require(blob.size > IV_BYTES) { "Blob too short: ${blob.size} bytes" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val spec = GCMParameterSpec(TAG_BITS, blob, 0, IV_BYTES)
         cipher.init(Cipher.DECRYPT_MODE, key, spec)

@@ -105,9 +105,9 @@ class KeyManager(context: Context) {
     }
 
     /** One-time migration: encrypt a legacy plaintext private key, drop the plaintext. */
-    private fun migratePrivateKeyIfNeeded() {
+    private fun migratePrivateKeyIfNeeded(masterKey: SecretKey) {
         val plaintext = prefs.getString(PREF_PLAINTEXT, null) ?: return
-        val blob = KeyCrypto.encrypt(masterKey(), Base64.decode(plaintext, Base64.NO_WRAP))
+        val blob = KeyCrypto.encrypt(masterKey, Base64.decode(plaintext, Base64.NO_WRAP))
         prefs.edit()
             .putString(PREF_ENC, Base64.encodeToString(blob, Base64.NO_WRAP))
             .remove(PREF_PLAINTEXT)
@@ -115,9 +115,14 @@ class KeyManager(context: Context) {
     }
 
     private fun loadPrivateKeyBytes(): ByteArray {
-        migratePrivateKeyIfNeeded()
+        val mk = masterKey()
+        migratePrivateKeyIfNeeded(mk)
         val enc = prefs.getString(PREF_ENC, null) ?: throw IllegalStateException("No private key")
-        return KeyCrypto.decrypt(masterKey(), Base64.decode(enc, Base64.NO_WRAP))
+        return try {
+            KeyCrypto.decrypt(mk, Base64.decode(enc, Base64.NO_WRAP))
+        } catch (e: javax.crypto.AEADBadTagException) {
+            throw IllegalStateException("Private key blob corrupted or master key changed", e)
+        }
     }
 
     private fun generateKeyPair() {

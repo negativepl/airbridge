@@ -27,6 +27,12 @@ class KeyCryptoTest {
     }
 
     @Test
+    fun `blob shorter than IV is rejected`() {
+        val key = jvmKey()
+        assertThrows(IllegalArgumentException::class.java) { KeyCrypto.decrypt(key, ByteArray(5)) }
+    }
+
+    @Test
     fun `tampered blob fails authentication`() {
         val key = jvmKey()
         val blob = KeyCrypto.encrypt(key, byteArrayOf(9, 9, 9))
