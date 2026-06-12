@@ -2,17 +2,26 @@ package com.airbridge.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.security.KeyPairGenerator
 import java.security.KeyFactory
+import java.security.KeyStore
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.UUID
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 
 class KeyManager(context: Context) {
 
     companion object {
+        private const val MASTER_KEY_ALIAS = "airbridge_master_key"
+        private const val PREF_ENC = "private_key_enc"
+        private const val PREF_PLAINTEXT = "private_key_base64" // legacy
+
         /** SHA-256 hex fingerprint of a base64-encoded raw public key. */
         fun fingerprintOf(publicKeyBase64: String): String {
             val keyBytes = Base64.decode(publicKeyBase64, Base64.NO_WRAP)
@@ -53,9 +62,7 @@ class KeyManager(context: Context) {
     fun getPublicKeyFingerprint(): String = fingerprintOf(getRawPublicKeyBase64())
 
     fun sign(data: ByteArray): String {
-        val privKeyBase64 = prefs.getString("private_key_base64", null)
-            ?: throw IllegalStateException("No private key")
-        val privKeyBytes = Base64.decode(privKeyBase64, Base64.NO_WRAP)
+        val privKeyBytes = loadPrivateKeyBytes()
         val keySpec = PKCS8EncodedKeySpec(privKeyBytes)
         val keyFactory = KeyFactory.getInstance("Ed25519")
         val privateKey = keyFactory.generatePrivate(keySpec)
@@ -80,14 +87,47 @@ class KeyManager(context: Context) {
         }
     }
 
+    private fun masterKey(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (ks.getEntry(MASTER_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(
+            KeyGenParameterSpec.Builder(
+                MASTER_KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build()
+        )
+        return generator.generateKey()
+    }
+
+    /** One-time migration: encrypt a legacy plaintext private key, drop the plaintext. */
+    private fun migratePrivateKeyIfNeeded() {
+        val plaintext = prefs.getString(PREF_PLAINTEXT, null) ?: return
+        val blob = KeyCrypto.encrypt(masterKey(), Base64.decode(plaintext, Base64.NO_WRAP))
+        prefs.edit()
+            .putString(PREF_ENC, Base64.encodeToString(blob, Base64.NO_WRAP))
+            .remove(PREF_PLAINTEXT)
+            .apply()
+    }
+
+    private fun loadPrivateKeyBytes(): ByteArray {
+        migratePrivateKeyIfNeeded()
+        val enc = prefs.getString(PREF_ENC, null) ?: throw IllegalStateException("No private key")
+        return KeyCrypto.decrypt(masterKey(), Base64.decode(enc, Base64.NO_WRAP))
+    }
+
     private fun generateKeyPair() {
         val kpg = KeyPairGenerator.getInstance("Ed25519")
         val keyPair = kpg.generateKeyPair()
         val pubBase64 = Base64.encodeToString(keyPair.public.encoded, Base64.NO_WRAP)
-        val privBase64 = Base64.encodeToString(keyPair.private.encoded, Base64.NO_WRAP)
+        val privBlob = KeyCrypto.encrypt(masterKey(), keyPair.private.encoded)
         prefs.edit()
             .putString("public_key_base64", pubBase64)
-            .putString("private_key_base64", privBase64)
+            .putString(PREF_ENC, Base64.encodeToString(privBlob, Base64.NO_WRAP))
             .apply()
     }
 }
