@@ -13,7 +13,26 @@ data class PairedDevice(
     val deviceName: String,
     val publicKeyBase64: String,
     val publicKeyFingerprint: String,
-    val pairedAt: Long
+    val pairedAt: Long,
+    /** SHA-256 hex of the Mac's TLS certificate DER, learned from the pairing QR.
+     *  Empty = paired before TLS support → re-pairing required. */
+    val certFingerprint: String = ""
+)
+
+internal fun PairedDevice.toJson(): JSONObject = JSONObject().apply {
+    put("device_name", deviceName)
+    put("public_key", publicKeyBase64)
+    put("fingerprint", publicKeyFingerprint)
+    put("paired_at", pairedAt)
+    put("cert_fingerprint", certFingerprint)
+}
+
+internal fun pairedDeviceFromJson(obj: JSONObject): PairedDevice = PairedDevice(
+    deviceName = obj.getString("device_name"),
+    publicKeyBase64 = obj.getString("public_key"),
+    publicKeyFingerprint = obj.getString("fingerprint"),
+    pairedAt = obj.getLong("paired_at"),
+    certFingerprint = obj.optString("cert_fingerprint", "")
 )
 
 class PairedDeviceStore(context: Context) {
@@ -31,15 +50,7 @@ class PairedDeviceStore(context: Context) {
     fun getAll(): List<PairedDevice> {
         val json = prefs.getString("devices", "[]") ?: "[]"
         val arr = JSONArray(json)
-        return (0 until arr.length()).map { i ->
-            val obj = arr.getJSONObject(i)
-            PairedDevice(
-                deviceName = obj.getString("device_name"),
-                publicKeyBase64 = obj.getString("public_key"),
-                publicKeyFingerprint = obj.getString("fingerprint"),
-                pairedAt = obj.getLong("paired_at")
-            )
-        }
+        return (0 until arr.length()).map { i -> pairedDeviceFromJson(arr.getJSONObject(i)) }
     }
 
     fun add(device: PairedDevice) {
@@ -66,14 +77,7 @@ class PairedDeviceStore(context: Context) {
 
     private fun save(devices: List<PairedDevice>) {
         val arr = JSONArray()
-        devices.forEach { d ->
-            arr.put(JSONObject().apply {
-                put("device_name", d.deviceName)
-                put("public_key", d.publicKeyBase64)
-                put("fingerprint", d.publicKeyFingerprint)
-                put("paired_at", d.pairedAt)
-            })
-        }
+        devices.forEach { d -> arr.put(d.toJson()) }
         prefs.edit().putString("devices", arr.toString()).apply()
         _revision.update { it + 1 }
     }
