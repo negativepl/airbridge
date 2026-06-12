@@ -1,8 +1,9 @@
 #!/bin/bash
-# dev-install.sh — Debug build + replace binary in ~/Applications/AirBridge.app + relaunch
+# dev-install.sh — Debug build + replace binary in /Applications/AirBridge.app + relaunch
 #
-# Uses existing .app bundle structure created by release.sh. Fast iteration for UI work.
-# Does NOT recreate the full bundle or re-sign — only replaces the binary and resource bundle.
+# /Applications holds the ONE canonical install (release.sh syncs there too).
+# Uses the existing .app bundle structure. Fast iteration for UI work:
+# does NOT recreate the full bundle — only replaces binary/resources and re-signs.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +17,7 @@ if grep -qE ': error:' /tmp/airbridge-build.log; then
     exit 1
 fi
 
-APP="$HOME/Applications/AirBridge.app"
+APP="/Applications/AirBridge.app"
 if [ ! -d "$APP" ]; then
     echo "ERROR: $APP doesn't exist — run scripts/release.sh once to create it"
     exit 1

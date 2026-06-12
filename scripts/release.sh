@@ -13,12 +13,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 
-# Build logs are created with mktemp below; initialize before the trap so the
-# EXIT cleanup never references unset variables (set -u) and logs are removed
-# on success, failure, and interruption alike.
+# Build logs and the app staging dir are created with mktemp below; initialize
+# before the trap so the EXIT cleanup never references unset variables (set -u)
+# and everything is removed on success, failure, and interruption alike.
 BUILD_LOG=""
 ANDROID_BUILD_LOG=""
-trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG"' EXIT
+APP_STAGE=""
+trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG"; [ -n "$APP_STAGE" ] && rm -rf "$APP_STAGE"' EXIT
 
 # Read version from gradle
 VERSION=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -45,9 +46,11 @@ fi
 echo "  macOS build succeeded"
 MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
 
-# Build app bundle from scratch
-APP_BUNDLE="$HOME/Applications/AirBridge.app"
-rm -rf "$APP_BUNDLE"
+# Build app bundle from scratch in a temp staging dir. The only user-visible
+# copy lives in /Applications (synced below) — keeping the bundle out of
+# ~/Applications avoids two AirBridge.app copies confusing Spotlight/the user.
+APP_STAGE="$(mktemp -d -t airbridge-app)"
+APP_BUNDLE="$APP_STAGE/AirBridge.app"
 mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp "$MACOS_BIN" "$APP_BUNDLE/Contents/MacOS/AirbridgeApp"
 cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
@@ -81,7 +84,15 @@ done
 # developer); updates afterwards are friction-free.
 "$ROOT/scripts/setup-signing-cert.sh"
 codesign --force --deep --sign "AirBridge Signing" "$APP_BUNDLE"
-echo "  App bundle: $APP_BUNDLE (signed: AirBridge Signing)"
+echo "  App bundle staged: $APP_BUNDLE (signed: AirBridge Signing)"
+
+# Sync the freshly built release into /Applications — the canonical install.
+INSTALLED_APP="/Applications/AirBridge.app"
+killall AirbridgeApp 2>/dev/null || true
+sleep 0.3
+rm -rf "$INSTALLED_APP"   # ditto merges into an existing tree; replace instead
+ditto "$APP_BUNDLE" "$INSTALLED_APP"
+echo "  Installed: $INSTALLED_APP"
 
 # Create DMG with Applications symlink and compact window
 DMG_PATH="$ROOT/AirBridge.dmg"
