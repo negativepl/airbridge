@@ -98,6 +98,11 @@ class HttpFileDownloader {
         } catch (e: Exception) {
             Log.e(TAG, "Download exception", e)
             null
+        } finally {
+            // The per-call client would otherwise leave a live Dispatcher and
+            // ConnectionPool behind until GC (same pattern as MirrorClient.close()).
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
         }
     }
 }

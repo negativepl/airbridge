@@ -135,8 +135,10 @@ class AirbridgeService : Service() {
         @Volatile
         var pendingPairRequest: PendingPairRequest? = null
 
-        /** TLS pin of the live connection — for UI call sites (e.g. screen
-         *  share) that launch their own pinned clients to the same Mac. */
+        /** TLS pin of the live connection — for external call sites (UI/
+         *  Activities, e.g. screen share) that launch their own pinned clients
+         *  to the same Mac; code inside the service reads
+         *  `webSocketClient.certFingerprintInUse` directly. */
         fun certFingerprintInUse(): String =
             instance?.webSocketClient?.certFingerprintInUse ?: ""
     }
@@ -1422,11 +1424,12 @@ class AirbridgeService : Service() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
         val stopAction = Notification.Action.Builder(
-            null as android.graphics.drawable.Icon?, "Zatrzymaj", stopPI
+            null as android.graphics.drawable.Icon?,
+            getString(com.airbridge.R.string.notification_ring_stop), stopPI
         ).build()
         val notif = Notification.Builder(this, CHANNEL_FILES_ID)
-            .setContentTitle("AirBridge dzwoni")
-            .setContentText("Dotknij Zatrzymaj, aby wyciszyć")
+            .setContentTitle(getString(com.airbridge.R.string.notification_ring_title))
+            .setContentText(getString(com.airbridge.R.string.notification_ring_text))
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_ALARM)

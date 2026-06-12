@@ -126,6 +126,11 @@ class HttpFileUploader {
         } catch (e: Exception) {
             Log.e(TAG, "Upload exception", e)
             false
+        } finally {
+            // The per-call client would otherwise leave a live Dispatcher and
+            // ConnectionPool behind until GC (same pattern as MirrorClient.close()).
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
         }
     }
 }

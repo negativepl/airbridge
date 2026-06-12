@@ -203,6 +203,10 @@
     <string name="pairing_success_title">Sparowano!</string>
     <string name="repair_needed_no_pin">%s wymaga ponownego sparowania po aktualizacji zabezpieczeń. Otwórz AirBridge na Macu i zeskanuj kod QR.</string>
     <string name="repair_needed_cert_changed">Certyfikat bezpieczeństwa komputera %s się zmienił. AirBridge nie połączy się, dopóki nie sparujesz ponownie, skanując kod QR na Macu.</string>
+    <string name="repair_action_scan">Sparuj ponownie</string>
+    <string name="notification_ring_title">AirBridge dzwoni</string>
+    <string name="notification_ring_text">Dotknij Zatrzymaj, aby wyciszyć</string>
+    <string name="notification_ring_stop">Zatrzymaj</string>
     <string name="pairing_success_desc">Połączono z %s</string>
     <string name="pairing_success_connected">Połączenie aktywne</string>
     <string name="pairing_success_continue">Dalej</string>
