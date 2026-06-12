@@ -106,9 +106,15 @@ public actor WebSocketServer {
         // TLS always — there is no plaintext fallback. The phone pins the
         // certificate fingerprint it learned from the pairing QR code.
         let tlsOptions = NWProtocolTLS.Options()
+        // sec_identity_create returns nil when the SecIdentity has no private
+        // key in the Keychain (e.g. after a Keychain reset) — surface that as
+        // a thrown error instead of crashing in start().
+        guard let secIdentity = sec_identity_create(tlsIdentity) else {
+            throw WebSocketServerError.tlsIdentityUnavailable
+        }
         sec_protocol_options_set_local_identity(
             tlsOptions.securityProtocolOptions,
-            sec_identity_create(tlsIdentity)!)
+            secIdentity)
         let parameters = NWParameters(tls: tlsOptions)
         parameters.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
 
@@ -376,4 +382,20 @@ public actor WebSocketServer {
 public enum WebSocketServerError: Error {
     case invalidPort(UInt16)
     case encodingFailed
+    /// The TLS `SecIdentity` could not be wrapped for Network.framework —
+    /// typically its private key is missing from the Keychain.
+    case tlsIdentityUnavailable
+}
+
+extension WebSocketServerError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPort(let port):
+            return "Invalid port: \(port)"
+        case .encodingFailed:
+            return "Failed to encode message"
+        case .tlsIdentityUnavailable:
+            return "TLS identity is unavailable (private key missing from the Keychain)"
+        }
+    }
 }

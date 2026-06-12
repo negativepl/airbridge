@@ -103,9 +103,15 @@ public actor HttpUploadServer {
         // TLS always — there is no plaintext fallback. The phone pins the
         // certificate fingerprint it learned from the pairing QR code.
         let tlsOptions = NWProtocolTLS.Options()
+        // sec_identity_create returns nil when the SecIdentity has no private
+        // key in the Keychain (e.g. after a Keychain reset) — surface that as
+        // a thrown error instead of crashing in start().
+        guard let secIdentity = sec_identity_create(tlsIdentity) else {
+            throw HttpUploadServerError.tlsIdentityUnavailable
+        }
         sec_protocol_options_set_local_identity(
             tlsOptions.securityProtocolOptions,
-            sec_identity_create(tlsIdentity)!)
+            secIdentity)
         let parameters = NWParameters(tls: tlsOptions)
 
         let nwPort: NWEndpoint.Port
@@ -751,4 +757,18 @@ public actor HttpUploadServer {
 
 public enum HttpUploadServerError: Error {
     case invalidPort(UInt16)
+    /// The TLS `SecIdentity` could not be wrapped for Network.framework —
+    /// typically its private key is missing from the Keychain.
+    case tlsIdentityUnavailable
+}
+
+extension HttpUploadServerError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPort(let port):
+            return "Invalid port: \(port)"
+        case .tlsIdentityUnavailable:
+            return "TLS identity is unavailable (private key missing from the Keychain)"
+        }
+    }
 }
