@@ -25,7 +25,10 @@ public final class TLSIdentityManager: @unchecked Sendable {
     }
 
     public convenience init() {
-        self.init(storage: KeychainStorage())
+        // File-backed for the same reason as KeyManager.persistent(): a
+        // self-signed binary cannot keep a stable login-keychain partition
+        // across re-signs, so the keychain re-prompts on every rebuild.
+        self.init(storage: FileStorage())
     }
 
     /// Returns the persistent identity, generating it on first use.

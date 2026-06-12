@@ -40,13 +40,25 @@ final class InMemoryStorage: Storage, @unchecked Sendable {
 // MARK: - FileStorage
 
 /// Stores key-value data as individual files inside ~/Library/Application Support/AirBridge/.
+///
+/// This is the PRODUCTION backing store (see `KeyManager.persistent()` for the
+/// rationale). The directory is created `0700` and every file `0600`, so only
+/// the current macOS user account can read the material. That threat model —
+/// "any process running as this user can read it" — is identical to what an
+/// open-ACL login-keychain item would give us, and is the deliberate trade-off
+/// documented on `KeyManager.persistent()`.
 final class FileStorage: Storage, @unchecked Sendable {
     private let directory: URL
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         directory = appSupport.appendingPathComponent("AirBridge")
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        // Tighten perms even if the directory already existed with looser bits.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
     }
 
     private func url(for account: String) -> URL {
@@ -58,7 +70,13 @@ final class FileStorage: Storage, @unchecked Sendable {
     }
 
     func save(_ data: Data, account: String) {
-        try? data.write(to: url(for: account), options: .atomic)
+        let url = url(for: account)
+        do {
+            try data.write(to: url, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } catch {
+            // Best-effort: storage failures surface later as a missing key.
+        }
     }
 
     func delete(account: String) {
@@ -134,10 +152,10 @@ final class KeychainStorage: Storage, @unchecked Sendable {
 
 /// Manages Ed25519 key pairs and paired-device storage.
 /// Use `.ephemeral()` for in-memory (test) storage and `.persistent()` for
-/// Keychain-backed production storage (legacy file data is migrated on first use).
-public final class KeyManager: Sendable {
+/// disk-backed production storage.
+public final class KeyManager: @unchecked Sendable {
 
-    // MARK: Keychain account names
+    // MARK: Account names
 
     enum Account {
         static let privateKey = "private_key"
@@ -148,6 +166,12 @@ public final class KeyManager: Sendable {
     // MARK: Private state
 
     private let storage: any Storage
+
+    /// In-memory cache of the signing key so `sign()` does not hit storage on
+    /// every AuthRequest / reconnect. Guarded by `keyLock`, mirroring the
+    /// caching pattern in `TLSIdentityManager`.
+    private let keyLock = NSLock()
+    private var cachedPrivateKey: Curve25519.Signing.PrivateKey?
 
     // MARK: Init
 
@@ -173,14 +197,28 @@ public final class KeyManager: Sendable {
         }
     }
 
-    /// Creates a `KeyManager` backed by the Keychain, migrating any legacy
-    /// file-based data from Application Support on first use.
+    /// Creates a `KeyManager` backed by on-disk storage in Application Support.
+    ///
+    /// Why not the login Keychain? AirBridge ships with a **self-signed** code
+    /// signature (no Apple Developer ID). macOS keychain "partition lists"
+    /// (securityd `clientid.cpp` / `acls.cpp`) classify self-signed code by its
+    /// `cdhash:<hash>` — which changes on every rebuild — and match partitions
+    /// by *exact* string. Only Apple-anchored code gets a stable `teamid:` /
+    /// `apple:` partition. The Data-Protection keychain
+    /// (`kSecUseDataProtectionKeychain`) needs an `application-identifier`
+    /// entitlement we cannot mint without an Apple team, and returns
+    /// `errSecMissingEntitlement` (-34018) for self-signed binaries.
+    ///
+    /// Net effect: every `dev-install` re-sign produced a new cdhash, so the
+    /// previously granted "Always Allow" no longer matched and the login-keychain
+    /// password prompt returned on each access. Verified empirically on this Mac
+    /// (a differently-cdhashed but identically-cert-signed reader is denied an
+    /// open-ACL item with errSecAuthFailed / a password prompt).
+    ///
+    /// File storage sidesteps securityd entirely: it never prompts and survives
+    /// re-signs. Files are `0600` in a `0700` directory (see `FileStorage`).
     public static func persistent() -> KeyManager {
-        let keychain = KeychainStorage()
-        migrate(from: FileStorage(), to: keychain,
-                accounts: [Account.privateKey, Account.deviceId,
-                           Account.pairedDevice, pairedDevicesAccount])
-        return KeyManager(storage: keychain)
+        KeyManager(storage: FileStorage())
     }
 
     // MARK: Identity
@@ -198,28 +236,40 @@ public final class KeyManager: Sendable {
             deviceId = newId
         }
 
-        // Load or generate private key
-        let privateKey: Curve25519.Signing.PrivateKey
-        if let data = storage.load(account: Account.privateKey) {
-            privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: data)
-        } else {
-            let newKey = Curve25519.Signing.PrivateKey()
-            storage.save(newKey.rawRepresentation, account: Account.privateKey)
-            privateKey = newKey
-        }
+        // Load or generate the private key (cached after first use).
+        let privateKey = try loadOrCreatePrivateKey()
 
         let publicKeyBase64 = privateKey.publicKey.rawRepresentation.base64EncodedString()
         return DeviceIdentity(deviceId: deviceId, publicKeyBase64: publicKeyBase64)
     }
 
+    /// Returns the cached signing key, loading it from storage (or generating
+    /// and persisting a fresh one) on first use. Subsequent calls never touch
+    /// storage. Thread-safe via `keyLock`.
+    private func loadOrCreatePrivateKey() throws -> Curve25519.Signing.PrivateKey {
+        keyLock.lock(); defer { keyLock.unlock() }
+        if let cachedPrivateKey { return cachedPrivateKey }
+        let key: Curve25519.Signing.PrivateKey
+        if let data = storage.load(account: Account.privateKey) {
+            key = try Curve25519.Signing.PrivateKey(rawRepresentation: data)
+        } else {
+            key = Curve25519.Signing.PrivateKey()
+            storage.save(key.rawRepresentation, account: Account.privateKey)
+        }
+        cachedPrivateKey = key
+        return key
+    }
+
     // MARK: Signing
 
-    /// Signs `data` using the stored private key.
+    /// Signs `data` using the stored private key (read once, then cached).
     public func sign(_ data: Data) throws -> Data {
-        guard let keyData = storage.load(account: Account.privateKey) else {
+        let privateKey: Curve25519.Signing.PrivateKey
+        do {
+            privateKey = try loadOrCreatePrivateKey()
+        } catch {
             throw KeyManagerError.noPrivateKey
         }
-        let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: keyData)
         return try privateKey.signature(for: data)
     }
 
