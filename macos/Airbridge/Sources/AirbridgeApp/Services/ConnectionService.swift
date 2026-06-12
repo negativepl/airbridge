@@ -1,5 +1,8 @@
 import Foundation
 import Network
+// SecIdentity is immutable and thread-safe but not marked Sendable in the SDK;
+// @preconcurrency downgrades the (false-positive) actor-crossing diagnostics.
+@preconcurrency import Security
 import SwiftUI
 import Protocol
 import AirbridgeSecurity
@@ -54,6 +57,8 @@ final class ConnectionService {
     // MARK: - Dependencies
 
     @ObservationIgnored let keyManager = KeyManager.persistent()
+    /// Owns the persistent self-signed TLS identity served by all listeners.
+    @ObservationIgnored private let tlsIdentityManager = TLSIdentityManager()
     @ObservationIgnored private var _pairingManager: PairingManager?
     var pairingManager: PairingManager {
         if let pm = _pairingManager { return pm }
@@ -118,7 +123,7 @@ final class ConnectionService {
                 guard let host = allowed.host else { return false }
                 return HttpUploadServer.normalizeHost(remoteHost) == HttpUploadServer.normalizeHost(host)
             }
-            try await httpServer.start()
+            try await httpServer.start(tlsIdentity: tlsIdentityManager.identity())
             try await advertiseServer()
             keyManager.migrateFromSingleDevice()
             startNetworkMonitor()
@@ -139,7 +144,8 @@ final class ConnectionService {
         let identity = try keyManager.getOrCreateIdentity()
         let fingerprint = keyManager.fingerprintOf(identity.publicKeyBase64)
         let mPort = mirrorService?.actualPort
-        try await server.start(bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
+        let tlsIdentity = try tlsIdentityManager.identity()
+        try await server.start(tlsIdentity: tlsIdentity, bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
         await configureServerCallbacks()
     }
 
@@ -485,6 +491,17 @@ final class ConnectionService {
 
     func currentPairingTokenString() -> String? {
         pairingService?.currentTokenData()?.base64EncodedString()
+    }
+
+    /// Hands the persistent TLS identity to the mirror service. Must run
+    /// BEFORE `mirrorService.start()` — without an identity the mirror server
+    /// refuses to start (main channels are unaffected).
+    func provideMirrorTLSIdentity() {
+        do {
+            mirrorService?.tlsIdentity = try tlsIdentityManager.identity()
+        } catch {
+            NSLog("[ConnectionService] Mirror TLS identity unavailable: \(error)")
+        }
     }
 
     // MARK: - Helpers

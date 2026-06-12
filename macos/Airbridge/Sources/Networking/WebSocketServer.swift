@@ -1,13 +1,14 @@
 import Foundation
 import Network
+import Security
 import Protocol
 
 // MARK: - WebSocketServer
 
 /// An actor that manages a WebSocket server using `NWListener`.
 ///
-/// Clients connect over a plain (non-TLS) TCP connection with WebSocket framing.
-/// Messages are JSON-encoded `Message` values.
+/// Clients connect over TLS (the listener serves the injected `SecIdentity`)
+/// with WebSocket framing. Messages are JSON-encoded `Message` values.
 public actor WebSocketServer {
 
     // MARK: - Public Properties
@@ -98,11 +99,17 @@ public actor WebSocketServer {
         authenticatedConnections.removeAll()
     }
 
-    public func start(bonjourName: String? = nil, httpPort: UInt16? = nil, mirrorPort: UInt16? = nil, publicKeyFingerprint: String? = nil) async throws {
+    public func start(tlsIdentity: SecIdentity, bonjourName: String? = nil, httpPort: UInt16? = nil, mirrorPort: UInt16? = nil, publicKeyFingerprint: String? = nil) async throws {
         let wsOptions = NWProtocolWebSocket.Options()
         wsOptions.autoReplyPing = true
 
-        let parameters = NWParameters.tcp
+        // TLS always — there is no plaintext fallback. The phone pins the
+        // certificate fingerprint it learned from the pairing QR code.
+        let tlsOptions = NWProtocolTLS.Options()
+        sec_protocol_options_set_local_identity(
+            tlsOptions.securityProtocolOptions,
+            sec_identity_create(tlsIdentity)!)
+        let parameters = NWParameters(tls: tlsOptions)
         parameters.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
 
         let nwPort: NWEndpoint.Port

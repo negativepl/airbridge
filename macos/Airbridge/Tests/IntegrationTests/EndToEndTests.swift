@@ -13,17 +13,18 @@ final class EndToEndTests: XCTestCase {
     /// 1. The client can send a `clipboardUpdate` to the server and the server records it.
     /// 2. The server can broadcast a `clipboardUpdate` back to the client.
     func testClipboardSyncRoundTrip() async throws {
-        // 1. Start server on an ephemeral port
+        // 1. Start server on an ephemeral port (TLS — test identity)
         let server = WebSocketServer(port: 0)
-        try await server.start()
+        try await server.start(tlsIdentity: TLSTestSupport.identity)
 
         let port = await server.actualPort
         XCTAssertNotNil(port, "Server should have an assigned port after start")
         guard let port else { return }
 
-        // 2. Connect a URLSession WebSocket client
-        let url = URL(string: "ws://127.0.0.1:\(port)")!
-        let client = URLSession.shared.webSocketTask(with: url)
+        // 2. Connect a URLSession WebSocket client trusting the test cert
+        let url = URL(string: "wss://127.0.0.1:\(port)")!
+        let session = URLSession(configuration: .default, delegate: TrustAllDelegate(), delegateQueue: nil)
+        let client = session.webSocketTask(with: url)
         client.resume()
 
         // Allow connection handshake to complete

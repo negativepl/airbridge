@@ -1,5 +1,8 @@
 import Foundation
 import Network
+// SecIdentity is immutable and thread-safe but not marked Sendable in the SDK;
+// @preconcurrency downgrades the (false-positive) actor-crossing diagnostics.
+@preconcurrency import Security
 import Networking
 import Mirror
 import CoreMedia
@@ -149,6 +152,11 @@ public final class MirrorService {
         }
     }
 
+    /// TLS identity for the mirror listener — injected by `ConnectionService`
+    /// (which owns the `TLSIdentityManager`) before `start()` is called.
+    /// `nil` at start() is a programmer error: the mirror server won't run.
+    public var tlsIdentity: SecIdentity?
+
     private let server: WebSocketServer
     private var pairingTokenProvider: () -> Data?
     private var decoder: VideoDecoder?
@@ -191,6 +199,12 @@ public final class MirrorService {
 
     public func start() async throws {
         guard actualPort == nil else { return }
+        guard let tlsIdentity else {
+            // Programmer error: ConnectionService.provideMirrorTLSIdentity()
+            // must run first. Don't start the mirror; main channels still work.
+            MirrorDebugLog.write("mirror server NOT started: missing TLS identity")
+            return
+        }
         await server.setCallbacks(
             onMessage: nil,
             onBinaryMessage: { [weak self] data in
@@ -201,7 +215,7 @@ public final class MirrorService {
                 Task { @MainActor in self?.handleDisconnect() }
             }
         )
-        try await server.start()
+        try await server.start(tlsIdentity: tlsIdentity)
         actualPort = await server.actualPort
         MirrorDebugLog.write("mirror server started on port \(actualPort ?? 0)")
     }

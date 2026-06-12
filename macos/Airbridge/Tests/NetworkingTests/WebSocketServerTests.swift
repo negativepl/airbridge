@@ -5,18 +5,21 @@ import Protocol
 
 final class WebSocketServerTests: XCTestCase {
 
+    /// URLSession trusting the test server's self-signed certificate.
+    private let session = URLSession(configuration: .default, delegate: TrustAllDelegate(), delegateQueue: nil)
+
     // MARK: - Test 1: Server starts and accepts connection
 
     func testServerStartsAndAcceptsConnection() async throws {
         let server = WebSocketServer(port: 0)
-        try await server.start()
+        try await server.start(tlsIdentity: TLSTestSupport.identity)
 
         let port = await server.actualPort
         XCTAssertNotNil(port, "Server should have assigned a port")
         guard let port else { return }
 
-        let url = URL(string: "ws://127.0.0.1:\(port)")!
-        let task = URLSession.shared.webSocketTask(with: url)
+        let url = URL(string: "wss://127.0.0.1:\(port)")!
+        let task = session.webSocketTask(with: url)
         task.resume()
 
         // Give server time to register the connection
@@ -49,14 +52,14 @@ final class WebSocketServerTests: XCTestCase {
 
     func testServerSendsMessage() async throws {
         let server = WebSocketServer(port: 0)
-        try await server.start()
+        try await server.start(tlsIdentity: TLSTestSupport.identity)
 
         let port = await server.actualPort
         XCTAssertNotNil(port, "Server should have assigned a port")
         guard let port else { return }
 
-        let url = URL(string: "ws://127.0.0.1:\(port)")!
-        let task = URLSession.shared.webSocketTask(with: url)
+        let url = URL(string: "wss://127.0.0.1:\(port)")!
+        let task = session.webSocketTask(with: url)
         task.resume()
 
         // Wait for connection to be established
@@ -102,13 +105,13 @@ final class WebSocketServerTests: XCTestCase {
             onClientDisconnected: { id in disconnected.set(id) }
         )
 
-        try await server.start()
+        try await server.start(tlsIdentity: TLSTestSupport.identity)
         let port = await server.actualPort
         XCTAssertNotNil(port)
         guard let port else { return }
 
-        let url = URL(string: "ws://127.0.0.1:\(port)")!
-        let task = URLSession.shared.webSocketTask(with: url)
+        let url = URL(string: "wss://127.0.0.1:\(port)")!
+        let task = session.webSocketTask(with: url)
         task.resume()
 
         try await Task.sleep(nanoseconds: 300_000_000) // 0.3s
@@ -139,7 +142,7 @@ final class WebSocketServerTests: XCTestCase {
 
     func testStopClearsAuthenticatedConnections() async throws {
         let server = WebSocketServer(port: 0)
-        try await server.start()
+        try await server.start(tlsIdentity: TLSTestSupport.identity)
 
         await server.markAuthenticated("127.0.0.1:12345")
         let authedBefore = await server.isAuthenticated("127.0.0.1:12345")

@@ -17,14 +17,15 @@ struct MirrorIntegrationTests {
     func handshakeAcceptsValidToken() async throws {
         let token = Data(repeating: 0xAB, count: 16)
         let service = MirrorService(port: 0, pairingTokenProvider: { token })
+        service.tlsIdentity = TLSTestSupport.identity
         try await service.start()
         guard let port = service.actualPort else {
             Issue.record("MirrorService failed to obtain a port")
             return
         }
 
-        let url = URL(string: "ws://127.0.0.1:\(port)/")!
-        let session = URLSession(configuration: .default)
+        let url = URL(string: "wss://127.0.0.1:\(port)/")!
+        let session = URLSession(configuration: .default, delegate: TrustAllDelegate(), delegateQueue: nil)
         let task = session.webSocketTask(with: url)
         task.resume()
 
@@ -62,14 +63,15 @@ struct MirrorIntegrationTests {
         let validToken = Data(repeating: 0xAB, count: 16)
         let badToken = Data(repeating: 0xCD, count: 16)
         let service = MirrorService(port: 0, pairingTokenProvider: { validToken })
+        service.tlsIdentity = TLSTestSupport.identity
         try await service.start()
         guard let port = service.actualPort else {
             Issue.record("MirrorService failed to obtain a port")
             return
         }
 
-        let url = URL(string: "ws://127.0.0.1:\(port)/")!
-        let session = URLSession(configuration: .default)
+        let url = URL(string: "wss://127.0.0.1:\(port)/")!
+        let session = URLSession(configuration: .default, delegate: TrustAllDelegate(), delegateQueue: nil)
         let task = session.webSocketTask(with: url)
         task.resume()
 

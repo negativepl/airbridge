@@ -90,7 +90,9 @@ let package = Package(
 
         .testTarget(
             name: "NetworkingTests",
-            dependencies: ["Networking"],
+            // AirbridgeSecurity: tests start the servers with a throwaway
+            // TLS identity from TLSIdentityManager (see TLSTestSupport).
+            dependencies: ["Networking", "AirbridgeSecurity"],
             path: "Tests/NetworkingTests"
         ),
 

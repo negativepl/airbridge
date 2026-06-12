@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import CryptoKit
 
 // MARK: - HttpUploadServer
@@ -96,10 +97,16 @@ public actor HttpUploadServer {
 
     // MARK: - Start / Stop
 
-    /// Creates and starts the `NWListener` with plain TCP (no application protocol).
+    /// Creates and starts the `NWListener` over TLS (no application protocol).
     /// Suspends until the listener is ready (or throws on failure).
-    public func start() async throws {
-        let parameters = NWParameters.tcp
+    public func start(tlsIdentity: SecIdentity) async throws {
+        // TLS always — there is no plaintext fallback. The phone pins the
+        // certificate fingerprint it learned from the pairing QR code.
+        let tlsOptions = NWProtocolTLS.Options()
+        sec_protocol_options_set_local_identity(
+            tlsOptions.securityProtocolOptions,
+            sec_identity_create(tlsIdentity)!)
+        let parameters = NWParameters(tls: tlsOptions)
 
         let nwPort: NWEndpoint.Port
         if port == 0 {

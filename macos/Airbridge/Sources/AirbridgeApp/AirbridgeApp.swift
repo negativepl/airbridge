@@ -74,6 +74,9 @@ struct AirbridgeApp: App {
         _mirrorService = State(initialValue: mirror)
 
         Task { @MainActor in
+            // The mirror listener needs the TLS identity before it starts;
+            // ConnectionService owns the TLSIdentityManager.
+            connection.provideMirrorTLSIdentity()
             try? await mirror.start()
             connection.startServer()
         }
