@@ -6,11 +6,12 @@ Airbridge uses a JSON-over-WebSocket protocol for communication between the macO
 
 ## Transport
 
-- **Control protocol**: WebSocket (RFC 6455) on port **8765** (default)
-- **Discovery**: Bonjour/mDNS service type `_airbridge._tcp` (TXT record carries `http_port`, `mirror_port`, `pk_fingerprint`)
-- **File Transfer**: HTTP on port **8766** — the phone POSTs uploads (`POST /upload`) and pulls Mac → phone files (`GET /send/{transfer_id}`). The Mac only ever listens; the phone initiates every connection (macOS Local Network Privacy blocks Mac-side outbound TCP to local IPs).
-- **Screen Mirror**: binary WebSocket on port **8767** (advertised as `mirror_port`) — see [Mirror Binary Protocol](#mirror-binary-protocol)
-- **Security**: Ed25519 signature authentication (no TLS — local network only)
+- **Control protocol**: WebSocket (RFC 6455) over TLS on port **8765** (default)
+- **Discovery**: Bonjour/mDNS service type `_airbridge._tcp` (TXT record carries `http_port`, `mirror_port`, `pk_fingerprint`, `cert_fingerprint`)
+- **File Transfer**: HTTPS on port **8766** — the phone POSTs uploads (`POST /upload`) and pulls Mac → phone files (`GET /send/{transfer_id}`). The Mac only ever listens; the phone initiates every connection (macOS Local Network Privacy blocks Mac-side outbound TCP to local IPs).
+- **Screen Mirror**: binary WebSocket over TLS on port **8767** (advertised as `mirror_port`) — see [Mirror Binary Protocol](#mirror-binary-protocol)
+- **Encryption**: all three channels run over TLS using a persistent self-signed identity generated on the Mac. The phone pins the certificate by the SHA-256 fingerprint of its DER encoding, exchanged in the pairing QR code (the `cert_fingerprint` TXT key is informational only — the pinned value always comes from pairing). Hostname verification is disabled because connections are made by IP; the pin is the trust anchor.
+- **Authentication**: Ed25519 signature authentication on top of TLS (see [Authentication](#authentication))
 
 ## Message Format
 
@@ -207,7 +208,8 @@ Sent by the phone immediately after the WebSocket connects.
   "type": "auth_request",
   "public_key": "MCowBQYDK2VwAyEA...",
   "signature": "base64-ed25519-signature",
-  "timestamp": 1712345678901
+  "timestamp": 1712345678901,
+  "protocol_version": 1
 }
 ```
 
@@ -219,6 +221,7 @@ Sent by the phone immediately after the WebSocket connects.
 | `public_key` | string | Base64-encoded Ed25519 public key, used to look up the paired device |
 | `signature` | string | Base64 Ed25519 signature over the `timestamp` |
 | `timestamp` | integer | Unix milliseconds; the Mac rejects the request if it is more than **30 seconds** off (replay protection) |
+| `protocol_version` | integer | (Optional) sender's protocol version; absent means `1` (pre-versioning peers). Mismatches are logged, not rejected |
 
 ### `auth_response`
 
@@ -228,7 +231,8 @@ Sent by the Mac after verifying (or rejecting) an `auth_request`.
 {
   "type": "auth_response",
   "accepted": true,
-  "mirror_port": 8767
+  "mirror_port": 8767,
+  "protocol_version": 1
 }
 ```
 
@@ -240,6 +244,7 @@ Sent by the Mac after verifying (or rejecting) an `auth_request`.
 | `accepted` | boolean | Whether authentication succeeded |
 | `reason` | string | (Optional) failure reason when `accepted` is `false` (e.g. `"not_paired"`, `"expired"`, `"bad_signature"`) |
 | `mirror_port` | integer | (Optional) the mirror WebSocket port — re-supplied here because the Bonjour TXT record is only seen once and is lost across reconnects |
+| `protocol_version` | integer | (Optional) sender's protocol version; absent means `1` (pre-versioning peers). Mismatches are logged, not rejected |
 
 ---
 
@@ -293,6 +298,7 @@ The QR code displayed on the macOS device encodes a JSON object that allows the 
   "port": 8765,
   "public_key": "MFkwEwYHKoZIzj0CAQY...",
   "pairing_token": "a1b2c3d4e5f6",
+  "cert_fingerprint": "3f1a9c...64-hex-chars...b2e0",
   "protocol_version": 1
 }
 ```
@@ -305,12 +311,14 @@ The QR code displayed on the macOS device encodes a JSON object that allows the 
 | `port` | integer | WebSocket server port (default: 8765) |
 | `public_key` | string | Base64-encoded Ed25519 public key of the macOS device |
 | `pairing_token` | string | One-time random token; cleared after successful pairing |
+| `cert_fingerprint` | string | Lowercase SHA-256 hex over the DER encoding of the Mac's TLS certificate; the phone pins it for every TLS connection to this Mac |
 | `protocol_version` | integer | Protocol version number; currently `1` |
 
 **Notes:**
 - The QR code payload is compact JSON (no extra whitespace)
 - The `pairing_token` proves physical proximity and is one-time use — the Mac clears it once a matching `pair_request` is accepted
 - There is no key exchange / shared secret. Each device keeps a long-lived Ed25519 identity; after pairing, every reconnection is authenticated by the phone signing a fresh timestamp (see [Authentication](#authentication)), which the Mac verifies against the stored public key
+- Pairings created on a pre-TLS version have no stored certificate fingerprint; the phone refuses to connect unpinned and prompts the user to pair again instead
 
 ---
 
@@ -334,7 +342,7 @@ Current version: **1**
 
 ## Complete Message Type List
 
-The sections above detail the representative messages. The full set of **49** control-channel message types is:
+The sections above detail the representative messages. The full set of **52** control-channel message types is:
 
 | Category | Types |
 |---|---|
@@ -346,7 +354,8 @@ The sections above detail the representative messages. The full set of **49** co
 | Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response`, `file_delete_request`, `file_delete_response` |
 | Device Info & Monitor | `device_info_request`, `device_info_response`, `wallpaper_request`, `wallpaper_response`, `mac_info_request`, `mac_info_response`, `mac_wallpaper_request`, `mac_wallpaper_response` |
 | Mirror control | `mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error` |
-| Notifications | `notification_posted` |
+| Notifications | `notification_posted`, `notification_reply` |
+| Find My Phone | `phone_ring`, `phone_ring_stop` |
 | Utility | `ping`, `pong` |
 
 > The `file_transfer_start` / `file_chunk` / `file_chunk_ack` cluster is a legacy WebSocket-chunk transport. The active file transfer path is HTTP (`POST /upload` and `GET /send/{id}` on port 8766).
@@ -386,13 +395,14 @@ A bad pairing token in `HELLO` / `REVERSE_HELLO` causes the connection to be dro
 Android                          macOS
    |                               |
    |   [scans QR code]             |
+   |   [pins cert_fingerprint]     |
    |                               |
-   |--- WebSocket connect -------->|
+   |--- TLS WebSocket connect ---->|
    |--- pair_request ------------->|
    |                               | [user confirms on macOS]
    |<-- pair_response (accepted) --|
    |                               |
-   |   [ECDH key exchange done]    |
+   |   [public keys exchanged]     |
    |   [session established]       |
 ```
 

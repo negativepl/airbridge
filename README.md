@@ -25,7 +25,7 @@
 
 ## What is AirBridge?
 
-AirBridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, a full phone-storage browser, photo gallery, SMS, live Mac system monitoring, and two-way **screen mirroring with remote control** — all without cables, accounts, or cloud services. **Your data never leaves your home network.**
+AirBridge connects your Android phone with your Mac over your local Wi-Fi network. Clipboard sync, file transfers, a full phone-storage browser, photo gallery, SMS, live Mac system monitoring, and two-way **screen mirroring with remote control** — all without cables, accounts, or cloud services. **All traffic is TLS-encrypted and never leaves your home network.**
 
 This is an open-source alternative to apps like Phone Link, KDE Connect, or Intel Unison — built specifically for the Android + macOS combination that Apple ignores.
 
@@ -37,12 +37,12 @@ This is an open-source alternative to apps like Phone Link, KDE Connect, or Inte
 |---|---|---|
 | **Language** | Swift 6.2 (strict concurrency) | Kotlin 2.3 |
 | **UI** | SwiftUI + Liquid Glass (macOS 26) | Jetpack Compose + Material 3 Expressive |
-| **Networking** | Network.framework (NWListener) | OkHttp WebSocket |
+| **Networking** | Network.framework (NWListener, TLS) | OkHttp WebSocket (TLS, pinned certificate) |
 | **Discovery** | Bonjour / mDNS (NWListener.service) | NSD (NsdManager) |
-| **File Transfer** | HTTP server (NWListener, GET/POST) | HTTP upload + pull-download (OkHttp) |
+| **File Transfer** | HTTPS server (NWListener, GET/POST) | HTTPS upload + pull-download (OkHttp) |
 | **Screen Mirror** | VideoToolbox (VTDecompressionSession) + AVSampleBufferDisplayLayer | MediaProjection + MediaCodec (HW H.264/HEVC) |
 | **Remote control** | CGEvent injection (mouse/keyboard) | AccessibilityService (gesture/text injection) |
-| **Crypto** | CryptoKit (Ed25519) | java.security (Ed25519) |
+| **Crypto** | CryptoKit (Ed25519), self-signed TLS identity | java.security (Ed25519), AndroidKeyStore (AES-GCM key encryption) |
 | **Camera** | — | CameraX + ML Kit (QR scanning) |
 | **Architecture** | MVVM, SPM, @Observable | MVVM, Foreground Service, StateFlow |
 | **Min version** | macOS 26 (Tahoe) | Android 10 (API 29) |
@@ -105,8 +105,11 @@ Browse your phone's entire photo library from your Mac. Thumbnails load on scrol
 Read all your SMS conversations on your Mac. Send replies directly. Full chat bubble UI with contact name resolution. Short codes (automated messages) are detected and blocked from replying.
 
 ### Security & Privacy
+- **TLS on every channel** — The control WebSocket, the HTTP file transfer server, and the mirror stream all run over TLS, encrypted end to end on your LAN with a persistent self-signed identity generated on the Mac.
+- **Certificate pinning** — The pairing QR code carries the SHA-256 fingerprint of the Mac's TLS certificate. The phone pins that exact certificate and refuses to connect to anything else, so the self-signed cert can't be swapped by an attacker. Devices paired before TLS are prompted to re-pair once.
 - **Ed25519 key pairs** — Each device generates a cryptographic identity on first launch.
-- **QR code pairing** — One-time scan to exchange public keys. No accounts, no registration.
+- **Encrypted key storage** — On Android the Ed25519 private key is encrypted at rest with an AES-GCM key held in the hardware-backed AndroidKeyStore. On the Mac, device secrets live in hardened file storage (0700/0600 permissions) with an in-memory cache.
+- **QR code pairing** — One-time scan to exchange public keys and the TLS certificate fingerprint. No accounts, no registration.
 - **Signature authentication** — Every reconnection is verified with a signed timestamp. Replay window: 30 seconds.
 - **Token-gated mirror channel** — The video channel requires a 16-byte token derived from the paired device's key; a bad token is dropped instantly with no response.
 - **Local only** — All traffic stays on your Wi-Fi network. No internet connection required. No telemetry, no analytics, no tracking.
@@ -163,19 +166,19 @@ Or build it yourself — see [Building from Source](#building-from-source) below
 ┌──────────────┐       Local Wi-Fi       ┌──────────────┐
 │    macOS     │◄──────────────────────►│   Android    │
 │   (Server)   │  WebSocket + HTTP +    │   (Client)   │
-│              │     Video stream       │              │
+│              │  Video — all over TLS  │              │
 └──────────────┘                         └──────────────┘
 ```
 
 | Channel | Port | Direction | Purpose |
 |---|---|---|---|
-| Control WebSocket | **8765** | Phone → Mac | Clipboard, gallery, SMS, files, device info, control |
-| HTTP transfer | **8766** | Phone → Mac | File transfer both ways — phone `POST`s uploads and pulls Mac → phone files via `GET /send/{id}` |
-| Mirror WebSocket | **8767** | Phone → Mac | Screen mirror video + input stream (advertised as `mirror_port`) |
+| Control WebSocket (TLS) | **8765** | Phone → Mac | Clipboard, gallery, SMS, files, device info, control |
+| HTTPS transfer | **8766** | Phone → Mac | File transfer both ways — phone `POST`s uploads and pulls Mac → phone files via `GET /send/{id}` |
+| Mirror WebSocket (TLS) | **8767** | Phone → Mac | Screen mirror video + input stream (advertised as `mirror_port`) |
 
-1. **Mac** starts a control WebSocket server (8765), an HTTP upload server (8766), and a mirror WebSocket server (8767)
-2. **Mac** advertises itself via Bonjour as `_airbridge._tcp`, publishing `http_port` and `mirror_port` in its TXT record
-3. **Android** discovers the service via NSD and connects over the control WebSocket
+1. **Mac** starts a control WebSocket server (8765), an HTTP upload server (8766), and a mirror WebSocket server (8767) — all three serve TLS with the Mac's persistent self-signed identity
+2. **Mac** advertises itself via Bonjour as `_airbridge._tcp`, publishing `http_port`, `mirror_port` and the TLS `cert_fingerprint` in its TXT record
+3. **Android** discovers the service via NSD and connects over the control WebSocket, verifying the Mac's certificate against the fingerprint pinned at pairing time
 4. **Android** authenticates with its Ed25519 key pair
 5. **Both** exchange JSON messages over the control channel (clipboard, SMS, gallery, files, device info, mirror control)
 6. **Files** are transferred via HTTP POST; **screen frames and input events** flow over the binary mirror channel
@@ -187,6 +190,8 @@ Or build it yourself — see [Building from Source](#building-from-source) below
 1. Open AirBridge on your Mac → **Settings** → **Add New Device**
 2. Open AirBridge on your phone → scan the QR code
 3. Done — devices are paired and will auto-connect on the same Wi-Fi
+
+The QR code carries the Mac's address, its Ed25519 public key, a one-time pairing token, and the SHA-256 fingerprint of its TLS certificate — the phone pins that certificate for all future connections. Devices paired on a pre-TLS version show a one-tap "pair again" prompt after updating.
 
 ### File Transfer Protocol
 
@@ -253,17 +258,17 @@ Views (SwiftUI + Liquid Glass)
         └── Services (@Observable, @MainActor)
               └── Library Modules (SPM)
                     ├── Protocol      — Message types, JSON coding
-                    ├── Networking    — WebSocket server, HTTP upload server, Bonjour
+                    ├── Networking    — TLS WebSocket server, HTTPS upload server, Bonjour
                     ├── Clipboard     — NSPasteboard monitoring
-                    ├── FileTransfer  — File chunking, assembly
                     ├── Mirror        — Video encode/decode, renderer, reverse pipeline
+                    ├── CVirtualDisplay — ObjC shim for the virtual second display
                     ├── Pairing       — QR generation, key exchange
-                    └── AirbridgeSecurity — Ed25519 keys, device identity
+                    └── AirbridgeSecurity — Ed25519 keys, device identity, TLS identity manager
 ```
 
 - **Swift 6** language mode with strict `Sendable` concurrency
 - **Liquid Glass** UI throughout (macOS 26 native glass effects)
-- **7 tabs** — Home, Send, Gallery, Files, Messages, Mirror, Settings (`TabView(.sidebarAdaptable)`)
+- **8 tabs** — Home, Send, Gallery, Files, Messages, Mirror, Settings, About (`TabView(.sidebarAdaptable)`)
 - **`MacSystemInfo`** service collects CPU/RAM/disk/battery + a downscaled wallpaper to feed the phone's monitor card
 
 ### Android — Service + Compose
@@ -272,15 +277,15 @@ Views (SwiftUI + Liquid Glass)
 UI (Jetpack Compose + Material 3 Expressive)
   └── MainViewModel (AndroidViewModel)
         └── AirbridgeService (Foreground Service)
-              ├── WebSocketClient     — OkHttp WebSocket (control channel)
-              ├── HttpFileUploader    — HTTP POST to Mac
-              ├── HttpFileDownloader  — pulls Mac → phone files over HTTP
+              ├── WebSocketClient     — OkHttp WebSocket (control channel, TLS + pinned cert)
+              ├── HttpFileUploader    — HTTPS POST to Mac
+              ├── HttpFileDownloader  — pulls Mac → phone files over HTTPS
               ├── NsdDiscovery        — Bonjour/mDNS discovery (reads mirror_port)
               ├── ClipboardSync       — System clipboard monitoring
               ├── GalleryProvider     — MediaStore queries
               ├── FilesProvider       — Full filesystem listing + thumbnails (All Files Access)
               ├── SmsProvider         — SMS ContentProvider
-              └── KeyManager          — Ed25519 key generation
+              └── KeyManager          — Ed25519 keys, encrypted at rest via AndroidKeyStore
         └── MirrorService (Foreground Service, mediaProjection)
               ├── ScreenEncoder       — Hardware H.264/HEVC via MediaCodec
               ├── MirrorClient        — Binary video/input WebSocket to Mac
@@ -289,11 +294,11 @@ UI (Jetpack Compose + Material 3 Expressive)
 
 - **compileSdk 37** (Android 16) with `Notification.ProgressStyle`
 - **AGP 9 / Gradle 9** with AGP's built-in Kotlin (no standalone `kotlin-android` plugin)
-- **R8/ProGuard** minification — release APK is ~25 MB (vs 83 MB debug)
+- **R8/ProGuard** minification — release APK is ~28 MB (vs ~83 MB debug)
 
 ### Protocol
 
-**49 JSON message types** over the control WebSocket, plus a separate **binary video/input protocol** for the mirror channel:
+**52 JSON message types** over the control WebSocket, plus a separate **binary video/input protocol** for the mirror channel:
 
 | Category | Messages |
 |---|---|
@@ -305,7 +310,8 @@ UI (Jetpack Compose + Material 3 Expressive)
 | Files Browser | `files_list_request`, `files_list_response`, `file_thumbnail_request`, `file_thumbnail_response`, `file_download_request`, `folder_stats_request`, `folder_stats_response`, `file_delete_request`, `file_delete_response` |
 | Device Info & Monitor | `device_info_request`, `device_info_response`, `wallpaper_request`, `wallpaper_response`, `mac_info_request`, `mac_info_response`, `mac_wallpaper_request`, `mac_wallpaper_response` |
 | Mirror control | `mirror_start_request`, `reverse_mirror_start`, `mirror_stop`, `mirror_error` |
-| Notifications | `notification_posted` |
+| Notifications | `notification_posted`, `notification_reply` |
+| Find My Phone | `phone_ring`, `phone_ring_stop` |
 | Utility | `ping`, `pong` |
 
 The mirror video stream is **not** JSON — it's a binary frame protocol (`[1B type][payload]`): `HELLO` / `HELLO_ACK` handshake, `VIDEO_CONFIG` (H.264 SPS/PPS) and `VIDEO_CONFIG_HEVC` (VPS/SPS/PPS), `VIDEO_FRAME`, a `STATUS` channel (screen off, app backgrounded, accessibility state, encoder errors), forward input (`INPUT_TAP`), and reverse input (`REVERSE_HELLO`, `REVERSE_INPUT`, `REVERSE_SCROLL`, `REVERSE_TEXT`, `REVERSE_KEY`). See [docs/protocol.md](docs/protocol.md) for the full spec.
@@ -346,23 +352,27 @@ airbridge/
 │       ├── sms/                # SMS provider
 │       ├── clipboard/          # Clipboard sync
 │       ├── discovery/          # mDNS/NSD discovery
-│       ├── security/           # Ed25519 key management
+│       ├── network/            # TLS certificate pinning + network monitor
+│       ├── security/           # Ed25519 key management (AndroidKeyStore-encrypted)
 │       └── share/              # Share Sheet + text selection handler
 ├── macos/Airbridge/            # macOS app (SPM)
 │   ├── Sources/
 │   │   ├── AirbridgeApp/       # App entry, Views, ViewModels, Services
 │   │   ├── Protocol/           # Shared message types
-│   │   ├── Networking/         # WebSocket + HTTP servers + Bonjour
+│   │   ├── Networking/         # TLS WebSocket + HTTPS servers + Bonjour
 │   │   ├── Clipboard/          # NSPasteboard monitor
-│   │   ├── FileTransfer/       # File chunking + assembly
 │   │   ├── Mirror/             # Video encode/decode, renderer, reverse pipeline
+│   │   ├── CVirtualDisplay/    # ObjC shim for the virtual second display
 │   │   ├── Pairing/            # QR code generation
-│   │   └── AirbridgeSecurity/  # Ed25519 + device identity
+│   │   └── AirbridgeSecurity/  # Ed25519 + device identity + TLS identity
 │   ├── Tests/                  # Unit + integration tests
 │   └── Package.swift           # SPM manifest (swift-tools-version 6.2)
 ├── scripts/
 │   ├── bump-version.sh         # Version bumping across platforms
-│   └── release.sh              # Build + GitHub release automation
+│   ├── release.sh              # Build + GitHub release automation
+│   ├── dev-install.sh          # Local dev build + install to /Applications
+│   ├── setup-signing-cert.sh   # Stable self-signed signing identity
+│   └── reset-permissions.sh    # TCC permission reset helper
 ├── docs/
 │   ├── protocol.md             # Protocol specification
 │   └── landing/                # Landing page + screenshots
@@ -405,7 +415,7 @@ Have an idea? [Open an issue](https://github.com/negativepl/airbridge/issues).
 Yes. AirBridge only needs a local Wi-Fi network. No internet, no cloud, no accounts.
 
 **Is it safe?**
-All communication uses Ed25519 signed authentication, and the mirror channel is gated by the same pairing token. Data never leaves your network. The code is open source — audit it yourself.
+All traffic is TLS-encrypted with a certificate pinned at pairing time, every reconnection uses Ed25519 signed authentication, and the mirror channel is gated by a pairing-derived token. Data never leaves your network. The code is open source — audit it yourself.
 
 **Can I control my phone from my Mac (and vice versa)?**
 Yes — both ways. Mirror the phone to the Mac and drive it with mouse + keyboard, or mirror the Mac to the phone and control it by touch. The phone can even act as a phone-shaped second display.
