@@ -12,7 +12,7 @@ final class KeychainStorageTests: XCTestCase {
     }
 
     override func tearDown() {
-        for account in ["a", "b", "private_key"] { storage.delete(account: account) }
+        storage.deleteAll()
         super.tearDown()
     }
 

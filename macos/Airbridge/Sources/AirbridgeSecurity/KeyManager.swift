@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Security
+import os
 
 // MARK: - Errors
 
@@ -69,6 +70,8 @@ final class FileStorage: Storage, @unchecked Sendable {
 
 /// Keychain-backed Storage (kSecClassGenericPassword). One item per account.
 final class KeychainStorage: Storage, @unchecked Sendable {
+    private static let logger = Logger(subsystem: "com.airbridge.macos", category: "keychain")
+
     private let service: String
 
     init(service: String = "com.airbridge.macos") {
@@ -93,18 +96,37 @@ final class KeychainStorage: Storage, @unchecked Sendable {
     func save(_ data: Data, account: String) {
         let query = baseQuery(account: account)
         if SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess {
-            SecItemUpdate(query as CFDictionary,
-                          [kSecValueData as String: data] as CFDictionary)
+            let status = SecItemUpdate(query as CFDictionary,
+                                       [kSecValueData as String: data] as CFDictionary)
+            if status != errSecSuccess {
+                Self.logger.error("SecItemUpdate failed for account \(account, privacy: .public): status \(status)")
+            }
         } else {
             var add = query
             add[kSecValueData as String] = data
             add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            SecItemAdd(add as CFDictionary, nil)
+            let status = SecItemAdd(add as CFDictionary, nil)
+            if status != errSecSuccess {
+                Self.logger.error("SecItemAdd failed for account \(account, privacy: .public): status \(status)")
+            }
         }
     }
 
     func delete(account: String) {
-        SecItemDelete(baseQuery(account: account) as CFDictionary)
+        let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            Self.logger.error("SecItemDelete failed for account \(account, privacy: .public): status \(status)")
+        }
+    }
+
+    /// Removes every item belonging to this service. Test-only helper.
+    func deleteAll() {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service]
+        let status = SecItemDelete(query as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            Self.logger.error("SecItemDelete (all) failed for service \(self.service, privacy: .public): status \(status)")
+        }
     }
 }
 
