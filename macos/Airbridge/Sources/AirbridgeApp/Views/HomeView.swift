@@ -211,30 +211,30 @@ struct HomeView: View {
     }
 
     private func phonePreview(_ img: NSImage, vm: HomeViewModel) -> some View {
-        let aspect = img.size.width / max(img.size.height, 1)
-        let width: CGFloat = 150
-        let height = min(max(width / max(aspect, 0.01), 110), 280)
+        // Fixed square tile: the wallpaper fills and is cropped to it, so the
+        // card keeps its shape no matter what dimensions the phone reports.
+        let side: CGFloat = 150
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         return Image(nsImage: img)
             .resizable()
             .aspectRatio(contentMode: .fill)
-            .frame(width: width, height: height)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .frame(width: side, height: side)
+            .clipShape(shape)
+            .overlay(
+                // Soft inner edge — clipped to the tile so the blur never
+                // bleeds outside and shimmers against the glass background.
+                shape
+                    .strokeBorder(.black.opacity(0.25), lineWidth: 3)
+                    .blur(radius: 2)
+                    .clipShape(shape)
+            )
+            .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 1))
             .overlay(alignment: .bottom) {
                 if let info = vm.deviceInfo {
                     batteryPill(info.batteryPercent, charging: info.batteryCharging)
                         .padding(.bottom, 10)
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.black.opacity(0.25), lineWidth: 3)
-                    .blur(radius: 2)
-                    .padding(-1)
-            )
             .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
             .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryPercent)
             .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryCharging)
@@ -286,7 +286,8 @@ struct HomeView: View {
                 freeBytes: info.freeRamBytes,
                 totalBytes: info.totalRamBytes
             )
-            infoRow(L10n.isPL ? "Zasilanie" : "Power", Self.powerText(info))
+            // Power state intentionally has no row — the battery pill on the
+            // wallpaper tile already shows percentage and a charging bolt.
         }
     }
 
@@ -329,18 +330,6 @@ struct HomeView: View {
         let f = ByteCountFormatter()
         f.countStyle = .binary
         return f.string(fromByteCount: value)
-    }
-
-    private static func powerText(_ info: DeviceInfo) -> String {
-        let isPL = L10n.isPL
-        guard info.batteryCharging else {
-            return isPL ? "Na baterii" : "On battery"
-        }
-        if info.chargeTimeRemainingMs > 0 {
-            let t = formatChargeTime(info.chargeTimeRemainingMs, isPL: isPL)
-            return isPL ? "Ładowanie · \(t) do pełna" : "Charging · \(t) to full"
-        }
-        return isPL ? "Ładowanie" : "Charging"
     }
 
     private func formatSpeed(_ speed: Double) -> String {
