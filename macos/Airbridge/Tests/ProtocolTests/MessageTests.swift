@@ -613,4 +613,17 @@ final class MessageTests: XCTestCase {
         let data = try JSONEncoder().encode(msg)
         XCTAssertEqual(try JSONDecoder().decode(Message.self, from: data), msg)
     }
+
+    // MARK: - QRPayload
+
+    func testQRPayloadCarriesCertFingerprint() throws {
+        let payload = QRPayload(host: "1.2.3.4", port: 8765,
+                                publicKey: "cGs=", pairingToken: "tok",
+                                certFingerprint: "ab12")
+        let data = try JSONEncoder().encode(payload)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["cert_fingerprint"] as? String, "ab12")
+        let decoded = try JSONDecoder().decode(QRPayload.self, from: data)
+        XCTAssertEqual(decoded.certFingerprint, "ab12")
+    }
 }

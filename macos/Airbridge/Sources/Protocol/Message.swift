@@ -1048,6 +1048,9 @@ public struct QRPayload: Codable, Equatable, Sendable {
     public let port: Int
     public let publicKey: String
     public let pairingToken: String
+    /// Lowercase SHA-256 hex over the Mac's TLS certificate DER. The phone
+    /// pins this fingerprint for all TLS connections to the Mac.
+    public let certFingerprint: String
     public let protocolVersion: Int
 
     private enum CodingKeys: String, CodingKey {
@@ -1055,6 +1058,7 @@ public struct QRPayload: Codable, Equatable, Sendable {
         case port
         case publicKey       = "public_key"
         case pairingToken    = "pairing_token"
+        case certFingerprint = "cert_fingerprint"
         case protocolVersion = "protocol_version"
     }
 
@@ -1063,12 +1067,14 @@ public struct QRPayload: Codable, Equatable, Sendable {
         port: Int,
         publicKey: String,
         pairingToken: String,
+        certFingerprint: String,
         protocolVersion: Int = ProtocolConstants.version
     ) {
         self.host = host
         self.port = port
         self.publicKey = publicKey
         self.pairingToken = pairingToken
+        self.certFingerprint = certFingerprint
         self.protocolVersion = protocolVersion
     }
 }

@@ -99,7 +99,7 @@ public actor WebSocketServer {
         authenticatedConnections.removeAll()
     }
 
-    public func start(tlsIdentity: SecIdentity, bonjourName: String? = nil, httpPort: UInt16? = nil, mirrorPort: UInt16? = nil, publicKeyFingerprint: String? = nil) async throws {
+    public func start(tlsIdentity: SecIdentity, bonjourName: String? = nil, httpPort: UInt16? = nil, mirrorPort: UInt16? = nil, publicKeyFingerprint: String? = nil, certFingerprint: String? = nil) async throws {
         let wsOptions = NWProtocolWebSocket.Options()
         wsOptions.autoReplyPing = true
 
@@ -142,6 +142,12 @@ public actor WebSocketServer {
             }
             if let publicKeyFingerprint {
                 txtRecord["pk_fingerprint"] = publicKeyFingerprint
+            }
+            // Informational only: lets the phone detect a changed TLS cert
+            // (Mac re-installed) and prompt for re-pairing. Trust always
+            // comes from the pairing QR code, never from NSD.
+            if let certFingerprint {
+                txtRecord["cert_fingerprint"] = certFingerprint
             }
             listener.service = NWListener.Service(name: bonjourName, type: "_airbridge._tcp", txtRecord: txtRecord)
         }

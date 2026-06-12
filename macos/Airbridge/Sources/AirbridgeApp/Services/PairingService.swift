@@ -21,7 +21,9 @@ final class PairingService {
         guard let connectionService,
               let ip = connectionService.getLocalIPAddress() else { return nil }
         do {
-            return try connectionService.pairingManager.generatePairingPayload(host: ip, port: 8765)
+            let certFingerprint = try connectionService.tlsCertificateFingerprint()
+            return try connectionService.pairingManager.generatePairingPayload(
+                host: ip, port: 8765, certFingerprint: certFingerprint)
         } catch {
             return nil
         }

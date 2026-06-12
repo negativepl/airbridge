@@ -17,7 +17,7 @@ final class PairingManagerTests: XCTestCase {
 
     func testGeneratesPairingPayload() throws {
         let manager = makePairingManager()
-        let payload = try manager.generatePairingPayload(host: "192.168.1.10", port: 8765)
+        let payload = try manager.generatePairingPayload(host: "192.168.1.10", port: 8765, certFingerprint: "cafe01")
 
         XCTAssertEqual(payload.host, "192.168.1.10")
         XCTAssertEqual(payload.port, 8765)
@@ -28,7 +28,7 @@ final class PairingManagerTests: XCTestCase {
 
     func testPairingPayloadSerializesToJSON() throws {
         let manager = makePairingManager()
-        let payload = try manager.generatePairingPayload(host: "10.0.0.1", port: 9000)
+        let payload = try manager.generatePairingPayload(host: "10.0.0.1", port: 9000, certFingerprint: "cafe01")
 
         let data = try JSONEncoder().encode(payload)
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -42,7 +42,7 @@ final class PairingManagerTests: XCTestCase {
 
     func testGeneratesQRImage() throws {
         let manager = makePairingManager()
-        let payload = try manager.generatePairingPayload(host: "localhost", port: 12345)
+        let payload = try manager.generatePairingPayload(host: "localhost", port: 12345, certFingerprint: "cafe01")
 
         let image = try QRCodeGenerator.generate(from: payload)
 
@@ -51,7 +51,7 @@ final class PairingManagerTests: XCTestCase {
 
     func testValidatesPairingToken() throws {
         let manager = makePairingManager()
-        let payload = try manager.generatePairingPayload(host: "localhost", port: 8080)
+        let payload = try manager.generatePairingPayload(host: "localhost", port: 8080, certFingerprint: "cafe01")
 
         let token = payload.pairingToken
 
@@ -63,5 +63,17 @@ final class PairingManagerTests: XCTestCase {
 
         // One-time use: second call with same token should fail
         XCTAssertFalse(manager.validateToken(token), "Token must be invalidated after first use")
+    }
+
+    func testPairingPayloadCarriesCertFingerprint() throws {
+        let manager = makePairingManager()
+        let payload = try manager.generatePairingPayload(
+            host: "192.168.1.10", port: 8765, certFingerprint: "ab12cd34")
+
+        XCTAssertEqual(payload.certFingerprint, "ab12cd34")
+
+        let data = try JSONEncoder().encode(payload)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["cert_fingerprint"] as? String, "ab12cd34")
     }
 }

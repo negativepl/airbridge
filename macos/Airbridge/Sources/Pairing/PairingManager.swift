@@ -34,9 +34,11 @@ public final class PairingManager: @unchecked Sendable {
     /// - Parameters:
     ///   - host: The IPv4/IPv6 address or hostname of this device.
     ///   - port: The TCP port the WebSocket server is listening on.
+    ///   - certFingerprint: Lowercase SHA-256 hex of the Mac's TLS certificate
+    ///     DER; the phone pins it for all subsequent TLS connections.
     /// - Returns: A fully populated `PairingPayload`.
     /// - Throws: If the identity key cannot be read / created.
-    public func generatePairingPayload(host: String, port: Int) throws -> PairingPayload {
+    public func generatePairingPayload(host: String, port: Int, certFingerprint: String) throws -> PairingPayload {
         let identity = try keyManager.getOrCreateIdentity()
         let token = UUID().uuidString
         lock.withLock { activeToken = token }
@@ -45,6 +47,7 @@ public final class PairingManager: @unchecked Sendable {
             port: port,
             publicKey: identity.publicKeyBase64,
             pairingToken: token,
+            certFingerprint: certFingerprint,
             protocolVersion: ProtocolConstants.version
         )
     }

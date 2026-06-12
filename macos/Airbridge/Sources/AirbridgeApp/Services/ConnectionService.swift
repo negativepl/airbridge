@@ -145,8 +145,15 @@ final class ConnectionService {
         let fingerprint = keyManager.fingerprintOf(identity.publicKeyBase64)
         let mPort = mirrorService?.actualPort
         let tlsIdentity = try tlsIdentityManager.identity()
-        try await server.start(tlsIdentity: tlsIdentity, bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint)
+        let certFingerprint = try tlsIdentityManager.certificateFingerprint()
+        try await server.start(tlsIdentity: tlsIdentity, bonjourName: deviceName, httpPort: httpPort, mirrorPort: mPort, publicKeyFingerprint: fingerprint, certFingerprint: certFingerprint)
         await configureServerCallbacks()
+    }
+
+    /// Lowercase SHA-256 hex over the Mac's TLS certificate DER — embedded in
+    /// the pairing QR code so the phone can pin it.
+    func tlsCertificateFingerprint() throws -> String {
+        try tlsIdentityManager.certificateFingerprint()
     }
 
     private func startNetworkMonitor() {
