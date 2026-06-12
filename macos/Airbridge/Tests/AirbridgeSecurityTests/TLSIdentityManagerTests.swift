@@ -24,4 +24,13 @@ final class TLSIdentityManagerTests: XCTestCase {
         let manager2 = TLSIdentityManager(storage: KeychainStorage(service: service))
         XCTAssertEqual(try manager2.certificateFingerprint(), fp1)
     }
+
+    func testCorruptedBlobThrowsImportFailed() throws {
+        let storage = InMemoryStorage()
+        storage.save(Data("garbage".utf8), account: "tls_identity_p12")
+        let manager = TLSIdentityManager(storage: storage)
+        XCTAssertThrowsError(try manager.identity()) { error in
+            guard case TLSIdentityError.importFailed = error else { return XCTFail("expected importFailed, got \(error)") }
+        }
+    }
 }

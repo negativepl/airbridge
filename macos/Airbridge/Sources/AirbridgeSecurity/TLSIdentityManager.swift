@@ -48,8 +48,10 @@ public final class TLSIdentityManager: @unchecked Sendable {
     public func certificateFingerprint() throws -> String {
         let identity = try identity()
         var cert: SecCertificate?
-        SecIdentityCopyCertificate(identity, &cert)
-        guard let cert else { throw TLSIdentityError.certificateUnavailable }
+        let status = SecIdentityCopyCertificate(identity, &cert)
+        guard status == errSecSuccess, let cert else {
+            throw TLSIdentityError.certificateUnavailable
+        }
         let der = SecCertificateCopyData(cert) as Data
         return SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
     }
@@ -86,7 +88,9 @@ public final class TLSIdentityManager: @unchecked Sendable {
         process.arguments = args
         let stderr = Pipe()
         process.standardError = stderr
-        process.standardOutput = Pipe()
+        // Discard stdout: an unread Pipe() would deadlock the process once its
+        // buffer (~64 KB) fills up.
+        process.standardOutput = FileHandle.nullDevice
         try process.run()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
@@ -106,6 +110,7 @@ public final class TLSIdentityManager: @unchecked Sendable {
               let identityRef = first[kSecImportItemIdentity as String] else {
             throw TLSIdentityError.importFailed(status)
         }
+        // kSecImportItemIdentity is guaranteed SecIdentityRef by the Security framework.
         return (identityRef as! SecIdentity)
     }
 }
