@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.DesktopMac
 import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -173,6 +174,43 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                     onDisconnect = { viewModel.disconnect() },
                     onReconnect = { viewModel.reconnect() }
                 )
+            }
+        }
+
+        // ── Re-pair guidance (TLS pin missing or Mac certificate changed) ──
+        val pairingIssue by AirbridgeService.pairingIssue.collectAsState()
+        androidx.compose.animation.AnimatedVisibility(
+            visible = pairingIssue != null,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CardShape,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.WarningAmber,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = pairingIssue ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
             }
         }
 

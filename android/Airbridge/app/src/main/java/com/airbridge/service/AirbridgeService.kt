@@ -55,6 +55,7 @@ class AirbridgeService : Service() {
 
         const val EXTRA_HOST = "extra_host"
         const val EXTRA_PORT = "extra_port"
+        const val EXTRA_CERT_FINGERPRINT = "extra_cert_fingerprint"
 
         // Shared state observable by UI
         val isConnected = MutableStateFlow(false)
@@ -65,6 +66,14 @@ class AirbridgeService : Service() {
         val macWallpaper = MutableStateFlow<String?>(null)  // base64 JPEG
         val connectedSince = MutableStateFlow<Long?>(null)
         val recentActivity = MutableStateFlow<List<ActivityItem>>(emptyList())
+
+        /**
+         * Visible re-pair guidance (null = no issue). Set when a paired Mac is
+         * found but cannot be trusted over TLS (no stored pin, or the
+         * advertised certificate differs from the pinned one); cleared on a
+         * successful connect or successful pairing. Rendered in MainScreen.
+         */
+        val pairingIssue = MutableStateFlow<String?>(null)
 
         // Transfer progress: null = no transfer, 0.0..1.0 = in progress
         val transferProgress = MutableStateFlow<Float?>(null)
@@ -125,6 +134,11 @@ class AirbridgeService : Service() {
 
         @Volatile
         var pendingPairRequest: PendingPairRequest? = null
+
+        /** TLS pin of the live connection — for UI call sites (e.g. screen
+         *  share) that launch their own pinned clients to the same Mac. */
+        fun certFingerprintInUse(): String =
+            instance?.webSocketClient?.certFingerprintInUse ?: ""
     }
 
     /** Pairing data captured from a scanned QR code, consumed once the WebSocket connects. */
@@ -133,7 +147,9 @@ class AirbridgeService : Service() {
         val phonePublicKeyBase64: String,
         val pairingToken: String,
         /** The Mac's public key as scanned from the QR code — trust anchor for PairResponse. */
-        val expectedMacPublicKeyBase64: String
+        val expectedMacPublicKeyBase64: String,
+        /** SHA-256 hex of the Mac's TLS certificate DER, from the same QR. */
+        val certFingerprint: String
     )
 
     private val deviceId: String = UUID.randomUUID().toString()
@@ -160,6 +176,14 @@ class AirbridgeService : Service() {
      */
     @Volatile
     private var expectedMacPublicKey: String? = null
+
+    /**
+     * The Mac's TLS cert fingerprint from the scanned QR code, held between
+     * sending the PairRequest and the accepted PairResponse so the stored
+     * PairedDevice can carry the pin. Lifecycle mirrors [expectedMacPublicKey].
+     */
+    @Volatile
+    private var pendingPairCertFingerprint: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -210,11 +234,12 @@ class AirbridgeService : Service() {
             ACTION_CONNECT -> {
                 val host = intent.getStringExtra(EXTRA_HOST)
                 val port = intent.getIntExtra(EXTRA_PORT, 0)
+                val certFingerprint = intent.getStringExtra(EXTRA_CERT_FINGERPRINT) ?: ""
                 if (host != null && port != 0) {
                     Log.d(TAG, "Connecting directly to $host:$port")
                     connectedHost.value = host
                     webSocketClient.shouldReconnect = true
-                    webSocketClient.connect(host, port)
+                    webSocketClient.connect(host, port, certFingerprint)
                 } else {
                     Log.w(TAG, "ACTION_CONNECT missing host or port")
                 }
@@ -257,6 +282,7 @@ class AirbridgeService : Service() {
                                 val tempFile = httpFileDownloader.download(
                                     host = host,
                                     port = port,
+                                    certFingerprint = webSocketClient.certFingerprintInUse,
                                     transferId = transferId,
                                     filenameHint = offer.filename
                                 ) { bytesReceived, totalBytes ->
@@ -342,6 +368,7 @@ class AirbridgeService : Service() {
             if (pending != null) {
                 pendingPairRequest = null
                 expectedMacPublicKey = pending.expectedMacPublicKeyBase64
+                pendingPairCertFingerprint = pending.certFingerprint
                 sendPairRequest(pending.deviceName, pending.phonePublicKeyBase64, pending.pairingToken)
             } else {
                 // Normal reconnect — send auth handshake
@@ -362,6 +389,7 @@ class AirbridgeService : Service() {
             Log.d(TAG, "WebSocket disconnected")
             clipboardSync.stopListening()
             expectedMacPublicKey = null
+            pendingPairCertFingerprint = null
             isConnected.value = false
             connectedSince.value = null
             macInfo.value = null
@@ -397,13 +425,27 @@ class AirbridgeService : Service() {
     }
 
     private fun setupNsdDiscovery() {
-        nsdDiscovery.onServiceFound = handler@{ host, port, deviceName, httpPort, fingerprint, mirrorPort ->
+        nsdDiscovery.onServiceFound = handler@{ host, port, deviceName, httpPort, fingerprint, nsdCertFingerprint, mirrorPort ->
             if (fingerprint.isEmpty()) {
                 Log.d(TAG, "NSD: $deviceName has no fingerprint — skipping")
                 return@handler
             }
-            if (!pairedDeviceStore.isPaired(fingerprint)) {
+            val device = pairedDeviceStore.findByFingerprint(fingerprint)
+            if (device == null) {
                 Log.d(TAG, "NSD: $deviceName not paired (fp=${fingerprint.take(16)}...) — skipping")
+                return@handler
+            }
+            // TLS pin gate: connecting without a pin (or with a stale one)
+            // would only fail the handshake — surface re-pair guidance instead.
+            val pinned = device.certFingerprint
+            if (pinned.isEmpty()) {
+                Log.w(TAG, "NSD: $deviceName paired without a TLS pin (pre-TLS pairing) — re-pair required")
+                pairingIssue.value = getString(com.airbridge.R.string.repair_needed_no_pin, deviceName)
+                return@handler
+            }
+            if (nsdCertFingerprint.isNotEmpty() && nsdCertFingerprint != pinned) {
+                Log.w(TAG, "NSD: $deviceName advertises a different TLS certificate — re-pair required")
+                pairingIssue.value = getString(com.airbridge.R.string.repair_needed_cert_changed, deviceName)
                 return@handler
             }
             Log.d(TAG, "NSD: paired device $deviceName found at $host:$port — connecting (mirrorPort=$mirrorPort)")
@@ -414,7 +456,7 @@ class AirbridgeService : Service() {
             Companion.mirrorPortFlow.value = mirrorPort
             nsdDiscovery.stopDiscovery()
             webSocketClient.shouldReconnect = true
-            webSocketClient.connect(host, port)
+            webSocketClient.connect(host, port, pinned)
         }
     }
 
@@ -743,6 +785,7 @@ class AirbridgeService : Service() {
                     clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
+                    pairingIssue.value = null
                     // Pull the Mac's system info + wallpaper for the Home monitor.
                     webSocketClient.send(Message.MacInfoRequest)
                     webSocketClient.send(Message.MacWallpaperRequest)
@@ -758,6 +801,8 @@ class AirbridgeService : Service() {
             is Message.PairResponse -> {
                 val expectedKey = expectedMacPublicKey
                 expectedMacPublicKey = null
+                val pairCertFingerprint = pendingPairCertFingerprint
+                pendingPairCertFingerprint = null
                 if (message.accepted) {
                     // Verify the key in the PairResponse against the key scanned
                     // from the Mac's QR code. A mismatch (or a PairResponse with
@@ -781,12 +826,14 @@ class AirbridgeService : Service() {
                             deviceName = message.deviceName,
                             publicKeyBase64 = message.publicKey,
                             publicKeyFingerprint = com.airbridge.security.KeyManager.fingerprintOf(message.publicKey),
-                            pairedAt = System.currentTimeMillis()
+                            pairedAt = System.currentTimeMillis(),
+                            certFingerprint = pairCertFingerprint ?: ""
                         )
                     )
                     clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
+                    pairingIssue.value = null
                     // pairing status tracked via StateFlow
                 } else {
                     connectedDeviceName.value = null
@@ -853,6 +900,7 @@ class AirbridgeService : Service() {
                             httpFileUploader.upload(
                                 host = host,
                                 port = port,
+                                certFingerprint = webSocketClient.certFingerprintInUse,
                                 uri = uri,
                                 contentResolver = applicationContext.contentResolver
                             ) { _, _ -> }
@@ -947,6 +995,7 @@ class AirbridgeService : Service() {
                         httpFileUploader.upload(
                             host = host,
                             port = port,
+                            certFingerprint = webSocketClient.certFingerprintInUse,
                             uri = uri,
                             contentResolver = applicationContext.contentResolver
                         ) { _, _ -> }
@@ -1006,6 +1055,7 @@ class AirbridgeService : Service() {
                     putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_HOST, host)
                     putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_PORT, mirrorPort)
                     putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_TOKEN, tokenBytes)
+                    putExtra(com.airbridge.mirror.MirrorActivity.EXTRA_CERT_FINGERPRINT, webSocketClient.certFingerprintInUse)
                 }
                 startActivity(intent)
                 Log.d(TAG, "MirrorStartRequest: launched MirrorActivity → $host:$mirrorPort")
@@ -1025,6 +1075,7 @@ class AirbridgeService : Service() {
                     putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_PORT, mirrorPort)
                     putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_TOKEN, tokenBytes)
                     putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_MODE, message.mode)
+                    putExtra(com.airbridge.mirror.ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, webSocketClient.certFingerprintInUse)
                 }
                 startActivity(intent)
                 Log.d(TAG, "ReverseMirrorStart: launched ReverseMirrorActivity → $host:$mirrorPort mode=${message.mode}")
@@ -1178,6 +1229,7 @@ class AirbridgeService : Service() {
             val success = httpFileUploader.upload(
                 host = host,
                 port = port,
+                certFingerprint = webSocketClient.certFingerprintInUse,
                 uri = uri,
                 contentResolver = applicationContext.contentResolver
             ) { bytesSent, totalBytes ->

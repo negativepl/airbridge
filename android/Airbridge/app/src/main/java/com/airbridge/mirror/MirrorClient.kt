@@ -1,5 +1,6 @@
 package com.airbridge.mirror
 
+import com.airbridge.network.PinnedTls
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -13,6 +14,7 @@ class MirrorClient(
     private val onTap: (Float, Float) -> Unit,
     private val host: String,
     private val port: Int,
+    private val certFingerprint: String,
     private val pairingToken: ByteArray,
     private val screenWidth: UInt,
     private val screenHeight: UInt,
@@ -20,14 +22,16 @@ class MirrorClient(
     private val onAck: (MirrorMessage.HelloAck) -> Unit,
     private val onDisconnect: () -> Unit
 ) {
-    private val http = OkHttpClient.Builder()
-        .pingInterval(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS)
-        .build()
+    private val http = PinnedTls.apply(
+        OkHttpClient.Builder()
+            .pingInterval(15, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS),
+        certFingerprint
+    ).build()
     private var webSocket: WebSocket? = null
 
     fun connect() {
-        val req = Request.Builder().url("ws://$host:$port/").build()
+        val req = Request.Builder().url("wss://$host:$port/").build()
         webSocket = http.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 val hello = MirrorMessage.Hello(pairingToken, screenWidth, screenHeight, orientation)

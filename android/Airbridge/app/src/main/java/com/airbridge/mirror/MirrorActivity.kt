@@ -10,12 +10,14 @@ class MirrorActivity : Activity() {
     private var host: String = ""
     private var port: Int = 0
     private var token: ByteArray = ByteArray(0)
+    private var certFingerprint: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         host = intent.getStringExtra(EXTRA_HOST) ?: return finish()
         port = intent.getIntExtra(EXTRA_PORT, 0)
         token = intent.getByteArrayExtra(EXTRA_TOKEN) ?: return finish()
+        certFingerprint = intent.getStringExtra(EXTRA_CERT_FINGERPRINT) ?: ""
 
         val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         startActivityForResult(mpm.createScreenCaptureIntent(), REQUEST_CAPTURE)
@@ -34,6 +36,7 @@ class MirrorActivity : Activity() {
             putExtra(MirrorService.EXTRA_HOST, host)
             putExtra(MirrorService.EXTRA_PORT, port)
             putExtra(MirrorService.EXTRA_TOKEN, token)
+            putExtra(MirrorService.EXTRA_CERT_FINGERPRINT, certFingerprint)
         }
         startForegroundService(svc)
         finish()
@@ -43,6 +46,7 @@ class MirrorActivity : Activity() {
         const val EXTRA_HOST = "host"
         const val EXTRA_PORT = "port"
         const val EXTRA_TOKEN = "token"
+        const val EXTRA_CERT_FINGERPRINT = "certFingerprint"
         private const val REQUEST_CAPTURE = 4711
     }
 }

@@ -1,6 +1,7 @@
 package com.airbridge.service
 
 import android.util.Log
+import com.airbridge.network.PinnedTls
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -25,11 +26,6 @@ class HttpFileDownloader {
         private const val BUFFER_SIZE = 256 * 1024 // 256 KB read buffer
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.MINUTES)
-        .build()
-
     /**
      * Download a file from the given host/port for the given transferId.
      * On success returns the temp file. On failure returns null.
@@ -38,11 +34,20 @@ class HttpFileDownloader {
     fun download(
         host: String,
         port: Int,
+        certFingerprint: String,
         transferId: String,
         filenameHint: String,
         onProgress: (bytesReceived: Long, totalBytes: Long) -> Unit
     ): File? {
-        val url = "http://$host:$port/send/$transferId"
+        // Built per call: the TLS pin is per-host, so the client cannot be a
+        // long-lived field.
+        val client = PinnedTls.apply(
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.MINUTES),
+            certFingerprint
+        ).build()
+        val url = "https://$host:$port/send/$transferId"
         Log.d(TAG, "GET $url")
 
         val request = Request.Builder().url(url).get().build()

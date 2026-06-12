@@ -1,7 +1,10 @@
 package com.airbridge.mirror
 
+import com.airbridge.network.PinnedTls
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
@@ -16,7 +19,24 @@ class MirrorClientTest {
 
     private lateinit var server: MockWebServer
 
-    @Before fun setUp() { server = MockWebServer().apply { start() } }
+    // Real TLS (wss) like production: MockWebServer serves a self-signed
+    // certificate and the client pins its fingerprint via PinnedTls.
+    private val heldCertificate: HeldCertificate = HeldCertificate.Builder()
+        .commonName("localhost")
+        .addSubjectAlternativeName("localhost")
+        .build()
+
+    private val pin: String = PinnedTls.fingerprintOf(heldCertificate.certificate)
+
+    @Before fun setUp() {
+        server = MockWebServer().apply {
+            val certs = HandshakeCertificates.Builder()
+                .heldCertificate(heldCertificate)
+                .build()
+            useHttps(certs.sslSocketFactory(), false)
+            start()
+        }
+    }
     @After fun tearDown() {
         // MockWebServer's internal task-runner threads may still be draining; ignore the timeout
         try { server.shutdown() } catch (_: java.io.IOException) { }
@@ -34,6 +54,7 @@ class MirrorClientTest {
         val client = MirrorClient(
             host = server.hostName,
             port = server.port,
+            certFingerprint = pin,
             pairingToken = token,
             screenWidth = 1080u,
             screenHeight = 2376u,

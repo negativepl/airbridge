@@ -40,6 +40,7 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
     private var port: Int = 0
     private var token: ByteArray = ByteArray(0)
     private var mode: Int = 0
+    private var certFingerprint: String = ""
 
     private var videoW = 0
     private var videoH = 0
@@ -57,6 +58,7 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         port = intent.getIntExtra(EXTRA_PORT, 0)
         token = intent.getByteArrayExtra(EXTRA_TOKEN) ?: return finish()
         mode = intent.getIntExtra(EXTRA_MODE, 0)
+        certFingerprint = intent.getStringExtra(EXTRA_CERT_FINGERPRINT) ?: ""
         if (port == 0) return finish()
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -91,7 +93,7 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         decoder = dec
         val (sw, sh) = realDisplaySize()
         client = ReverseMirrorClient(
-            host = host, port = port, pairingToken = token,
+            host = host, port = port, certFingerprint = certFingerprint, pairingToken = token,
             screenWidth = sw.toUInt(), screenHeight = sh.toUInt(), mode = mode.toUByte(),
             onConfig = { sps, pps -> dec.onConfig(sps, pps) },
             onConfigHEVC = { vps, sps, pps -> dec.onConfigHEVC(vps, sps, pps) },
@@ -275,5 +277,6 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         const val EXTRA_PORT = "port"
         const val EXTRA_TOKEN = "token"
         const val EXTRA_MODE = "mode"
+        const val EXTRA_CERT_FINGERPRINT = "certFingerprint"
     }
 }

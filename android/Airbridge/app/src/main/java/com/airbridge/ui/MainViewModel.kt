@@ -77,6 +77,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handlePairingPayload(payload: com.airbridge.pairing.PairingPayload) {
         val context = getApplication<Application>()
+
+        // A QR with no TLS fingerprint comes from a pre-TLS Mac app. Both apps
+        // ship together — refuse instead of pairing without a pin.
+        if (payload.certFingerprint.isBlank()) {
+            android.util.Log.e(
+                "MainViewModel",
+                "Pairing QR has no cert_fingerprint — Mac app is outdated, refusing to pair"
+            )
+            return
+        }
+
         val keyManager = com.airbridge.security.KeyManager(context)
         val pairedDeviceStore = com.airbridge.security.PairedDeviceStore(context)
 
@@ -89,7 +100,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 deviceName = "Mac",
                 publicKeyBase64 = payload.publicKey,
                 publicKeyFingerprint = fingerprint,
-                pairedAt = System.currentTimeMillis()
+                pairedAt = System.currentTimeMillis(),
+                certFingerprint = payload.certFingerprint
             )
         )
 
@@ -105,7 +117,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             deviceName = android.os.Build.MODEL,
             phonePublicKeyBase64 = keyManager.getRawPublicKeyBase64(),
             pairingToken = payload.pairingToken,
-            expectedMacPublicKeyBase64 = payload.publicKey
+            expectedMacPublicKeyBase64 = payload.publicKey,
+            certFingerprint = payload.certFingerprint
         )
 
         // Connect to Mac
@@ -113,6 +126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = AirbridgeService.ACTION_CONNECT
             putExtra(AirbridgeService.EXTRA_HOST, payload.host)
             putExtra(AirbridgeService.EXTRA_PORT, payload.port)
+            putExtra(AirbridgeService.EXTRA_CERT_FINGERPRINT, payload.certFingerprint)
         }
         context.startForegroundService(intent)
     }

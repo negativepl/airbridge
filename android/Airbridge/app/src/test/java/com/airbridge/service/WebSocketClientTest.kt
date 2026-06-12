@@ -1,5 +1,6 @@
 package com.airbridge.service
 
+import com.airbridge.network.PinnedTls
 import com.airbridge.protocol.ContentType
 import com.airbridge.protocol.Message
 import java.util.concurrent.CountDownLatch
@@ -10,12 +11,31 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebSocketClientTest {
+
+    // Testy idą po prawdziwym TLS (wss): MockWebServer serwuje self-signed
+    // HeldCertificate, a klient przypina jego odcisk przez PinnedTls — tak jak
+    // w produkcji pin z QR przypina cert Maca.
+    private val heldCertificate: HeldCertificate = HeldCertificate.Builder()
+        .commonName("localhost")
+        .addSubjectAlternativeName("localhost")
+        .build()
+
+    private val pin: String = PinnedTls.fingerprintOf(heldCertificate.certificate)
+
+    private fun tlsServer(): MockWebServer = MockWebServer().apply {
+        val certs = HandshakeCertificates.Builder()
+            .heldCertificate(heldCertificate)
+            .build()
+        useHttps(certs.sslSocketFactory(), false)
+    }
 
     /** Serwerowy listener zbierający otwarte sockety i sygnalizujący zamknięcia. */
     private class ServerSocketRecorder : WebSocketListener() {
@@ -40,8 +60,8 @@ class WebSocketClientTest {
     @Test
     fun `connect to a different host cancels the previous socket`() {
         // Dwa serwery = dwa różne host:port, jak po zmianie sieci.
-        val serverA = MockWebServer()
-        val serverB = MockWebServer()
+        val serverA = tlsServer()
+        val serverB = tlsServer()
         val first = ServerSocketRecorder()
         val second = ServerSocketRecorder()
         serverA.enqueue(MockResponse().withWebSocketUpgrade(first))
@@ -52,11 +72,11 @@ class WebSocketClientTest {
         val client = WebSocketClient()
         client.shouldReconnect = false
         try {
-            client.connect(serverA.hostName, serverA.port)
+            client.connect(serverA.hostName, serverA.port, pin)
             assertTrue("first socket should open", first.opened.await(5, TimeUnit.SECONDS))
 
             // Drugi connect (np. discovery po zmianie sieci) — stary socket musi paść.
-            client.connect(serverB.hostName, serverB.port)
+            client.connect(serverB.hostName, serverB.port, pin)
             assertTrue("second socket should open", second.opened.await(5, TimeUnit.SECONDS))
             assertTrue(
                 "first (stale) socket should be cancelled by the second connect",
@@ -75,7 +95,7 @@ class WebSocketClientTest {
 
     @Test
     fun `duplicate connect to the same host and port is ignored`() {
-        val server = MockWebServer()
+        val server = tlsServer()
         val first = ServerSocketRecorder()
         val second = ServerSocketRecorder()
         server.enqueue(MockResponse().withWebSocketUpgrade(first))
@@ -87,13 +107,13 @@ class WebSocketClientTest {
         val connected = CountDownLatch(1)
         client.onConnected = { connected.countDown() }
         try {
-            client.connect(server.hostName, server.port)
+            client.connect(server.hostName, server.port, pin)
             assertTrue("first socket should open", first.opened.await(5, TimeUnit.SECONDS))
             assertTrue("client should report connected", connected.await(5, TimeUnit.SECONDS))
 
             // Duplikat (race discovery vs reconnect po zmianie sieci) — ma być
             // zignorowany: bez drugiego socketa i bez zrywania żywego.
-            client.connect(server.hostName, server.port)
+            client.connect(server.hostName, server.port, pin)
 
             assertFalse(
                 "duplicate connect must not open a second socket",
@@ -114,8 +134,8 @@ class WebSocketClientTest {
 
     @Test
     fun `message from stale socket is not delivered`() {
-        val serverA = MockWebServer()
-        val serverB = MockWebServer()
+        val serverA = tlsServer()
+        val serverB = tlsServer()
         val first = ServerSocketRecorder()
         val second = ServerSocketRecorder()
         serverA.enqueue(MockResponse().withWebSocketUpgrade(first))
@@ -132,9 +152,9 @@ class WebSocketClientTest {
             gotMessage.countDown()
         }
         try {
-            client.connect(serverA.hostName, serverA.port)
+            client.connect(serverA.hostName, serverA.port, pin)
             assertTrue(first.opened.await(5, TimeUnit.SECONDS))
-            client.connect(serverB.hostName, serverB.port)
+            client.connect(serverB.hostName, serverB.port, pin)
             assertTrue(second.opened.await(5, TimeUnit.SECONDS))
 
             // Oba serwerowe sockety wysyłają tę samą wiadomość — dotrzeć ma

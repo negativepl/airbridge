@@ -29,6 +29,8 @@ object PinnedTls {
                     throw CertificateException("No pinned certificate — device not paired over TLS")
                 }
                 val presented = fingerprintOf(leaf)
+                // Constant-time compare over the hex-string bytes (64 ASCII chars); equal
+                // lengths in practice, and the pin is not attacker-controlled at runtime.
                 if (!MessageDigest.isEqual(
                         presented.toByteArray(), pinnedFingerprint.lowercase().toByteArray())) {
                     throw CertificateException(

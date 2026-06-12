@@ -12,7 +12,7 @@ class NsdDiscovery(private val context: Context) {
         private const val SERVICE_TYPE = "_airbridge._tcp."
     }
 
-    var onServiceFound: ((host: String, port: Int, deviceName: String, httpPort: Int, fingerprint: String, mirrorPort: Int?) -> Unit)? = null
+    var onServiceFound: ((host: String, port: Int, deviceName: String, httpPort: Int, fingerprint: String, certFingerprint: String, mirrorPort: Int?) -> Unit)? = null
     var onServiceLost: (() -> Unit)? = null
 
     // Lifecycle state. All transitions happen under the NsdDiscovery lock —
@@ -110,8 +110,9 @@ class NsdDiscovery(private val context: Context) {
             val mirrorPortStr = serviceInfo.attributes["mirror_port"]?.let { String(it, Charsets.UTF_8) }
             val mirrorPort = mirrorPortStr?.toIntOrNull()
             val fingerprint = serviceInfo.attributes["pk_fingerprint"]?.let { String(it, Charsets.UTF_8) } ?: ""
-            Log.d(TAG, "Service resolved: $name at $host:$port (httpPort=$httpPort, mirrorPort=$mirrorPort, fp=${fingerprint.take(16)}...)")
-            onServiceFound?.invoke(host, port, name, httpPort, fingerprint, mirrorPort)
+            val certFingerprint = serviceInfo.attributes["cert_fingerprint"]?.let { String(it, Charsets.UTF_8) } ?: ""
+            Log.d(TAG, "Service resolved: $name at $host:$port (httpPort=$httpPort, mirrorPort=$mirrorPort, fp=${fingerprint.take(16)}..., certFp=${certFingerprint.take(16)}...)")
+            onServiceFound?.invoke(host, port, name, httpPort, fingerprint, certFingerprint, mirrorPort)
         }
     }
 

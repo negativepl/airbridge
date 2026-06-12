@@ -44,7 +44,10 @@ data class PairingPayload(
     val port: Int,
     val publicKey: String,
     val pairingToken: String,
-    val protocolVersion: Int
+    val protocolVersion: Int,
+    /** SHA-256 hex of the Mac's TLS certificate DER. Empty = Mac app too old
+     *  (no TLS support) — pairing is refused; both apps must ship together. */
+    val certFingerprint: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,7 +139,8 @@ fun QrScannerScreen(
                                                             port = json.getInt("port"),
                                                             publicKey = json.getString("public_key"),
                                                             pairingToken = json.getString("pairing_token"),
-                                                            protocolVersion = json.getInt("protocol_version")
+                                                            protocolVersion = json.getInt("protocol_version"),
+                                                            certFingerprint = json.optString("cert_fingerprint", "")
                                                         )
                                                         if (!scanned.value) {
                                                             scanned.value = true

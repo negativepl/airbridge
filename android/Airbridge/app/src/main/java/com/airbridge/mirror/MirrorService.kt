@@ -44,6 +44,7 @@ class MirrorService : Service() {
         val host = intent.getStringExtra(EXTRA_HOST) ?: return stopSelf()
         val port = intent.getIntExtra(EXTRA_PORT, 0)
         val token = intent.getByteArrayExtra(EXTRA_TOKEN) ?: return stopSelf()
+        val certFingerprint = intent.getStringExtra(EXTRA_CERT_FINGERPRINT) ?: ""
 
         val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val projection = mpm.getMediaProjection(resultCode, data) ?: return stopSelf()
@@ -55,7 +56,7 @@ class MirrorService : Service() {
             onTap = { x, y ->
                 MirrorAccessibilityService.dispatchTap(this, x, y)
             },
-            host = host, port = port, pairingToken = token,
+            host = host, port = port, certFingerprint = certFingerprint, pairingToken = token,
             screenWidth = w.toUInt(), screenHeight = h.toUInt(), orientation = 0u,
             onAck = { ack ->
                 if (generation != sessionGeneration) return@MirrorClient
@@ -128,6 +129,7 @@ class MirrorService : Service() {
         const val EXTRA_HOST = "host"
         const val EXTRA_PORT = "port"
         const val EXTRA_TOKEN = "token"
+        const val EXTRA_CERT_FINGERPRINT = "certFingerprint"
         private const val CHANNEL = "mirror"
         private const val NOTIF_ID = 4711
     }

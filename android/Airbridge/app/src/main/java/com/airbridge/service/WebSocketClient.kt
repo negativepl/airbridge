@@ -1,6 +1,7 @@
 package com.airbridge.service
 
 import android.util.Log
+import com.airbridge.network.PinnedTls
 import com.airbridge.protocol.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,14 +52,19 @@ class WebSocketClient {
     @Volatile
     private var currentPort: Int = 0
 
+    /** TLS pin (SHA-256 hex of the Mac cert DER) for the current host. Lives
+     *  and clears exactly like [currentHost]. */
+    @Volatile
+    private var currentCertFingerprint: String = ""
+
+    /** The pin used by the live/last connection — HTTP and mirror clients
+     *  talking to the same Mac reuse it. */
+    val certFingerprintInUse: String get() = currentCertFingerprint
+
     @Volatile
     var shouldReconnect: Boolean = true
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    private val httpClient = OkHttpClient.Builder()
-        .pingInterval(PING_INTERVAL_SECONDS, TimeUnit.SECONDS)
-        .build()
 
     private val listener = object : WebSocketListener() {
         // Listener jest wspólny dla kolejnych socketów. Eventy z socketa innego
@@ -121,6 +127,7 @@ class WebSocketClient {
                 Log.d(TAG, "Reconnect exhausted for cached host — requesting re-discovery")
                 reconnectPolicy.onSuccess() // reset for the next host
                 currentHost = null
+                currentCertFingerprint = ""
                 onReconnectExhausted?.invoke()
             }
         }
@@ -129,11 +136,12 @@ class WebSocketClient {
     private fun scheduleReconnect(delayMs: Long) {
         val host = currentHost ?: return
         val port = currentPort
+        val certFingerprint = currentCertFingerprint
         scope.launch {
             delay(delayMs)
             if (shouldReconnect && !isConnected && currentHost == host) {
                 Log.d(TAG, "Attempting reconnect to $host:$port (delay ${delayMs}ms)")
-                connect(host, port)
+                connect(host, port, certFingerprint)
             }
         }
     }
@@ -144,13 +152,14 @@ class WebSocketClient {
      */
     fun forgetHost() {
         currentHost = null
+        currentCertFingerprint = ""
         reconnectPolicy.onSuccess()
         webSocket?.cancel()
         webSocket = null
         isConnected = false
     }
 
-    fun connect(host: String, port: Int) {
+    fun connect(host: String, port: Int, certFingerprint: String) {
         // Guard: discovery i reconnect potrafią zawołać connect() niemal
         // równocześnie (np. po zmianie sieci). Drugi connect do tego samego
         // hosta:portu, gdy socket żyje albo właśnie się otwiera, jest zbędny.
@@ -165,10 +174,17 @@ class WebSocketClient {
         existing?.cancel()
         currentHost = host
         currentPort = port
+        currentCertFingerprint = certFingerprint
+        // Client zbudowany per połączenie: pin TLS jest per-host, więc nie da
+        // się go trzymać w jednym długowiecznym OkHttpClient.
+        val client = PinnedTls.apply(
+            OkHttpClient.Builder().pingInterval(PING_INTERVAL_SECONDS, TimeUnit.SECONDS),
+            certFingerprint
+        ).build()
         val request = Request.Builder()
-            .url("ws://$host:$port")
+            .url("wss://$host:$port")
             .build()
-        webSocket = httpClient.newWebSocket(request, listener)
+        webSocket = client.newWebSocket(request, listener)
     }
 
     fun disconnect() {

@@ -60,6 +60,7 @@ fun ScreenShareScreen() {
             putExtra(ReverseMirrorActivity.EXTRA_PORT, p)
             putExtra(ReverseMirrorActivity.EXTRA_TOKEN, Base64.decode(t, Base64.NO_WRAP))
             putExtra(ReverseMirrorActivity.EXTRA_MODE, mode)
+            putExtra(ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, AirbridgeService.certFingerprintInUse())
         }
         context.startActivity(intent)
     }

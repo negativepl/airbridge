@@ -203,6 +203,8 @@
     <string name="pairing_success_desc">Connected with %s</string>
     <string name="pairing_success_connected">Connection active</string>
     <string name="pairing_success_continue">Continue</string>
+    <string name="repair_needed_no_pin">%s needs to be paired again after the security update. Open AirBridge on your Mac and scan the QR code.</string>
+    <string name="repair_needed_cert_changed">The security certificate of %s has changed. AirBridge will not connect until you pair again by scanning the QR code on your Mac.</string>
     <string name="screen_sharing_title">Screen Sharing</string>
     <string name="screen_sharing_show_mac">Show Mac screen</string>
     <string name="screen_sharing_show_mac_desc">View and control the Mac\'s main screen.</string>

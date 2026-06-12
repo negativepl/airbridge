@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import com.airbridge.network.PinnedTls
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,19 +20,23 @@ class HttpFileUploader {
         private const val BUFFER_SIZE = 1024 * 1024 // 1MB read buffer
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(5, TimeUnit.MINUTES)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
-
     fun upload(
         host: String,
         port: Int,
+        certFingerprint: String,
         uri: Uri,
         contentResolver: ContentResolver,
         onProgress: (bytesSent: Long, totalBytes: Long) -> Unit
     ): Boolean {
+        // Built per call: the TLS pin is per-host, so the client cannot be a
+        // long-lived field.
+        val client = PinnedTls.apply(
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.MINUTES)
+                .readTimeout(30, TimeUnit.SECONDS),
+            certFingerprint
+        ).build()
         val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
         var filename = "file"
         var fileSize = 0L
@@ -101,7 +106,7 @@ class HttpFileUploader {
 
         val encodedFilename = java.net.URLEncoder.encode(filename, "UTF-8")
         val request = Request.Builder()
-            .url("http://$host:$port/upload")
+            .url("https://$host:$port/upload")
             .header("X-Filename", encodedFilename)
             .header("X-Mime-Type", mimeType)
             .apply { if (checksum != null) header("X-Checksum-SHA256", checksum) }
