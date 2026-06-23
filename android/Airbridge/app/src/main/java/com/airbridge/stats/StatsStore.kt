@@ -26,7 +26,7 @@ fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L * 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f GB", bytes / (1024.0 * 1024 * 1024))
     bytes >= 1024L * 1024 -> String.format(java.util.Locale.US, "%.1f MB", bytes / (1024.0 * 1024))
     bytes >= 1024L -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
-    else -> "$bytes B"
+    else -> String.format(java.util.Locale.US, "%d B", bytes)
 }
 
 fun formatDuration(seconds: Long): String {

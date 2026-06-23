@@ -234,5 +234,4 @@
     <string name="stats_data_received">Data received</string>
     <string name="stats_clipboard">Clipboard syncs</string>
     <string name="stats_online">Time online</string>
-    <string name="stats_sessions">Sessions</string>
 </resources>

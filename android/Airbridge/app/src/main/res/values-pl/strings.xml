@@ -235,5 +235,4 @@
     <string name="stats_data_received">Dane odebrane</string>
     <string name="stats_clipboard">Synchronizacje schowka</string>
     <string name="stats_online">Czas online</string>
-    <string name="stats_sessions">Sesje</string>
 </resources>

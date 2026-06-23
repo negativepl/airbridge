@@ -302,6 +302,14 @@ class AirbridgeService : Service() {
         nsdDiscovery.restart()
     }
 
+    /** Zlicza czas trwającej sesji do statystyk i czyści znacznik startu. Idempotentne. */
+    private fun recordAndClearConnectedSince() {
+        val since = connectedSince.value ?: return
+        val secs = (System.currentTimeMillis() - since) / 1000
+        if (secs > 0) statsStore.recordConnectedTime(secs)
+        connectedSince.value = null
+    }
+
     /**
      * Called when the device switches to a different network (e.g. work Wi-Fi
      * -> home Wi-Fi). The cached host is now on an unreachable network, so we
@@ -315,6 +323,7 @@ class AirbridgeService : Service() {
         Log.d(TAG, "Network changed — forgetting stale host and restarting discovery")
         webSocketClient.forgetHost()
         connectedHost.value = null
+        recordAndClearConnectedSince()
         isConnected.value = false
         nsdDiscovery.restart()
     }
@@ -439,7 +448,7 @@ class AirbridgeService : Service() {
                 webSocketClient.disconnect()
                 isConnected.value = false
                 connectedDeviceName.value = null
-                connectedSince.value = null
+                recordAndClearConnectedSince()
                 connectedHost.value = null
                 stopSelf()
             }
@@ -493,12 +502,7 @@ class AirbridgeService : Service() {
             expectedMacPublicKey = null
             pendingPairCertFingerprint = null
             isConnected.value = false
-            // Record connected duration before zeroing the timestamp.
-            connectedSince.value?.let { since ->
-                val secs = (System.currentTimeMillis() - since) / 1000
-                if (secs > 0) statsStore.recordConnectedTime(secs)
-            }
-            connectedSince.value = null
+            recordAndClearConnectedSince()
             macInfo.value = null
             macWallpaper.value = null
             // Keep connectedHost — WebSocket auto-reconnects to same host
@@ -897,7 +901,6 @@ class AirbridgeService : Service() {
                     }
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
-                    statsStore.recordSession()
                     pairingIssue.value = null
                     // Pull the Mac's system info + wallpaper for the Home monitor.
                     webSocketClient.send(Message.MacInfoRequest)
@@ -945,7 +948,6 @@ class AirbridgeService : Service() {
                     )
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
-                    statsStore.recordSession()
                     pairingIssue.value = null
                     // pairing status tracked via StateFlow
                 } else {
