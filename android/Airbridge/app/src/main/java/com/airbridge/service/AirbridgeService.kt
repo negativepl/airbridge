@@ -77,6 +77,15 @@ class AirbridgeService : Service() {
         val connectedSince = MutableStateFlow<Long?>(null)
         val recentActivity = MutableStateFlow<List<ActivityItem>>(emptyList())
 
+        // Stats mirror: bridges StatsStore.stats → here so ViewModel can observe
+        // without a Context. Initialised in onCreate() via serviceScope.collect.
+        val statsFlow = MutableStateFlow(
+            com.airbridge.stats.Stats(
+                com.airbridge.stats.StatCounters(),
+                com.airbridge.stats.StatCounters()
+            )
+        )
+
         private const val ACTIVITY_LOG_KEY = "activity_log"
         private const val ACTIVITY_LIMIT = 50
 
@@ -147,6 +156,7 @@ class AirbridgeService : Service() {
             )
             svc.webSocketClient.send(msg)
             addActivity(svc.applicationContext, ActivityItem("clipboard_sent", "", System.currentTimeMillis()))
+            svc.statsStore.recordClipboardSync()
             Log.d(TAG, "Sent clipboard to Mac (${data.length} chars)")
         }
 
@@ -207,6 +217,7 @@ class AirbridgeService : Service() {
     private val httpFileServer = HttpFileServer()
     private lateinit var galleryProvider: GalleryProvider
     private val filesProvider by lazy { FilesProvider(contentResolver) }
+    private val statsStore by lazy { com.airbridge.stats.StatsStore(applicationContext) }
     private lateinit var smsProvider: SmsProvider
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
@@ -245,6 +256,11 @@ class AirbridgeService : Service() {
         pairedDeviceStore = com.airbridge.security.PairedDeviceStore(this)
 
         loadActivityLog(applicationContext)
+        // Bridge StatsStore.stats → companion statsFlow so the ViewModel can
+        // observe stats without holding a Context reference.
+        serviceScope.launch {
+            statsStore.stats.collect { statsFlow.value = it }
+        }
         setupWebSocketCallbacks()
         setupClipboardSync()
         setupNsdDiscovery()
@@ -477,6 +493,11 @@ class AirbridgeService : Service() {
             expectedMacPublicKey = null
             pendingPairCertFingerprint = null
             isConnected.value = false
+            // Record connected duration before zeroing the timestamp.
+            connectedSince.value?.let { since ->
+                val secs = (System.currentTimeMillis() - since) / 1000
+                if (secs > 0) statsStore.recordConnectedTime(secs)
+            }
             connectedSince.value = null
             macInfo.value = null
             macWallpaper.value = null
@@ -652,9 +673,11 @@ class AirbridgeService : Service() {
                     return@launch
                 }
                 tempFile.copyTo(file, overwrite = true)
+                val receivedBytes = file.length()
                 tempFile.delete()
                 Log.d(TAG, "File received: ${file.absolutePath}")
                 addActivity(applicationContext, ActivityItem("file_received", filename, System.currentTimeMillis()))
+                statsStore.recordFileReceived(receivedBytes)
                 transferProgress.value = null
                 transferFileName.value = null
 
@@ -717,6 +740,7 @@ class AirbridgeService : Service() {
                     return@launch
                 }
                 val (newUri, out) = created
+                val receivedBytes = tempFile.length()
                 try {
                     out.use { os -> tempFile.inputStream().use { it.copyTo(os) } }
                 } catch (e: Exception) {
@@ -731,6 +755,7 @@ class AirbridgeService : Service() {
                 tempFile.delete()
                 Log.d(TAG, "File received into dir: $destinationDir/$filename")
                 addActivity(applicationContext, ActivityItem("file_received", filename, System.currentTimeMillis()))
+                statsStore.recordFileReceived(receivedBytes)
                 transferProgress.value = null
                 transferFileName.value = null
 
@@ -850,6 +875,7 @@ class AirbridgeService : Service() {
                     lastRemoteClipHash = hash
                     clipboardSync.setClipboard(message.data)
                     addActivity(applicationContext, ActivityItem("clipboard_received", "", System.currentTimeMillis()))
+                    statsStore.recordClipboardSync()
                     vibrateOnSync()
                     Log.d(TAG, "Applied remote clipboard update")
                 }
@@ -871,6 +897,7 @@ class AirbridgeService : Service() {
                     }
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
+                    statsStore.recordSession()
                     pairingIssue.value = null
                     // Pull the Mac's system info + wallpaper for the Home monitor.
                     webSocketClient.send(Message.MacInfoRequest)
@@ -918,6 +945,7 @@ class AirbridgeService : Service() {
                     )
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
+                    statsStore.recordSession()
                     pairingIssue.value = null
                     // pairing status tracked via StateFlow
                 } else {
@@ -1363,6 +1391,7 @@ class AirbridgeService : Service() {
                 val speedMBs = if (elapsed > 0) lastFileSize / 1024.0 / 1024.0 / (elapsed / 1000.0) else 0.0
                 Log.d(TAG, "HTTP transfer complete: $filename in ${elapsed}ms (%.2f MB/s)".format(speedMBs))
                 addActivity(applicationContext, ActivityItem("file_sent", filename, System.currentTimeMillis()))
+                statsStore.recordFileSent(lastFileSize)
                 // Complete notification
                 val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                     .setContentTitle(getString(com.airbridge.R.string.notification_title_file_sent))
