@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.airbridge.protocol.ContentType
 import com.airbridge.service.ActivityItem
 import com.airbridge.service.AirbridgeService
+import com.airbridge.stats.Stats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val connectedHost: StateFlow<String?> = AirbridgeService.connectedHost
     val connectedSince: StateFlow<Long?> = AirbridgeService.connectedSince
     val recentActivity: StateFlow<List<ActivityItem>> = AirbridgeService.recentActivity
+    val stats: StateFlow<Stats> = AirbridgeService.statsFlow
     val transferProgress: StateFlow<Float?> = AirbridgeService.transferProgress
     val transferFileName: StateFlow<String?> = AirbridgeService.transferFileName
     val transferSpeedBps: StateFlow<Long> = AirbridgeService.transferSpeedBps

@@ -74,6 +74,8 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
     val transferSpeedBps by viewModel.transferSpeedBps.collectAsState()
     val transferEtaSeconds by viewModel.transferEtaSeconds.collectAsState()
     val transferSpeedHistory by viewModel.transferSpeedHistory.collectAsState()
+    val stats by viewModel.stats.collectAsState()
+    val activity by viewModel.recentActivity.collectAsState()
 
     val context = LocalContext.current
     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
@@ -337,6 +339,10 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
             }
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+        StatsSection(stats)
+        ActivityFeed(activity)
 
         Spacer(modifier = Modifier.height(24.dp))
     }
