@@ -3,6 +3,7 @@ package com.airbridge.discovery
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.util.Log
 
 class NsdDiscovery(private val context: Context) {
@@ -34,6 +35,33 @@ class NsdDiscovery(private val context: Context) {
         context.getSystemService(Context.NSD_SERVICE) as NsdManager
     }
 
+    // Without a held multicast lock, Android drops inbound multicast (including
+    // mDNS responses) once the app is backgrounded or the device dozes — so a
+    // discovery started while the screen is off can sit forever without ever
+    // seeing the Mac. Held for the whole lifetime of an active discovery and
+    // released only on a real stop (kept across restart()).
+    private val multicastLock: WifiManager.MulticastLock by lazy {
+        (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+            .createMulticastLock("airbridge-nsd")
+            .apply { setReferenceCounted(false) }
+    }
+
+    private fun acquireMulticastLock() {
+        try {
+            if (!multicastLock.isHeld) multicastLock.acquire()
+        } catch (e: Exception) {
+            Log.w(TAG, "Multicast lock acquire failed", e)
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        try {
+            if (multicastLock.isHeld) multicastLock.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Multicast lock release failed", e)
+        }
+    }
+
     private fun createDiscoveryListener() = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(TAG, "Discovery start failed: error $errorCode")
@@ -43,6 +71,7 @@ class NsdDiscovery(private val context: Context) {
                     activeListener = null
                     isDiscovering = false
                     isStopping = false
+                    releaseMulticastLock()
                 }
             }
         }
@@ -259,6 +288,7 @@ class NsdDiscovery(private val context: Context) {
         }
         val listener = createDiscoveryListener()
         activeListener = listener
+        acquireMulticastLock()
         return NsdCall.Start(listener)
     }
 
@@ -292,8 +322,9 @@ class NsdDiscovery(private val context: Context) {
         isStopping = false
         if (pendingStart) {
             pendingStart = false
-            return startLocked()
+            return startLocked() // keeps the multicast lock held across restart
         }
+        releaseMulticastLock()
         return NsdCall.None
     }
 }

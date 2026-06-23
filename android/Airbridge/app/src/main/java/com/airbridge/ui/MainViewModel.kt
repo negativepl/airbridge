@@ -35,6 +35,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         getApplication<Application>().startForegroundService(intent)
     }
 
+    /**
+     * Nudge the service to re-run discovery when the app returns to the
+     * foreground. The service ignores it while connected, so this is a no-op in
+     * the common case and an instant recovery when a background discovery had
+     * gone stale (missed network edge). Cheaper than waiting for the watchdog.
+     */
+    fun rediscover() {
+        val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
+            action = AirbridgeService.ACTION_REDISCOVER
+        }
+        getApplication<Application>().startForegroundService(intent)
+    }
+
     fun stopService() {
         val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
             action = AirbridgeService.ACTION_DISCONNECT

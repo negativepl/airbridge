@@ -57,6 +57,15 @@ class AirbridgeService : Service() {
         const val EXTRA_PORT = "extra_port"
         const val EXTRA_CERT_FINGERPRINT = "extra_cert_fingerprint"
 
+        const val ACTION_REDISCOVER = "com.airbridge.action.REDISCOVER"
+
+        // Rediscovery watchdog cadence. With intervalTicks=2 the phone forces a
+        // fresh discovery ~30s after the connection drops and every ~30s while
+        // it stays down — the level-triggered backstop for a missed network
+        // edge. Long enough to let WebSocketClient's own fast reconnect (~14s)
+        // and onReconnectExhausted run first, so the two don't fight.
+        private const val REDISCOVERY_TICK_MS = 15_000L
+
         // Shared state observable by UI
         val isConnected = MutableStateFlow(false)
         val connectedDeviceName = MutableStateFlow<String?>(null)
@@ -160,6 +169,7 @@ class AirbridgeService : Service() {
     private lateinit var clipboardSync: ClipboardSync
     private lateinit var nsdDiscovery: NsdDiscovery
     private lateinit var networkMonitor: NetworkMonitor
+    private val rediscoveryWatchdog = RediscoveryWatchdog()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val httpFileUploader = HttpFileUploader()
     private val httpFileDownloader = HttpFileDownloader()
@@ -208,6 +218,40 @@ class AirbridgeService : Service() {
         setupNsdDiscovery()
         setupHttpFileServer()
         networkMonitor.start()
+        startRediscoveryWatchdog()
+    }
+
+    /**
+     * Level-triggered backstop: while the service runs but the connection is
+     * down, periodically force a fresh discovery. Edge-triggered restarts (on a
+     * network change) can be missed or silently fail — multicast throttled in
+     * Doze, or the Mac re-advertising a beat after our one discovery pass — and
+     * with no new network event arriving, the phone would otherwise sit idle on
+     * the right network forever. See [RediscoveryWatchdog]. The loop dies with
+     * serviceScope on onDestroy.
+     */
+    private fun startRediscoveryWatchdog() {
+        serviceScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(REDISCOVERY_TICK_MS)
+                if (rediscoveryWatchdog.onTick(isConnected.value)) {
+                    Log.d(TAG, "Rediscovery watchdog: still disconnected — forcing fresh discovery")
+                    forceRediscovery()
+                }
+            }
+        }
+    }
+
+    /**
+     * Drop the stale cached host and run a fresh discovery pass. Shared by the
+     * rediscovery watchdog and the explicit [ACTION_REDISCOVER] trigger (app
+     * brought to the foreground). Unlike [onNetworkChanged] this makes no
+     * assumption about a network switch — it is the recovery action on its own.
+     */
+    private fun forceRediscovery() {
+        webSocketClient.forgetHost()
+        connectedHost.value = null
+        nsdDiscovery.restart()
     }
 
     /**
@@ -232,6 +276,16 @@ class AirbridgeService : Service() {
             ACTION_START_DISCOVERY -> {
                 Log.d(TAG, "Starting NSD discovery")
                 nsdDiscovery.startDiscovery()
+            }
+            ACTION_REDISCOVER -> {
+                // App came to the foreground. If we're already connected this is
+                // a no-op; otherwise kick a fresh discovery immediately instead
+                // of waiting for the next watchdog tick, so opening the app feels
+                // like it reconnects on the spot.
+                if (!isConnected.value) {
+                    Log.d(TAG, "Foreground rediscover requested — forcing fresh discovery")
+                    forceRediscovery()
+                }
             }
             ACTION_CONNECT -> {
                 val host = intent.getStringExtra(EXTRA_HOST)
