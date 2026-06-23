@@ -55,16 +55,14 @@ final class NetworkChangeMonitor: @unchecked Sendable {
         let key = networkKey(path)
         let isBaseline = baselineKey == nil
         let changed = !isBaseline && (sawUnsatisfied || key != baselineKey)
-        // Diagnostyka przełączania sieci: jeśli przy zmianie WiFi `key` się NIE
-        // zmienia (ten sam interfejs en0, brak gateways), `changed` zostaje false
-        // i Mac nigdy nie re-advertise'uje — to główny podejrzany o „muszę
-        // restartować Maca". Log pokazuje realny klucz po obu stronach switcha.
-        log.notice("satisfied: key=\(key, privacy: .public) baseline=\(self.baselineKey ?? "nil", privacy: .public) sawUnsatisfied=\(self.sawUnsatisfied, privacy: .public) isBaseline=\(isBaseline, privacy: .public) -> changed=\(changed, privacy: .public)")
-        Diag.log("NetworkChange", "satisfied: key=\(key) baseline=\(baselineKey ?? "nil") sawUnsatisfied=\(sawUnsatisfied) isBaseline=\(isBaseline) -> changed=\(changed)")
         sawUnsatisfied = false
         baselineKey = key
 
+        // Only log a real transition — the per-callback "satisfied" path updates
+        // fire every few seconds and would otherwise flood the log.
         guard changed else { return }
+        log.notice("network changed -> \(key, privacy: .public)")
+        Diag.log("NetworkChange", "network changed -> \(key); re-advertising")
 
         debounce?.cancel()
         let work = DispatchWorkItem { [weak self] in
