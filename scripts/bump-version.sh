@@ -16,9 +16,10 @@ GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 PLIST="$ROOT/macos/Airbridge/Resources/Info.plist"
 APP_PLIST="$HOME/Applications/AirBridge.app/Contents/Info.plist"
 
-# Read current version from gradle
+# Read current version from gradle. May carry a pre-release suffix (e.g.
+# "2.5.0-beta"); strip it to "2.5.0" before numeric parsing.
 CURRENT=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
-IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT%%-*}"
 
 echo "Current version: $CURRENT"
 
@@ -41,17 +42,22 @@ case "${1:-}" in
         exit 1
         ;;
     *)
-        # Exact version provided
-        if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$1"
+        # Exact version provided, with optional pre-release suffix (e.g. 2.6.0-beta)
+        if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+            EXACT="$1"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${1%%-*}"
         else
-            echo "Error: Invalid version format. Use X.Y.Z"
+            echo "Error: Invalid version format. Use X.Y.Z or X.Y.Z-suffix"
             exit 1
         fi
         ;;
 esac
 
-NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+# Numeric base drives versionCode and CFBundleVersion; the (possibly suffixed)
+# display version drives versionName and CFBundleShortVersionString. patch/minor/
+# major bumps drop any suffix (promotion); only an explicit X.Y.Z-suffix keeps it.
+VERSION_BASE="$MAJOR.$MINOR.$PATCH"
+NEW_VERSION="${EXACT:-$VERSION_BASE}"
 # versionCode = major*10000 + minor*100 + patch
 VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
 
@@ -65,14 +71,14 @@ echo "  Updated: $GRADLE"
 # 2. Update macOS Info.plist (in repo)
 if [ -f "$PLIST" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$PLIST"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_VERSION" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION_BASE" "$PLIST"
     echo "  Updated: $PLIST"
 fi
 
 # 3. Update macOS app bundle Info.plist (if installed)
 if [ -f "$APP_PLIST" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$APP_PLIST"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_VERSION" "$APP_PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION_BASE" "$APP_PLIST"
     echo "  Updated: $APP_PLIST"
 fi
 

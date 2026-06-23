@@ -21,8 +21,11 @@ ANDROID_BUILD_LOG=""
 APP_STAGE=""
 trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG"; [ -n "$APP_STAGE" ] && rm -rf "$APP_STAGE"' EXIT
 
-# Read version from gradle
+# Read version from gradle. VERSION may carry a pre-release suffix (e.g.
+# "2.6.0-beta") — that drives the display string and tag; VERSION_BASE is the
+# numeric part used for CFBundleVersion (which must stay purely numeric).
 VERSION=$(grep 'versionName' "$GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+VERSION_BASE="${VERSION%%-*}"
 TAG="v$VERSION"
 
 echo "=== Building AirBridge $TAG ==="
@@ -55,7 +58,7 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp "$MACOS_BIN" "$APP_BUNDLE/Contents/MacOS/AirbridgeApp"
 cp "$ROOT/macos/Airbridge/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION_BASE" "$APP_BUNDLE/Contents/Info.plist"
 
 # Copy SPM resources directly into Contents/Resources. We avoid SwiftPM's
 # Bundle.module accessor (its generated fallback path is hardcoded to the

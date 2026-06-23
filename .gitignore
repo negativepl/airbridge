@@ -29,3 +29,7 @@ local.properties
 *.pem
 *.key
 *-signing.pass
+
+# Internal design docs and scratch mockups (not for the public repo)
+docs/superpowers/
+docs/mockups/
