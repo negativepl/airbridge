@@ -1,6 +1,7 @@
 import XCTest
 @testable import Clipboard
 
+@MainActor
 final class ClipboardMonitorTests: XCTestCase {
 
     // MARK: - testDetectsTextChange

@@ -30,6 +30,15 @@ let package = Package(
                 "Mirror",
             ],
             path: "Sources/AirbridgeApp",
+            // Icon design sources kept in-repo but not bundled by SwiftPM:
+            // the runtime icon ships as AppIcon.icns (declared below). The .svg
+            // is the source artwork; .xcassets is only compiled by Xcode (actool),
+            // not by `swift build`, so leaving them undeclared triggers the
+            // "unhandled files" warning — exclude them explicitly.
+            exclude: [
+                "Resources/AppIcon.svg",
+                "Assets.xcassets"
+            ],
             resources: [
                 .copy("Resources/airdrop.mp3"),
                 .copy("Resources/AppIcon.icns"),

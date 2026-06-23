@@ -28,12 +28,10 @@ class SendToMacActivity : ComponentActivity() {
 
         Log.d(TAG, "Received text (${text.length} chars)")
 
-        // Send via AirbridgeService static method
+        // Send via AirbridgeService static method. We deliberately do not touch the
+        // local clipboard here: the selected text arrives via EXTRA_PROCESS_TEXT, so
+        // there is no need to read or overwrite the user's clipboard to send it.
         AirbridgeService.sendClipboardToMac(ContentType.PLAIN_TEXT, text)
-
-        // Also copy to clipboard so Mac→Android echo prevention works
-        val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("AirBridge", text))
 
         Toast.makeText(this, getString(com.airbridge.R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
         finish()

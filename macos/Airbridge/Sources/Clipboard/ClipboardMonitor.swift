@@ -105,6 +105,11 @@ public final class MockPasteboard: PasteboardProtocol {
 /// Loop-prevention: when `setClipboard(content:)` is called to push remote content,
 /// `suppressNextChange` is set so that the resulting pasteboard change does not
 /// re-trigger `onChange`.
+///
+/// Main-actor isolated: all pasteboard access happens on the main thread and the
+/// polling timer is installed on `RunLoop.main`, so isolating the whole type both
+/// matches reality and makes it `Sendable` for the timer's `@Sendable` closure.
+@MainActor
 public final class ClipboardMonitor {
 
     // MARK: Public
@@ -142,7 +147,12 @@ public final class ClipboardMonitor {
             withTimeInterval: pollInterval,
             repeats: true
         ) { [weak self] _ in
-            self?.poll()
+            // Installed on RunLoop.main below, so this @Sendable closure always
+            // fires on the main actor; assumeIsolated bridges to it (and asserts
+            // it at runtime) without hopping or silencing the isolation check.
+            MainActor.assumeIsolated {
+                self?.poll()
+            }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -204,14 +214,19 @@ public final class ClipboardMonitor {
     private func readContent() -> ClipboardContent? {
         let availableTypes = pasteboard.types ?? []
 
-        // Priority: HTML > plain text > PNG
-        if availableTypes.contains(.html),
-           let text = pasteboard.string(forType: .html) {
-            return ClipboardContent(contentType: .html, textData: text, imageData: nil)
-        }
-
+        // Plain text wins. The Android side applies every clipboard update via
+        // ClipData.newPlainText, so sending the .html representation (which browsers
+        // put on the pasteboard alongside .string) surfaces raw markup in the
+        // keyboard preview. Prefer .string; only fall back to HTML when it is the
+        // sole representation, flattening it to plain text first.
         if availableTypes.contains(.string),
            let text = pasteboard.string(forType: .string) {
+            return ClipboardContent(contentType: .plainText, textData: text, imageData: nil)
+        }
+
+        if availableTypes.contains(.html),
+           let html = pasteboard.string(forType: .html) {
+            let text = Self.plainText(fromHTML: html) ?? html
             return ClipboardContent(contentType: .plainText, textData: text, imageData: nil)
         }
 
@@ -221,6 +236,16 @@ public final class ClipboardMonitor {
         }
 
         return nil
+    }
+
+    /// Strips an HTML fragment down to its plain-text content.
+    private static func plainText(fromHTML html: String) -> String? {
+        guard let data = html.data(using: .utf8) else { return nil }
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+        return try? NSAttributedString(data: data, options: options, documentAttributes: nil).string
     }
 
     private func hashForContent(_ content: ClipboardContent) -> String {

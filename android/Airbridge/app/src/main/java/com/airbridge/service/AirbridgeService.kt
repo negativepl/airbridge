@@ -407,7 +407,6 @@ class AirbridgeService : Service() {
         stopRinging()
         instance = null
         networkMonitor.stop()
-        clipboardSync.stopListening()
         nsdDiscovery.stopDiscovery()
         webSocketClient.disconnect()
         httpFileServer.stop()
@@ -443,7 +442,6 @@ class AirbridgeService : Service() {
 
         webSocketClient.onDisconnected = {
             Log.d(TAG, "WebSocket disconnected")
-            clipboardSync.stopListening()
             expectedMacPublicKey = null
             pendingPairCertFingerprint = null
             isConnected.value = false
@@ -838,7 +836,6 @@ class AirbridgeService : Service() {
                         currentMirrorPort = port
                         mirrorPortFlow.value = port
                     }
-                    clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
                     pairingIssue.value = null
@@ -886,7 +883,6 @@ class AirbridgeService : Service() {
                             certFingerprint = pairCertFingerprint ?: ""
                         )
                     )
-                    clipboardSync.startListening()
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
                     pairingIssue.value = null
