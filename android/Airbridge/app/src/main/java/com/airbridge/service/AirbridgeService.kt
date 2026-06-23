@@ -76,6 +76,9 @@ class AirbridgeService : Service() {
         val connectedSince = MutableStateFlow<Long?>(null)
         val recentActivity = MutableStateFlow<List<ActivityItem>>(emptyList())
 
+        private const val ACTIVITY_LOG_KEY = "activity_log"
+        private const val ACTIVITY_LIMIT = 50
+
         /**
          * Visible re-pair guidance (null = no issue). Set when a paired Mac is
          * found but cannot be trusted over TLS (no stored pin, or the
@@ -93,10 +96,36 @@ class AirbridgeService : Service() {
         val transferEtaSeconds = MutableStateFlow<Int>(0)
         val transferSpeedHistory = MutableStateFlow<List<Float>>(emptyList())  // normalized 0-1 speed samples
 
-        fun addActivity(item: ActivityItem) {
+        fun addActivity(context: Context, item: ActivityItem) {
             // Atomic read-modify-write: callers run on arbitrary threads
             // (WebSocket callbacks, IO coroutines, main thread).
-            recentActivity.update { (listOf(item) + it).take(10) }
+            val next = (listOf(item) + recentActivity.value).take(ACTIVITY_LIMIT)
+            recentActivity.value = next
+            val arr = org.json.JSONArray()
+            next.forEach { a ->
+                arr.put(
+                    org.json.JSONObject()
+                        .put("type", a.type)
+                        .put("description", a.description)
+                        .put("timestamp", a.timestamp)
+                )
+            }
+            context.getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE)
+                .edit().putString(ACTIVITY_LOG_KEY, arr.toString()).apply()
+        }
+
+        fun loadActivityLog(context: Context) {
+            val json = context.getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE)
+                .getString(ACTIVITY_LOG_KEY, "[]") ?: "[]"
+            try {
+                val arr = org.json.JSONArray(json)
+                recentActivity.value = (0 until arr.length()).map { i ->
+                    val o = arr.getJSONObject(i)
+                    ActivityItem(o.getString("type"), o.getString("description"), o.getLong("timestamp"))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "loadActivityLog: failed to parse activity log", e)
+            }
         }
 
         // Reference to running instance for AccessibilityService to send clipboard
@@ -115,7 +144,7 @@ class AirbridgeService : Service() {
                 data = data
             )
             svc.webSocketClient.send(msg)
-            addActivity(ActivityItem("clipboard_sent", "", System.currentTimeMillis()))
+            addActivity(svc.applicationContext, ActivityItem("clipboard_sent", "", System.currentTimeMillis()))
             Log.d(TAG, "Sent clipboard to Mac (${data.length} chars)")
         }
 
@@ -213,6 +242,7 @@ class AirbridgeService : Service() {
         keyManager = com.airbridge.security.KeyManager(this)
         pairedDeviceStore = com.airbridge.security.PairedDeviceStore(this)
 
+        loadActivityLog(applicationContext)
         setupWebSocketCallbacks()
         setupClipboardSync()
         setupNsdDiscovery()
@@ -622,7 +652,7 @@ class AirbridgeService : Service() {
                 tempFile.copyTo(file, overwrite = true)
                 tempFile.delete()
                 Log.d(TAG, "File received: ${file.absolutePath}")
-                addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
+                addActivity(applicationContext, ActivityItem("file_received", filename, System.currentTimeMillis()))
                 transferProgress.value = null
                 transferFileName.value = null
 
@@ -698,7 +728,7 @@ class AirbridgeService : Service() {
                 }
                 tempFile.delete()
                 Log.d(TAG, "File received into dir: $destinationDir/$filename")
-                addActivity(ActivityItem("file_received", filename, System.currentTimeMillis()))
+                addActivity(applicationContext, ActivityItem("file_received", filename, System.currentTimeMillis()))
                 transferProgress.value = null
                 transferFileName.value = null
 
@@ -817,7 +847,8 @@ class AirbridgeService : Service() {
                     val hash = sha256(message.data)
                     lastRemoteClipHash = hash
                     clipboardSync.setClipboard(message.data)
-                    addActivity(ActivityItem("clipboard_received", "", System.currentTimeMillis()))
+                    addActivity(applicationContext, ActivityItem("clipboard_received", "", System.currentTimeMillis()))
+                    vibrateOnSync()
                     Log.d(TAG, "Applied remote clipboard update")
                 }
             }
@@ -904,7 +935,7 @@ class AirbridgeService : Service() {
                 pendingOutgoingOffers.remove(message.transferId)?.complete(false)
             }
             is Message.Pong -> {
-                addActivity(ActivityItem("ping", "Pong!", System.currentTimeMillis()))
+                addActivity(applicationContext, ActivityItem("ping", "Pong!", System.currentTimeMillis()))
                 Log.d(TAG, "Received pong")
             }
             is Message.GalleryRequest -> {
@@ -1158,7 +1189,14 @@ class AirbridgeService : Service() {
                 macInfo.value = message.info
             }
             is Message.MacWallpaperResponse -> {
-                macWallpaper.value = message.imageBase64.takeIf { it.isNotEmpty() }
+                val wallpaper = message.imageBase64.takeIf { it.isNotEmpty() }
+                macWallpaper.value = wallpaper
+                // Cache it against the connected Mac so the paired-device card can
+                // show it offline; overwriting keeps it in sync with the Mac.
+                val name = connectedDeviceName.value
+                if (wallpaper != null && name != null) {
+                    com.airbridge.device.WallpaperCache.save(applicationContext, name, wallpaper)
+                }
             }
             is Message.WallpaperRequest -> {
                 serviceScope.launch {
@@ -1322,7 +1360,7 @@ class AirbridgeService : Service() {
             if (success) {
                 val speedMBs = if (elapsed > 0) lastFileSize / 1024.0 / 1024.0 / (elapsed / 1000.0) else 0.0
                 Log.d(TAG, "HTTP transfer complete: $filename in ${elapsed}ms (%.2f MB/s)".format(speedMBs))
-                addActivity(ActivityItem("file_sent", filename, System.currentTimeMillis()))
+                addActivity(applicationContext, ActivityItem("file_sent", filename, System.currentTimeMillis()))
                 // Complete notification
                 val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
                     .setContentTitle(getString(com.airbridge.R.string.notification_title_file_sent))
@@ -1359,7 +1397,7 @@ class AirbridgeService : Service() {
         if (webSocketClient.isConnected) {
             val msg = Message.Ping()
             webSocketClient.send(msg)
-            addActivity(ActivityItem("ping", "Ping", System.currentTimeMillis()))
+            addActivity(applicationContext, ActivityItem("ping", "Ping", System.currentTimeMillis()))
             Log.d(TAG, "Sent ping")
         }
     }
@@ -1440,6 +1478,23 @@ class AirbridgeService : Service() {
         }
         ringVibrator = vibrator
         val effect = android.os.VibrationEffect.createWaveform(longArrayOf(0, 600, 400), 0)
+        vibrator.vibrate(effect)
+    }
+
+    // Single crisp tap when an incoming clipboard update is applied, gated on the
+    // "Vibrate on sync" setting. Uses the platform's predefined EFFECT_CLICK so the
+    // system maps it to the device's haptic actuator (sharp tap on an LRA), rather
+    // than a raw timed buzz. Distinct from startVibration(), which loops for the ring.
+    private fun vibrateOnSync() {
+        val prefs = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean("vibrate_on_sync", false)) return
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+        }
+        val effect = android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK)
         vibrator.vibrate(effect)
     }
 
