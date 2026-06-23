@@ -223,4 +223,16 @@
     <string name="power_battery">Battery</string>
     <string name="power_charging">Charging</string>
     <string name="power_source">Power source</string>
+
+    <!-- Statistics -->
+    <string name="stats_title">Statistics</string>
+    <string name="stats_today">Today</string>
+    <string name="stats_total">Total</string>
+    <string name="stats_files_sent">Files sent</string>
+    <string name="stats_files_received">Files received</string>
+    <string name="stats_data_sent">Data sent</string>
+    <string name="stats_data_received">Data received</string>
+    <string name="stats_clipboard">Clipboard syncs</string>
+    <string name="stats_online">Time online</string>
+    <string name="stats_sessions">Sessions</string>
 </resources>
