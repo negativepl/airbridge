@@ -567,7 +567,7 @@ final class ConnectionService {
                 &hostname, socklen_t(hostname.count),
                 nil, 0, NI_NUMERICHOST
             ) == 0 {
-                address = String(cString: hostname)
+                address = hostname.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
                 break
             }
         }

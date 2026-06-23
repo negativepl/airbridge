@@ -7,6 +7,7 @@ enum AppRelauncher {
     /// Needed because `AXIsProcessTrusted()` is cached per-process: a freshly
     /// granted Accessibility permission only takes effect in a new process. So
     /// after the user grants Accessibility we restart to pick it up.
+    @MainActor
     static func relaunch() {
         let bundlePath = Bundle.main.bundlePath
         let task = Process()

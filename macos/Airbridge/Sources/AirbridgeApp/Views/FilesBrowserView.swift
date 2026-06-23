@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import Protocol
+import os
 
 struct FilesBrowserView: View {
     let filesBrowserService: FilesBrowserService
@@ -309,22 +310,21 @@ struct FilesBrowserView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         guard !filesBrowserService.needsPermission else { return false }
-        let lock = NSLock()
-        var urls: [URL] = []
+        // Sendable lock-guarded accumulator: provider completions fire on
+        // arbitrary queues, so the collected URLs need synchronized shared state
+        // that is safe to capture in the @Sendable completion closures.
+        let collected = OSAllocatedUnfairLock<[URL]>(initialState: [])
         let group = DispatchGroup()
         for provider in providers {
             guard provider.canLoadObject(ofClass: URL.self) else { continue }
             group.enter()
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url {
-                    lock.lock()
-                    urls.append(url)
-                    lock.unlock()
-                }
+                if let url { collected.withLock { $0.append(url) } }
                 group.leave()
             }
         }
         group.notify(queue: .main) {
+            let urls = collected.withLock { $0 }
             if !urls.isEmpty { filesBrowserService.upload(urls: urls) }
         }
         return true

@@ -33,7 +33,7 @@ final class InMemoryStorage: Storage, @unchecked Sendable {
     }
 
     func delete(account: String) {
-        lock.withLock { store.removeValue(forKey: account) }
+        lock.withLock { _ = store.removeValue(forKey: account) }
     }
 }
 

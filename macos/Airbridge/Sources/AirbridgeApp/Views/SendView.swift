@@ -134,8 +134,8 @@ struct SendView: View {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                let files = Self.resolveFiles(from: url)
                 Task { @MainActor in
+                    let files = Self.resolveFiles(from: url)
                     for file in files { viewModel?.sendFile(url: file) }
                 }
             }
