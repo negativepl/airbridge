@@ -8,13 +8,15 @@ public enum TLSIdentityError: Error, Sendable {
     case certificateUnavailable
 }
 
-/// Owns the Mac's self-signed TLS identity. The PKCS#12 blob lives in the
-/// Keychain (via Storage); the SecIdentity is re-imported from it on demand.
-/// The certificate is the app's TLS trust anchor — its SHA-256(DER)
-/// fingerprint is distributed to the phone inside the pairing QR code.
+/// Owns the Mac's self-signed TLS identity. The PKCS#12 blob is persisted in
+/// `FileStorage` (NOT the keychain); the `SecIdentity` is re-imported from it
+/// on demand **into process memory only** (`kSecImportToMemoryOnly`), so macOS
+/// never guards it behind a keychain prompt. The certificate is the app's TLS
+/// trust anchor — its SHA-256(DER) fingerprint is distributed to the phone
+/// inside the pairing QR code.
 public final class TLSIdentityManager: @unchecked Sendable {
     private static let account = "tls_identity_p12"
-    private static let passphrase = "airbridge-tls"   // protects only the in-Keychain blob
+    private static let passphrase = "airbridge-tls"   // protects only the on-disk P12 blob
 
     private let storage: any Storage
     private let lock = NSLock()
@@ -25,9 +27,10 @@ public final class TLSIdentityManager: @unchecked Sendable {
     }
 
     public convenience init() {
-        // File-backed for the same reason as KeyManager.persistent(): a
-        // self-signed binary cannot keep a stable login-keychain partition
-        // across re-signs, so the keychain re-prompts on every rebuild.
+        // File-backed: a self-signed binary cannot keep a stable keychain
+        // partition across re-signs, so any keychain re-prompts on every
+        // rebuild. The P12 blob lives in FileStorage; the identity is imported
+        // memory-only (see importIdentity) so no keychain is ever touched.
         self.init(storage: FileStorage())
     }
 
@@ -104,7 +107,17 @@ public final class TLSIdentityManager: @unchecked Sendable {
     }
 
     private static func importIdentity(from p12: Data) throws -> SecIdentity {
-        let options = [kSecImportExportPassphrase as String: passphrase]
+        // Import WYŁĄCZNIE do pamięci procesu — żadnego keychaina. To definitywnie
+        // eliminuje wszystkie monity macOS o hasło/dostęp do pęku: dla self-signed
+        // apki keychain jest nie do ucywilizowania (ACL przypięty do cdhash zmienia
+        // się co re-sign, partition list, auto-lock — każdy z osobna wywołuje monit
+        // przy KAŻDYM użyciu klucza w handshake'u TLS). `kSecImportToMemoryOnly`
+        // sprawia, że SecIdentity żyje w RAM i jest używana bezpośrednio przez
+        // Network.framework (sec_identity_create) — nic nie trafia na dysk/pęk.
+        let options: [String: Any] = [
+            kSecImportExportPassphrase as String: passphrase,
+            kSecImportToMemoryOnly as String: kCFBooleanTrue as Any
+        ]
         var items: CFArray?
         let status = SecPKCS12Import(p12 as CFData, options as CFDictionary, &items)
         guard status == errSecSuccess,
