@@ -198,6 +198,8 @@
     <string name="pairing_paired_devices">Paired devices</string>
     <string name="pairing_remove">Remove</string>
     <string name="pairing_remove_confirm">Remove pairing with %s?</string>
+    <string name="pairing_paired_on">Paired %s</string>
+    <string name="pairing_connected">Connected</string>
     <string name="pairing_in_progress">Pairing…</string>
     <string name="pairing_in_progress_desc">Connecting to your Mac</string>
     <string name="pairing_success_title">Paired!</string>

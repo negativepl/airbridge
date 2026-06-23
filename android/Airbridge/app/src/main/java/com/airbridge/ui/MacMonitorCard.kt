@@ -55,7 +55,7 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.largeIncreased,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         val bitmap = remember(wallpaperBase64) {
             wallpaperBase64?.let {

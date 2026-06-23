@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
@@ -99,8 +100,9 @@ class AirbridgeService : Service() {
         fun addActivity(context: Context, item: ActivityItem) {
             // Atomic read-modify-write: callers run on arbitrary threads
             // (WebSocket callbacks, IO coroutines, main thread).
-            val next = (listOf(item) + recentActivity.value).take(ACTIVITY_LIMIT)
-            recentActivity.value = next
+            val next = recentActivity.updateAndGet { current ->
+                (listOf(item) + current).take(ACTIVITY_LIMIT)
+            }
             val arr = org.json.JSONArray()
             next.forEach { a ->
                 arr.put(

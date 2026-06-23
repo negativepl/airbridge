@@ -199,6 +199,8 @@
     <string name="pairing_paired_devices">Sparowane urządzenia</string>
     <string name="pairing_remove">Usuń</string>
     <string name="pairing_remove_confirm">Usunąć parowanie z %s?</string>
+    <string name="pairing_paired_on">Sparowano %s</string>
+    <string name="pairing_connected">Połączono</string>
     <string name="pairing_in_progress">Parowanie…</string>
     <string name="pairing_in_progress_desc">Łączenie z komputerem Mac</string>
     <string name="pairing_success_title">Sparowano!</string>

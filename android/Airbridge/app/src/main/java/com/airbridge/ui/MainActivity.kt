@@ -59,9 +59,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
-import androidx.compose.material3.ShortNavigationBarItemDefaults
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBar
@@ -72,6 +71,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -81,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -193,15 +194,19 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Scaffold(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         topBar = {
+                            // Reset the TopAppBar's internal color animation on theme
+                            // change so it switches instantly with the rest of the UI
+                            // (Scaffold/nav bar) instead of lagging by a fade.
+                            key(MaterialTheme.colorScheme.surfaceContainer) {
                             TopAppBar(
                                 title = {
                                     Text(stringResource(pageTitles[pagerState.targetPage.coerceIn(0, pageTitles.lastIndex)]))
                                 },
                                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                                 ),
                                 actions = {
                                     IconButton(onClick = { showSettings = true }) {
@@ -225,22 +230,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
+                            }
                         },
                         bottomBar = {
-                            // Material 3 Expressive compact dock. ShortNavigationBar
-                            // gives the spec-correct short bar + tight active-indicator
-                            // pill bounded to the item (the ripple no longer floods
-                            // half the bar like a hand-rolled Row would).
-                            ShortNavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            // Stock Material 3 navigation bar. Its default container is
+                            // surfaceContainer — the same token as our screen background — so
+                            // it would blend in; lift it one step to surfaceContainerHigh so
+                            // the dock reads as a distinct bar above the content.
+                            NavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             ) {
-                                val itemColors = ShortNavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer
-                                )
                                 navItems.forEachIndexed { index, item ->
-                                    ShortNavigationBarItem(
+                                    NavigationBarItem(
                                         selected = pagerState.targetPage == index,
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -254,8 +255,7 @@ class MainActivity : ComponentActivity() {
                                                 contentDescription = stringResource(item.labelRes)
                                             )
                                         },
-                                        label = null,
-                                        colors = itemColors
+                                        label = { Text(stringResource(item.labelRes)) }
                                     )
                                 }
                             }
@@ -353,9 +353,16 @@ class MainActivity : ComponentActivity() {
                         )
                     ) {
                         BackHandler { showSettings = false }
+                        // exitUntilCollapsed: the app bar slides up off-screen with the
+                        // content as you scroll up and only comes back once you scroll all
+                        // the way to the top — it doesn't pop back mid-list like enterAlways.
+                        val settingsScrollBehavior =
+                            androidx.compose.material3.TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
                         Scaffold(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.nestedScroll(settingsScrollBehavior.nestedScrollConnection),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
                             topBar = {
+                                key(MaterialTheme.colorScheme.surfaceContainer) {
                                 TopAppBar(
                                     title = { Text(stringResource(R.string.nav_settings)) },
                                     navigationIcon = {
@@ -363,11 +370,14 @@ class MainActivity : ComponentActivity() {
                                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                                         }
                                     },
+                                    scrollBehavior = settingsScrollBehavior,
+                                    // Keep one flat surface while it slides (no color jump).
                                     colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                                     )
                                 )
+                                }
                             }
                         ) { pad ->
                             Box(modifier = Modifier.padding(pad)) {
@@ -394,9 +404,13 @@ class MainActivity : ComponentActivity() {
                         )
                     ) {
                         BackHandler { showAbout = false }
+                        val aboutScrollBehavior =
+                            androidx.compose.material3.TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
                         Scaffold(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.nestedScroll(aboutScrollBehavior.nestedScrollConnection),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
                             topBar = {
+                                key(MaterialTheme.colorScheme.surfaceContainer) {
                                 TopAppBar(
                                     title = { Text(stringResource(R.string.nav_about)) },
                                     navigationIcon = {
@@ -404,11 +418,13 @@ class MainActivity : ComponentActivity() {
                                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                                         }
                                     },
+                                    scrollBehavior = aboutScrollBehavior,
                                     colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                                     )
                                 )
+                                }
                             }
                         ) { pad ->
                             Box(modifier = Modifier.padding(pad)) {
@@ -527,7 +543,7 @@ private fun SendConfirmationSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.large)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

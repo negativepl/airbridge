@@ -1,8 +1,13 @@
 package com.airbridge.ui
 
 import android.content.SharedPreferences
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -15,11 +20,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
@@ -31,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -73,6 +87,12 @@ fun SettingsScreen(
         val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
         val pairedDevices = remember(pairedDevicesRevision) { pairedDeviceStore.getAll() }
 
+        // Live Mac data, available only while the paired Mac is connected, so the
+        // card can mirror the home-screen hero (wallpaper + hardware name).
+        val macInfo by com.airbridge.service.AirbridgeService.macInfo.collectAsState()
+        val macWallpaper by com.airbridge.service.AirbridgeService.macWallpaper.collectAsState()
+        val connectedDeviceName by com.airbridge.service.AirbridgeService.connectedDeviceName.collectAsState()
+
         if (pairedDevices.isEmpty()) {
             Text(
                 text = stringResource(R.string.pairing_no_devices),
@@ -82,26 +102,39 @@ fun SettingsScreen(
             )
         } else {
             pairedDevices.forEach { device ->
-                ListItem(
-                    headlineContent = { Text(device.deviceName) },
-                    supportingContent = {
-                        Text(
+                val isLive = connectedDeviceName == device.deviceName
+                val liveWallpaper = if (isLive) macWallpaper else null
+                // Prefer the live wallpaper; fall back to the last cached one so the
+                // card still shows the Mac's wallpaper while it's offline.
+                val wallpaper = remember(liveWallpaper, device.deviceName, pairedDevicesRevision) {
+                    val live = liveWallpaper?.let {
+                        runCatching {
+                            val bytes = Base64.decode(it, Base64.NO_WRAP)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        }.getOrNull()
+                    }
+                    (live ?: com.airbridge.device.WallpaperCache.load(context, device.deviceName))
+                        ?.asImageBitmap()
+                }
+                PairedDeviceCard(
+                    deviceName = device.deviceName,
+                    subtitle = if (isLive && macInfo != null) {
+                        "${macInfo!!.model} · ${macInfo!!.chip}"
+                    } else {
+                        stringResource(
+                            R.string.pairing_paired_on,
                             java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
                                 .format(java.util.Date(device.pairedAt))
                         )
                     },
-                    trailingContent = {
-                        TextButton(onClick = {
-                            pairedDeviceStore.remove(device.publicKeyFingerprint)
-                        }) {
-                            Text(
-                                text = stringResource(R.string.pairing_remove),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    wallpaper = wallpaper,
+                    isConnected = isLive,
+                    onRemove = {
+                        com.airbridge.device.WallpaperCache.delete(context, device.deviceName)
+                        pairedDeviceStore.remove(device.publicKeyFingerprint)
+                    }
                 )
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
 
@@ -309,6 +342,107 @@ fun SettingsScreen(
             }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun PairedDeviceCard(
+    deviceName: String,
+    subtitle: String,
+    wallpaper: androidx.compose.ui.graphics.ImageBitmap?,
+    isConnected: Boolean,
+    onRemove: () -> Unit
+) {
+    var showConfirm by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            if (wallpaper != null) {
+                Image(
+                    bitmap = wallpaper,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(160.dp)
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxWidth().height(160.dp).background(MaterialTheme.colorScheme.primaryContainer))
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth().height(160.dp).background(
+                    Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
+                )
+            )
+            // Connection status — top-left pill, mirroring the home hero card.
+            if (isConnected) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.pairing_connected),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White
+                    )
+                }
+            }
+            // Remove — top-right, woven into the image instead of a separate bar.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable { showConfirm = true }
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    contentDescription = stringResource(R.string.pairing_remove),
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+                Text(deviceName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title = { Text(stringResource(R.string.pairing_remove)) },
+            text = { Text(stringResource(R.string.pairing_remove_confirm, deviceName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showConfirm = false
+                    onRemove()
+                }) {
+                    Text(
+                        text = stringResource(R.string.pairing_remove),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) {
+                    Text(stringResource(R.string.send_confirm_cancel))
+                }
+            }
+        )
     }
 }
 
