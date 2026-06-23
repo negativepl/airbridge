@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import os
 // SecIdentity is immutable and thread-safe but not marked Sendable in the SDK;
 // @preconcurrency downgrades the (false-positive) actor-crossing diagnostics.
 @preconcurrency import Security
@@ -41,6 +42,8 @@ final class ConnectionService {
 
     // MARK: - Observable State
 
+    private let log = Logger(subsystem: "com.airbridge.macos", category: "Connection")
+
     private(set) var isConnected: Bool = false
     private(set) var connectedDeviceName: String = ""
     private(set) var deviceInfo: DeviceInfo?
@@ -73,6 +76,8 @@ final class ConnectionService {
     @ObservationIgnored private let allowedUploadSender = AllowedSenderStore()
     var mirrorService: MirrorService?
     var pairingService: PairingService?
+    /// Typed ref so a dropped connection can dismiss an orphaned incoming-file popup.
+    var fileTransferService: FileTransferService?
     private var serverStarted = false
     @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
 
@@ -185,6 +190,8 @@ final class ConnectionService {
     /// The Mac moved to a different network: re-advertise Bonjour on the new IP
     /// so the phone can rediscover us. The phone is the side that reconnects.
     private func handleNetworkChange() {
+        log.notice("handleNetworkChange: serverStarted=\(self.serverStarted, privacy: .public) manuallyDisconnected=\(self.manuallyDisconnected, privacy: .public) isRestarting=\(self.isRestarting, privacy: .public)")
+        Diag.log("Connection", "handleNetworkChange: serverStarted=\(serverStarted) manuallyDisconnected=\(manuallyDisconnected) isRestarting=\(isRestarting) wasConnected=\(isConnected)")
         guard serverStarted, !manuallyDisconnected else { return }
         statusMessage = L10n.isPL ? "Zmiana sieci — ponowne rozgłaszanie…" : "Network changed — re-advertising…"
         phase = .starting
@@ -196,15 +203,18 @@ final class ConnectionService {
         Task {
             await runRestartCatchingUp {
                 guard serverStarted, !manuallyDisconnected else { return }
+                self.log.notice("network change: stopping + re-advertising server")
                 await server.stop()
                 // Reset connection state before trying to come back up, so the UI
                 // never shows "Connected" on a dead server if advertising fails.
                 resetConnectionState()
                 do {
                     try await advertiseServer()
+                    Diag.log("Connection", "re-advertise OK — listening, waiting for phone to reconnect")
                     statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                     phase = .listening
                 } catch {
+                    Diag.log("Connection", "re-advertise FAILED: \(error.localizedDescription)")
                     statusMessage = L10n.isPL ? "Błąd serwera: \(error.localizedDescription)" : "Server failed: \(error.localizedDescription)"
                     phase = .error
                 }
@@ -396,6 +406,7 @@ final class ConnectionService {
             self.connectedDeviceName = device?.deviceName ?? "Device"
             self.setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
             self.isConnected = true
+            Diag.log("Connection", "phone connected + authenticated: \(self.connectedDeviceName) @ \(Self.hostPart(ofConnectionId: connectionId) ?? "?")")
             self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
             self.phase = .connected
 
@@ -473,10 +484,13 @@ final class ConnectionService {
             Task { @MainActor in
                 guard let self else { return }
                 let stillConnected = await self.server.isConnected
+                Diag.log("Connection", "client disconnected: \(endpoint) — stillConnected=\(stillConnected)")
                 self.isConnected = stillConnected
                 if !stillConnected {
                     // No phone connected → the upload server accepts nobody.
                     self.setConnectedClientIP(nil)
+                    // Dismiss any incoming-file popup orphaned by the dropped link.
+                    self.fileTransferService?.connectionLost()
                 }
                 if !stillConnected && !self.manuallyDisconnected {
                     self.connectedDeviceName = ""
@@ -492,6 +506,7 @@ final class ConnectionService {
             onClientConnected: onConnect,
             onClientDisconnected: onDisconnect
         )
+        await server.setDiagnostic { Diag.log("WS", $0) }
     }
 
     // MARK: - Mirror Helpers

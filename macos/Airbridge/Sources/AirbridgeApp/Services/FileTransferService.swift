@@ -88,30 +88,38 @@ final class FileTransferService: MessageHandler {
     }
 
     func acceptIncomingOffer() {
-        guard !pendingOfferIds.isEmpty else { return }
         let ids = pendingOfferIds
         pendingOfferIds = []
         pendingOffersTotalSize = 0
+        incomingOfferTransferId = nil
+        // Nothing to accept (e.g. the offer was cleared by a dropped connection)
+        // — don't strand the popup on screen; just dismiss it.
+        guard !ids.isEmpty else {
+            TransferPopup.shared.hide(delay: 0)
+            return
+        }
         let connectionService = self.connectionService
         Task {
             for id in ids {
                 try? await connectionService?.broadcast(Message.fileTransferAccept(transferId: id))
             }
         }
-        // Reset offer state — actual uploads arrive via HTTP and trigger the receive flow
-        incomingOfferTransferId = nil
         // Keep the popup visible — receive HTTP upload progress will replace it
     }
 
     func rejectIncomingOffer() {
-        guard !pendingOfferIds.isEmpty else { return }
+        // Always dismiss locally, even if the offer state is already empty (a
+        // dropped connection can clear it while the popup is still on screen).
+        // The reject broadcast is best-effort over whatever connection exists.
         let ids = pendingOfferIds
         pendingOfferIds = []
         pendingOffersTotalSize = 0
-        let connectionService = self.connectionService
-        Task {
-            for id in ids {
-                try? await connectionService?.broadcast(Message.fileTransferReject(transferId: id))
+        if !ids.isEmpty {
+            let connectionService = self.connectionService
+            Task {
+                for id in ids {
+                    try? await connectionService?.broadcast(Message.fileTransferReject(transferId: id))
+                }
             }
         }
         incomingOfferTransferId = nil
@@ -128,6 +136,22 @@ final class FileTransferService: MessageHandler {
             fileTransferFileName = ""
             isReceivingFile = false
         }
+    }
+
+    /// The connection dropped while an incoming offer was awaiting accept/reject.
+    /// The HTTP upload can't arrive over a dead session, so clear the offer and
+    /// dismiss the popup instead of leaving it orphaned (the bug where "Reject"
+    /// appeared to do nothing after the connection died).
+    func connectionLost() {
+        guard hasIncomingOffer else { return }
+        pendingOfferIds = []
+        pendingOffersTotalSize = 0
+        incomingOfferTransferId = nil
+        isWaitingForAccept = false
+        isRejected = false
+        fileTransferFileName = ""
+        isReceivingFile = false
+        TransferPopup.shared.hide(delay: 0)
     }
 
     // MARK: - Sending

@@ -2,6 +2,7 @@ import Foundation
 import Network
 import Security
 import Protocol
+import os
 
 // MARK: - WebSocketServer
 
@@ -37,6 +38,11 @@ public actor WebSocketServer {
     /// Called when a client disconnects. Passes the connection endpoint description.
     public var onClientDisconnected: (@Sendable (String) -> Void)?
 
+    /// Optional diagnostic sink for connection-lifecycle events (new/removed
+    /// connection, liveness timeout). Wired to the file-based `Diag` log so a
+    /// real network switch captures the full server-side sequence. Temporary.
+    public var onDiagnostic: (@Sendable (String) -> Void)?
+
     /// Convenience method to set all callbacks at once from outside the actor.
     public func setCallbacks(
         onMessage: (@Sendable (Message, String) -> Void)?,
@@ -58,6 +64,21 @@ public actor WebSocketServer {
 
     /// Tracks authenticated connection IDs.
     private var authenticatedConnections: Set<String> = []
+
+    private let log = Logger(subsystem: "com.airbridge.macos", category: "WebSocketServer")
+
+    // MARK: - Liveness / heartbeat
+    //
+    // Bez tego Mac nie wykrywa martwego peera: TCP po zmianie sieci/zniknięciu
+    // telefonu zostaje half-open i NWConnection nie przechodzi szybko w .failed.
+    // Mac trzyma „zombie" — myśli, że jest połączony i broadcastuje w próżnię,
+    // przez co użytkownik musi ręcznie restartować apkę na Macu. Aktywnie
+    // pingujemy każde połączenie i zrywamy je, gdy zbyt długo brak jakiejkolwiek
+    // ramki zwrotnej (telefon auto-odpowiada pongiem na nasz ping).
+    private var lastActivity: [String: Date] = [:]
+    private var livenessTask: Task<Void, Never>?
+    private let pingInterval: TimeInterval = 10
+    private let deadInterval: TimeInterval = 30
 
     // Continuation used to signal that the listener reached .ready
     private var readyContinuation: CheckedContinuation<Void, Error>?
@@ -84,9 +105,14 @@ public actor WebSocketServer {
         authenticatedConnections.insert(connectionId)
     }
 
+    public func setDiagnostic(_ sink: (@Sendable (String) -> Void)?) {
+        self.onDiagnostic = sink
+    }
+
     public func disconnectClient(_ connectionId: String) {
         connections[connectionId]?.cancel()
         connections.removeValue(forKey: connectionId)
+        lastActivity.removeValue(forKey: connectionId)
         authenticatedConnections.remove(connectionId)
     }
 
@@ -96,6 +122,7 @@ public actor WebSocketServer {
             conn.cancel()
         }
         connections.removeAll()
+        lastActivity.removeAll()
         authenticatedConnections.removeAll()
     }
 
@@ -177,12 +204,16 @@ public actor WebSocketServer {
     /// Suspends until the listener has fully cancelled and released its port,
     /// so a subsequent `start()` can re-bind without hitting "address in use".
     public func stop() async {
+        livenessTask?.cancel()
+        livenessTask = nil
         for (_, conn) in connections {
             conn.cancel()
         }
         connections.removeAll()
+        lastActivity.removeAll()
         authenticatedConnections.removeAll()
         actualPort = nil
+        log.notice("server stopped")
         guard let listener else { return }
         self.listener = nil
         // If the listener already reached .cancelled on its own (e.g. after a
@@ -295,6 +326,9 @@ public actor WebSocketServer {
     private func handleNewConnection(_ connection: NWConnection) {
         let id = connectionID(for: connection)
         connections[id] = connection
+        lastActivity[id] = Date()
+        log.notice("new connection \(id, privacy: .public) (total=\(self.connections.count, privacy: .public))")
+        onDiagnostic?("WS new connection \(id) (total=\(connections.count))")
 
         connection.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
@@ -305,16 +339,21 @@ public actor WebSocketServer {
 
         connection.start(queue: .global(qos: .userInitiated))
         onClientConnected?(id)
+        startLivenessMonitorIfNeeded()
 
         receiveNextMessage(on: connection, id: id)
     }
 
     private func handleConnectionStateChange(_ state: NWConnection.State, id: String) {
         switch state {
-        case .failed, .cancelled:
-            connections.removeValue(forKey: id)
-            authenticatedConnections.remove(id)
-            onClientDisconnected?(id)
+        case .failed(let error):
+            log.notice("connection \(id, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            onDiagnostic?("WS connection \(id) failed: \(error.localizedDescription)")
+            removeConnection(id: id)
+        case .cancelled:
+            log.notice("connection \(id, privacy: .public) cancelled")
+            onDiagnostic?("WS connection \(id) cancelled")
+            removeConnection(id: id)
         default:
             break
         }
@@ -329,6 +368,12 @@ public actor WebSocketServer {
                     await self.removeConnection(id: id)
                 }
                 return
+            }
+
+            // Każda ramka (w tym pong na nasz heartbeat) liczy się jako oznaka
+            // życia — resetuje licznik bezczynności dla tego połączenia.
+            Task {
+                await self.noteActivity(id: id)
             }
 
             if let data, !data.isEmpty {
@@ -363,12 +408,59 @@ public actor WebSocketServer {
     }
 
     private func removeConnection(id: String) {
+        // Idempotentne: stan połączenia i timeout liveness mogą zawołać to oba.
+        guard connections[id] != nil || lastActivity[id] != nil else { return }
         connections.removeValue(forKey: id)
+        lastActivity.removeValue(forKey: id)
         // Also drop the authentication state. Connection IDs are derived from
         // host:port, so a later connection can legitimately reuse the same ID;
         // leaving it here would let that new client skip authentication.
         authenticatedConnections.remove(id)
+        log.notice("removed connection \(id, privacy: .public) (total=\(self.connections.count, privacy: .public))")
         onClientDisconnected?(id)
+    }
+
+    // MARK: - Liveness / heartbeat
+
+    private func noteActivity(id: String) {
+        guard connections[id] != nil else { return }
+        lastActivity[id] = Date()
+    }
+
+    /// Pętla heartbeatu: co `pingInterval` pinguje żywe połączenia, a te bez
+    /// jakiejkolwiek aktywności przez `deadInterval` zrywa jako zombie.
+    private func startLivenessMonitorIfNeeded() {
+        guard livenessTask == nil else { return }
+        let interval = pingInterval
+        livenessTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                await self?.runLivenessCheck()
+            }
+        }
+    }
+
+    private func runLivenessCheck() {
+        guard !connections.isEmpty else { return }
+        let now = Date()
+        for (id, conn) in connections {
+            let last = lastActivity[id] ?? now
+            let idle = now.timeIntervalSince(last)
+            if idle > deadInterval {
+                log.notice("liveness timeout for \(id, privacy: .public) — idle \(Int(idle), privacy: .public)s > \(Int(self.deadInterval), privacy: .public)s, dropping zombie")
+                onDiagnostic?("WS liveness timeout \(id) — idle \(Int(idle))s, dropping zombie")
+                conn.cancel()
+                removeConnection(id: id)
+            } else {
+                sendPing(on: conn)
+            }
+        }
+    }
+
+    private func sendPing(on connection: NWConnection) {
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .ping)
+        let context = NWConnection.ContentContext(identifier: "ping", metadata: [metadata])
+        connection.send(content: Data(), contentContext: context, isComplete: true, completion: .idempotent)
     }
 
     // MARK: - Helpers

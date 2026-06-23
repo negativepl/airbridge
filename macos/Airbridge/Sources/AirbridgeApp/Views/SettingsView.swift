@@ -1,5 +1,4 @@
 import SwiftUI
-import ServiceManagement
 import AirbridgeSecurity
 
 struct SettingsView: View {
@@ -20,6 +19,7 @@ struct SettingsView: View {
     @State private var shortcutDisplay: String = GlobalHotkeyService.currentShortcutDisplay()
     @State private var shortcutMonitor: Any?
     @State private var accessibilityPollTimer: Timer?
+    @State private var launchAtLoginError: String?
 
     init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService, notificationService: NotificationService) {
         self.connectionService = connectionService
@@ -177,19 +177,25 @@ struct SettingsView: View {
             Toggle(L10n.launchAtLogin, isOn: Binding(
                 get: { launchAtLogin },
                 set: { newValue in
-                    launchAtLogin = newValue
                     do {
-                        if newValue {
-                            try SMAppService.mainApp.register()
-                        } else {
-                            try SMAppService.mainApp.unregister()
-                        }
+                        try LaunchAtLogin.setEnabled(newValue)
+                        launchAtLogin = newValue
+                        launchAtLoginError = nil
                     } catch {
-                        launchAtLogin = !newValue
+                        // Nie udawaj, że działa: zostaw przełącznik w starym stanie
+                        // (get zwróci niezmienione `launchAtLogin`) i pokaż powód.
+                        launchAtLoginError = error.localizedDescription
                     }
                 }
             ))
             .font(.ab(.body))
+
+            if let launchAtLoginError {
+                Text(L10n.isPL ? "Nie udało się ustawić autostartu: \(launchAtLoginError)"
+                               : "Couldn't set launch at login: \(launchAtLoginError)")
+                    .font(.ab(.caption))
+                    .foregroundStyle(.red)
+            }
 
             Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
                 .font(.ab(.body))

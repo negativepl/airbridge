@@ -10,6 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let showInDock = UserDefaults.standard.bool(forKey: "showInDock")
         NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+
+        // Uzgodnij autostart z realnym stanem systemu: self-signed cdhash zmienia
+        // się co build, więc rejestracja login itemu gubi się przy podmianie
+        // bundla. Jeśli user chce autostart, a system go nie ma — rejestruj ponownie.
+        LaunchAtLogin.reconcileOnLaunch()
     }
 }
 
@@ -61,6 +66,7 @@ struct AirbridgeApp: App {
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms, files: filesBrowser, notifications: notifications)
         connection.mirrorService = mirror
         connection.pairingService = pairing
+        connection.fileTransferService = fileTransfer
 
         _connectionService = State(initialValue: connection)
         _clipboardService = State(initialValue: clipboard)
