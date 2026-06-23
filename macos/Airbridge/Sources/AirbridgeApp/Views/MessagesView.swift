@@ -204,7 +204,7 @@ struct MessagesView: View {
                         .onSubmit { sendMessage(to: convo) }
                 }
                 .padding(.vertical, 12)
-                .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
+                .contentCard(cornerRadius: 18)
 
                 Button {
                     sendMessage(to: convo)

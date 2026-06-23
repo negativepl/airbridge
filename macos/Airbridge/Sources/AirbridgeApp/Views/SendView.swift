@@ -96,11 +96,18 @@ struct SendView: View {
             .padding(24)
             .frame(maxWidth: .infinity, minHeight: 220)
         }
-        .glassEffect(
-            isTargeted
-                ? .regular.tint(.accentColor).interactive()
-                : .regular.interactive(),
-            in: .rect(cornerRadius: 18, style: .continuous)
+        // Solid content surface (Liquid Glass is reserved for chrome). The
+        // drop affordance is carried by the accent tint while a file is over
+        // the zone plus the dashed border below — no glass refraction.
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(isTargeted
+                    ? Color.accentColor.opacity(0.18)
+                    : Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)

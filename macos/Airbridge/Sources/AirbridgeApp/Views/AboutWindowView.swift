@@ -63,7 +63,7 @@ struct AboutWindowView: View {
                     url: "https://anthropic.com"
                 )
             }
-            .glassEffect(.regular, in: .rect(cornerRadius: 14, style: .continuous))
+            .contentCard(cornerRadius: 14)
             .padding(.horizontal, 20)
 
             // Primary action

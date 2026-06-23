@@ -518,7 +518,7 @@ struct PhotoDetailView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
+        .contentCard(cornerRadius: 18)
     }
 
     private var metaLine: String {
