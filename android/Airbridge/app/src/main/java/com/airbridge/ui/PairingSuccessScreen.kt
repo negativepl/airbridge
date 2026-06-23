@@ -2,7 +2,6 @@ package com.airbridge.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
@@ -58,7 +56,7 @@ fun PairingSuccessScreen(
 
     val checkScale by animateFloatAsState(
         targetValue = if (phase == 1) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 200f),
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "checkScale"
     )
 
@@ -154,8 +152,7 @@ fun PairingSuccessScreen(
                     onClick = onContinue,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(50)
+                        .height(56.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.pairing_success_continue),

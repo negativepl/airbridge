@@ -13,8 +13,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,31 +33,38 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.ShortNavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -135,14 +146,19 @@ class MainActivity : ComponentActivity() {
                         val icon: ImageVector
                     )
 
+                    // Dolny pasek: tylko miejsca główne. Ustawienia i O aplikacji
+                    // przeniesione do górnego paska.
                     val navItems = listOf(
                         NavItem(R.string.nav_home, Icons.Rounded.Home),
-                        NavItem(R.string.nav_screen_sharing, Icons.Rounded.ScreenShare),
-                        NavItem(R.string.nav_settings, Icons.Rounded.Settings),
-                        NavItem(R.string.nav_about, Icons.Rounded.Info)
+                        NavItem(R.string.nav_screen_sharing, Icons.Rounded.ScreenShare)
+                    )
+                    // Tytuł w górnym pasku = nazwa bieżącej strony pagera (2 strony).
+                    val pageTitles = listOf(
+                        R.string.app_name,
+                        R.string.nav_screen_sharing
                     )
 
-                    val pagerState = rememberPagerState(pageCount = { 4 })
+                    val pagerState = rememberPagerState(pageCount = { 2 })
                     val coroutineScope = rememberCoroutineScope()
                     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(this@MainActivity) }
                     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
@@ -150,6 +166,9 @@ class MainActivity : ComponentActivity() {
                         pairedDeviceStore.getAll().isNotEmpty()
                     }
                     var fabMenuExpanded by remember { mutableStateOf(false) }
+                    var topMenuExpanded by remember { mutableStateOf(false) }
+                    var showSettings by remember { mutableStateOf(false) }
+                    var showAbout by remember { mutableStateOf(false) }
                     var pendingFileUri by remember { mutableStateOf<Uri?>(null) }
                     var pendingIsPhoto by remember { mutableStateOf(false) }
                     val context = LocalContext.current
@@ -173,149 +192,227 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Scaffold(
-                            bottomBar = {
-                                Box {
-                                    NavigationBar {
-                                        // First 2 tabs (Home, History)
-                                        val navBarColors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                                            unselectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                            unselectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                                        )
-                                        navItems.take(2).forEachIndexed { index, item ->
-                                            NavigationBarItem(
-                                                selected = pagerState.targetPage == index,
-                                                onClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    coroutineScope.launch {
-                                                        pagerState.animateScrollToPage(index)
-                                                    }
-                                                },
-                                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
-                                                label = { Text(stringResource(item.labelRes), maxLines = 1) },
-                                                colors = navBarColors
-                                            )
-                                        }
-
-                                        // Empty space for FAB
-                                        NavigationBarItem(
-                                            selected = false,
-                                            onClick = { },
-                                            icon = { Spacer(Modifier.size(24.dp)) },
-                                            label = { },
-                                            enabled = false
-                                        )
-
-                                        // Last 2 tabs (Settings, About)
-                                        navItems.drop(2).forEachIndexed { index, item ->
-                                            NavigationBarItem(
-                                                selected = pagerState.targetPage == index + 2,
-                                                onClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    coroutineScope.launch {
-                                                        pagerState.animateScrollToPage(index + 2)
-                                                    }
-                                                },
-                                                icon = { Icon(item.icon, contentDescription = stringResource(item.labelRes)) },
-                                                label = { Text(stringResource(item.labelRes), maxLines = 1) },
-                                                colors = navBarColors
-                                            )
-                                        }
+                    Scaffold(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        topBar = {
+                            TopAppBar(
+                                title = {
+                                    Text(stringResource(pageTitles[pagerState.targetPage.coerceIn(0, pageTitles.lastIndex)]))
+                                },
+                                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                ),
+                                actions = {
+                                    IconButton(onClick = { showSettings = true }) {
+                                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                                     }
-                                }
-                            }
-                        ) { innerPadding ->
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.padding(innerPadding),
-                                beyondViewportPageCount = 3,
-                            ) { page ->
-                                when (page) {
-                                    0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
-                                    1 -> ScreenShareScreen()
-                                    2 -> SettingsScreen(
-                                        prefs = prefs,
-                                        onThemeChanged = { themeMode = it },
-                                        onScanQr = { showQrScanner = true }
-                                    )
-                                    3 -> AboutScreen()
-                                }
-                            }
-                        }
-
-                        if (hasPairedDevices) {
-                            BackHandler(fabMenuExpanded) { fabMenuExpanded = false }
-                            FloatingActionButtonMenu(
-                                expanded = fabMenuExpanded,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding()
-                                    .padding(bottom = 20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                button = {
-                                    ToggleFloatingActionButton(
-                                        checked = fabMenuExpanded,
-                                        onCheckedChange = { fabMenuExpanded = it }
+                                    IconButton(onClick = { topMenuExpanded = true }) {
+                                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.nav_about))
+                                    }
+                                    DropdownMenu(
+                                        expanded = topMenuExpanded,
+                                        onDismissRequest = { topMenuExpanded = false }
                                     ) {
-                                        val showingClose by remember {
-                                            derivedStateOf { checkedProgress > 0.5f }
-                                        }
-                                        val icon = if (showingClose) Icons.Rounded.Close else Icons.Rounded.FileUpload
-                                        Icon(
-                                            painter = rememberVectorPainter(icon),
-                                            contentDescription = stringResource(
-                                                if (showingClose) R.string.fab_close_menu else R.string.nav_send
-                                            ),
-                                            modifier = Modifier.animateIcon({ checkedProgress })
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.nav_about)) },
+                                            leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                                            onClick = {
+                                                topMenuExpanded = false
+                                                showAbout = true
+                                            }
                                         )
                                     }
                                 }
+                            )
+                        },
+                        bottomBar = {
+                            // Material 3 Expressive compact dock. ShortNavigationBar
+                            // gives the spec-correct short bar + tight active-indicator
+                            // pill bounded to the item (the ripple no longer floods
+                            // half the bar like a hand-rolled Row would).
+                            ShortNavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             ) {
-                                FloatingActionButtonMenuItem(
-                                    onClick = {
-                                        fabMenuExpanded = false
-                                        filePickerLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                                    text = { Text(stringResource(R.string.action_send_file)) }
+                                val itemColors = ShortNavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer
                                 )
-                                FloatingActionButtonMenuItem(
-                                    onClick = {
-                                        fabMenuExpanded = false
-                                        photoPickerLauncher.launch(
-                                            ActivityResultContracts.PickVisualMedia
-                                                .ImageAndVideo.let {
-                                                    androidx.activity.result.PickVisualMediaRequest(it)
-                                                }
-                                        )
-                                    },
-                                    icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
-                                    text = { Text(stringResource(R.string.action_send_photo)) }
-                                )
-                                FloatingActionButtonMenuItem(
-                                    onClick = {
-                                        fabMenuExpanded = false
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = clipboard.primaryClip
-                                        if (clip != null && clip.itemCount > 0) {
-                                            val text = clip.getItemAt(0).coerceToText(context).toString()
+                                navItems.forEachIndexed { index, item ->
+                                    ShortNavigationBarItem(
+                                        selected = pagerState.targetPage == index,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(index)
+                                            }
+                                        },
+                                        icon = {
+                                            Icon(
+                                                item.icon,
+                                                contentDescription = stringResource(item.labelRes)
+                                            )
+                                        },
+                                        label = null,
+                                        colors = itemColors
+                                    )
+                                }
+                            }
+                        },
+                        floatingActionButton = {
+                            if (hasPairedDevices) {
+                                BackHandler(fabMenuExpanded) { fabMenuExpanded = false }
+                                FloatingActionButtonMenu(
+                                    expanded = fabMenuExpanded,
+                                    horizontalAlignment = Alignment.End,
+                                    button = {
+                                        ToggleFloatingActionButton(
+                                            checked = fabMenuExpanded,
+                                            onCheckedChange = { fabMenuExpanded = it }
+                                        ) {
+                                            val showingClose by remember {
+                                                derivedStateOf { checkedProgress > 0.5f }
+                                            }
+                                            val icon = if (showingClose) Icons.Rounded.Close else Icons.Rounded.FileUpload
+                                            Icon(
+                                                painter = rememberVectorPainter(icon),
+                                                contentDescription = stringResource(
+                                                    if (showingClose) R.string.fab_close_menu else R.string.nav_send
+                                                ),
+                                                modifier = Modifier.animateIcon({ checkedProgress })
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            filePickerLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_file)) }
+                                    )
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            photoPickerLauncher.launch(
+                                                androidx.activity.result.PickVisualMediaRequest(
+                                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                                                )
+                                            )
+                                        },
+                                        icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_photo)) }
+                                    )
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = clipboard.primaryClip
+                                            val text = if (clip != null && clip.itemCount > 0)
+                                                clip.getItemAt(0).coerceToText(context).toString() else ""
                                             if (text.isNotEmpty()) {
                                                 viewModel.sendClipboard(text)
                                                 Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
                                             } else {
                                                 Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
                                             }
-                                        } else {
-                                            Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                        },
+                                        icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_clipboard)) }
+                                    )
+                                }
+                            }
+                        },
+                        floatingActionButtonPosition = FabPosition.End
+                    ) { innerPadding ->
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.padding(innerPadding),
+                            beyondViewportPageCount = 1,
+                        ) { page ->
+                            when (page) {
+                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
+                                1 -> ScreenShareScreen()
+                            }
+                        }
+                    }
+
+                    // Ustawienia / O aplikacji — pełne ekrany otwierane z paska
+                    // (nie strony pagera, więc nie da się ich wyswipe'ować).
+                    AnimatedVisibility(
+                        visible = showSettings,
+                        enter = slideInHorizontally(
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            initialOffsetX = { it }
+                        ),
+                        exit = slideOutHorizontally(
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            targetOffsetX = { it }
+                        )
+                    ) {
+                        BackHandler { showSettings = false }
+                        Scaffold(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            topBar = {
+                                TopAppBar(
+                                    title = { Text(stringResource(R.string.nav_settings)) },
+                                    navigationIcon = {
+                                        IconButton(onClick = { showSettings = false }) {
+                                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                                         }
                                     },
-                                    icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                                    text = { Text(stringResource(R.string.action_send_clipboard)) }
+                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    )
                                 )
+                            }
+                        ) { pad ->
+                            Box(modifier = Modifier.padding(pad)) {
+                                SettingsScreen(
+                                    prefs = prefs,
+                                    onThemeChanged = { themeMode = it },
+                                    onScanQr = {
+                                        showSettings = false
+                                        showQrScanner = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = showAbout,
+                        enter = slideInHorizontally(
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            initialOffsetX = { it }
+                        ),
+                        exit = slideOutHorizontally(
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            targetOffsetX = { it }
+                        )
+                    ) {
+                        BackHandler { showAbout = false }
+                        Scaffold(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            topBar = {
+                                TopAppBar(
+                                    title = { Text(stringResource(R.string.nav_about)) },
+                                    navigationIcon = {
+                                        IconButton(onClick = { showAbout = false }) {
+                                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
+                                        }
+                                    },
+                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    )
+                                )
+                            }
+                        ) { pad ->
+                            Box(modifier = Modifier.padding(pad)) {
+                                AboutScreen()
                             }
                         }
                     }
@@ -355,6 +452,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Returning to the app is the user's cue that they expect a connection.
+        // If a background discovery had gone stale (network switched while we
+        // were away), this recovers it at once; the service ignores it when
+        // already connected.
+        viewModel.rediscover()
     }
 }
 
@@ -412,7 +518,7 @@ private fun SendConfirmationSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(MaterialTheme.shapes.large),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -420,7 +526,7 @@ private fun SendConfirmationSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(MaterialTheme.shapes.large)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -480,8 +586,7 @@ private fun SendConfirmationSheet(
             onClick = onConfirm,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(50)
+                .height(48.dp)
         ) {
             Icon(
                 Icons.Rounded.FileUpload,
@@ -498,8 +603,7 @@ private fun SendConfirmationSheet(
             onClick = onCancel,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(50)
+                .height(48.dp)
         ) {
             Text(stringResource(R.string.send_confirm_cancel))
         }

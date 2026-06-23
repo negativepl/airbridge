@@ -1,12 +1,8 @@
 package com.airbridge.ui
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.airbridge.R
-
-val CardShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun formatTimeAgo(timestamp: Long, now: Long): String {

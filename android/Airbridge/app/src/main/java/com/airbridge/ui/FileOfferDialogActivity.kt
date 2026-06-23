@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -104,7 +105,10 @@ class FileOfferDialogActivity : ComponentActivity() {
                         }
                     },
                     confirmButton = {
-                        TextButton(onClick = {
+                        // Accept is the primary, affirmative action — give it
+                        // filled emphasis so it's not visually identical to the
+                        // destructive Reject (which stays a low-emphasis TextButton).
+                        Button(onClick = {
                             startService(
                                 Intent(this, AirbridgeService::class.java).apply {
                                     action = AirbridgeService.ACTION_ACCEPT_FILE

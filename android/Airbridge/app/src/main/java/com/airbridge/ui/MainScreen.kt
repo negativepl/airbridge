@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Computer
@@ -95,8 +93,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(
-                onClick = { onScanQr() },
-                shape = RoundedCornerShape(50)
+                onClick = { onScanQr() }
             ) {
                 Text(stringResource(R.string.pairing_add_mac))
             }
@@ -109,17 +106,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
@@ -140,21 +127,18 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
             isConnected -> 1
             else -> 0
         }
+        val connEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val connEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+        val connExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         androidx.compose.animation.AnimatedContent(
             targetState = connState,
             transitionSpec = {
-                (androidx.compose.animation.fadeIn(
-                    animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
-                ) + androidx.compose.animation.scaleIn(
-                    initialScale = 0.92f,
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                    )
-                )).togetherWith(
-                    androidx.compose.animation.fadeOut(
-                        animationSpec = androidx.compose.animation.core.tween(150)
-                    )
+                (androidx.compose.animation.fadeIn(animationSpec = connEnterFade) +
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.92f,
+                        animationSpec = connEnterScale
+                    )).togetherWith(
+                    androidx.compose.animation.fadeOut(animationSpec = connExitFade)
                 )
             },
             label = "connectionState"
@@ -189,7 +173,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = CardShape,
+                    shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
@@ -239,7 +223,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
             Card(
                 onClick = { transferExpanded = !transferExpanded },
                 modifier = Modifier.fillMaxWidth(),
-                shape = CardShape,
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -248,10 +232,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                     modifier = Modifier
                         .padding(16.dp)
                         .animateContentSize(
-                            animationSpec = spring(
-                                dampingRatio = 0.8f,
-                                stiffness = 300f
-                            )
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()
                         )
                 ) {
                     Row(
@@ -301,7 +282,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(120.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(MaterialTheme.shapes.medium)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
@@ -368,9 +349,9 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
 private fun ConnectingCard(deviceName: String?) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CardShape,
+        shape = MaterialTheme.shapes.extraLarge,
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLowest
     ) {
         Column(
             modifier = Modifier
@@ -433,21 +414,21 @@ private fun DeviceCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CardShape,
+        shape = MaterialTheme.shapes.extraLarge,
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLowest
     ) {
+        val cardEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val cardEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+        val cardExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         androidx.compose.animation.AnimatedContent(
             targetState = state,
             transitionSpec = {
-                (androidx.compose.animation.fadeIn(
-                    animationSpec = androidx.compose.animation.core.tween(300)
-                ) + androidx.compose.animation.scaleIn(
-                    initialScale = 0.95f,
-                    animationSpec = androidx.compose.animation.core.tween(300)
-                )) togetherWith (androidx.compose.animation.fadeOut(
-                    animationSpec = androidx.compose.animation.core.tween(200)
-                ))
+                (androidx.compose.animation.fadeIn(animationSpec = cardEnterFade) +
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.95f,
+                        animationSpec = cardEnterScale
+                    )) togetherWith (androidx.compose.animation.fadeOut(animationSpec = cardExitFade))
             },
             label = "deviceCardState"
         ) { currentState ->
@@ -515,8 +496,7 @@ private fun DeviceCard(
                             onClick = onDisconnect,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(50)
+                                .height(48.dp)
                         ) {
                             Icon(
                                 Icons.Rounded.LinkOff,
@@ -607,8 +587,7 @@ private fun DeviceCard(
                             onClick = onReconnect,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(50)
+                                .height(48.dp)
                         ) {
                             Icon(
                                 Icons.Rounded.Refresh,

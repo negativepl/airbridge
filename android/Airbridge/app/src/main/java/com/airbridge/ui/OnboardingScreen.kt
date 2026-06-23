@@ -6,18 +6,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -69,12 +67,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
@@ -134,10 +130,7 @@ fun OnboardingScreen(
                         val isSelected = pagerState.currentPage == index
                         val dotWidth by animateDpAsState(
                             targetValue = if (isSelected) 24.dp else 8.dp,
-                            animationSpec = spring(
-                                dampingRatio = 0.7f,
-                                stiffness = 300f
-                            ),
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
                             label = "dotWidth"
                         )
                         val color by animateColorAsState(
@@ -145,6 +138,7 @@ fun OnboardingScreen(
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.outlineVariant,
+                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
                             label = "dotColor"
                         )
                         Box(
@@ -159,11 +153,15 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                val btnEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                val btnEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+                val btnExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                val btnExitScale = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
                 AnimatedContent(
                     targetState = pagerState.currentPage == 3,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(300)) + scaleIn(initialScale = 0.95f, animationSpec = tween(300)))
-                            .togetherWith(fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.95f, animationSpec = tween(200)))
+                        (fadeIn(animationSpec = btnEnterFade) + scaleIn(initialScale = 0.95f, animationSpec = btnEnterScale))
+                            .togetherWith(fadeOut(animationSpec = btnExitFade) + scaleOut(targetScale = 0.95f, animationSpec = btnExitScale))
                     },
                     label = "buttonTransition"
                 ) { isScanPage ->
@@ -176,8 +174,7 @@ fun OnboardingScreen(
                             onClick = { onSkipPairing() },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp),
-                            shape = PillShape
+                                .height(56.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.pairing_skip),
@@ -188,8 +185,7 @@ fun OnboardingScreen(
                             onClick = { onScanQr() },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp),
-                            shape = PillShape
+                                .height(56.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.pairing_scan_title),
@@ -198,13 +194,8 @@ fun OnboardingScreen(
                         }
                     }
                 } else {
-                    // "Next" — FilledTonalButton with pill shape and press feedback
-                    var pressed by remember { mutableStateOf(false) }
-                    val buttonScale by animateFloatAsState(
-                        targetValue = if (pressed) 0.95f else 1f,
-                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-                        label = "btnScale"
-                    )
+                    // "Next" — native FilledTonalButton; pressed feedback (state layer
+                    // + Expressive shape) is built in, no hand-rolled scale needed.
                     FilledTonalButton(
                         onClick = {
                             coroutineScope.launch {
@@ -214,17 +205,6 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .scale(buttonScale)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        pressed = true
-                                        tryAwaitRelease()
-                                        pressed = false
-                                    }
-                                )
-                            },
-                        shape = PillShape
                     ) {
                         Text(
                             text = stringResource(R.string.onboarding_next),
@@ -588,60 +568,40 @@ private fun PermissionRow(
     granted: Boolean,
     onRequest: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    ListItem(
+        leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
                 tint = if (granted) MaterialTheme.colorScheme.success else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        },
+        headlineContent = { Text(description) },
+        supportingContent = if (why.isNotEmpty()) {
+            { Text(why) }
+        } else null,
+        trailingContent = {
             if (granted) {
-                Spacer(modifier = Modifier.weight(1f))
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.success,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
+            } else {
+                FilledTonalButton(onClick = onRequest) {
+                    Text(stringResource(R.string.onboarding_perm_allow_btn))
+                }
             }
-        }
-        if (why.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = why,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 36.dp)
-            )
-        }
-        if (!granted) {
-            Spacer(modifier = Modifier.height(10.dp))
-            FilledTonalButton(
-                onClick = onRequest,
-                modifier = Modifier.fillMaxWidth().height(36.dp),
-                shape = RoundedCornerShape(50)
-            ) {
-                Text(
-                    text = stringResource(R.string.onboarding_perm_allow_btn),
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-        }
-    }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+    )
 }
 
 @Composable

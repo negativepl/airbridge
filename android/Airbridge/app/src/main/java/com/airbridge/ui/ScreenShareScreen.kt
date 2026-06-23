@@ -71,15 +71,7 @@ fun ScreenShareScreen() {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
-        Spacer(Modifier.size(16.dp))
-        Text(
-            text = stringResource(R.string.screen_sharing_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.size(16.dp))
+        Spacer(Modifier.size(8.dp))
 
         if (ready) {
             shareCard(
@@ -98,7 +90,7 @@ fun ScreenShareScreen() {
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
             ) {
                 Text(
                     text = stringResource(R.string.screen_sharing_connect_first),
@@ -116,7 +108,7 @@ private fun shareCard(icon: ImageVector, title: String, subtitle: String, onClic
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(18.dp),

@@ -54,7 +54,7 @@ import kotlin.math.roundToInt
 fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.largeIncreased,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         val bitmap = remember(wallpaperBase64) {
@@ -143,8 +143,7 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
             Spacer(Modifier.size(18.dp))
             FilledTonalButton(
                 onClick = onDisconnect,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(50)
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Icon(Icons.Rounded.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))

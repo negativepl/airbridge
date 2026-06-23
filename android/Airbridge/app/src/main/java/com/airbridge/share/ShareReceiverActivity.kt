@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
@@ -39,6 +38,8 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -252,6 +253,12 @@ class ShareReceiverActivity : ComponentActivity() {
                 Intent(this, AirbridgeService::class.java).apply {
                     action = AirbridgeService.ACTION_SEND_FILE
                     data = uri
+                    // Forward the temporary read grant to the service. Without
+                    // this the grant dies when this activity finish()es, and the
+                    // service's async upload hits SecurityException reading the
+                    // shared URI — which crashed the whole app (and dropped the
+                    // connection). The grant now lives with the service.
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
             )
         }
@@ -311,8 +318,7 @@ private fun ShareSheetBottomBar(
                 enabled = sendEnabled,
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp),
-                shape = RoundedCornerShape(50)
+                    .height(52.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.FileUpload,
@@ -334,7 +340,7 @@ private fun EmptyDevicesState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(MaterialTheme.shapes.largeIncreased)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -370,7 +376,7 @@ private fun SharePreview(parsed: ParsedShare) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -413,7 +419,7 @@ private fun SharePreview(parsed: ParsedShare) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -465,7 +471,7 @@ private fun SharePreview(parsed: ParsedShare) {
         fileSize <= 0 -> ""
         fileSize < 1024 -> "$fileSize B"
         fileSize < 1024 * 1024 -> "${fileSize / 1024} KB"
-        else -> String.format("%.1f MB", fileSize / (1024.0 * 1024.0))
+        else -> String.format(java.util.Locale.getDefault(), "%.1f MB", fileSize / (1024.0 * 1024.0))
     }
 
     if (isImage) {
@@ -476,7 +482,7 @@ private fun SharePreview(parsed: ParsedShare) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 10f)
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(MaterialTheme.shapes.largeIncreased)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             )
             Spacer(Modifier.height(12.dp))
@@ -501,7 +507,7 @@ private fun SharePreview(parsed: ParsedShare) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -563,58 +569,59 @@ private fun DeviceRow(
         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .clickable(enabled = isOnline, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isOnline) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Computer,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
+    ListItem(
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isOnline) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Computer,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        },
+        headlineContent = {
             Text(
                 text = device.deviceName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        },
+        supportingContent = {
             Text(
                 text = stringResource(
                     if (isOnline) R.string.share_sheet_connected
                     else R.string.share_sheet_offline
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = statusColor
+                )
             )
-        }
-        if (isSelected && isOnline) {
-            Icon(
-                imageVector = Icons.Rounded.Check,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-    }
+        },
+        trailingContent = {
+            if (isSelected && isOnline) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = bg,
+            headlineColor = contentColor,
+            supportingColor = statusColor
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .clickable(enabled = isOnline, onClick = onClick)
+    )
 }
