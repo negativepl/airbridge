@@ -37,17 +37,27 @@ class HttpFileUploader {
                 .readTimeout(30, TimeUnit.SECONDS),
             certFingerprint
         ).build()
-        val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+        var mimeType = "application/octet-stream"
         var filename = "file"
         var fileSize = 0L
 
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (nameIdx >= 0) filename = cursor.getString(nameIdx) ?: "file"
-                val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (sizeIdx >= 0) fileSize = cursor.getLong(sizeIdx)
+        // Reading a shared URI can fail with SecurityException if the temporary
+        // read grant expired (e.g. the sharing activity already finished). Return
+        // false instead of throwing — an uncaught throw here crashed the whole
+        // app and dropped the connection.
+        try {
+            contentResolver.getType(uri)?.let { mimeType = it }
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx >= 0) filename = cursor.getString(nameIdx) ?: "file"
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIdx >= 0) fileSize = cursor.getLong(sizeIdx)
+                }
             }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "No permission to read shared URI (grant likely expired): $uri", e)
+            return false
         }
 
         // file:// URIs (FilesProvider via MANAGE_EXTERNAL_STORAGE) are not
