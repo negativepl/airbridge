@@ -222,6 +222,7 @@
     <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>
     <string name="screen_sharing_second_display_desc">Dodatkowy pulpit dopasowany do ekranu telefonu.</string>
     <string name="screen_sharing_connect_first">Połącz się z Makiem, aby udostępniać ekran.</string>
+    <string name="mirror_switching_view">Przełączam widok…</string>
     <string name="mac_disk">Dysk</string>
     <string name="power_adapter">Zasilacz</string>
     <string name="power_battery">Bateria</string>

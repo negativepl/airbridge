@@ -221,6 +221,7 @@
     <string name="screen_sharing_second_display">Phone as second display</string>
     <string name="screen_sharing_second_display_desc">An extra desktop shaped to your phone.</string>
     <string name="screen_sharing_connect_first">Connect to your Mac to share its screen.</string>
+    <string name="mirror_switching_view">Switching view…</string>
     <string name="mac_disk">Disk</string>
     <string name="power_adapter">Power adapter</string>
     <string name="power_battery">Battery</string>

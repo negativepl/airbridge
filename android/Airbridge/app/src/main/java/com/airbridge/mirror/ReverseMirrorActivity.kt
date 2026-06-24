@@ -21,6 +21,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
@@ -88,7 +89,23 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         )
         // Black overlay above the video — fades in over the brief reconnect when
         // the virtual display is rebuilt on rotation, so the switch doesn't blink.
-        fadeOverlay = View(this).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
+        // Carries a centered label so the user knows the view is being switched.
+        fadeOverlay = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            alpha = 0f
+            addView(
+                TextView(this@ReverseMirrorActivity).apply {
+                    text = getString(com.airbridge.R.string.mirror_switching_view)
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                },
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                )
+            )
+        }
         container.addView(
             fadeOverlay,
             FrameLayout.LayoutParams(
