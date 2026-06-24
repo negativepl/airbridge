@@ -166,6 +166,22 @@ Or build it yourself — see [Building from Source](#building-from-source) below
 
 ---
 
+## Tested On
+
+Developed and verified on real hardware:
+
+| Device | OS |
+|---|---|
+| Samsung Galaxy Z Fold7 | One UI 8.5 (Android 16) |
+| OPPO Find X9 Ultra | ColorOS 16 (Android 16) |
+| OPPO Find N6 | ColorOS 16 (Android 16) |
+| MacBook Pro 16″ (M1 Max) | macOS 26 (Tahoe) · 27 (beta) |
+| MacBook Pro 16″ (M4 Max) | macOS 26 (Tahoe) |
+
+Other recent Android phones and Apple Silicon Macs should work too — these are just the devices the app is actively tested on.
+
+---
+
 ## How It Works
 
 ```
