@@ -90,6 +90,25 @@ struct MainWindow: View {
         // Liquid Glass scroll edge effect works on every tab without a filler
         // item here.
         .toolbar {
+            // Active-device switcher — drives which phone Gallery/Files/SMS/send
+            // target. Shown only when more than one phone is connected; with one,
+            // everything just targets it.
+            if connectionService.connectedDevices.count > 1 {
+                ToolbarItem(placement: .navigation) {
+                    Picker(selection: Binding(
+                        get: { connectionService.activeDeviceId ?? "" },
+                        set: { connectionService.setActiveDevice($0) }
+                    )) {
+                        ForEach(connectionService.connectedDevices) { device in
+                            Text(deviceLabel(device)).tag(device.connectionId)
+                        }
+                    } label: {
+                        Label(L10n.isPL ? "Aktywne urządzenie" : "Active device", systemImage: "iphone")
+                    }
+                    .pickerStyle(.menu)
+                    .help(L10n.isPL ? "Aktywne urządzenie dla galerii, plików, SMS i wysyłki" : "Active device for gallery, files, SMS and sending")
+                }
+            }
             if selectedTab == .gallery {
                 if !galleryService.photos.isEmpty {
                     ToolbarItem(placement: .primaryAction) {
@@ -169,6 +188,12 @@ struct MainWindow: View {
                 }
             }
         }
+    }
+
+    /// Marketing name ("Galaxy Z Fold7") with a fallback to the pairing name.
+    private func deviceLabel(_ device: ConnectedDevice) -> String {
+        if let n = device.deviceInfo?.name, !n.isEmpty { return n }
+        return device.name
     }
 
     // Sortowanie Plików jako natywny element toolbara (jak picker widoku) —

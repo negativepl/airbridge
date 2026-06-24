@@ -27,7 +27,7 @@ final class SmsService: MessageHandler {
         isLoadingConversations = true
         if page == 0 { conversations = [] }
         Task {
-            try? await connectionService.broadcast(Message.smsConversationsRequest(page: page, pageSize: pageSize))
+            try? await connectionService.sendToActive(Message.smsConversationsRequest(page: page, pageSize: pageSize))
         }
     }
 
@@ -39,7 +39,7 @@ final class SmsService: MessageHandler {
             currentThreadId = threadId
         }
         Task {
-            try? await connectionService.broadcast(Message.smsMessagesRequest(threadId: threadId, page: page, pageSize: pageSize))
+            try? await connectionService.sendToActive(Message.smsMessagesRequest(threadId: threadId, page: page, pageSize: pageSize))
         }
     }
 
@@ -47,7 +47,7 @@ final class SmsService: MessageHandler {
         guard let connectionService, connectionService.isConnected else { return }
         sendResult = nil
         Task {
-            try? await connectionService.broadcast(Message.smsSendRequest(address: address, body: body))
+            try? await connectionService.sendToActive(Message.smsSendRequest(address: address, body: body))
         }
     }
 

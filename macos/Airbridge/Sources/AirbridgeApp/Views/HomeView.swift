@@ -206,18 +206,28 @@ struct HomeView: View {
     private func deviceCard(_ vm: HomeViewModel) -> some View {
         // One card per connected phone — they stack instead of fighting over a
         // single slot, so two devices read as a list rather than flipping.
+        let switchable = vm.connectedDevices.count > 1
         VStack(spacing: 12) {
             ForEach(vm.connectedDevices) { device in
                 singleDeviceCard(
                     info: device.deviceInfo,
-                    wallpaper: device.wallpaper.flatMap { NSImage(data: $0) }
+                    wallpaper: device.wallpaper.flatMap { NSImage(data: $0) },
+                    isActive: switchable && device.connectionId == connectionService.activeDeviceId,
+                    switchable: switchable,
+                    onSelect: { connectionService.setActiveDevice(device.connectionId) }
                 )
             }
         }
     }
 
     @ViewBuilder
-    private func singleDeviceCard(info: DeviceInfo?, wallpaper: NSImage?) -> some View {
+    private func singleDeviceCard(
+        info: DeviceInfo?,
+        wallpaper: NSImage?,
+        isActive: Bool,
+        switchable: Bool,
+        onSelect: @escaping () -> Void
+    ) -> some View {
         if wallpaper != nil || info != nil {
             GlassSection {
                 HStack(alignment: .center, spacing: 18) {
@@ -230,6 +240,17 @@ struct HomeView: View {
                     }
                 }
             }
+            // With more than one phone, the card is a selectable target: click to
+            // make it active; the accent border marks the current target.
+            .overlay {
+                if isActive {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { if switchable { onSelect() } }
+            .animation(.airbridgeQuick, value: isActive)
         }
     }
 

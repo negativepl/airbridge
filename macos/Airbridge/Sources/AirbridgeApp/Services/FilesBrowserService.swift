@@ -119,7 +119,7 @@ final class FilesBrowserService: MessageHandler {
             foldersFirst: foldersFirst,
             query: searchQuery
         )
-        Task { try? await connectionService.broadcast(message) }
+        Task { try? await connectionService.sendToActive(message) }
     }
 
     func reload() { open(path: currentPath) }
@@ -232,7 +232,7 @@ final class FilesBrowserService: MessageHandler {
               !requestedThumbnails.contains(entry.relativePath),
               let connectionService else { return }
         requestedThumbnails.insert(entry.relativePath)
-        Task { try? await connectionService.broadcast(.fileThumbnailRequest(path: entry.relativePath)) }
+        Task { try? await connectionService.sendToActive(.fileThumbnailRequest(path: entry.relativePath)) }
     }
 
     // MARK: - Folder stats
@@ -264,7 +264,7 @@ final class FilesBrowserService: MessageHandler {
         guard let next = entries.first(where: { $0.isDirectory && folderStats[$0.relativePath] == nil }) else { return }
         guard !requestedFolderStats.contains(next.relativePath) else { return }
         requestedFolderStats.insert(next.relativePath)
-        Task { try? await connectionService.broadcast(.folderStatsRequest(path: next.relativePath)) }
+        Task { try? await connectionService.sendToActive(.folderStatsRequest(path: next.relativePath)) }
     }
 
     // MARK: - Transfer
@@ -272,12 +272,12 @@ final class FilesBrowserService: MessageHandler {
     func download(_ entry: FileEntry) {
         guard let connectionService else { return }
         let transferId = UUID().uuidString
-        Task { try? await connectionService.broadcast(.fileDownloadRequest(transferId: transferId, path: entry.relativePath)) }
+        Task { try? await connectionService.sendToActive(.fileDownloadRequest(transferId: transferId, path: entry.relativePath)) }
     }
 
     func delete(_ entry: FileEntry) {
         guard let connectionService else { return }
-        Task { try? await connectionService.broadcast(.fileDeleteRequest(path: entry.relativePath)) }
+        Task { try? await connectionService.sendToActive(.fileDeleteRequest(path: entry.relativePath)) }
     }
 
     func upload(urls: [URL]) {

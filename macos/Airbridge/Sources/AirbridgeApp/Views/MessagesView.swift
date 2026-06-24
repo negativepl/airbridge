@@ -43,6 +43,11 @@ struct MessagesView: View {
                 smsService.loadConversations()
             }
         }
+        .onChange(of: connectionService.activeDeviceId) { _, _ in
+            // Switched phones — reload conversations from the new device (page 0
+            // resets the list).
+            if connectionService.isConnected { smsService.loadConversations() }
+        }
         .navigationTitle(navTitle)
         .navigationSubtitle(navSubtitle)
     }

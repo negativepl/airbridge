@@ -54,6 +54,10 @@ struct FilesBrowserView: View {
                 filesBrowserService.open(path: "")
             }
         }
+        .onChange(of: connectionService.activeDeviceId) { _, _ in
+            // Switched phones — paths differ per device, so reopen the new root.
+            if connectionService.isConnected { filesBrowserService.open(path: "") }
+        }
         .onChange(of: filesBrowserService.searchQuery) { _, q in
             if q.isEmpty && !searchText.isEmpty { searchText = "" }
         }

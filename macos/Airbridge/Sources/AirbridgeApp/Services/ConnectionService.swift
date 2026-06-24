@@ -53,6 +53,25 @@ final class ConnectionService {
     /// back to — the most recently added connection.
     var primaryDevice: ConnectedDevice? { connectedDevices.last }
 
+    /// The phone that device-specific actions target (Gallery, Files, SMS, file
+    /// send, ring). With multiple phones connected, the user picks it; with one,
+    /// it is simply that one.
+    private(set) var activeDeviceId: String?
+    var activeDevice: ConnectedDevice? {
+        connectedDevices.first { $0.connectionId == activeDeviceId } ?? primaryDevice
+    }
+
+    func setActiveDevice(_ connectionId: String) {
+        guard connectedDevices.contains(where: { $0.connectionId == connectionId }) else { return }
+        activeDeviceId = connectionId
+    }
+
+    /// Send a message only to the active device. No-op when none is connected.
+    func sendToActive(_ message: Message) async throws {
+        guard let id = activeDevice?.connectionId else { return }
+        try await server.sendTo(message, connectionId: id)
+    }
+
     var isConnected: Bool { !connectedDevices.isEmpty }
     var connectedDeviceName: String { primaryDevice?.name ?? "" }
     var deviceInfo: DeviceInfo? { primaryDevice?.deviceInfo }
@@ -273,6 +292,7 @@ final class ConnectionService {
     private func resetConnectionState() {
         connectedDevices.removeAll()
         refreshAllowedUploadHosts()
+        ensureActiveDeviceValid()
     }
 
     // MARK: - Broadcasting
@@ -311,7 +331,7 @@ final class ConnectionService {
 
     func ringPhone() {
         isRinging = true
-        Task { try? await server.broadcast(.phoneRing) }
+        Task { try? await sendToActive(.phoneRing) }
         // Telefon sam wycisza się po 30 s — zsynchronizuj przycisk nawet gdyby
         // potwierdzenie PhoneRingStop nie dotarło.
         ringResetTask?.cancel()
@@ -325,7 +345,7 @@ final class ConnectionService {
     func stopRingPhone() {
         isRinging = false
         ringResetTask?.cancel()
-        Task { try? await server.broadcast(.phoneRingStop) }
+        Task { try? await sendToActive(.phoneRingStop) }
     }
 
     /// Telefon zgłosił, że dzwonek ucichł (przycisk na telefonie / auto-stop).
@@ -347,11 +367,19 @@ final class ConnectionService {
                 name: name, clientIP: clientIP, deviceInfo: nil, wallpaper: nil))
         }
         refreshAllowedUploadHosts()
+        ensureActiveDeviceValid()
     }
 
     /// Syncs the set of IPs allowed to upload to the currently connected devices.
     private func refreshAllowedUploadHosts() {
         allowedUploadSender.hosts = Set(connectedDevices.compactMap { $0.clientIP })
+    }
+
+    /// Keeps `activeDeviceId` pointing at a live device: defaults to the most
+    /// recent connection when unset, and re-targets when the active one drops.
+    private func ensureActiveDeviceValid() {
+        if let id = activeDeviceId, connectedDevices.contains(where: { $0.connectionId == id }) { return }
+        activeDeviceId = connectedDevices.last?.connectionId
     }
 
     /// Bumped on every successful pairing so the pairing UI can advance to the
@@ -532,6 +560,7 @@ final class ConnectionService {
                 // leaving any other connected phones intact.
                 self.connectedDevices.removeAll { $0.connectionId == endpoint }
                 self.refreshAllowedUploadHosts()
+                self.ensureActiveDeviceValid()
                 Diag.log("Connection", "client disconnected: \(endpoint) — remaining=\(self.connectedDevices.count)")
                 if self.connectedDevices.isEmpty {
                     // Dismiss any incoming-file popup orphaned by the dropped link.

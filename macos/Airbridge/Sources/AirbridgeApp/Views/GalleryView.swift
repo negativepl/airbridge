@@ -38,6 +38,10 @@ struct GalleryView: View {
                 galleryService.loadPhotos()
             }
         }
+        .onChange(of: connectionService.activeDeviceId) { _, _ in
+            // Switched to a different phone — reload its gallery.
+            if connectionService.isConnected { galleryService.clearAndReload() }
+        }
         .sheet(item: $selectedPhoto) { photo in
             PhotoDetailView(photo: photo, galleryService: galleryService, onClose: { selectedPhoto = nil })
         }

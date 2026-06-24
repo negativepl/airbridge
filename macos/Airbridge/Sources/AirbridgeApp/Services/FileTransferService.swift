@@ -249,9 +249,11 @@ final class FileTransferService: MessageHandler {
                 onComplete: onComplete
             )
 
-            // 3. Send offer
+            // 3. Send offer to the active device only (accept/reject below stay
+            //    broadcast — those answer an offer a phone sent us, and must reach
+            //    that phone regardless of which one is active).
             let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize, destinationDir: destinationDir)
-            try? await connectionService.broadcast(offer)
+            try? await connectionService.sendToActive(offer)
 
             // 4. Wait for accept/reject (non-blocking for MainActor)
             var accepted = false

@@ -34,7 +34,7 @@ final class GalleryService: MessageHandler {
         }
         let message = Message.galleryRequest(page: page, pageSize: pageSize)
         Task {
-            try? await connectionService.broadcast(message)
+            try? await connectionService.sendToActive(message)
         }
     }
 
@@ -64,7 +64,7 @@ final class GalleryService: MessageHandler {
         requestedThumbnails.insert(photoId)
         let message = Message.galleryThumbnailRequest(photoId: photoId)
         Task {
-            try? await connectionService.broadcast(message)
+            try? await connectionService.sendToActive(message)
         }
     }
 
@@ -77,7 +77,7 @@ final class GalleryService: MessageHandler {
         let message = Message.galleryPreviewRequest(photoId: photoId, maxSize: maxSize)
         NSLog("[Gallery] requesting preview for \(photoId) maxSize=\(maxSize)")
         Task {
-            try? await connectionService.broadcast(message)
+            try? await connectionService.sendToActive(message)
         }
     }
 
@@ -85,7 +85,7 @@ final class GalleryService: MessageHandler {
         guard let connectionService else { return }
         let message = Message.galleryDownloadRequest(photoId: photoId)
         Task {
-            try? await connectionService.broadcast(message)
+            try? await connectionService.sendToActive(message)
         }
     }
 

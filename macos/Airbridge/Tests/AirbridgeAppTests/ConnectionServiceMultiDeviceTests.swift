@@ -30,6 +30,31 @@ final class ConnectionServiceMultiDeviceTests: XCTestCase {
         XCTAssertEqual(svc.connectedDevices.first?.name, "Oppo Find X8")
     }
 
+    func testActiveDeviceDefaultsToFirstAndHoldsSelection() {
+        let svc = ConnectionService()
+        XCTAssertNil(svc.activeDevice)
+
+        svc.upsertDevice(connectionId: "1.1.1.1:5", publicKey: "kA", name: "Oppo")
+        // First connection becomes active automatically.
+        XCTAssertEqual(svc.activeDevice?.connectionId, "1.1.1.1:5")
+
+        svc.upsertDevice(connectionId: "1.1.1.2:5", publicKey: "kB", name: "Samsung")
+        // A second connection does NOT steal the active selection.
+        XCTAssertEqual(svc.activeDevice?.connectionId, "1.1.1.1:5")
+    }
+
+    func testSetActiveDeviceSelectsAndIgnoresUnknown() {
+        let svc = ConnectionService()
+        svc.upsertDevice(connectionId: "1.1.1.1:5", publicKey: "kA", name: "Oppo")
+        svc.upsertDevice(connectionId: "1.1.1.2:5", publicKey: "kB", name: "Samsung")
+
+        svc.setActiveDevice("1.1.1.2:5")
+        XCTAssertEqual(svc.activeDevice?.name, "Samsung")
+
+        svc.setActiveDevice("9.9.9.9:9") // not connected — ignored
+        XCTAssertEqual(svc.activeDevice?.name, "Samsung")
+    }
+
     func testPairedSignalIncrementsOnBump() {
         let svc = ConnectionService()
         let before = svc.pairedSignal
