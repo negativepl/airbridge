@@ -184,7 +184,12 @@ else
     CHANGELOG="$(git log --oneline -10 --no-decorate "$TAG")"
 fi
 
-NOTES="$(cat <<EOF
+# Curated notes win when RELEASE_NOTES_FILE points at a readable file; otherwise
+# fall back to the auto changelog.
+if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "${RELEASE_NOTES_FILE}" ]; then
+    NOTES="$(cat "$RELEASE_NOTES_FILE")"
+else
+    NOTES="$(cat <<EOF
 ## AirBridge $TAG
 
 ### Downloads
@@ -195,10 +200,17 @@ NOTES="$(cat <<EOF
 $CHANGELOG
 EOF
 )"
+fi
+
+# A tag with a pre-release suffix (e.g. v2.7.0-beta) publishes as a GitHub
+# pre-release so it never becomes the "Latest" badge.
+PRERELEASE_FLAG=""
+[[ "$TAG" == *-* ]] && PRERELEASE_FLAG="--prerelease"
 
 gh release create "$TAG" \
     --title "AirBridge $TAG" \
     --notes "$NOTES" \
+    $PRERELEASE_FLAG \
     "$ROOT/AirBridge.dmg#AirBridge.dmg" \
     "$ROOT/AirBridge.apk#AirBridge.apk"
 
