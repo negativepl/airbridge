@@ -21,6 +21,8 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * Reverse mirror viewer: shows the Mac's screen on the phone. Display-only for
@@ -44,6 +46,8 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
 
     private var videoW = 0
     private var videoH = 0
+    /// Soft-keyboard height; the stream is fitted into the space above it.
+    private var imeHeight = 0
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -86,6 +90,14 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
                 applyAspect()
             }
         }
+        // Track the soft keyboard height so the stream can fit into the space
+        // above it instead of being covered — there is plenty of black letterbox
+        // room in portrait. Re-fit whenever the IME inset changes.
+        ViewCompat.setOnApplyWindowInsetsListener(container) { _, insets ->
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            if (ime != imeHeight) { imeHeight = ime; applyAspect() }
+            insets
+        }
         setupKeyboard()
         container.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
@@ -122,12 +134,17 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
     private fun applyAspect() {
         if (videoW <= 0 || videoH <= 0) return
         val cw = container.width
-        val ch = container.height
-        if (cw <= 0 || ch <= 0) { container.post { applyAspect() }; return }
-        val scale = minOf(cw.toFloat() / videoW, ch.toFloat() / videoH)
+        val fullH = container.height
+        if (cw <= 0 || fullH <= 0) { container.post { applyAspect() }; return }
+        // Fit into the area ABOVE the keyboard; when no keyboard, that's the full
+        // height, so this stays centered as before.
+        val usableH = (fullH - imeHeight).coerceAtLeast(1)
+        val scale = minOf(cw.toFloat() / videoW, usableH.toFloat() / videoH)
         val w = (videoW * scale).toInt()
         val h = (videoH * scale).toInt()
-        surfaceView.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.CENTER)
+        surfaceView.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.TOP or Gravity.CENTER_HORIZONTAL).also {
+            it.topMargin = ((usableH - h) / 2).coerceAtLeast(0)
+        }
     }
 
     // MARK: - Keyboard
