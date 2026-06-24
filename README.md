@@ -81,7 +81,7 @@ Browse your phone's **entire storage** from the Mac in a Finder-like view:
 
 ### Live Mac System Monitor
 
-When connected, the phone shows a **Phone Link-style card for your Mac**: the Mac's wallpaper as a hero banner with computer name, model and chip, plus **live CPU load, RAM, disk usage, and battery** (with charging / AC-power state). The Mac's Home tab mirrors this back — showing the **phone's wallpaper, model, battery, storage and RAM** in a glass hero card.
+When connected, the phone shows a **Phone Link-style card for your Mac**: the Mac's wallpaper as a hero banner with computer name, model and chip, plus **live CPU load, RAM, disk usage, and battery** (with charging / AC-power state). The Mac's Home tab mirrors this back — showing **each connected phone's wallpaper, model, battery, storage and RAM** in a glass hero card (one per device when several phones are connected).
 
 ### Clipboard Sync
 Copy text on your phone, paste on your Mac — and vice versa. Works automatically in the background. Supports plain text and HTML.
@@ -125,7 +125,7 @@ Read all your SMS conversations on your Mac. Send replies directly. Full chat bu
 No IP addresses, no manual configuration. Mac advertises itself via Bonjour/mDNS (including the mirror port in its TXT record), and Android discovers it automatically using NSD. If your devices are on the same Wi-Fi, they will find each other.
 
 ### Multi-device
-Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing is independent and uses its own key pair.
+Pair multiple phones with one Mac, or one phone with multiple Macs — each pairing is independent and uses its own key pair. **More than one phone can be connected to the Mac at the same time:** the Mac's Home tab lists every connected device, and an active-device switcher (in the window toolbar and the menu bar) chooses which phone the Gallery, Files, Messages, file sending and "ring" actions target.
 
 ### macOS System Integration
 - **Menu Bar icon** — Always-visible connection status indicator in the system menu bar with quick access to open the main window.
@@ -140,6 +140,7 @@ Pair multiple phones with one Mac, or one phone with multiple Macs. Each pairing
 - **Share Sheet integration** — Share files or photos from any app directly to AirBridge. The app appears as a share target and lets you pick which paired device to send to.
 - **Theme selection** — Choose between System, Light, or Dark theme in Settings.
 - **Onboarding wizard** — First-launch setup guides you through permissions (including All Files Access and Accessibility) and pairing with animated explanations.
+- **Home dashboard** — The main screen shows transfer statistics (files and data sent and received, with a Today / Total toggle) and a recent file-transfer feed, alongside the live Mac monitor card.
 
 ### Localization
 Both apps support **English** and **Polish**. The UI language follows your system setting.
@@ -404,7 +405,6 @@ Features we're planning to add:
 
 - **Cellular file transfer** — Send files over mobile data when devices aren't on the same Wi-Fi (relay server or direct connection via WebRTC)
 - **Granular sharing controls (macOS)** — Choose what you share with each device: clipboard, files, gallery, SMS, screen. Prevent a paired device from accessing features you don't want to expose
-- **Device picker on Send screen** — When multiple devices are paired, show a device selector on the Send tab instead of sending to all
 - **Mirror audio** — Stream the phone's audio alongside the screen
 - **Notification improvements** — Explore Samsung Live Notifications / Now Bar integration for file transfer progress on supported devices
 - **Auto-update notifications** — Both apps will check for new versions on GitHub and notify you when an update is available, with a direct link to download
