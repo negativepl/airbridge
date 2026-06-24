@@ -3,6 +3,7 @@ import Mirror
 
 struct MainWindow: View {
     @State private var selectedTab: NavigationItem = .home
+    @State private var showPairing = false
     @Environment(\.openWindow) private var openWindow
     @AppStorage("gallery.viewMode") private var galleryViewModeRaw: String = GalleryViewMode.filmstrip.rawValue
     @AppStorage("files.viewMode") private var filesViewModeRaw: String = FileViewMode.list.rawValue
@@ -90,6 +91,17 @@ struct MainWindow: View {
         // Liquid Glass scroll edge effect works on every tab without a filler
         // item here.
         .toolbar {
+            // Add a paired device — global action, always available (the QR sheet
+            // works whether or not a phone is connected). Sits next to the device
+            // switcher rather than crammed into a Settings row.
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showPairing = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help(L10n.isPL ? "Dodaj nowe urządzenie" : "Add new device")
+            }
             // Active-device switcher — drives which phone Gallery/Files/SMS/send
             // target. Trailing edge (right), shown only when more than one phone
             // is connected; with one, everything just targets it.
@@ -185,6 +197,9 @@ struct MainWindow: View {
                     .help(L10n.isPL ? "Zatrzymaj udostępnianie" : "Stop sharing")
                 }
             }
+        }
+        .sheet(isPresented: $showPairing) {
+            PairingView(pairingService: pairingService, connectionService: connectionService, isPresented: $showPairing)
         }
     }
 

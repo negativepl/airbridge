@@ -101,7 +101,7 @@ struct SettingsView: View {
                     addDeviceButton
                 }
             } else {
-                ForEach(Array(vm.pairedDevices.enumerated()), id: \.element.publicKeyBase64) { index, device in
+                ForEach(vm.pairedDevices, id: \.publicKeyBase64) { device in
                     HStack(spacing: 12) {
                         Image(systemName: "iphone")
                             .font(.ab(.title3))
@@ -114,10 +114,8 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        // "Add" sits next to the last device's "Remove".
-                        if index == vm.pairedDevices.count - 1 {
-                            addDeviceButton
-                        }
+                        // Adding a device now lives in the window toolbar (next to
+                        // the device switcher), so the row stays a clean list item.
                         Button(L10n.isPL ? "Usuń" : "Remove", role: .destructive) {
                             vm.unpairDevice(publicKey: device.publicKeyBase64)
                         }
