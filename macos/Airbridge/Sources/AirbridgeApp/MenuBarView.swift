@@ -27,13 +27,16 @@ struct MenuBarView: View {
                     .padding(.horizontal, 8)
 
                 if devices.count > 1 {
-                    // Tap a device to make it the active target (ring, send, etc.);
-                    // a checkmark marks the current one.
-                    ForEach(devices) { device in
+                    // Tap a device to make it the active target (ring, send, etc.).
+                    // The active one is bold and floated to the top.
+                    let activeId = connectionService.activeDeviceId
+                    let ordered = devices.filter { $0.connectionId == activeId }
+                        + devices.filter { $0.connectionId != activeId }
+                    ForEach(ordered) { device in
                         DeviceSelectRow(
                             name: menuDeviceName(device),
                             info: device.deviceInfo,
-                            isActive: device.connectionId == connectionService.activeDeviceId,
+                            isActive: device.connectionId == activeId,
                             onSelect: { connectionService.setActiveDevice(device.connectionId) }
                         )
                     }
@@ -128,14 +131,9 @@ private struct DeviceSelectRow: View {
                 .frame(width: 18, alignment: .center)
                 .foregroundStyle((info?.batteryCharging ?? false) ? Color.green : Color.primary)
             Text(label)
-                .font(.ab(.subheadline))
-                .foregroundStyle(.secondary)
+                .font(.ab(.subheadline, weight: isActive ? .bold : .regular))
+                .foregroundStyle(isActive ? .primary : .secondary)
             Spacer(minLength: 0)
-            if isActive {
-                Image(systemName: "checkmark")
-                    .font(.ab(.subheadline, weight: .semibold))
-                    .foregroundStyle(.tint)
-            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
