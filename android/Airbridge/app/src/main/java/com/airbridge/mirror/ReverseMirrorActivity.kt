@@ -54,7 +54,6 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
     /// rotation restart) doesn't close the activity.
     private var streamGen = 0
     private var restartOnClose = false
-    private var lastLandscape: Boolean? = null
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -119,14 +118,18 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         // we read the NEW dimensions; posting after a config change races the relayout
         // and re-fits against the stale (pre-rotation) size, leaving the image cropped.
         container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            val sizeChanged = (right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)
-            if (!sizeChanged) return@addOnLayoutChangeListener
-            val landscape = (right - left) > (bottom - top)
-            val flipped = lastLandscape != null && landscape != lastLandscape
-            lastLandscape = landscape
-            // Mode 1 reshapes the virtual display on rotation (reconnect); mode 0
-            // (and non-rotation resizes) just re-fit the existing video.
-            if (mode == 1 && flipped) restartStreamForRotation() else applyAspect()
+            val w = right - left; val h = bottom - top
+            val ow = oldRight - oldLeft; val oh = oldBottom - oldTop
+            if (w == ow && h == oh) return@addOnLayoutChangeListener   // no size change
+            // Mode 1 rebuilds the virtual display when the screen's aspect ratio
+            // changes meaningfully (rotation OR fold/unfold); mode 0 and minor
+            // resizes just re-fit the existing video. ow/oh == 0 on first layout.
+            if (mode == 1 && ow > 0 && oh > 0 &&
+                kotlin.math.abs(w.toFloat() / h - ow.toFloat() / oh) > 0.1f) {
+                restartStreamForRotation()
+            } else {
+                applyAspect()
+            }
         }
         // Track the soft keyboard height so the stream can fit into the space
         // above it instead of being covered — there is plenty of black letterbox

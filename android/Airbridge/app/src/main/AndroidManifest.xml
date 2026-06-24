@@ -127,7 +127,7 @@
             android:name=".mirror.ReverseMirrorActivity"
             android:exported="false"
             android:screenOrientation="fullSensor"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
 
         <provider
