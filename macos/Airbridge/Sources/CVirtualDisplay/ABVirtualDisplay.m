@@ -107,6 +107,18 @@
     return self;
 }
 
+- (void)invalidate {
+    // Releasing the CGVirtualDisplay removes it from the WindowServer. Do it
+    // explicitly (not just via ARC dealloc) so a hung caller can't leave the
+    // display alive.
+    _display = nil;
+    _displayID = 0;
+}
+
+- (void)dealloc {
+    [self invalidate];
+}
+
 /// Wait for the display to register, then break it out of any mirror set and
 /// select the highest-resolution (least-scaled) mode it offers.
 - (void)configureDisplay:(CGDirectDisplayID)displayID {

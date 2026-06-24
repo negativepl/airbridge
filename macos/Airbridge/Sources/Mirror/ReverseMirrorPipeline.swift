@@ -117,10 +117,14 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     }
 
     public func stop() async {
+        // Tear down the virtual display FIRST and explicitly. If capture.stop()
+        // below ever hangs, an orphaned display must not survive — it can become
+        // the main screen and steal the user's windows.
+        virtualDisplay?.invalidate()
+        virtualDisplay = nil
         await capture?.stop()
         capture = nil
         clearEncoder()
-        virtualDisplay = nil   // releasing removes the virtual display
     }
 
     /// Fit (w,h) so the long edge is at most `cap`, keeping aspect, even pixels.

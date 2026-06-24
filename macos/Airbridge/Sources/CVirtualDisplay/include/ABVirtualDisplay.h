@@ -23,6 +23,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// Diagnostic: which display mode was selected (logical + backing pixels).
 @property (nonatomic, readonly, nullable) NSString *selectedMode;
 
+/// Immediately tear down the underlying CGVirtualDisplay and remove the display.
+/// Safe to call more than once. Also invoked from dealloc, but call it
+/// explicitly so teardown never depends on ARC release timing — an orphaned
+/// virtual display can hijack the main screen.
+- (void)invalidate;
+
 @end
 
 NS_ASSUME_NONNULL_END
