@@ -788,12 +788,17 @@ final class TransferPopup {
         )
         let hostingView = NSHostingView(rootView: view)
 
-        let window = NSWindow(
+        // A non-activating panel: clicking its buttons (Accept/Reject) must NOT
+        // activate the app, otherwise the SwiftUI WindowGroup restores the main
+        // window on top. The whole flow stays inside the popup.
+        let window = NSPanel(
             contentRect: NSRect(x: x, y: y, width: width, height: height),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
+        window.isFloatingPanel = true
+        window.becomesKeyOnlyIfNeeded = true
         window.contentView = hostingView
         window.level = NSWindow.Level(Int(CGWindowLevelForKey(.popUpMenuWindow)))
         window.hasShadow = false
