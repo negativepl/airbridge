@@ -12,7 +12,7 @@ struct MenuBarView: View {
                 StatusIndicator(state: connectionService.isConnected ? .connected : .disconnected, size: 12)
                     .frame(width: 18, alignment: .center)
                 if connectionService.isConnected {
-                    Text("\(L10n.connectedToDevice) \(connectionService.connectedDeviceName)")
+                    Text(connectionHeadline)
                         .font(.ab(.subheadline))
                 } else {
                     Text(L10n.notConnected).font(.ab(.subheadline)).foregroundStyle(.secondary)
@@ -21,13 +21,25 @@ struct MenuBarView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
 
-            if connectionService.isConnected, let info = connectionService.deviceInfo {
+            let devices = connectionService.connectedDevices
+            if !devices.isEmpty {
                 Divider()
                     .padding(.horizontal, 8)
 
-                BatteryRow(percent: info.batteryPercent, charging: info.batteryCharging, chargeTimeRemainingMs: info.chargeTimeRemainingMs)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 4)
+                // One battery row per device; show the name only when more than one
+                // phone is connected, so the single-device case stays compact.
+                ForEach(devices) { device in
+                    if let info = device.deviceInfo {
+                        BatteryRow(
+                            deviceName: devices.count > 1 ? menuDeviceName(device) : nil,
+                            percent: info.batteryPercent,
+                            charging: info.batteryCharging,
+                            chargeTimeRemainingMs: info.chargeTimeRemainingMs
+                        )
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 4)
+                    }
+                }
             }
 
             Divider()
@@ -66,10 +78,27 @@ struct MenuBarView: View {
         .padding(.vertical, 6)
         .frame(width: 260)
     }
+
+    private var connectionHeadline: String {
+        let devices = connectionService.connectedDevices
+        if devices.count > 1 {
+            return L10n.isPL ? "Połączono z \(devices.count) urządzeniami" : "Connected to \(devices.count) devices"
+        }
+        let name = devices.first.map { menuDeviceName($0) } ?? connectionService.connectedDeviceName
+        return "\(L10n.connectedToDevice) \(name)"
+    }
+
+    /// Marketing name from device info ("Galaxy Z Fold7") with a fallback to the
+    /// pairing name before device_info arrives.
+    private func menuDeviceName(_ device: ConnectedDevice) -> String {
+        if let n = device.deviceInfo?.name, !n.isEmpty { return n }
+        return device.name
+    }
 }
 
 /// Wiersz baterii telefonu w rozwijanym menu paska.
 private struct BatteryRow: View {
+    var deviceName: String? = nil
     let percent: Int
     let charging: Bool
     let chargeTimeRemainingMs: Int64
@@ -88,14 +117,15 @@ private struct BatteryRow: View {
     }
 
     private var label: String {
+        let prefix = deviceName.map { "\($0) • " } ?? ""
         if charging {
             if chargeTimeRemainingMs > 0 {
                 let t = formatChargeTime(chargeTimeRemainingMs, isPL: L10n.isPL)
-                return L10n.isPL ? "Bateria \(percent)% • \(t) do pełna" : "Battery \(percent)% • \(t) to full"
+                return prefix + (L10n.isPL ? "Bateria \(percent)% • \(t) do pełna" : "Battery \(percent)% • \(t) to full")
             }
-            return L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging"
+            return prefix + (L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging")
         }
-        return L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%"
+        return prefix + (L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%")
     }
 
     private var symbol: String {

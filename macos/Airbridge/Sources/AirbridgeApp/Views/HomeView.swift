@@ -75,9 +75,21 @@ struct HomeView: View {
         return vm.deviceName
     }
 
+    private func connectionHeadline(_ vm: HomeViewModel) -> String {
+        let n = vm.connectedDevices.count
+        if n > 1 {
+            return L10n.isPL ? "Połączono z \(n) urządzeniami" : "Connected to \(n) devices"
+        }
+        return L10n.isPL ? "Połączono z \(connectedName(vm))" : "Connected to \(connectedName(vm))"
+    }
+
     private func connectedDetail(_ vm: HomeViewModel) -> String {
         var parts: [String] = []
-        if let model = vm.deviceInfo?.model, !model.isEmpty { parts.append(model) }
+        // With more than one device the per-device cards carry the model, so the
+        // header summarises with just the Mac's network address.
+        if vm.connectedDevices.count <= 1, let model = vm.deviceInfo?.model, !model.isEmpty {
+            parts.append(model)
+        }
         if let ip = vm.localIP { parts.append(ip) }
         return parts.joined(separator: " · ")
     }
@@ -91,9 +103,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Group {
                         if vm.isConnected {
-                            Text(L10n.isPL
-                                ? "Połączono z \(connectedName(vm))"
-                                : "Connected to \(connectedName(vm))")
+                            Text(connectionHeadline(vm))
                         } else if !vm.hasPairedDevices {
                             Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
                         } else if isDisconnected {
