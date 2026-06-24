@@ -194,14 +194,27 @@ struct HomeView: View {
 
     @ViewBuilder
     private func deviceCard(_ vm: HomeViewModel) -> some View {
-        let wallpaper = vm.isConnected ? connectionService.phoneWallpaper.flatMap { NSImage(data: $0) } : nil
-        if wallpaper != nil || vm.deviceInfo != nil {
+        // One card per connected phone — they stack instead of fighting over a
+        // single slot, so two devices read as a list rather than flipping.
+        VStack(spacing: 12) {
+            ForEach(vm.connectedDevices) { device in
+                singleDeviceCard(
+                    info: device.deviceInfo,
+                    wallpaper: device.wallpaper.flatMap { NSImage(data: $0) }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func singleDeviceCard(info: DeviceInfo?, wallpaper: NSImage?) -> some View {
+        if wallpaper != nil || info != nil {
             GlassSection {
                 HStack(alignment: .center, spacing: 18) {
                     if let img = wallpaper {
-                        phonePreview(img, vm: vm)
+                        phonePreview(img, info: info)
                     }
-                    if let info = vm.deviceInfo {
+                    if let info {
                         deviceInfoColumn(info)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -210,7 +223,7 @@ struct HomeView: View {
         }
     }
 
-    private func phonePreview(_ img: NSImage, vm: HomeViewModel) -> some View {
+    private func phonePreview(_ img: NSImage, info: DeviceInfo?) -> some View {
         // Fixed square tile: the wallpaper fills and is cropped to it, so the
         // card keeps its shape no matter what dimensions the phone reports.
         let side: CGFloat = 150
@@ -230,14 +243,14 @@ struct HomeView: View {
             )
             .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 1))
             .overlay(alignment: .bottom) {
-                if let info = vm.deviceInfo {
+                if let info {
                     batteryPill(info.batteryPercent, charging: info.batteryCharging)
                         .padding(.bottom, 10)
                 }
             }
             .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
-            .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryPercent)
-            .animation(.airbridgeQuick, value: vm.deviceInfo?.batteryCharging)
+            .animation(.airbridgeQuick, value: info?.batteryPercent)
+            .animation(.airbridgeQuick, value: info?.batteryCharging)
     }
 
     private func batteryPill(_ percent: Int, charging: Bool) -> some View {

@@ -27,6 +27,7 @@ final class HomeViewModel {
 
     var hasPairedDevices: Bool { !connectionService.keyManager.getPairedDevices().isEmpty }
     var deviceInfo: DeviceInfo? { connectionService.deviceInfo }
+    var connectedDevices: [ConnectedDevice] { connectionService.connectedDevices }
 
     func disconnect() { connectionService.disconnect() }
     func reconnect() { connectionService.reconnect() }

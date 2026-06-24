@@ -32,13 +32,16 @@ final class PairingViewModel {
         }
     }
 
-    func onConnectionChanged() {
-        if connectionService.isConnected && phase == 0 {
-            pairedDeviceName = connectionService.connectedDeviceName
-            phase = 1
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                self?.phase = 2
-            }
+    /// Advance to the "Paired!" state. Driven by `ConnectionService.pairedSignal`
+    /// (bumped on every successful pairing) rather than `isConnected`, so the QR
+    /// dismisses even when another device is already connected — in that case
+    /// `isConnected` stays `true` and never fires a change.
+    func onPaired() {
+        guard phase == 0 else { return }
+        pairedDeviceName = connectionService.connectedDeviceName
+        phase = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.phase = 2
         }
     }
 }

@@ -101,8 +101,8 @@ struct PairingView: View {
                 viewModel = vm
             }
         }
-        .onChange(of: connectionService.isConnected) { _, _ in
-            viewModel?.onConnectionChanged()
+        .onChange(of: connectionService.pairedSignal) { _, _ in
+            viewModel?.onPaired()
         }
     }
 }
