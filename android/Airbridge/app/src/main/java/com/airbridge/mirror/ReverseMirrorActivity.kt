@@ -48,6 +48,11 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
     private var videoH = 0
     /// Soft-keyboard height; the stream is fitted into the space above it.
     private var imeHeight = 0
+    /// Identifies the live stream so a superseded client's disconnect (during a
+    /// rotation restart) doesn't close the activity.
+    private var streamGen = 0
+    private var restartOnClose = false
+    private var lastLandscape: Boolean? = null
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -86,9 +91,14 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         // we read the NEW dimensions; posting after a config change races the relayout
         // and re-fits against the stale (pre-rotation) size, leaving the image cropped.
         container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
-                applyAspect()
-            }
+            val sizeChanged = (right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)
+            if (!sizeChanged) return@addOnLayoutChangeListener
+            val landscape = (right - left) > (bottom - top)
+            val flipped = lastLandscape != null && landscape != lastLandscape
+            lastLandscape = landscape
+            // Mode 1 reshapes the virtual display on rotation (reconnect); mode 0
+            // (and non-rotation resizes) just re-fit the existing video.
+            if (mode == 1 && flipped) restartStreamForRotation() else applyAspect()
         }
         // Track the soft keyboard height so the stream can fit into the space
         // above it instead of being covered — there is plenty of black letterbox
@@ -106,9 +116,12 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
     }
 
-    override fun surfaceCreated(holder: SurfaceHolder) {
+    override fun surfaceCreated(holder: SurfaceHolder) { startStream() }
+
+    private fun startStream() {
+        val gen = ++streamGen
         val dec = ScreenDecoder(
-            surface = holder.surface,
+            surface = surfaceView.holder.surface,
             onVideoSize = { w, h -> runOnUiThread { videoW = w; videoH = h; applyAspect() } }
         )
         decoder = dec
@@ -119,8 +132,33 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
             onConfig = { sps, pps -> dec.onConfig(sps, pps) },
             onConfigHEVC = { vps, sps, pps -> dec.onConfigHEVC(vps, sps, pps) },
             onFrame = { annexB, pts -> dec.onFrame(annexB, pts) },
-            onDisconnect = { runOnUiThread { finish() } }
+            onDisconnect = { runOnUiThread { onClientGone(gen) } }
         ).also { it.connect() }
+    }
+
+    private fun onClientGone(gen: Int) {
+        if (gen != streamGen) return            // superseded client (rotation restart) — ignore
+        if (restartOnClose) {
+            restartOnClose = false
+            decoder?.stop(); decoder = null
+            startStream()                        // reconnect with the new dimensions
+        } else {
+            finish()
+        }
+    }
+
+    /**
+     * Mode 1 (virtual second display): on rotation the Mac must rebuild the
+     * virtual screen in the new orientation (it can't resize in place).
+     * Reconnect with the new dimensions — but only AFTER the old connection is
+     * fully closed, because the Mac ignores a new hello while a pipeline still
+     * exists, and tears the old display down on disconnect.
+     */
+    private fun restartStreamForRotation() {
+        val c = client ?: return
+        client = null
+        restartOnClose = true
+        c.close()   // → onClientGone(currentGen) → startStream()
     }
 
     @Suppress("DEPRECATION")
