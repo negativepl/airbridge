@@ -60,4 +60,15 @@ final class PairingService {
               keyData.count >= 16 else { return nil }
         return keyData.prefix(16)
     }
+
+    /// A mirror hello token is valid when its 16 bytes match the public-key
+    /// prefix of ANY paired device — so any connected phone (not just the first)
+    /// can open the mirror with its own key.
+    public func isValidMirrorToken(_ token: Data) -> Bool {
+        guard token.count == 16 else { return false }
+        return pairedDevices.contains { device in
+            guard let key = Data(base64Encoded: device.publicKeyBase64), key.count >= 16 else { return false }
+            return key.prefix(16) == token
+        }
+    }
 }

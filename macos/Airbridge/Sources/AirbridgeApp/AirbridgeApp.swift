@@ -52,7 +52,7 @@ struct AirbridgeApp: App {
         let notifications = NotificationService()
         let hotkey = GlobalHotkeyService()
 
-        let mirror = MirrorService(pairingTokenProvider: { [weak pairing] in pairing?.currentTokenData() })
+        let mirror = MirrorService(mirrorTokenValidator: { [weak pairing] token in pairing?.isValidMirrorToken(token) ?? false })
 
         clipboard.configure(connectionService: connection)
         fileTransfer.configure(connectionService: connection)

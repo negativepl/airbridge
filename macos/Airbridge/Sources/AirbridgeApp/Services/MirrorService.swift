@@ -158,7 +158,10 @@ public final class MirrorService {
     public var tlsIdentity: SecIdentity?
 
     private let server: WebSocketServer
-    private var pairingTokenProvider: () -> Data?
+    /// Returns true if the 16-byte hello token matches a paired device (its
+    /// public-key prefix). Checks ALL paired devices, so any connected phone —
+    /// not just the first — can open the mirror.
+    private var mirrorTokenValidator: (Data) -> Bool
     private var decoder: VideoDecoder?
     // Reverse mirror (Mac -> phone)
     private var reversePipeline: ReverseMirrorPipeline?
@@ -171,8 +174,8 @@ public final class MirrorService {
     private var fpsWindowStartedAt = Date()
     private var fpsFrameCount = 0
 
-    public init(port: UInt16 = 8767, pairingTokenProvider: @escaping () -> Data? = { nil }) {
-        self.pairingTokenProvider = pairingTokenProvider
+    public init(port: UInt16 = 8767, mirrorTokenValidator: @escaping (Data) -> Bool = { _ in false }) {
+        self.mirrorTokenValidator = mirrorTokenValidator
         self.server = WebSocketServer(port: port)
 
         // Load per-mode quality, migrating legacy single-setting keys into the
@@ -193,8 +196,8 @@ public final class MirrorService {
         self.quality = loadedQuality
     }
 
-    public func setPairingTokenProvider(_ provider: @escaping () -> Data?) {
-        self.pairingTokenProvider = provider
+    public func setMirrorTokenValidator(_ validator: @escaping (Data) -> Bool) {
+        self.mirrorTokenValidator = validator
     }
 
     public func start() async throws {
@@ -264,7 +267,7 @@ public final class MirrorService {
             switch msg {
             case let .hello(token, screenWidth, screenHeight, _):
                 MirrorDebugLog.write("received HELLO tokenBytes=\(token.count)")
-                guard let expected = pairingTokenProvider(), token == expected else {
+                guard mirrorTokenValidator(token) else {
                     MirrorDebugLog.write("HELLO rejected")
                     Task { await server.disconnectAllClients() }
                     return
@@ -342,7 +345,7 @@ public final class MirrorService {
 
             case let .reverseHello(token, w, h, mode):
                 MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
-                guard let expected = pairingTokenProvider(), token == expected else {
+                guard mirrorTokenValidator(token) else {
                     MirrorDebugLog.write("REVERSE_HELLO rejected")
                     Task { await server.disconnectAllClients() }
                     return

@@ -53,8 +53,14 @@ class ReverseMirrorClient(
                         }
                     }
             }
-            override fun onClosed(ws: WebSocket, code: Int, reason: String) { onDisconnect() }
-            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) { onDisconnect() }
+            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                android.util.Log.w("ReverseMirror", "onClosed code=$code reason=$reason")
+                onDisconnect()
+            }
+            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                android.util.Log.w("ReverseMirror", "onFailure: ${t.javaClass.simpleName}: ${t.message} resp=${response?.code}")
+                onDisconnect()
+            }
         })
     }
 

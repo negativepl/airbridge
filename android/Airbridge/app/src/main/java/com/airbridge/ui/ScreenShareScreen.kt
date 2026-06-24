@@ -1,8 +1,6 @@
 package com.airbridge.ui
 
-import android.content.Context
 import android.content.Intent
-import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,8 +45,12 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
     val isConnected by AirbridgeService.isConnected.collectAsState()
     val host by AirbridgeService.connectedHost.collectAsState()
     val mirrorPort by AirbridgeService.mirrorPortFlow.collectAsState()
-    val token = remember(isConnected) {
-        context.getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE).getString("mirror_token", null)
+    // The mirror hello token is this phone's own Ed25519 public-key prefix (16
+    // bytes) — that's what the Mac validates against the paired device. (The old
+    // `mirror_token` pref was the 24-byte pairing token, which overflowed the
+    // 16-byte hello buffer and never matched.)
+    val token = remember {
+        runCatching { com.airbridge.security.KeyManager(context).getRawPublicKeyBytes().copyOf(16) }.getOrNull()
     }
     val ready = isConnected && host != null && mirrorPort != null && token != null
 
@@ -60,7 +62,7 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(ReverseMirrorActivity.EXTRA_HOST, h)
             putExtra(ReverseMirrorActivity.EXTRA_PORT, p)
-            putExtra(ReverseMirrorActivity.EXTRA_TOKEN, Base64.decode(t, Base64.NO_WRAP))
+            putExtra(ReverseMirrorActivity.EXTRA_TOKEN, t)
             putExtra(ReverseMirrorActivity.EXTRA_MODE, mode)
             putExtra(ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, AirbridgeService.certFingerprintInUse())
         }
