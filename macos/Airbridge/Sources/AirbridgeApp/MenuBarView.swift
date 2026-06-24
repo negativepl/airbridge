@@ -14,6 +14,7 @@ struct MenuBarView: View {
                 if connectionService.isConnected {
                     Text(connectionHeadline)
                         .font(.ab(.subheadline))
+                        .lineLimit(1)
                 } else {
                     Text(L10n.notConnected).font(.ab(.subheadline)).foregroundStyle(.secondary)
                 }
@@ -85,7 +86,10 @@ struct MenuBarView: View {
             }
         }
         .padding(.vertical, 6)
-        .frame(width: 320)
+        // Size to content (narrow for short names, wide for long ones) instead of
+        // a fixed width, clamped so it is never cramped nor absurdly wide.
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(minWidth: 240, maxWidth: 420)
     }
 
     private var connectionHeadline: String {
@@ -133,6 +137,7 @@ private struct DeviceSelectRow: View {
             Text(label)
                 .font(.ab(.subheadline, weight: isActive ? .bold : .regular))
                 .foregroundStyle(isActive ? .primary : .secondary)
+                .lineLimit(1)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
@@ -181,6 +186,7 @@ private struct BatteryRow: View {
             Text(label)
                 .font(.ab(.subheadline))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             Spacer(minLength: 0)
         }
     }
