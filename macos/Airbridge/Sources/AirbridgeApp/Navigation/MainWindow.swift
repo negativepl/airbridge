@@ -91,10 +91,10 @@ struct MainWindow: View {
         // item here.
         .toolbar {
             // Active-device switcher — drives which phone Gallery/Files/SMS/send
-            // target. Shown only when more than one phone is connected; with one,
-            // everything just targets it.
+            // target. Trailing edge (right), shown only when more than one phone
+            // is connected; with one, everything just targets it.
             if connectionService.connectedDevices.count > 1 {
-                ToolbarItem(placement: .navigation) {
+                ToolbarItem(placement: .primaryAction) {
                     Picker(selection: Binding(
                         get: { connectionService.activeDeviceId ?? "" },
                         set: { connectionService.setActiveDevice($0) }
@@ -108,6 +108,7 @@ struct MainWindow: View {
                     .pickerStyle(.menu)
                     .help(L10n.isPL ? "Aktywne urządzenie dla galerii, plików, SMS i wysyłki" : "Active device for gallery, files, SMS and sending")
                 }
+                ToolbarSpacer(.fixed)
             }
             if selectedTab == .gallery {
                 if !galleryService.photos.isEmpty {

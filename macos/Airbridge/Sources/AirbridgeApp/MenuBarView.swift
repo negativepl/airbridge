@@ -76,7 +76,7 @@ struct MenuBarView: View {
             }
         }
         .padding(.vertical, 6)
-        .frame(width: 260)
+        .frame(width: 320)
     }
 
     private var connectionHeadline: String {
@@ -117,15 +117,21 @@ private struct BatteryRow: View {
     }
 
     private var label: String {
-        let prefix = deviceName.map { "\($0) • " } ?? ""
+        // Multi-device rows are prefixed with the (long) device name, so use a
+        // compact battery form there — "Name • 95%" — and drop the "Battery" word
+        // and the charge-time detail that would otherwise truncate.
+        if let deviceName {
+            let charge = charging ? (L10n.isPL ? " • ładowanie" : " • charging") : ""
+            return "\(deviceName) • \(percent)%\(charge)"
+        }
         if charging {
             if chargeTimeRemainingMs > 0 {
                 let t = formatChargeTime(chargeTimeRemainingMs, isPL: L10n.isPL)
-                return prefix + (L10n.isPL ? "Bateria \(percent)% • \(t) do pełna" : "Battery \(percent)% • \(t) to full")
+                return L10n.isPL ? "Bateria \(percent)% • \(t) do pełna" : "Battery \(percent)% • \(t) to full"
             }
-            return prefix + (L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging")
+            return L10n.isPL ? "Bateria \(percent)% • ładowanie" : "Battery \(percent)% • charging"
         }
-        return prefix + (L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%")
+        return L10n.isPL ? "Bateria \(percent)%" : "Battery \(percent)%"
     }
 
     private var symbol: String {
