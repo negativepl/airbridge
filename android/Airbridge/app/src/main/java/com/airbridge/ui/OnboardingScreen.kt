@@ -7,12 +7,13 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,13 +30,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.graphics.shapes.RoundedPolygon
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -51,7 +52,9 @@ import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
@@ -67,10 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
@@ -87,6 +87,15 @@ import com.airbridge.R
 import kotlinx.coroutines.launch
 
 private val PillShape = RoundedCornerShape(50)
+
+// "Next" page change: emphasized-easing tween, NOT a spring — a spring overshoots
+// (bounces) at the end, which reads as broken next to a standard app screen
+// transition. Google apps don't bounce between screens; this curve accelerates
+// then settles smoothly with no overshoot.
+private val PageScrollSpec = tween<Float>(
+    durationMillis = 400,
+    easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -199,7 +208,10 @@ fun OnboardingScreen(
                     FilledTonalButton(
                         onClick = {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                pagerState.animateScrollToPage(
+                                    pagerState.currentPage + 1,
+                                    animationSpec = PageScrollSpec
+                                )
                             }
                         },
                         modifier = Modifier
@@ -230,10 +242,12 @@ private fun OnboardingPage(page: Int) {
 
 @Composable
 private fun WelcomePage() {
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -277,24 +291,26 @@ private fun WelcomePage() {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        FeatureRow(icon = Icons.Rounded.ContentPaste, text = stringResource(R.string.onboarding_feature_clipboard))
+        FeatureRow(icon = Icons.Rounded.ContentPaste, text = stringResource(R.string.onboarding_feature_clipboard), shape = MaterialShapes.Cookie9Sided)
         Spacer(modifier = Modifier.height(16.dp))
-        FeatureRow(icon = Icons.AutoMirrored.Rounded.InsertDriveFile, text = stringResource(R.string.onboarding_feature_files))
+        FeatureRow(icon = Icons.AutoMirrored.Rounded.InsertDriveFile, text = stringResource(R.string.onboarding_feature_files), shape = MaterialShapes.Clover4Leaf)
         Spacer(modifier = Modifier.height(16.dp))
-        FeatureRow(icon = Icons.AutoMirrored.Rounded.ScreenShare, text = stringResource(R.string.onboarding_feature_mirror))
+        FeatureRow(icon = Icons.AutoMirrored.Rounded.ScreenShare, text = stringResource(R.string.onboarding_feature_mirror), shape = MaterialShapes.Sunny)
         Spacer(modifier = Modifier.height(16.dp))
-        FeatureRow(icon = Icons.Rounded.Notifications, text = stringResource(R.string.onboarding_feature_notifications))
+        FeatureRow(icon = Icons.Rounded.Notifications, text = stringResource(R.string.onboarding_feature_notifications), shape = MaterialShapes.Flower)
         Spacer(modifier = Modifier.height(16.dp))
-        FeatureRow(icon = Icons.Rounded.AutoAwesome, text = stringResource(R.string.onboarding_feature_more))
+        FeatureRow(icon = Icons.Rounded.AutoAwesome, text = stringResource(R.string.onboarding_feature_more), shape = MaterialShapes.Gem)
     }
 }
 
 @Composable
 private fun HowItWorksPage() {
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -322,15 +338,15 @@ private fun HowItWorksPage() {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        NumberedRow(number = "1", text = stringResource(R.string.onboarding_how_wifi))
+        NumberedRow(number = "1", text = stringResource(R.string.onboarding_how_wifi), shape = MaterialShapes.Sunny)
         Spacer(modifier = Modifier.height(16.dp))
-        NumberedRow(number = "2", text = stringResource(R.string.onboarding_how_auto))
+        NumberedRow(number = "2", text = stringResource(R.string.onboarding_how_auto), shape = MaterialShapes.Cookie6Sided)
         Spacer(modifier = Modifier.height(16.dp))
-        NumberedRow(number = "3", text = stringResource(R.string.onboarding_how_local))
+        NumberedRow(number = "3", text = stringResource(R.string.onboarding_how_local), shape = MaterialShapes.Clover4Leaf)
         Spacer(modifier = Modifier.height(16.dp))
-        NumberedRow(number = "4", text = stringResource(R.string.onboarding_how_privacy))
+        NumberedRow(number = "4", text = stringResource(R.string.onboarding_how_privacy), shape = MaterialShapes.Pentagon)
         Spacer(modifier = Modifier.height(16.dp))
-        NumberedRow(number = "5", text = stringResource(R.string.onboarding_how_pairing))
+        NumberedRow(number = "5", text = stringResource(R.string.onboarding_how_pairing), shape = MaterialShapes.Flower)
     }
 }
 
@@ -389,10 +405,12 @@ private fun PermissionsPage() {
 
     val allGranted = notificationsGranted && smsGranted && photosGranted && contactsGranted && hasFilesGrant
 
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -568,48 +586,83 @@ private fun PermissionRow(
     granted: Boolean,
     onRequest: () -> Unit
 ) {
-    ListItem(
-        leadingContent = {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = if (granted) MaterialTheme.colorScheme.success else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        headlineContent = { Text(description) },
-        supportingContent = if (why.isNotEmpty()) {
-            { Text(why) }
-        } else null,
-        trailingContent = {
-            if (granted) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.success,
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                FilledTonalButton(onClick = onRequest) {
-                    Text(stringResource(R.string.onboarding_perm_allow_btn))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(MaterialShapes.Cookie7Sided.toShape())
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                // Title + reason take the full row width — both the action and the
+                // granted check sit on the row below, so nothing squeezes the text.
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        description,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (why.isNotEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            why,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
-        },
-        colors = ListItemDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-    )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (granted) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.success,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.onboarding_perm_granted_short),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.success
+                    )
+                } else {
+                    FilledTonalButton(onClick = onRequest) {
+                        Text(stringResource(R.string.onboarding_perm_allow_btn))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun ScanPage() {
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -638,7 +691,7 @@ private fun ScanPage() {
 }
 
 @Composable
-private fun FeatureRow(icon: ImageVector, text: String) {
+private fun FeatureRow(icon: ImageVector, text: String, shape: RoundedPolygon) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -646,7 +699,7 @@ private fun FeatureRow(icon: ImageVector, text: String) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(CircleShape)
+                .clip(shape.toShape())
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
@@ -667,7 +720,7 @@ private fun FeatureRow(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun NumberedRow(number: String, text: String) {
+private fun NumberedRow(number: String, text: String, shape: RoundedPolygon) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
@@ -675,7 +728,7 @@ private fun NumberedRow(number: String, text: String) {
         Box(
             modifier = Modifier
                 .size(32.dp)
-                .clip(CircleShape)
+                .clip(shape.toShape())
                 .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
@@ -698,72 +751,37 @@ private fun NumberedRow(number: String, text: String) {
 
 @Composable
 private fun WifiSymbol() {
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-
     Box(
         modifier = Modifier
             .size(140.dp)
             .clip(MaterialShapes.Cookie9Sided.toShape())
-            .background(primaryContainer),
+            .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(64.dp)) {
-            val cx = size.width / 2f
-            val bottom = size.height * 0.78f
-            val strokeW = 5f
-
-            // Draw three arcs from bottom center
-            for (i in 0..2) {
-                val radius = 14f + i * 16f
-                drawArc(
-                    color = primary,
-                    startAngle = 225f,
-                    sweepAngle = 90f,
-                    useCenter = false,
-                    topLeft = Offset(cx - radius, bottom - radius * 2 + radius * 0.3f),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeW, cap = StrokeCap.Round)
-                )
-            }
-            // Dot at the bottom
-            drawCircle(
-                color = primary,
-                radius = 4f,
-                center = Offset(cx, bottom)
-            )
-        }
+        Icon(
+            imageVector = Icons.Rounded.Wifi,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(64.dp)
+        )
     }
 }
 
 @Composable
 private fun QrSymbol() {
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-
     Box(
         modifier = Modifier
             .size(140.dp)
             .clip(MaterialShapes.Sunny.toShape())
-            .background(primaryContainer),
+            .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(64.dp)) {
-            val w = size.width
-            val h = size.height
-            val strokeW = 5f
-
-            // QR code corner brackets
-            drawLine(primary, Offset(w * 0.1f, w * 0.1f), Offset(w * 0.35f, w * 0.1f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.1f, w * 0.1f), Offset(w * 0.1f, w * 0.35f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.65f, w * 0.1f), Offset(w * 0.9f, w * 0.1f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.9f, w * 0.1f), Offset(w * 0.9f, w * 0.35f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.1f, h * 0.65f), Offset(w * 0.1f, h * 0.9f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.1f, h * 0.9f), Offset(w * 0.35f, h * 0.9f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.65f, h * 0.9f), Offset(w * 0.9f, h * 0.9f), strokeW, StrokeCap.Round)
-            drawLine(primary, Offset(w * 0.9f, h * 0.65f), Offset(w * 0.9f, h * 0.9f), strokeW, StrokeCap.Round)
-            drawCircle(primary, radius = w * 0.06f, center = Offset(w * 0.5f, h * 0.5f))
-        }
+        Icon(
+            imageVector = Icons.Rounded.QrCodeScanner,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(64.dp)
+        )
     }
 }
 

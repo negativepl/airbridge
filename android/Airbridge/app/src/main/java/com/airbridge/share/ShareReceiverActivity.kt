@@ -66,6 +66,7 @@ import com.airbridge.security.PairedDevice
 import com.airbridge.security.PairedDeviceStore
 import com.airbridge.service.AirbridgeService
 import com.airbridge.ui.AirbridgeTheme
+import com.airbridge.ui.ScrollLimitHaptics
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.collectAsState
 
@@ -178,11 +179,13 @@ class ShareReceiverActivity : ComponentActivity() {
                     },
                     containerColor = MaterialTheme.colorScheme.surface
                 ) { padding ->
+                    val scrollState = rememberScrollState()
+                    ScrollLimitHaptics(scrollState)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState)
                             .padding(horizontal = 24.dp, vertical = 8.dp)
                     ) {
                         SharePreview(parsed)

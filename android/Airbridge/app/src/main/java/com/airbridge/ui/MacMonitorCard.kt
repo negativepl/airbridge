@@ -4,7 +4,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LinkOff
@@ -30,7 +29,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -131,6 +129,22 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
                     Text("${info.batteryPercent}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
                 }
             }
+            // Disconnect — woven into the wallpaper bottom-right like the battery and
+            // power-source pills, so it needs no dedicated row below the bars.
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable(onClick = onDisconnect)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.LinkOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(5.dp))
+                Text(stringResource(R.string.disconnect), style = MaterialTheme.typography.labelLarge, color = Color.White)
+            }
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
@@ -139,16 +153,6 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
             barRow("RAM", "${gb(info.usedRamBytes)} / ${gb(info.totalRamBytes)}", frac(info.usedRamBytes, info.totalRamBytes))
             Spacer(Modifier.size(14.dp))
             barRow(stringResource(R.string.mac_disk), "${gb(info.totalStorageBytes - info.freeStorageBytes)} / ${gb(info.totalStorageBytes)}", frac(info.totalStorageBytes - info.freeStorageBytes, info.totalStorageBytes))
-
-            Spacer(Modifier.size(18.dp))
-            FilledTonalButton(
-                onClick = onDisconnect,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
-            ) {
-                Icon(Icons.Rounded.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.disconnect), style = MaterialTheme.typography.labelLarge)
-            }
         }
     }
 }

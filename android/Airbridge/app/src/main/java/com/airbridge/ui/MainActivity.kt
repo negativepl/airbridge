@@ -14,6 +14,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -34,8 +36,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
+import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.FileUpload
@@ -43,7 +45,6 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Photo
-import androidx.compose.material.icons.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -70,6 +71,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -81,18 +83,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.airbridge.R
 import java.util.Locale
 import kotlinx.coroutines.launch
+
+// Settings/About slide in with an emphasized-easing tween — NOT a spring, which
+// overshoots (the "bounce" the onboarding pager also had). Keeps the whole app's
+// screen transitions consistent and bounce-free.
+private val ScreenSlideEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+private val ScreenEnterSpec = tween<IntOffset>(durationMillis = 350, easing = ScreenSlideEasing)
+private val ScreenExitSpec = tween<IntOffset>(durationMillis = 250, easing = ScreenSlideEasing)
 
 class MainActivity : ComponentActivity() {
 
@@ -151,7 +163,7 @@ class MainActivity : ComponentActivity() {
                     // przeniesione do górnego paska.
                     val navItems = listOf(
                         NavItem(R.string.nav_home, Icons.Rounded.Home),
-                        NavItem(R.string.nav_screen_sharing, Icons.Rounded.ScreenShare)
+                        NavItem(R.string.nav_screen_sharing, Icons.AutoMirrored.Rounded.ScreenShare)
                     )
                     // Tytuł w górnym pasku = nazwa bieżącej strony pagera (2 strony).
                     val pageTitles = listOf(
@@ -175,6 +187,20 @@ class MainActivity : ComponentActivity() {
                     val context = LocalContext.current
                     val haptic = LocalHapticFeedback.current
 
+                    // Measure the FAB and the nav dock in window coordinates so the
+                    // home content can reserve a bottom clearance that leaves the
+                    // SAME gap above the FAB as the FAB leaves above the dock — by
+                    // construction, regardless of FAB size, insets or screen.
+                    val density = LocalDensity.current
+                    var fabTopPx by remember { mutableFloatStateOf(0f) }
+                    var fabBottomPx by remember { mutableFloatStateOf(0f) }
+                    var dockTopPx by remember { mutableFloatStateOf(0f) }
+                    val fabClearance = if (dockTopPx > 0f && fabTopPx > 0f) {
+                        with(density) {
+                            ((dockTopPx - fabTopPx) + (dockTopPx - fabBottomPx)).coerceAtLeast(0f).toDp()
+                        }
+                    } else 88.dp
+
                     // Pickers — store URI for confirmation instead of sending immediately
                     val filePickerLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
@@ -193,6 +219,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // Static top bar — no collapse. The bar would otherwise be shared
+                    // across both pager pages, and a bar collapsed on Home looked broken
+                    // on the short Screen page (and jumped when resetting). A fixed bar is
+                    // cleaner for a two-tab pager.
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         topBar = {
@@ -238,7 +268,10 @@ class MainActivity : ComponentActivity() {
                             // it would blend in; lift it one step to surfaceContainerHigh so
                             // the dock reads as a distinct bar above the content.
                             NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.onGloballyPositioned {
+                                    dockTopPx = it.boundsInWindow().top
+                                }
                             ) {
                                 navItems.forEachIndexed { index, item ->
                                     NavigationBarItem(
@@ -269,7 +302,16 @@ class MainActivity : ComponentActivity() {
                                     button = {
                                         ToggleFloatingActionButton(
                                             checked = fabMenuExpanded,
-                                            onCheckedChange = { fabMenuExpanded = it }
+                                            onCheckedChange = { fabMenuExpanded = it },
+                                            modifier = Modifier.onGloballyPositioned {
+                                                val b = it.boundsInWindow()
+                                                // Only trust the collapsed bounds; the FAB grows
+                                                // while the menu is open.
+                                                if (!fabMenuExpanded) {
+                                                    fabTopPx = b.top
+                                                    fabBottomPx = b.bottom
+                                                }
+                                            }
                                         ) {
                                             val showingClose by remember {
                                                 derivedStateOf { checkedProgress > 0.5f }
@@ -333,8 +375,8 @@ class MainActivity : ComponentActivity() {
                             beyondViewportPageCount = 1,
                         ) { page ->
                             when (page) {
-                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true })
-                                1 -> ScreenShareScreen()
+                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true }, bottomClearance = fabClearance)
+                                1 -> ScreenShareScreen(bottomClearance = fabClearance)
                             }
                         }
                     }
@@ -344,99 +386,45 @@ class MainActivity : ComponentActivity() {
                     AnimatedVisibility(
                         visible = showSettings,
                         enter = slideInHorizontally(
-                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            animationSpec = ScreenEnterSpec,
                             initialOffsetX = { it }
                         ),
                         exit = slideOutHorizontally(
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            animationSpec = ScreenExitSpec,
                             targetOffsetX = { it }
                         )
                     ) {
-                        BackHandler { showSettings = false }
-                        // exitUntilCollapsed: the app bar slides up off-screen with the
-                        // content as you scroll up and only comes back once you scroll all
-                        // the way to the top — it doesn't pop back mid-list like enterAlways.
-                        val settingsScrollBehavior =
-                            androidx.compose.material3.TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-                        Scaffold(
-                            modifier = Modifier.nestedScroll(settingsScrollBehavior.nestedScrollConnection),
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            topBar = {
-                                key(MaterialTheme.colorScheme.surfaceContainer) {
-                                TopAppBar(
-                                    title = { Text(stringResource(R.string.nav_settings)) },
-                                    navigationIcon = {
-                                        IconButton(onClick = { showSettings = false }) {
-                                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
-                                        }
-                                    },
-                                    scrollBehavior = settingsScrollBehavior,
-                                    // Keep one flat surface while it slides (no color jump).
-                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                                    )
-                                )
-                                }
-                            }
-                        ) { pad ->
-                            Box(modifier = Modifier.padding(pad)) {
-                                SettingsScreen(
-                                    prefs = prefs,
-                                    onThemeChanged = { themeMode = it },
-                                    onScanQr = {
-                                        showSettings = false
-                                        showQrScanner = true
-                                    }
-                                )
-                            }
-                        }
+                        SettingsScreen(
+                            prefs = prefs,
+                            onThemeChanged = { themeMode = it },
+                            onScanQr = {
+                                showSettings = false
+                                showQrScanner = true
+                            },
+                            onBack = { showSettings = false }
+                        )
                     }
                     AnimatedVisibility(
                         visible = showAbout,
                         enter = slideInHorizontally(
-                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            animationSpec = ScreenEnterSpec,
                             initialOffsetX = { it }
                         ),
                         exit = slideOutHorizontally(
-                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                            animationSpec = ScreenExitSpec,
                             targetOffsetX = { it }
                         )
                     ) {
-                        BackHandler { showAbout = false }
-                        val aboutScrollBehavior =
-                            androidx.compose.material3.TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-                        Scaffold(
-                            modifier = Modifier.nestedScroll(aboutScrollBehavior.nestedScrollConnection),
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            topBar = {
-                                key(MaterialTheme.colorScheme.surfaceContainer) {
-                                TopAppBar(
-                                    title = { Text(stringResource(R.string.nav_about)) },
-                                    navigationIcon = {
-                                        IconButton(onClick = { showAbout = false }) {
-                                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
-                                        }
-                                    },
-                                    scrollBehavior = aboutScrollBehavior,
-                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                                    )
-                                )
-                                }
-                            }
-                        ) { pad ->
-                            Box(modifier = Modifier.padding(pad)) {
-                                AboutScreen()
-                            }
-                        }
+                        AboutScreen(onBack = { showAbout = false })
                     }
 
                     // File/photo confirmation sheet
                     if (pendingFileUri != null) {
                         ModalBottomSheet(
                             onDismissRequest = { pendingFileUri = null },
+                            // rememberModalBottomSheetState is deprecated in favour of
+                            // rememberBottomSheetState(Hidden), which is not yet present in
+                            // material3 1.5.0-alpha22 — keep this until the replacement ships.
                             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                         ) {
                             SendConfirmationSheet(

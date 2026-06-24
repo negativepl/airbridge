@@ -28,6 +28,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -43,11 +47,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,16 +72,53 @@ import androidx.activity.result.contract.ActivityResultContracts
 fun SettingsScreen(
     prefs: SharedPreferences,
     onThemeChanged: (String) -> Unit,
-    onScanQr: () -> Unit = {}
+    onScanQr: () -> Unit = {},
+    onBack: () -> Unit = {}
+) {
+    BackHandler { onBack() }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        topBar = {
+            key(MaterialTheme.colorScheme.surfaceContainer) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.nav_settings)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                )
+            }
+        }
+    ) { pad ->
+        SettingsContent(prefs, onThemeChanged, onScanQr, Modifier.padding(pad))
+    }
+}
+
+@Composable
+private fun SettingsContent(
+    prefs: SharedPreferences,
+    onThemeChanged: (String) -> Unit,
+    onScanQr: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
     var autoConnect by remember { mutableStateOf(prefs.getBoolean("auto_connect", true)) }
     var vibrateOnSync by remember { mutableStateOf(prefs.getBoolean("vibrate_on_sync", false)) }
 
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 24.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))

@@ -61,12 +61,11 @@ import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import com.airbridge.service.AirbridgeService
 import com.airbridge.util.formatTransferSpeed
+import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 
-
-
 @Composable
-fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
+fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}, bottomClearance: Dp = 88.dp) {
     val isConnected by viewModel.isConnected.collectAsState()
     val connectedDeviceName by viewModel.connectedDeviceName.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
@@ -102,10 +101,12 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
         }
     } else {
 
+    val scrollState = rememberScrollState()
+    ScrollLimitHaptics(scrollState)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 24.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
@@ -344,7 +345,11 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}) {
         StatsSection(stats)
         ActivityFeed(activity)
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // The FAB floats over the scroll content (Scaffold's innerPadding only
+        // reserves the nav bar, not the FAB). The clearance is measured from the
+        // real FAB and dock positions so the last row sits the same distance above
+        // the FAB as the FAB sits above the dock.
+        Spacer(modifier = Modifier.height(bottomClearance))
     }
     } // end else (hasPairedDevices)
 }
@@ -498,22 +503,14 @@ private fun DeviceCard(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        androidx.compose.material3.FilledTonalButton(
-                            onClick = onDisconnect,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
+                        androidx.compose.material3.FilledTonalButton(onClick = onDisconnect) {
                             Icon(
                                 Icons.Rounded.LinkOff,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                stringResource(R.string.disconnect),
-                                style = MaterialTheme.typography.labelLarge
-                            )
+                            Text(stringResource(R.string.disconnect))
                         }
                     }
                     1 -> {

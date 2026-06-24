@@ -21,7 +21,7 @@
     <string name="onboarding_ready_title">You\'re all set!</string>
     <string name="onboarding_ready_desc">Select any text in any app — a menu will appear with \'Send to Mac\' option. Tap it to transfer instantly.</string>
     <string name="onboarding_permissions_title">Permissions</string>
-    <string name="onboarding_permissions_desc">AirBridge needs a few permissions to fully work.</string>
+    <string name="onboarding_permissions_desc">AirBridge needs a few permissions to work fully and correctly.</string>
     <string name="onboarding_perm_notifications">Notifications — to show transfer progress</string>
     <string name="onboarding_perm_nearby">Local network — to find your Mac nearby</string>
     <string name="onboarding_perm_allow">Allow notifications</string>
@@ -45,6 +45,7 @@
     <string name="onboarding_perm_optional_header">Optional — mirroring &amp; Mac notifications</string>
     <string name="onboarding_feature_mirror">Mirror your phone screen on your Mac — and back</string>
     <string name="onboarding_perm_allow_btn">Allow</string>
+    <string name="onboarding_perm_granted_short">Granted</string>
     <string name="onboarding_perm_all_granted">All permissions granted</string>
     <string name="onboarding_next">Next</string>
     <string name="onboarding_get_started">Get Started</string>
@@ -73,7 +74,9 @@
 
     <!-- Activity -->
     <string name="recent_activity">Recent activity</string>
-    <string name="no_activity">No activity yet</string>
+    <string name="no_activity">No transfers yet</string>
+    <string name="activity_sent">Sent to Mac</string>
+    <string name="activity_received">Received from Mac</string>
     <string name="connected_for">Connected for %s</string>
     <string name="minutes_ago">%d min ago</string>
     <string name="hours_ago">%d h ago</string>
@@ -232,6 +235,4 @@
     <string name="stats_files_received">Files received</string>
     <string name="stats_data_sent">Data sent</string>
     <string name="stats_data_received">Data received</string>
-    <string name="stats_clipboard">Clipboard syncs</string>
-    <string name="stats_online">Time online</string>
 </resources>

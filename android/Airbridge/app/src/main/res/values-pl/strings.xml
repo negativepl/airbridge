@@ -21,7 +21,7 @@
     <string name="onboarding_ready_title">Gotowe!</string>
     <string name="onboarding_ready_desc">Zaznacz dowolny tekst w dowolnej aplikacji — pojawi się opcja „Wyślij do komputera Mac". Kliknij, by przesłać tekst natychmiast.</string>
     <string name="onboarding_permissions_title">Uprawnienia</string>
-    <string name="onboarding_permissions_desc">AirBridge potrzebuje kilku uprawnień, aby w pełni działać.</string>
+    <string name="onboarding_permissions_desc">AirBridge potrzebuje kilku uprawnień, aby działać w pełni prawidłowo.</string>
     <string name="onboarding_perm_notifications">Powiadomienia o postępie przesyłania</string>
     <string name="onboarding_perm_nearby">Sieć lokalna — aby znaleźć komputer Mac w pobliżu</string>
     <string name="onboarding_perm_allow">Zezwól na powiadomienia</string>
@@ -45,6 +45,7 @@
     <string name="onboarding_perm_optional_header">Dodatkowe — mirror i powiadomienia na Macu</string>
     <string name="onboarding_feature_mirror">Pokaż ekran telefonu na Macu — i odwrotnie</string>
     <string name="onboarding_perm_allow_btn">Zezwól</string>
+    <string name="onboarding_perm_granted_short">Przyznano</string>
     <string name="onboarding_perm_all_granted">Wszystkie uprawnienia nadane</string>
     <string name="onboarding_next">Dalej</string>
     <string name="onboarding_get_started">Zaczynamy</string>
@@ -73,7 +74,9 @@
 
     <!-- Activity -->
     <string name="recent_activity">Ostatnia aktywność</string>
-    <string name="no_activity">Brak aktywności</string>
+    <string name="no_activity">Brak transferów</string>
+    <string name="activity_sent">Wysłano do Maca</string>
+    <string name="activity_received">Odebrano z Maca</string>
     <string name="connected_for">Połączono od %s</string>
     <string name="minutes_ago">%d min temu</string>
     <string name="hours_ago">%d godz. temu</string>
@@ -233,6 +236,4 @@
     <string name="stats_files_received">Pliki odebrane</string>
     <string name="stats_data_sent">Dane wysłane</string>
     <string name="stats_data_received">Dane odebrane</string>
-    <string name="stats_clipboard">Synchronizacje schowka</string>
-    <string name="stats_online">Czas online</string>
 </resources>

@@ -1,42 +1,65 @@
 package com.airbridge.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.RoundedPolygon
 import com.airbridge.R
 import com.airbridge.stats.StatCounters
 import com.airbridge.stats.Stats
 import com.airbridge.stats.formatBytes
-import com.airbridge.stats.formatDuration
+
+/** One transfer metric rendered as an expressive card: a MaterialShapes badge,
+ *  an animated count-up value and a label. */
+private data class StatSpec(
+    val polygon: RoundedPolygon,
+    val container: @Composable () -> Color,
+    val onContainer: @Composable () -> Color,
+    val icon: ImageVector,
+    val value: (StatCounters) -> Long,
+    val format: (Long) -> String,
+    val labelRes: Int,
+)
 
 @Composable
 fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
@@ -66,20 +89,45 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
             }
         }
         Spacer(Modifier.height(12.dp))
-        val cells = listOf(
-            Triple(Icons.Rounded.Upload, "${c.filesSent}", R.string.stats_files_sent),
-            Triple(Icons.Rounded.Upload, formatBytes(c.bytesSent), R.string.stats_data_sent),
-            Triple(Icons.Rounded.Download, "${c.filesReceived}", R.string.stats_files_received),
-            Triple(Icons.Rounded.Download, formatBytes(c.bytesReceived), R.string.stats_data_received),
-            Triple(Icons.Rounded.ContentCopy, "${c.clipboardSyncs}", R.string.stats_clipboard),
-            Triple(Icons.Rounded.Schedule, formatDuration(c.connectedSeconds), R.string.stats_online),
+        // Sent metrics carry primary tones, received metrics tertiary — direction
+        // reads from colour at a glance; each card gets a distinct MaterialShape.
+        val specs = listOf(
+            StatSpec(
+                MaterialShapes.Cookie9Sided,
+                { MaterialTheme.colorScheme.primaryContainer },
+                { MaterialTheme.colorScheme.onPrimaryContainer },
+                Icons.Rounded.Upload, { it.filesSent.toLong() }, { it.toString() }, R.string.stats_files_sent
+            ),
+            StatSpec(
+                MaterialShapes.Sunny,
+                { MaterialTheme.colorScheme.primaryContainer },
+                { MaterialTheme.colorScheme.onPrimaryContainer },
+                Icons.Rounded.Upload, { it.bytesSent }, ::formatBytes, R.string.stats_data_sent
+            ),
+            StatSpec(
+                MaterialShapes.Clover4Leaf,
+                { MaterialTheme.colorScheme.tertiaryContainer },
+                { MaterialTheme.colorScheme.onTertiaryContainer },
+                Icons.Rounded.Download, { it.filesReceived.toLong() }, { it.toString() }, R.string.stats_files_received
+            ),
+            StatSpec(
+                MaterialShapes.Flower,
+                { MaterialTheme.colorScheme.tertiaryContainer },
+                { MaterialTheme.colorScheme.onTertiaryContainer },
+                Icons.Rounded.Download, { it.bytesReceived }, ::formatBytes, R.string.stats_data_received
+            ),
         )
-        cells.chunked(2).forEach { rowCells ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowCells.forEach { (icon, value, labelRes) ->
-                    StatCard(icon, value, stringResource(labelRes), Modifier.weight(1f))
+        specs.chunked(2).forEach { rowSpecs ->
+            // IntrinsicSize.Max + fillMaxHeight → obie karty w rzędzie równają się do
+            // wyższej, więc dłuższy podpis nie rozciąga jednej karty względem sąsiada.
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                rowSpecs.forEach { spec ->
+                    StatCard(spec, spec.value(c), Modifier.weight(1f).fillMaxHeight())
                 }
-                if (rowCells.size == 1) Spacer(Modifier.weight(1f))
+                if (rowSpecs.size == 1) Spacer(Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -87,17 +135,36 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StatCard(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, label: String, modifier: Modifier) {
+private fun StatCard(spec: StatSpec, targetValue: Long, modifier: Modifier) {
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { started = true }
+    val animated by animateFloatAsState(
+        targetValue = if (started) targetValue.toFloat() else 0f,
+        animationSpec = tween(durationMillis = 700),
+        label = "statValue"
+    )
     Card(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         Column(Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            Text(value, style = MaterialTheme.typography.headlineMedium)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(spec.polygon.toShape())
+                    .background(spec.container()),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(spec.icon, contentDescription = null, tint = spec.onContainer(), modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(spec.format(animated.toLong()), style = MaterialTheme.typography.headlineMedium)
+            Text(
+                stringResource(spec.labelRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
