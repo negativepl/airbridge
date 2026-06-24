@@ -26,19 +26,25 @@ struct MenuBarView: View {
                 Divider()
                     .padding(.horizontal, 8)
 
-                // One battery row per device; show the name only when more than one
-                // phone is connected, so the single-device case stays compact.
-                ForEach(devices) { device in
-                    if let info = device.deviceInfo {
-                        BatteryRow(
-                            deviceName: devices.count > 1 ? menuDeviceName(device) : nil,
-                            percent: info.batteryPercent,
-                            charging: info.batteryCharging,
-                            chargeTimeRemainingMs: info.chargeTimeRemainingMs
+                if devices.count > 1 {
+                    // Tap a device to make it the active target (ring, send, etc.);
+                    // a checkmark marks the current one.
+                    ForEach(devices) { device in
+                        DeviceSelectRow(
+                            name: menuDeviceName(device),
+                            info: device.deviceInfo,
+                            isActive: device.connectionId == connectionService.activeDeviceId,
+                            onSelect: { connectionService.setActiveDevice(device.connectionId) }
                         )
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 4)
                     }
+                } else if let info = devices.first?.deviceInfo {
+                    BatteryRow(
+                        percent: info.batteryPercent,
+                        charging: info.batteryCharging,
+                        chargeTimeRemainingMs: info.chargeTimeRemainingMs
+                    )
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 4)
                 }
             }
 
@@ -52,7 +58,7 @@ struct MenuBarView: View {
                         connectionService.stopRingPhone()
                     }
                 } else {
-                    MenuRow(title: L10n.isPL ? "Zadzwoń na telefon" : "Ring phone",
+                    MenuRow(title: ringTitle,
                             systemImage: "iphone.radiowaves.left.and.right") {
                         connectionService.ringPhone()
                     }
@@ -93,6 +99,71 @@ struct MenuBarView: View {
     private func menuDeviceName(_ device: ConnectedDevice) -> String {
         if let n = device.deviceInfo?.name, !n.isEmpty { return n }
         return device.name
+    }
+
+    /// Ring action names the active device when more than one is connected, so it
+    /// is clear which phone will ring.
+    private var ringTitle: String {
+        if connectionService.connectedDevices.count > 1, let active = connectionService.activeDevice {
+            let name = menuDeviceName(active)
+            return L10n.isPL ? "Zadzwoń: \(name)" : "Ring \(name)"
+        }
+        return L10n.isPL ? "Zadzwoń na telefon" : "Ring phone"
+    }
+}
+
+/// Selectable device row in the menu popover: battery + name, tap to make active,
+/// checkmark on the current target.
+private struct DeviceSelectRow: View {
+    let name: String
+    let info: DeviceInfo?
+    let isActive: Bool
+    let onSelect: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: info.map { menuBatterySymbol($0.batteryPercent) } ?? "iphone")
+                .font(.ab(.subheadline))
+                .frame(width: 18, alignment: .center)
+                .foregroundStyle((info?.batteryCharging ?? false) ? Color.green : Color.primary)
+            Text(label)
+                .font(.ab(.subheadline))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if isActive {
+                Image(systemName: "checkmark")
+                    .font(.ab(.subheadline, weight: .semibold))
+                    .foregroundStyle(.tint)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 8)
+        .onHover { isHovered = $0 }
+        .onTapGesture { onSelect() }
+    }
+
+    private var label: String {
+        guard let info else { return name }
+        let charge = info.batteryCharging ? (L10n.isPL ? " • ładowanie" : " • charging") : ""
+        return "\(name) • \(info.batteryPercent)%\(charge)"
+    }
+}
+
+private func menuBatterySymbol(_ percent: Int) -> String {
+    switch percent {
+    case ...10: return "battery.0"
+    case ...37: return "battery.25"
+    case ...62: return "battery.50"
+    case ...87: return "battery.75"
+    default:    return "battery.100"
     }
 }
 

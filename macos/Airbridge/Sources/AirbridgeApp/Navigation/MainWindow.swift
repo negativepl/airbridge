@@ -95,17 +95,32 @@ struct MainWindow: View {
             // is connected; with one, everything just targets it.
             if connectionService.connectedDevices.count > 1 {
                 ToolbarItem(placement: .primaryAction) {
-                    Picker(selection: Binding(
-                        get: { connectionService.activeDeviceId ?? "" },
-                        set: { connectionService.setActiveDevice($0) }
-                    )) {
+                    Menu {
                         ForEach(connectionService.connectedDevices) { device in
-                            Text(deviceLabel(device)).tag(device.connectionId)
+                            Button {
+                                connectionService.setActiveDevice(device.connectionId)
+                            } label: {
+                                if device.connectionId == connectionService.activeDeviceId {
+                                    Label(deviceLabel(device), systemImage: "checkmark")
+                                } else {
+                                    Text(deviceLabel(device))
+                                }
+                            }
                         }
                     } label: {
-                        Label(L10n.isPL ? "Aktywne urządzenie" : "Active device", systemImage: "iphone")
+                        // Custom label so the value and chevron get real internal
+                        // padding instead of hugging the pill edges.
+                        HStack(spacing: 6) {
+                            Image(systemName: "iphone").foregroundStyle(.secondary)
+                            Text(activeDeviceLabel).lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
                     }
-                    .pickerStyle(.menu)
+                    .menuIndicator(.hidden)
                     .help(L10n.isPL ? "Aktywne urządzenie dla galerii, plików, SMS i wysyłki" : "Active device for gallery, files, SMS and sending")
                 }
                 ToolbarSpacer(.fixed)
@@ -195,6 +210,11 @@ struct MainWindow: View {
     private func deviceLabel(_ device: ConnectedDevice) -> String {
         if let n = device.deviceInfo?.name, !n.isEmpty { return n }
         return device.name
+    }
+
+    private var activeDeviceLabel: String {
+        connectionService.activeDevice.map { deviceLabel($0) }
+            ?? (L10n.isPL ? "Urządzenie" : "Device")
     }
 
     // Sortowanie Plików jako natywny element toolbara (jak picker widoku) —
