@@ -44,12 +44,21 @@ final class ConnectionService {
 
     private let log = Logger(subsystem: "com.airbridge.macos", category: "Connection")
 
-    private(set) var isConnected: Bool = false
-    private(set) var connectedDeviceName: String = ""
-    private(set) var deviceInfo: DeviceInfo?
+    /// Single source of truth for live phone connections. The legacy scalar
+    /// properties below are computed views over this so existing consumers
+    /// (menu bar, view models, upload validation) keep working unchanged.
+    private(set) var connectedDevices: [ConnectedDevice] = []
+
+    /// The device the single-device UI surfaces (menu bar, legacy reads) fall
+    /// back to — the most recently added connection.
+    var primaryDevice: ConnectedDevice? { connectedDevices.last }
+
+    var isConnected: Bool { !connectedDevices.isEmpty }
+    var connectedDeviceName: String { primaryDevice?.name ?? "" }
+    var deviceInfo: DeviceInfo? { primaryDevice?.deviceInfo }
     /// The phone's wallpaper (JPEG) for the Home hero, à la Phone Link.
-    private(set) var phoneWallpaper: Data?
-    private(set) var connectedClientIP: String?
+    var phoneWallpaper: Data? { primaryDevice?.wallpaper }
+    var connectedClientIP: String? { primaryDevice?.clientIP }
     private(set) var statusMessage: String = "Idle"
     /// Kept in sync with every `statusMessage`/`isConnected` change.
     private(set) var phase: ConnectionPhase = .starting
@@ -120,13 +129,13 @@ final class ConnectionService {
         startDeviceInfoPolling()
 
         do {
-            // Only the currently connected (paired + authenticated) phone may
-            // talk to the upload server; with no phone connected, reject all.
-            // Installed before start() so there is no allow-all window.
+            // Only currently connected (paired + authenticated) phones may talk to
+            // the upload server; with no phone connected, the set is empty → reject
+            // all. Installed before start() so there is no allow-all window.
             let allowed = allowedUploadSender
             await httpServer.setSenderValidator { remoteHost in
-                guard let host = allowed.host else { return false }
-                return HttpUploadServer.normalizeHost(remoteHost) == HttpUploadServer.normalizeHost(host)
+                let normalized = HttpUploadServer.normalizeHost(remoteHost)
+                return allowed.hosts.contains { HttpUploadServer.normalizeHost($0) == normalized }
             }
             try await httpServer.start(tlsIdentity: tlsIdentityManager.identity())
             try await advertiseServer()
@@ -262,10 +271,8 @@ final class ConnectionService {
     }
 
     private func resetConnectionState() {
-        isConnected = false
-        connectedDeviceName = ""
-        deviceInfo = nil
-        phoneWallpaper = nil
+        connectedDevices.removeAll()
+        refreshAllowedUploadHosts()
     }
 
     // MARK: - Broadcasting
@@ -327,6 +334,32 @@ final class ConnectionService {
         ringResetTask?.cancel()
     }
 
+    // MARK: - Device Bookkeeping
+
+    /// Add a new connection or update the existing one for `connectionId`.
+    func upsertDevice(connectionId: String, publicKey: String, name: String, clientIP: String? = nil) {
+        if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
+            connectedDevices[idx].name = name
+            if let clientIP { connectedDevices[idx].clientIP = clientIP }
+        } else {
+            connectedDevices.append(ConnectedDevice(
+                connectionId: connectionId, publicKey: publicKey,
+                name: name, clientIP: clientIP, deviceInfo: nil, wallpaper: nil))
+        }
+        refreshAllowedUploadHosts()
+    }
+
+    /// Syncs the set of IPs allowed to upload to the currently connected devices.
+    private func refreshAllowedUploadHosts() {
+        allowedUploadSender.hosts = Set(connectedDevices.compactMap { $0.clientIP })
+    }
+
+    /// Bumped on every successful pairing so the pairing UI can advance to the
+    /// "Paired!" state even when another device is already connected (in which
+    /// case `isConnected` does not transition false→true and would not fire).
+    private(set) var pairedSignal: Int = 0
+    func bumpPairedSignal() { pairedSignal += 1 }
+
     // MARK: - Auth Handling
 
     func handlePairRequest(deviceName: String, publicKey: String, token: String, from connectionId: String) {
@@ -339,11 +372,15 @@ final class ConnectionService {
         }
 
         pairingManager.completePairing(deviceName: deviceName, publicKey: publicKey)
-        connectedDeviceName = deviceName
-        setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
+        upsertDevice(
+            connectionId: connectionId,
+            publicKey: publicKey,
+            name: deviceName,
+            clientIP: Self.hostPart(ofConnectionId: connectionId)
+        )
         statusMessage = L10n.isPL ? "Sparowano z \(deviceName)" : "Paired with \(deviceName)"
-        isConnected = true
         phase = .connected
+        bumpPairedSignal()
 
         Task {
             await server.markAuthenticated(connectionId)
@@ -403,17 +440,21 @@ final class ConnectionService {
             try? await server.sendTo(.authResponse(accepted: true, reason: nil, mirrorPort: mirrorPort, protocolVersion: ProtocolConstants.version), connectionId: connectionId)
 
             let device = keyManager.getPairedDevices().first { $0.publicKeyBase64 == publicKey }
-            self.connectedDeviceName = device?.deviceName ?? "Device"
-            self.setConnectedClientIP(Self.hostPart(ofConnectionId: connectionId))
-            self.isConnected = true
-            Diag.log("Connection", "phone connected + authenticated: \(self.connectedDeviceName) @ \(Self.hostPart(ofConnectionId: connectionId) ?? "?")")
+            self.upsertDevice(
+                connectionId: connectionId,
+                publicKey: publicKey,
+                name: device?.deviceName ?? "Device",
+                clientIP: Self.hostPart(ofConnectionId: connectionId)
+            )
+            Diag.log("Connection", "phone connected + authenticated: \(device?.deviceName ?? "Device") @ \(Self.hostPart(ofConnectionId: connectionId) ?? "?")")
             self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
             self.phase = .connected
 
-            // Pull richer device info (exact name, storage, RAM, battery) and
-            // the wallpaper for the Home screen.
-            try? await self.server.broadcast(.deviceInfoRequest)
-            try? await self.server.broadcast(.wallpaperRequest)
+            // Pull richer device info (exact name, storage, RAM, battery) and the
+            // wallpaper for the Home screen — targeted to this connection so each
+            // device gets its own data instead of a lossy broadcast.
+            try? await self.server.sendTo(.deviceInfoRequest, connectionId: connectionId)
+            try? await self.server.sendTo(.wallpaperRequest, connectionId: connectionId)
         }
     }
 
@@ -432,13 +473,13 @@ final class ConnectionService {
                 let isAuth = await server.isAuthenticated(connectionId)
                 guard isAuth else { return }
                 await MainActor.run {
-                    self.routeAuthenticatedMessage(message)
+                    self.routeAuthenticatedMessage(message, from: connectionId)
                 }
             }
         }
     }
 
-    private func routeAuthenticatedMessage(_ message: Message) {
+    private func routeAuthenticatedMessage(_ message: Message, from connectionId: String) {
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
@@ -453,15 +494,19 @@ final class ConnectionService {
         case .notificationPosted:
             notificationHandler?.handleMessage(message)
         case .deviceInfoResponse(let info):
-            deviceInfo = info
+            if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
+                connectedDevices[idx].deviceInfo = info
+            }
         case .wallpaperResponse(let imageBase64):
-            phoneWallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
+            if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
+                connectedDevices[idx].wallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
+            }
         case .macInfoRequest:
             let info = MacSystemInfo.collect()
-            Task { try? await server.broadcast(.macInfoResponse(info: info)) }
+            Task { try? await server.sendTo(.macInfoResponse(info: info), connectionId: connectionId) }
         case .macWallpaperRequest:
             let image = MacSystemInfo.wallpaperJPEGBase64()
-            Task { try? await server.broadcast(.macWallpaperResponse(imageBase64: image)) }
+            Task { try? await server.sendTo(.macWallpaperResponse(imageBase64: image), connectionId: connectionId) }
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:
@@ -483,21 +528,18 @@ final class ConnectionService {
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
                 guard let self else { return }
-                let stillConnected = await self.server.isConnected
-                Diag.log("Connection", "client disconnected: \(endpoint) — stillConnected=\(stillConnected)")
-                self.isConnected = stillConnected
-                if !stillConnected {
-                    // No phone connected → the upload server accepts nobody.
-                    self.setConnectedClientIP(nil)
+                // `endpoint` is the connectionId ("host:port") — drop just that device,
+                // leaving any other connected phones intact.
+                self.connectedDevices.removeAll { $0.connectionId == endpoint }
+                self.refreshAllowedUploadHosts()
+                Diag.log("Connection", "client disconnected: \(endpoint) — remaining=\(self.connectedDevices.count)")
+                if self.connectedDevices.isEmpty {
                     // Dismiss any incoming-file popup orphaned by the dropped link.
                     self.fileTransferService?.connectionLost()
-                }
-                if !stillConnected && !self.manuallyDisconnected {
-                    self.connectedDeviceName = ""
-                    self.deviceInfo = nil
-                    self.phoneWallpaper = nil
-                    self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
-                    self.phase = .listening
+                    if !self.manuallyDisconnected {
+                        self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+                        self.phase = .listening
+                    }
                 }
             }
         }
@@ -529,14 +571,7 @@ final class ConnectionService {
     // MARK: - Helpers
 
     func getConnectedClientIP() -> String? {
-        connectedClientIP
-    }
-
-    /// Updates `connectedClientIP` and its thread-safe mirror used by the
-    /// HTTP upload server's sender validator.
-    private func setConnectedClientIP(_ ip: String?) {
-        connectedClientIP = ip
-        allowedUploadSender.host = ip
+        primaryDevice?.clientIP
     }
 
     /// A connectionId has the form "host:port". For IPv6 the host itself
@@ -577,14 +612,18 @@ final class ConnectionService {
 
 // MARK: - AllowedSenderStore
 
-/// Lock-protected holder for the connected phone's IP. The MainActor-bound
-/// `ConnectionService` writes it; the `HttpUploadServer` actor reads it from
-/// the sender-validator closure, so it must be `Sendable` and thread-safe.
+/// Lock-protected set of IPs allowed to upload — one per connected phone. The
+/// MainActor-bound `ConnectionService` writes it; the `HttpUploadServer` actor
+/// reads it from the sender-validator closure, so it must be `Sendable` and
+/// thread-safe.
 final class AllowedSenderStore: @unchecked Sendable {
     private let lock = NSLock()
-    private var _host: String?
-    var host: String? {
-        get { lock.withLock { _host } }
-        set { lock.withLock { _host = newValue } }
+    private var _hosts: Set<String> = []
+    var hosts: Set<String> {
+        get { lock.withLock { _hosts } }
+        set { lock.withLock { _hosts = newValue } }
+    }
+    func contains(_ host: String) -> Bool {
+        lock.withLock { _hosts.contains(host) }
     }
 }
