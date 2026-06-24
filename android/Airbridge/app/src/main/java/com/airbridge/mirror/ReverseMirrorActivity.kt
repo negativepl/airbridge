@@ -37,6 +37,7 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
 
     private lateinit var container: FrameLayout
     private lateinit var surfaceView: SurfaceView
+    private lateinit var fadeOverlay: View
 
     private var host: String = ""
     private var port: Int = 0
@@ -85,6 +86,16 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
                 Gravity.CENTER
             )
         )
+        // Black overlay above the video — fades in over the brief reconnect when
+        // the virtual display is rebuilt on rotation, so the switch doesn't blink.
+        fadeOverlay = View(this).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
+        container.addView(
+            fadeOverlay,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
         setContentView(container)
         // Re-fit the video whenever the container's size actually changes (rotation,
         // window resize). Doing it here — not in onConfigurationChanged — guarantees
@@ -122,7 +133,14 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         val gen = ++streamGen
         val dec = ScreenDecoder(
             surface = surfaceView.holder.surface,
-            onVideoSize = { w, h -> runOnUiThread { videoW = w; videoH = h; applyAspect() } }
+            onVideoSize = { w, h ->
+                runOnUiThread {
+                    videoW = w; videoH = h; applyAspect()
+                    // Reveal the (possibly reshaped) video; start delay lets the
+                    // first frame land before the fade uncovers it.
+                    fadeOverlay.animate().alpha(0f).setStartDelay(90).setDuration(240).start()
+                }
+            }
         )
         decoder = dec
         val (sw, sh) = realDisplaySize()
@@ -156,6 +174,8 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
      */
     private fun restartStreamForRotation() {
         val c = client ?: return
+        // Fade to black to hide the reconnect; the new stream fades it back in.
+        fadeOverlay.animate().alpha(1f).setStartDelay(0).setDuration(140).start()
         client = null
         restartOnClose = true
         c.close()   // → onClientGone(currentGen) → startStream()
