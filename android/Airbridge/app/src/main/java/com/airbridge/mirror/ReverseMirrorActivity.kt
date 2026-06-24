@@ -1,7 +1,6 @@
 package com.airbridge.mirror
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -17,13 +16,20 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.airbridge.ui.AirbridgeTheme
 
 /**
  * Reverse mirror viewer: shows the Mac's screen on the phone. Display-only for
@@ -31,7 +37,7 @@ import androidx.core.view.WindowInsetsCompat
  * incoming H.264 onto a [SurfaceView] that is letterboxed to the Mac's aspect
  * ratio (the Mac screen and the phone screen have different shapes).
  */
-class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
+class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private var client: ReverseMirrorClient? = null
     private var decoder: ScreenDecoder? = null
@@ -88,15 +94,18 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
         )
         // Black overlay above the video — fades in over the brief reconnect when
         // the virtual display is rebuilt on rotation, so the switch doesn't blink.
-        // Carries a centered label so the user knows the view is being switched.
+        // Carries the M3 Expressive morphing loader (native, on-brand) so the
+        // user sees a deliberate transition rather than a glitch.
         fadeOverlay = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             alpha = 0f
             addView(
-                TextView(this@ReverseMirrorActivity).apply {
-                    text = getString(com.airbridge.R.string.mirror_switching_view)
-                    setTextColor(Color.WHITE)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                ComposeView(this@ReverseMirrorActivity).apply {
+                    setContent {
+                        AirbridgeTheme(themeMode = "dark") {
+                            LoadingIndicator(modifier = Modifier.size(64.dp))
+                        }
+                    }
                 },
                 FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -140,11 +149,14 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
             insets
         }
         setupKeyboard()
-        container.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        // Immersive fullscreen via the modern API (the legacy SYSTEM_UI_FLAG_*
+        // bitmask is deprecated since API 30). Bars stay hidden, swipe reveals
+        // them transiently.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, container).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) { startStream() }
@@ -286,12 +298,12 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
     }
 
     private fun toggleKeyboard() {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        val controller = WindowInsetsControllerCompat(window, keyboardInput)
         keyboardVisible = if (keyboardVisible) {
-            imm.hideSoftInputFromWindow(keyboardInput.windowToken, 0); false
+            controller.hide(WindowInsetsCompat.Type.ime()); false
         } else {
             keyboardInput.requestFocus()
-            imm.showSoftInput(keyboardInput, InputMethodManager.SHOW_IMPLICIT); true
+            controller.show(WindowInsetsCompat.Type.ime()); true
         }
     }
 
