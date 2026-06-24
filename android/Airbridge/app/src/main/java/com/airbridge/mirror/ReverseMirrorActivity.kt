@@ -77,6 +77,15 @@ class ReverseMirrorActivity : Activity(), SurfaceHolder.Callback {
             )
         )
         setContentView(container)
+        // Re-fit the video whenever the container's size actually changes (rotation,
+        // window resize). Doing it here — not in onConfigurationChanged — guarantees
+        // we read the NEW dimensions; posting after a config change races the relayout
+        // and re-fits against the stale (pre-rotation) size, leaving the image cropped.
+        container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
+                applyAspect()
+            }
+        }
         setupKeyboard()
         container.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
