@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white" />
   <img src="https://img.shields.io/badge/Kotlin-2.3-7F52FF?logo=kotlin&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-blue" />
-  <img src="https://img.shields.io/github/v/release/negativepl/airbridge" />
+  <img src="https://img.shields.io/github/v/release/negativepl/airbridge?include_prereleases" />
   <img src="https://img.shields.io/badge/status-beta-orange" />
 </p>
 
