@@ -202,15 +202,13 @@ EOF
 )"
 fi
 
-# A tag with a pre-release suffix (e.g. v2.7.0-beta) publishes as a GitHub
-# pre-release so it never becomes the "Latest" badge.
-PRERELEASE_FLAG=""
-[[ "$TAG" == *-* ]] && PRERELEASE_FLAG="--prerelease"
-
+# The whole app is in beta (the "-beta" suffix in the tag/name and the README
+# status badge say so). Publish as a full release — not a GitHub pre-release —
+# so the newest, most reliable build is the one shown as "Latest".
 gh release create "$TAG" \
     --title "AirBridge $TAG" \
     --notes "$NOTES" \
-    $PRERELEASE_FLAG \
+    --latest \
     "$ROOT/AirBridge.dmg#AirBridge.dmg" \
     "$ROOT/AirBridge.apk#AirBridge.apk"
 
