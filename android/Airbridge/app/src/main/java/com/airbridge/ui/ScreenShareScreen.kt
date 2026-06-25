@@ -75,7 +75,7 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = bottomClearance),
+            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = bottomClearance),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (ready) {

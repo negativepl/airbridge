@@ -107,7 +107,7 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}, bottomCleara
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 8.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 

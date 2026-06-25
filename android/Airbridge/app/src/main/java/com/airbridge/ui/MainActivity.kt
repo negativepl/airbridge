@@ -203,30 +203,34 @@ class MainActivity : ComponentActivity() {
                         }
                     } else 88.dp
 
-                    // Pickers — store URI for confirmation instead of sending immediately
+                    val macFilesPath by viewModel.macFilesPath.collectAsState()
+                    // Pickers. On the Files tab a chosen file/photo uploads straight into the
+                    // folder currently open on the Mac; elsewhere it goes through the
+                    // confirmation flow (pendingFileUri) to the Mac's default location. Same
+                    // FAB on every tab — only the destination differs, decided here.
                     val filePickerLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri: Uri? ->
                         uri?.let {
-                            pendingFileUri = it
-                            pendingIsPhoto = false
+                            if (pagerState.currentPage == 2) {
+                                viewModel.uploadToMac(it, macFilesPath)
+                            } else {
+                                pendingFileUri = it
+                                pendingIsPhoto = false
+                            }
                         }
                     }
                     val photoPickerLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.PickVisualMedia()
                     ) { uri: Uri? ->
                         uri?.let {
-                            pendingFileUri = it
-                            pendingIsPhoto = true
+                            if (pagerState.currentPage == 2) {
+                                viewModel.uploadToMac(it, macFilesPath)
+                            } else {
+                                pendingFileUri = it
+                                pendingIsPhoto = true
+                            }
                         }
-                    }
-                    // Mac Files upload — sends straight to the currently-browsed Mac folder
-                    // (no confirmation sheet; the user already chose this from the Files tab).
-                    val macFilesPath by viewModel.macFilesPath.collectAsState()
-                    val macUploadLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.OpenDocument()
-                    ) { uri: Uri? ->
-                        uri?.let { viewModel.uploadToMac(it, macFilesPath) }
                     }
                     // On the Files tab, Back walks up the Mac folder tree instead of
                     // leaving the app. Gated on the tab being current AND being in a
@@ -343,57 +347,47 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 ) {
-                                    // The same FAB adapts its options to the current tab:
-                                    // on the Files tab it uploads into the folder currently
-                                    // open on the Mac; elsewhere it sends file/photo/clipboard.
-                                    if (pagerState.currentPage == 2) {
-                                        FloatingActionButtonMenuItem(
-                                            onClick = {
-                                                fabMenuExpanded = false
-                                                macUploadLauncher.launch(arrayOf("*/*"))
-                                            },
-                                            icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.action_send_file)) }
-                                        )
-                                    } else {
-                                        FloatingActionButtonMenuItem(
-                                            onClick = {
-                                                fabMenuExpanded = false
-                                                filePickerLauncher.launch(arrayOf("*/*"))
-                                            },
-                                            icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.action_send_file)) }
-                                        )
-                                        FloatingActionButtonMenuItem(
-                                            onClick = {
-                                                fabMenuExpanded = false
-                                                photoPickerLauncher.launch(
-                                                    androidx.activity.result.PickVisualMediaRequest(
-                                                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                                                    )
+                                    // Identical FAB on every tab — same three actions. The send
+                                    // destination (current Mac folder vs default) is decided in
+                                    // the picker callbacks above, so the menu never swaps items
+                                    // between tabs and the swipe stays smooth.
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            filePickerLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_file)) }
+                                    )
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            photoPickerLauncher.launch(
+                                                androidx.activity.result.PickVisualMediaRequest(
+                                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
                                                 )
-                                            },
-                                            icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.action_send_photo)) }
-                                        )
-                                        FloatingActionButtonMenuItem(
-                                            onClick = {
-                                                fabMenuExpanded = false
-                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                                val clip = clipboard.primaryClip
-                                                val text = if (clip != null && clip.itemCount > 0)
-                                                    clip.getItemAt(0).coerceToText(context).toString() else ""
-                                                if (text.isNotEmpty()) {
-                                                    viewModel.sendClipboard(text)
-                                                    Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
-                                            icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.action_send_clipboard)) }
-                                        )
-                                    }
+                                            )
+                                        },
+                                        icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_photo)) }
+                                    )
+                                    FloatingActionButtonMenuItem(
+                                        onClick = {
+                                            fabMenuExpanded = false
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = clipboard.primaryClip
+                                            val text = if (clip != null && clip.itemCount > 0)
+                                                clip.getItemAt(0).coerceToText(context).toString() else ""
+                                            if (text.isNotEmpty()) {
+                                                viewModel.sendClipboard(text)
+                                                Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                        text = { Text(stringResource(R.string.action_send_clipboard)) }
+                                    )
                                 }
                             }
                         },

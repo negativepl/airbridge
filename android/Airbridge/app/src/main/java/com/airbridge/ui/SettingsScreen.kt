@@ -119,7 +119,7 @@ private fun SettingsContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 8.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 

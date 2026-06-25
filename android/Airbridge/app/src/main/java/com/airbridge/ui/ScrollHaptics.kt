@@ -2,6 +2,7 @@ package com.airbridge.ui
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -37,5 +38,29 @@ fun ScrollLimitHaptics(scrollState: ScrollState) {
             }
             previous = value
         }
+    }
+}
+
+/**
+ * LazyColumn/LazyRow variant of [ScrollLimitHaptics]. A [ScrollState] tracks a
+ * pixel offset, but a lazy list doesn't — so edges are detected via
+ * `canScrollBackward`/`canScrollForward`, firing once when the list lands on an
+ * edge having been able to scroll past it a moment earlier. Lists short enough to
+ * not scroll start pinned to both edges and never transition, so they stay silent.
+ */
+@Composable
+fun ScrollLimitHaptics(listState: LazyListState) {
+    val view = LocalView.current
+    LaunchedEffect(listState) {
+        var prevTop = !listState.canScrollBackward
+        var prevBottom = !listState.canScrollForward
+        snapshotFlow { !listState.canScrollBackward to !listState.canScrollForward }
+            .collect { (atTop, atBottom) ->
+                if ((atTop && !prevTop) || (atBottom && !prevBottom)) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                }
+                prevTop = atTop
+                prevBottom = atBottom
+            }
     }
 }

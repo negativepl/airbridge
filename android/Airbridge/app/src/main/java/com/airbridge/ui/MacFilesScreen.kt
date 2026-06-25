@@ -26,8 +26,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -37,6 +39,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -184,13 +187,27 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
             }
 
             else -> {
+                val listState = rememberLazyListState()
+                ScrollLimitHaptics(listState)
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = bottomClearance)
                 ) {
-                    items(page.entries, key = { it.relativePath }) { entry ->
+                    itemsIndexed(page.entries, key = { _, it -> it.relativePath }) { index, entry ->
                         val thumb = thumbs[entry.relativePath]
                         val downloading = !entry.isDirectory && entry.name in downloadProgress
+                        // Grouped-list shape: the first/last rows round their outer edges
+                        // strongly, rows between are gently rounded. With a small gap the list
+                        // reads as one rounded group (M3 Expressive style).
+                        val isFirst = index == 0
+                        val isLast = index == page.entries.lastIndex
+                        val shape = RoundedCornerShape(
+                            topStart = if (isFirst) 20.dp else 8.dp,
+                            topEnd = if (isFirst) 20.dp else 8.dp,
+                            bottomStart = if (isLast) 20.dp else 8.dp,
+                            bottomEnd = if (isLast) 20.dp else 8.dp
+                        )
 
                         // Request a thumbnail for media files on appearance — but only if we
                         // don't already have it cached (thumbnails persist across navigation),
@@ -206,13 +223,6 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                         }
 
                         ListItem(
-                            headlineContent = {
-                                Text(
-                                    text = entry.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    maxLines = 1
-                                )
-                            },
                             supportingContent = if (!entry.isDirectory && entry.size > 0) {
                                 {
                                     Text(
@@ -275,14 +285,25 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                                 }
                             } else null,
                             // Tap a folder to open it; tap a file to download it. A file
-                            // already transferring is not re-tappable.
-                            modifier = Modifier.clickable(
-                                enabled = entry.isDirectory || !downloading
-                            ) {
+                            // already transferring is not re-tappable. The shape morphs on
+                            // press (native ListItem shapes).
+                            onClick = {
                                 if (entry.isDirectory) viewModel.openMacFolder(entry.relativePath)
                                 else viewModel.downloadMacFile(entry.relativePath)
-                            }
-                        )
+                            },
+                            enabled = entry.isDirectory || !downloading,
+                            shapes = ListItemDefaults.shapes(shape = shape),
+                            colors = ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = entry.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
