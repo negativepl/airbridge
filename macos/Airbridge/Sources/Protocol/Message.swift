@@ -92,6 +92,16 @@ public enum Message: Equatable, Sendable {
     case macWallpaperResponse(imageBase64: String)
     case folderStatsRequest(path: String)
     case folderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
+    case macFilesListRequest(path: String, page: Int, pageSize: Int,
+                             sortBy: String = "name", sortDir: String = "asc",
+                             foldersFirst: Bool = true, query: String = "")
+    case macFilesListResponse(path: String, entries: [FileEntry], totalCount: Int, page: Int, needsPermission: Bool)
+    case macFileThumbnailRequest(path: String)
+    case macFileThumbnailResponse(path: String, data: String)
+    case macFolderStatsRequest(path: String)
+    case macFolderStatsResponse(path: String, dirCount: Int, fileCount: Int, totalSize: Int64)
+    case macFileDownloadRequest(transferId: String, path: String)
+    case macFileDownloadReady(transferId: String, filename: String, mimeType: String, fileSize: Int64)
     case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String, notificationKey: String, canReply: Bool)
     case notificationReply(notificationKey: String, text: String)
 }
@@ -393,6 +403,14 @@ extension Message: Codable {
         case macWallpaperResponse     = "mac_wallpaper_response"
         case folderStatsRequest       = "folder_stats_request"
         case folderStatsResponse      = "folder_stats_response"
+        case macFilesListRequest      = "mac_files_list_request"
+        case macFilesListResponse     = "mac_files_list_response"
+        case macFileThumbnailRequest  = "mac_file_thumbnail_request"
+        case macFileThumbnailResponse = "mac_file_thumbnail_response"
+        case macFolderStatsRequest    = "mac_folder_stats_request"
+        case macFolderStatsResponse   = "mac_folder_stats_response"
+        case macFileDownloadRequest   = "mac_file_download_request"
+        case macFileDownloadReady     = "mac_file_download_ready"
         case notificationPosted       = "notification_posted"
         case notificationReply        = "notification_reply"
     }
@@ -733,6 +751,56 @@ extension Message: Codable {
             try container.encode(TypeKey.notificationReply.rawValue, forKey: .type)
             try container.encode(notificationKey, forKey: .notificationKey)
             try container.encode(text, forKey: .text)
+
+        case .macFilesListRequest(let path, let page, let pageSize, let sortBy, let sortDir, let foldersFirst, let query):
+            try container.encode(TypeKey.macFilesListRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(page, forKey: .page)
+            try container.encode(pageSize, forKey: .pageSize)
+            try container.encode(sortBy, forKey: .sortBy)
+            try container.encode(sortDir, forKey: .sortDir)
+            try container.encode(foldersFirst, forKey: .foldersFirst)
+            try container.encode(query, forKey: .query)
+
+        case .macFilesListResponse(let path, let entries, let totalCount, let page, let needsPermission):
+            try container.encode(TypeKey.macFilesListResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(entries, forKey: .entries)
+            try container.encode(totalCount, forKey: .totalCount)
+            try container.encode(page, forKey: .page)
+            try container.encode(needsPermission, forKey: .needsPermission)
+
+        case .macFileThumbnailRequest(let path):
+            try container.encode(TypeKey.macFileThumbnailRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+
+        case .macFileThumbnailResponse(let path, let data):
+            try container.encode(TypeKey.macFileThumbnailResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(data, forKey: .data)
+
+        case .macFolderStatsRequest(let path):
+            try container.encode(TypeKey.macFolderStatsRequest.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+
+        case .macFolderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
+            try container.encode(TypeKey.macFolderStatsResponse.rawValue, forKey: .type)
+            try container.encode(path, forKey: .path)
+            try container.encode(dirCount, forKey: .dirCount)
+            try container.encode(fileCount, forKey: .fileCount)
+            try container.encode(totalSize, forKey: .totalSize)
+
+        case .macFileDownloadRequest(let transferId, let path):
+            try container.encode(TypeKey.macFileDownloadRequest.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
+            try container.encode(path, forKey: .path)
+
+        case .macFileDownloadReady(let transferId, let filename, let mimeType, let fileSize):
+            try container.encode(TypeKey.macFileDownloadReady.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
+            try container.encode(filename, forKey: .filename)
+            try container.encode(mimeType, forKey: .mimeType)
+            try container.encode(fileSize, forKey: .fileSize)
         }
     }
 
@@ -1030,6 +1098,51 @@ extension Message: Codable {
             let notificationKey = try container.decode(String.self, forKey: .notificationKey)
             let text = try container.decode(String.self, forKey: .text)
             self = .notificationReply(notificationKey: notificationKey, text: text)
+
+        case .macFilesListRequest:
+            let path = try container.decode(String.self, forKey: .path)
+            let page = try container.decode(Int.self, forKey: .page)
+            let pageSize = try container.decode(Int.self, forKey: .pageSize)
+            let sortBy = try container.decodeIfPresent(String.self, forKey: .sortBy) ?? "name"
+            let sortDir = try container.decodeIfPresent(String.self, forKey: .sortDir) ?? "asc"
+            let foldersFirst = try container.decodeIfPresent(Bool.self, forKey: .foldersFirst) ?? true
+            let query = try container.decodeIfPresent(String.self, forKey: .query) ?? ""
+            self = .macFilesListRequest(path: path, page: page, pageSize: pageSize, sortBy: sortBy,
+                                        sortDir: sortDir, foldersFirst: foldersFirst, query: query)
+
+        case .macFilesListResponse:
+            let path = try container.decode(String.self, forKey: .path)
+            let entries = try container.decode([FileEntry].self, forKey: .entries)
+            let totalCount = try container.decode(Int.self, forKey: .totalCount)
+            let page = try container.decode(Int.self, forKey: .page)
+            let needsPermission = try container.decode(Bool.self, forKey: .needsPermission)
+            self = .macFilesListResponse(path: path, entries: entries, totalCount: totalCount, page: page, needsPermission: needsPermission)
+
+        case .macFileThumbnailRequest:
+            self = .macFileThumbnailRequest(path: try container.decode(String.self, forKey: .path))
+
+        case .macFileThumbnailResponse:
+            self = .macFileThumbnailResponse(path: try container.decode(String.self, forKey: .path),
+                                             data: try container.decode(String.self, forKey: .data))
+
+        case .macFolderStatsRequest:
+            self = .macFolderStatsRequest(path: try container.decode(String.self, forKey: .path))
+
+        case .macFolderStatsResponse:
+            self = .macFolderStatsResponse(path: try container.decode(String.self, forKey: .path),
+                                           dirCount: try container.decode(Int.self, forKey: .dirCount),
+                                           fileCount: try container.decode(Int.self, forKey: .fileCount),
+                                           totalSize: try container.decode(Int64.self, forKey: .totalSize))
+
+        case .macFileDownloadRequest:
+            self = .macFileDownloadRequest(transferId: try container.decode(String.self, forKey: .transferId),
+                                           path: try container.decode(String.self, forKey: .path))
+
+        case .macFileDownloadReady:
+            self = .macFileDownloadReady(transferId: try container.decode(String.self, forKey: .transferId),
+                                         filename: try container.decode(String.self, forKey: .filename),
+                                         mimeType: try container.decode(String.self, forKey: .mimeType),
+                                         fileSize: try container.decode(Int64.self, forKey: .fileSize))
         }
     }
 
