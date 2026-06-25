@@ -370,16 +370,25 @@ final class FileTransferService: MessageHandler {
                     }
                 } else if let rel = destinationDir,
                           let targetDir = MacFilesProvider().resolve(rel),
-                          (try? targetDir.checkResourceIsReachable()) == true {
+                          (try? targetDir.checkResourceIsReachable()) == true,
+                          let safeDest = Self.uniqueDestination(in: targetDir, filename: filename) {
                     do {
-                        let dest = Self.uniqueDestination(in: targetDir, filename: filename)
-                        try FileManager.default.moveItem(at: tempURL, to: dest)
+                        try FileManager.default.moveItem(at: tempURL, to: safeDest)
                         self.playReceiveSound()
                     } catch {
                         #if DEBUG
-                        print("[FileTransferService] X-Destination-Dir save failed: \(error)")
+                        print("[FileTransferService] X-Destination-Dir save failed: \(error); falling back to Downloads")
                         #endif
-                        try? FileManager.default.removeItem(at: tempURL)
+                        // Move to custom dir failed — fall back to Downloads rather than silently deleting.
+                        do {
+                            let _ = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
+                            self.playReceiveSound()
+                        } catch {
+                            #if DEBUG
+                            print("[FileTransferService] Downloads fallback also failed: \(error)")
+                            #endif
+                            try? FileManager.default.removeItem(at: tempURL)
+                        }
                     }
                 } else {
                     do {
@@ -494,13 +503,23 @@ final class FileTransferService: MessageHandler {
         return fileURL
     }
 
-    /// Returns a non-colliding destination URL inside `dir` for `filename`.
+    /// Returns a non-colliding destination URL inside `dir` for `filename`,
+    /// or `nil` when `filename` cannot be safely resolved inside `dir`
+    /// (e.g. a path-traversal attempt like `"../../evil.sh"`).
+    ///
+    /// The sanitized leaf name is used for the dedup loop — only the last
+    /// path component of the network-supplied name is ever written under `dir`.
     /// If `filename` already exists, appends " (n)" before the extension
     /// (e.g. "photo.jpg" → "photo (2).jpg") — mirrors Android's dedupedName.
-    static func uniqueDestination(in dir: URL, filename: String) -> URL {
-        let base = (filename as NSString).deletingPathExtension
-        let ext = (filename as NSString).pathExtension
-        var candidate = dir.appendingPathComponent(filename)
+    static func uniqueDestination(in dir: URL, filename: String) -> URL? {
+        // Sanitize against path traversal: reduce to leaf, verify containment.
+        guard let safeName = SafeFileName.sanitize(filename),
+              SafeFileName.resolvedURL(in: dir, filename: safeName) != nil else {
+            return nil
+        }
+        let base = (safeName as NSString).deletingPathExtension
+        let ext = (safeName as NSString).pathExtension
+        var candidate = dir.appendingPathComponent(safeName)
         var counter = 2
         while FileManager.default.fileExists(atPath: candidate.path) {
             let newName = ext.isEmpty ? "\(base) (\(counter))" : "\(base) (\(counter)).\(ext)"
