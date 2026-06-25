@@ -68,7 +68,11 @@ final class MacFilesProvider {
                                                    options: [.skipsHiddenFiles]) {
             for case let url as URL in en {
                 if url.lastPathComponent.lowercased().contains(needle) {
-                    let parentRel = String(url.deletingLastPathComponent().path
+                    // Resolve the parent's path canonically before slicing: on macOS,
+                    // FileManager.enumerator returns /private/var/... paths even when root
+                    // is /var/... (symlink), so we must resolve both sides consistently.
+                    let parentCanonical = url.deletingLastPathComponent().resolvingSymlinksInPath().path
+                    let parentRel = String(parentCanonical
                         .dropFirst(rootCanonical.count).drop(while: { $0 == "/" }))
                     hits.append(entry(for: url, parentRel: parentRel))
                     if hits.count >= Self.searchLimit { break }
