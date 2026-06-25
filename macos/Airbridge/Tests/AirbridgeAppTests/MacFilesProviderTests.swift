@@ -48,6 +48,16 @@ final class MacFilesProviderTests: XCTestCase {
                        "Nested file must have relativePath == 'sub/b.txt', got '\(entryB.relativePath)'")
     }
 
+    func testThumbnailNilForTextFile() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "hi".write(to: root.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        let p = MacFilesProvider(root: root)
+        let exp = expectation(description: "thumb")
+        p.thumbnailBase64("a.txt") { result in XCTAssertNil(result); exp.fulfill() }
+        wait(for: [exp], timeout: 5)
+    }
+
     func testListDirReturnsEntries() throws {
         let root = try tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

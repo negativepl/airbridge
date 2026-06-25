@@ -1,6 +1,8 @@
 import Foundation
 import Protocol
 import UniformTypeIdentifiers
+import QuickLookThumbnailing
+import AppKit
 
 /// Browses the Mac's home directory for the phone. Relative paths use "/"; root ("") == home.
 /// Every resolve is contained to the root (symlink-resolved) — mirror of FilesProvider's guard.
@@ -139,5 +141,25 @@ final class MacFilesProvider {
             return mime
         }
         return "application/octet-stream"
+    }
+}
+
+// MARK: - Thumbnail
+
+extension MacFilesProvider {
+    /// Returns a 400px JPEG base64 thumbnail for image/video files; nil for everything else.
+    func thumbnailBase64(_ relPath: String, completion: @escaping @Sendable (String?) -> Void) {
+        guard let url = fileURL(relPath) else { return completion(nil) }
+        let mime = Self.mime(for: url)
+        guard mime.hasPrefix("image/") || mime.hasPrefix("video/") else { return completion(nil) }
+        let size = CGSize(width: 400, height: 400)
+        let request = QLThumbnailGenerator.Request(fileAt: url, size: size, scale: 1,
+                                                   representationTypes: .thumbnail)
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { rep, _ in
+            guard let cg = rep?.cgImage else { return completion(nil) }
+            let bitmap = NSBitmapImageRep(cgImage: cg)
+            let jpeg = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.75])
+            completion(jpeg?.base64EncodedString())
+        }
     }
 }
