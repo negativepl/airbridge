@@ -106,6 +106,7 @@ final class ConnectionService {
     var pairingService: PairingService?
     /// Typed ref so a dropped connection can dismiss an orphaned incoming-file popup.
     var fileTransferService: FileTransferService?
+    private let macFilesService = MacFilesService()
     private var serverStarted = false
     @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
 
@@ -148,6 +149,7 @@ final class ConnectionService {
         startDeviceInfoPolling()
 
         do {
+            macFilesService.configure(server: server, uploadServer: httpServer)
             // Only currently connected (paired + authenticated) phones may talk to
             // the upload server; with no phone connected, the set is empty → reject
             // all. Installed before start() so there is no allow-all window.
@@ -529,6 +531,8 @@ final class ConnectionService {
             if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
                 connectedDevices[idx].wallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
             }
+        case .macFilesListRequest, .macFileThumbnailRequest, .macFolderStatsRequest, .macFileDownloadRequest:
+            macFilesService.handle(message, connectionId: connectionId)
         case .macInfoRequest:
             let info = MacSystemInfo.collect()
             Task { try? await server.sendTo(.macInfoResponse(info: info), connectionId: connectionId) }
