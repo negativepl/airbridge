@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
@@ -163,15 +164,17 @@ class MainActivity : ComponentActivity() {
                     // przeniesione do górnego paska.
                     val navItems = listOf(
                         NavItem(R.string.nav_home, Icons.Rounded.Home),
-                        NavItem(R.string.nav_screen_sharing, Icons.AutoMirrored.Rounded.ScreenShare)
+                        NavItem(R.string.nav_screen_sharing, Icons.AutoMirrored.Rounded.ScreenShare),
+                        NavItem(R.string.nav_mac_files, Icons.Rounded.Folder)
                     )
-                    // Tytuł w górnym pasku = nazwa bieżącej strony pagera (2 strony).
+                    // Tytuł w górnym pasku = nazwa bieżącej strony pagera (3 strony).
                     val pageTitles = listOf(
                         R.string.app_name,
-                        R.string.nav_screen_sharing
+                        R.string.nav_screen_sharing,
+                        R.string.nav_mac_files
                     )
 
-                    val pagerState = rememberPagerState(pageCount = { 2 })
+                    val pagerState = rememberPagerState(pageCount = { 3 })
                     val coroutineScope = rememberCoroutineScope()
                     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(this@MainActivity) }
                     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
@@ -377,6 +380,7 @@ class MainActivity : ComponentActivity() {
                             when (page) {
                                 0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true }, bottomClearance = fabClearance)
                                 1 -> ScreenShareScreen(bottomClearance = fabClearance)
+                                2 -> MacFilesScreen(viewModel = viewModel)
                             }
                         }
                     }
