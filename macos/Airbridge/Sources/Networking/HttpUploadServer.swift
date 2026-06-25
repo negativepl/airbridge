@@ -678,13 +678,13 @@ public actor HttpUploadServer {
                 + "Connection: close\r\n"
                 + "\r\n"
 
+            var sent: Int64 = 0
             do {
                 try await Self.send(Data(headers.utf8), on: connection)
                 // Report 0% before any body bytes — lets the UI switch out of
                 // "waiting for accept" into "transferring" immediately.
                 onProgress(0, total)
 
-                var sent: Int64 = 0
                 while sent < total {
                     // Never read past the advertised Content-Length, even if
                     // the file grew after the size was taken.
@@ -695,14 +695,22 @@ public actor HttpUploadServer {
                         // satisfied; drop the connection so the peer notices.
                         throw CocoaError(.fileReadCorruptFile)
                     }
-                    // Backpressure: wait for the previous chunk to be handed
-                    // to the transport before reading the next one.
-                    try await Self.send(chunk, on: connection)
                     sent += Int64(chunk.count)
+                    // Backpressure: wait for the previous chunk to be handed to the
+                    // transport before reading the next. Mark the FINAL chunk
+                    // `isComplete` so the framework flushes everything and closes the
+                    // stream gracefully — a bare cancel() after the last send can drop
+                    // in-flight bytes, which the phone sees as "unexpected end of stream".
+                    try await Self.send(chunk, on: connection, isComplete: sent >= total)
                     onProgress(sent, total)
                 }
                 onComplete(true)
-                connection.cancel()
+                // No cancel() here. The final chunk was sent with `isComplete`, which
+                // closes the send stream gracefully (FIN after the data). Cancelling now
+                // aborts the connection before those last bytes are actually delivered —
+                // the exact truncation the phone saw as "unexpected end of stream". The
+                // connection is reaped when the phone closes its side (peer close ->
+                // .cancelled/.failed -> removeConnection).
             } catch {
                 onComplete(false)
                 connection.cancel()
@@ -712,9 +720,9 @@ public actor HttpUploadServer {
 
     /// Sends one buffer and suspends until the transport has consumed it
     /// (`contentProcessed`) — this is what bounds memory to a single chunk.
-    private static func send(_ data: Data, on connection: NWConnection) async throws {
+    private static func send(_ data: Data, on connection: NWConnection, isComplete: Bool = false) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed { error in
+            connection.send(content: data, isComplete: isComplete, completion: .contentProcessed { error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
