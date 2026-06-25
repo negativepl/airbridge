@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +42,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
 import com.airbridge.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,8 +55,10 @@ fun MacFilesScreen(viewModel: MainViewModel) {
     val isConnected by viewModel.isConnected.collectAsState()
 
     // Load the root listing the first time the tab is shown and we are connected.
+    // Guard on path and entries being empty so a reconnect while browsing a subfolder
+    // does NOT reset navigation back to root.
     LaunchedEffect(isConnected) {
-        if (isConnected) {
+        if (isConnected && path.isEmpty() && entries.isEmpty()) {
             viewModel.openMacFolder("")
         }
     }
