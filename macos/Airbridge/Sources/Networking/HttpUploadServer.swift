@@ -20,10 +20,11 @@ public actor HttpUploadServer {
     // MARK: - Callbacks
 
     /// Called when a complete file has been received (on actor context).
-    /// Arguments: filename, mimeType, SHA-256 hex checksum, and the URL of a
-    /// temporary file holding the uploaded bytes. The callback OWNS the temp
-    /// file — it must move or delete it.
-    public var onFileReceived: (@Sendable (String, String, String, URL) -> Void)?
+    /// Arguments: filename, mimeType, SHA-256 hex checksum, the URL of a
+    /// temporary file holding the uploaded bytes, and an optional destination
+    /// directory relative to home (percent-decoded from X-Destination-Dir).
+    /// The callback OWNS the temp file — it must move or delete it.
+    public var onFileReceived: (@Sendable (String, String, String, URL, String?) -> Void)?
 
     /// Called periodically as body bytes arrive.
     /// Marked nonisolated(unsafe) so it can be called from receive callbacks
@@ -32,7 +33,7 @@ public actor HttpUploadServer {
 
     /// Sets both callbacks at once.
     public func setCallbacks(
-        onFileReceived: (@Sendable (String, String, String, URL) -> Void)?,
+        onFileReceived: (@Sendable (String, String, String, URL, String?) -> Void)?,
         onProgress: (@Sendable (String, Int, Int) -> Void)?
     ) {
         self.onFileReceived = onFileReceived
@@ -389,6 +390,7 @@ public actor HttpUploadServer {
 
         let mimeType = headers["x-mime-type"] ?? "application/octet-stream"
         let expectedChecksum = headers["x-checksum-sha256"]
+        let destinationDir = headers["x-destination-dir"].flatMap { $0.removingPercentEncoding }
 
         // Open the temp-file sink and feed it whatever body bytes arrived
         // together with the headers, then stream the rest from the socket.
@@ -410,6 +412,7 @@ public actor HttpUploadServer {
             filename: filename,
             mimeType: mimeType,
             expectedChecksum: expectedChecksum,
+            destinationDir: destinationDir,
             contentLength: contentLength,
             sink: sink
         )
@@ -493,6 +496,7 @@ public actor HttpUploadServer {
         filename: String,
         mimeType: String,
         expectedChecksum: String?,
+        destinationDir: String?,
         contentLength: Int,
         sink: UploadSink
     ) {
@@ -506,6 +510,7 @@ public actor HttpUploadServer {
                     filename: filename,
                     mimeType: mimeType,
                     expectedChecksum: expectedChecksum,
+                    destinationDir: destinationDir,
                     sink: sink
                 )
             }
@@ -546,6 +551,7 @@ public actor HttpUploadServer {
                 filename: filename,
                 mimeType: mimeType,
                 expectedChecksum: expectedChecksum,
+                destinationDir: destinationDir,
                 contentLength: contentLength,
                 sink: sink
             )
@@ -558,6 +564,7 @@ public actor HttpUploadServer {
         filename: String,
         mimeType: String,
         expectedChecksum: String?,
+        destinationDir: String?,
         sink: UploadSink
     ) {
         let computedChecksum: String
@@ -583,7 +590,7 @@ public actor HttpUploadServer {
 
         if let onFileReceived {
             // Ownership of the temp file passes to the callback.
-            onFileReceived(filename, mimeType, computedChecksum, sink.tempURL)
+            onFileReceived(filename, mimeType, computedChecksum, sink.tempURL, destinationDir)
         } else {
             // finish() already closed the handle — nobody wants the file.
             sink.deleteTempFile()

@@ -335,7 +335,7 @@ final class FileTransferService: MessageHandler {
         // The server hands over a temp file URL (ownership included — we must
         // move or delete it). Streaming to disk on the server side keeps
         // multi-GB uploads out of RAM; here we only move files around.
-        let onFileReceived: @Sendable (String, String, String, URL) -> Void = { [weak self] filename, _, _, tempURL in
+        let onFileReceived: @Sendable (String, String, String, URL, String?) -> Void = { [weak self] filename, _, _, tempURL, destinationDir in
             Task { @MainActor in
                 guard let self else {
                     try? FileManager.default.removeItem(at: tempURL)
@@ -367,6 +367,19 @@ final class FileTransferService: MessageHandler {
                         #endif
                         try? FileManager.default.removeItem(at: tempURL)
                         preview.completion(nil)
+                    }
+                } else if let rel = destinationDir,
+                          let targetDir = MacFilesProvider().resolve(rel),
+                          (try? targetDir.checkResourceIsReachable()) == true {
+                    do {
+                        let dest = Self.uniqueDestination(in: targetDir, filename: filename)
+                        try FileManager.default.moveItem(at: tempURL, to: dest)
+                        self.playReceiveSound()
+                    } catch {
+                        #if DEBUG
+                        print("[FileTransferService] X-Destination-Dir save failed: \(error)")
+                        #endif
+                        try? FileManager.default.removeItem(at: tempURL)
                     }
                 } else {
                     do {
@@ -479,6 +492,22 @@ final class FileTransferService: MessageHandler {
         }
         try FileManager.default.moveItem(at: tempURL, to: fileURL)
         return fileURL
+    }
+
+    /// Returns a non-colliding destination URL inside `dir` for `filename`.
+    /// If `filename` already exists, appends " (n)" before the extension
+    /// (e.g. "photo.jpg" → "photo (2).jpg") — mirrors Android's dedupedName.
+    static func uniqueDestination(in dir: URL, filename: String) -> URL {
+        let base = (filename as NSString).deletingPathExtension
+        let ext = (filename as NSString).pathExtension
+        var candidate = dir.appendingPathComponent(filename)
+        var counter = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            let newName = ext.isEmpty ? "\(base) (\(counter))" : "\(base) (\(counter)).\(ext)"
+            candidate = dir.appendingPathComponent(newName)
+            counter += 1
+        }
+        return candidate
     }
 
     private func playReceiveSound() {
