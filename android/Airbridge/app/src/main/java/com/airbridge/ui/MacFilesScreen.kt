@@ -3,6 +3,17 @@ package com.airbridge.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -20,20 +31,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +59,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
+import com.airbridge.protocol.FileEntry
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Browser for the Mac's home directory. Renders as plain content inside the
@@ -51,6 +69,11 @@ import com.airbridge.R
  * would double the insets and collide with the global FAB). The upload action
  * lives on the host's contextual FAB. [bottomClearance] keeps the list above
  * that FAB and the dock.
+ *
+ * Interaction is deliberately minimal: tapping a folder opens it, tapping a file
+ * downloads it (a small progress ring shows while it transfers; completion is
+ * confirmed by the system "file received" notification). Downloads are
+ * serialized one-at-a-time under the hood.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +84,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
     val loading by viewModel.macFilesLoading.collectAsState()
     val thumbs by viewModel.macFilesThumbnails.collectAsState()
     val isConnected by viewModel.isConnected.collectAsState()
+    // Per-file download progress (filename -> 0..1). A row shows a small progress
+    // ring while its name is present here (queued files sit at 0 until their turn).
+    val downloadProgress by viewModel.macDownloadProgress.collectAsState()
 
     // Load the root listing the first time the tab is shown and we are connected.
     // Guard on path and entries being empty so a reconnect while browsing a subfolder
@@ -71,6 +97,39 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
         }
     }
 
+    // Briefly flag a file as "just downloaded" when it leaves the progress map having
+    // succeeded — the row's progress ring then pops into a check for ~1.5s before
+    // clearing (the lasting confirmation is the system "file received" notification).
+    val downloadedNames by viewModel.macDownloadedNames.collectAsState()
+    val scope = rememberCoroutineScope()
+    val justDone = remember { mutableStateListOf<String>() }
+    LaunchedEffect(Unit) {
+        var prev = emptySet<String>()
+        snapshotFlow { downloadProgress.keys.toSet() }.collect { current ->
+            (prev - current).forEach { name ->
+                if (name in downloadedNames && name !in justDone) {
+                    justDone.add(name)
+                    scope.launch { delay(1500); justDone.remove(name) }
+                }
+            }
+            prev = current
+        }
+    }
+
+    // Keep the current folder's content on screen until the NEXT folder's listing has
+    // arrived, then swap with the slide. No loading flash between folders, and the
+    // directional transition gets real content on both sides (a true push).
+    var displayed by remember { mutableStateOf(FolderPage(path, entries, needsPermission)) }
+    LaunchedEffect(path, entries, loading, needsPermission) {
+        if (path != displayed.path) {
+            // New folder: hold the old page until its listing is ready (loading done).
+            if (!loading) displayed = FolderPage(path, entries, needsPermission)
+        } else {
+            // Same folder: keep content in sync (pagination, permission grant, refresh).
+            displayed = FolderPage(path, entries, needsPermission)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Breadcrumb path bar — tappable segments, each jumps straight to that
         // ancestor (mirror of the macOS FilesBrowserView path bar).
@@ -78,6 +137,24 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
             MacPathBar(path = path, onNavigate = { viewModel.openMacFolder(it) })
         }
 
+        // Directional folder navigation: entering a folder pushes the new listing in
+        // from the right, going up slides it back from the left (by path depth).
+        AnimatedContent(
+            targetState = displayed,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                if (initialState.path == targetState.path) {
+                    // Same folder (content refresh) — swap instantly, no slide.
+                    (fadeIn(snap()) togetherWith fadeOut(snap())) using null
+                } else {
+                    val dir = if (folderDepth(targetState.path) >= folderDepth(initialState.path))
+                        SlideDirection.Left else SlideDirection.Right
+                    (slideIntoContainer(dir, tween(330, easing = FastOutSlowInEasing)) + fadeIn(tween(220))) togetherWith
+                        (slideOutOfContainer(dir, tween(300, easing = FastOutSlowInEasing)) + fadeOut(tween(200)))
+                }
+            },
+            label = "folderNav"
+        ) { page ->
         when {
             !isConnected -> {
                 // Not connected — show a neutral empty state.
@@ -93,16 +170,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                 }
             }
 
-            loading && entries.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LoadingIndicator(modifier = Modifier.size(64.dp))
-                }
-            }
-
-            needsPermission -> {
+            page.needsPermission -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -120,19 +188,22 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = bottomClearance)
                 ) {
-                    items(entries, key = { it.relativePath }) { entry ->
-                        // Request a thumbnail for media files on appearance. Folder stats
-                        // are intentionally NOT requested in v1: they are not displayed, and
-                        // a recursive size walk per folder froze the Mac on large trees.
+                    items(page.entries, key = { it.relativePath }) { entry ->
+                        val thumb = thumbs[entry.relativePath]
+                        val downloading = !entry.isDirectory && entry.name in downloadProgress
+
+                        // Request a thumbnail for media files on appearance — but only if we
+                        // don't already have it cached (thumbnails persist across navigation),
+                        // so returning to a folder doesn't re-fetch. Folder stats are
+                        // intentionally NOT requested in v1 (not displayed, and the recursive
+                        // size walk per folder froze the Mac on large trees).
                         LaunchedEffect(entry.relativePath) {
-                            if (!entry.isDirectory &&
+                            if (thumb == null && !entry.isDirectory &&
                                 (entry.mimeType.startsWith("image/") || entry.mimeType.startsWith("video/"))
                             ) {
                                 viewModel.requestMacThumb(entry.relativePath)
                             }
                         }
-
-                        val thumb = thumbs[entry.relativePath]
 
                         ListItem(
                             headlineContent = {
@@ -166,28 +237,70 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                                     )
                                 }
                             },
-                            trailingContent = if (!entry.isDirectory) {
+                            // A small progress ring appears while the file transfers, then
+                            // pops into a check for a moment on completion; otherwise the row
+                            // has no trailing control — tapping the row is the download action.
+                            trailingContent = if (downloading || entry.name in justDone) {
                                 {
-                                    IconButton(
-                                        onClick = { viewModel.downloadMacFile(entry.relativePath) }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Download,
-                                            contentDescription = stringResource(R.string.mac_files_download)
-                                        )
+                                    AnimatedContent(
+                                        targetState = downloading,
+                                        contentAlignment = Alignment.Center,
+                                        transitionSpec = {
+                                            // The check springs in; the ring just fades out.
+                                            (fadeIn(tween(150)) + scaleIn(
+                                                initialScale = 0.5f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )) togetherWith fadeOut(tween(120)) using null
+                                        },
+                                        label = "downloadTrailing"
+                                    ) { isDownloading ->
+                                        if (isDownloading) {
+                                            CircularProgressIndicator(
+                                                progress = { (downloadProgress[entry.name] ?: 0f).coerceIn(0f, 1f) },
+                                                modifier = Modifier.size(22.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Rounded.CheckCircle,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
                                     }
                                 }
                             } else null,
-                            modifier = Modifier.clickable(enabled = entry.isDirectory) {
-                                viewModel.openMacFolder(entry.relativePath)
+                            // Tap a folder to open it; tap a file to download it. A file
+                            // already transferring is not re-tappable.
+                            modifier = Modifier.clickable(
+                                enabled = entry.isDirectory || !downloading
+                            ) {
+                                if (entry.isDirectory) viewModel.openMacFolder(entry.relativePath)
+                                else viewModel.downloadMacFile(entry.relativePath)
                             }
                         )
                     }
                 }
             }
         }
+        }
     }
 }
+
+/** A snapshot of one folder's renderable content, so the slide can keep showing the
+ *  previous folder until the next one's listing is ready. */
+private data class FolderPage(
+    val path: String,
+    val entries: List<FileEntry>,
+    val needsPermission: Boolean
+)
+
+private fun folderDepth(path: String): Int =
+    if (path.isEmpty()) 0 else path.split('/').count { it.isNotEmpty() }
 
 /**
  * Horizontally-scrollable breadcrumb. The root segment is the Mac itself; each

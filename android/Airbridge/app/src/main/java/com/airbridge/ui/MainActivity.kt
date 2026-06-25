@@ -47,7 +47,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -353,8 +352,8 @@ class MainActivity : ComponentActivity() {
                                                 fabMenuExpanded = false
                                                 macUploadLauncher.launch(arrayOf("*/*"))
                                             },
-                                            icon = { Icon(Icons.Rounded.Upload, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.mac_files_upload)) }
+                                            icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.action_send_file)) }
                                         )
                                     } else {
                                         FloatingActionButtonMenuItem(

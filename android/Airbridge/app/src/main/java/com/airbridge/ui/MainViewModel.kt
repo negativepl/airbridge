@@ -34,6 +34,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val macFilesLoading = AirbridgeService.macFilesLoading
     val macFilesThumbnails = AirbridgeService.macFilesThumbnails
     val macFolderStats = AirbridgeService.macFolderStats
+    val macDownloadedNames = AirbridgeService.macDownloadedNames
+    val macDownloadProgress = AirbridgeService.macDownloadProgress
 
     private val _showQrScanner = MutableStateFlow(false)
     val showQrScanner: StateFlow<Boolean> = _showQrScanner.asStateFlow()

@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -117,6 +119,16 @@ class AirbridgeService : Service() {
         val macFilesLoading = MutableStateFlow(false)
         val macFilesThumbnails = MutableStateFlow<Map<String, String>>(emptyMap())
         val macFolderStats = MutableStateFlow<Map<String, Triple<Int, Int, Long>>>(emptyMap())
+        // Names of files successfully downloaded from the Mac this session. The Files
+        // screen compares this against a per-folder baseline, so a row shows the "done"
+        // check only for files finished while that folder was open (and the download
+        // button returns after leaving). A StateFlow (not an event) so concurrent
+        // completions can never be missed.
+        val macDownloadedNames = MutableStateFlow<Set<String>>(emptySet())
+        // Per-file download progress (filename -> 0..1) so several rows can each show
+        // their own progress at once — the single transferProgress can't represent
+        // concurrent Mac-file downloads.
+        val macDownloadProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
         private val pendingMacDownloads = java.util.concurrent.ConcurrentHashMap<String, String>() // transferId -> filename
 
         fun addActivity(context: Context, item: ActivityItem) {
@@ -214,8 +226,9 @@ class AirbridgeService : Service() {
             if (page == 0) {
                 macFilesPath.value = path
                 macFilesEntries.value = emptyList()
-                macFilesThumbnails.value = emptyMap()
-                macFolderStats.value = emptyMap()
+                // Thumbnails/folder-stats are keyed by full path (globally unique), so
+                // they are NOT cleared on navigation — returning to a folder shows its
+                // previews instantly instead of falling back to placeholder icons.
             }
             macFilesLoading.value = true
             instance?.webSocketClient?.send(
@@ -257,6 +270,9 @@ class AirbridgeService : Service() {
     private lateinit var networkMonitor: NetworkMonitor
     private val rediscoveryWatchdog = RediscoveryWatchdog()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // Serializes Mac-file downloads — one /send transfer at a time (the Mac drops
+    // concurrent streams, and the shared progress/notification state is single-slot).
+    private val downloadMutex = Mutex()
     private val httpFileUploader = HttpFileUploader()
     private val httpFileDownloader = HttpFileDownloader()
     private val httpFileServer = HttpFileServer()
@@ -1310,24 +1326,35 @@ class AirbridgeService : Service() {
                     return
                 }
                 serviceScope.launch {
-                    transferFileName.value = name
-                    transferIsSending.value = false
-                    transferProgress.value = 0f
-                    val tempFile = httpFileDownloader.download(
-                        host = host,
-                        port = httpPort.value,
-                        certFingerprint = webSocketClient.certFingerprintInUse,
-                        transferId = message.transferId,
-                        filenameHint = name
-                    ) { bytesReceived, totalBytes ->
-                        updateTransferProgress(name, bytesReceived, totalBytes)
-                    }
-                    if (tempFile != null) {
-                        finalizeReceivedFile(name, tempFile)
-                    } else {
-                        Log.e(TAG, "MacFileDownloadReady: download failed for $name")
-                        transferProgress.value = null
-                        transferFileName.value = null
+                    // Mark the file as pending right away (its row shows the indicator),
+                    // but run the actual transfer under a mutex so downloads are
+                    // SERIALIZED. The Mac's HTTP server drops a second concurrent /send
+                    // stream ("unexpected end of stream"), and the shared transfer/
+                    // notification state can't represent two at once — so a second tapped
+                    // file waits here until the current one finishes.
+                    macDownloadProgress.update { it + (name to 0f) }
+                    downloadMutex.withLock {
+                        // Files-browser downloads show progress with the row's in-app progress
+                        // ring, so they do NOT post the ongoing "Receiving file" notification or
+                        // touch the global transfer state — but the completion "File received"
+                        // notification (below) still fires.
+                        val tempFile = httpFileDownloader.download(
+                            host = host,
+                            port = httpPort.value,
+                            certFingerprint = webSocketClient.certFingerprintInUse,
+                            transferId = message.transferId,
+                            filenameHint = name
+                        ) { bytesReceived, totalBytes ->
+                            val p = if (totalBytes > 0) bytesReceived.toFloat() / totalBytes else 0f
+                            macDownloadProgress.update { it + (name to p) }
+                        }
+                        if (tempFile != null) {
+                            finalizeReceivedFile(name, tempFile)
+                            macDownloadedNames.update { it + name }
+                        } else {
+                            Log.e(TAG, "MacFileDownloadReady: download failed for $name")
+                        }
+                        macDownloadProgress.update { it - name }
                     }
                 }
             }
