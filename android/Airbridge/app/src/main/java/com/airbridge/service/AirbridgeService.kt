@@ -106,6 +106,17 @@ class AirbridgeService : Service() {
         val transferEtaSeconds = MutableStateFlow<Int>(0)
         val transferSpeedHistory = MutableStateFlow<List<Float>>(emptyList())  // normalized 0-1 speed samples
 
+        // Mac Files Browser state — populated by requestMacFilesList/inbound handlers
+        val macFilesPath = MutableStateFlow("")
+        val macFilesEntries = MutableStateFlow<List<com.airbridge.protocol.FileEntry>>(emptyList())
+        val macFilesTotal = MutableStateFlow(0)
+        val macFilesPage = MutableStateFlow(0)
+        val macFilesNeedsPermission = MutableStateFlow(false)
+        val macFilesLoading = MutableStateFlow(false)
+        val macFilesThumbnails = MutableStateFlow<Map<String, String>>(emptyMap())
+        val macFolderStats = MutableStateFlow<Map<String, Triple<Int, Int, Long>>>(emptyMap())
+        private val pendingMacDownloads = java.util.concurrent.ConcurrentHashMap<String, String>() // transferId -> filename
+
         fun addActivity(context: Context, item: ActivityItem) {
             // Atomic read-modify-write: callers run on arbitrary threads
             // (WebSocket callbacks, IO coroutines, main thread).
@@ -191,6 +202,38 @@ class AirbridgeService : Service() {
          *  `webSocketClient.certFingerprintInUse` directly. */
         fun certFingerprintInUse(): String =
             instance?.webSocketClient?.certFingerprintInUse ?: ""
+
+        // --- Mac Files Browser send methods ---
+
+        fun requestMacFilesList(
+            path: String, page: Int = 0, sortBy: String, sortDir: String,
+            foldersFirst: Boolean, query: String
+        ) {
+            if (page == 0) {
+                macFilesPath.value = path
+                macFilesEntries.value = emptyList()
+                macFilesThumbnails.value = emptyMap()
+                macFolderStats.value = emptyMap()
+            }
+            macFilesLoading.value = true
+            instance?.webSocketClient?.send(
+                Message.MacFilesListRequest(path, page, 200, sortBy, sortDir, foldersFirst, query)
+            )
+        }
+
+        fun requestMacFileThumbnail(path: String) {
+            instance?.webSocketClient?.send(Message.MacFileThumbnailRequest(path))
+        }
+
+        fun requestMacFolderStats(path: String) {
+            instance?.webSocketClient?.send(Message.MacFolderStatsRequest(path))
+        }
+
+        fun downloadMacFile(path: String) {
+            val transferId = java.util.UUID.randomUUID().toString()
+            pendingMacDownloads[transferId] = path.substringAfterLast('/')
+            instance?.webSocketClient?.send(Message.MacFileDownloadRequest(transferId, path))
+        }
     }
 
     /** Pairing data captured from a scanned QR code, consumed once the WebSocket connects. */
@@ -1237,6 +1280,51 @@ class AirbridgeService : Service() {
                         webSocketClient.send(Message.WallpaperResponse(image))
                     } catch (e: Exception) {
                         Log.e(TAG, "WallpaperRequest failed", e)
+                    }
+                }
+            }
+            is Message.MacFilesListResponse -> {
+                if (message.path == macFilesPath.value) {
+                    macFilesNeedsPermission.value = message.needsPermission
+                    macFilesEntries.value = if (message.page == 0) message.entries
+                                           else macFilesEntries.value + message.entries
+                    macFilesTotal.value = message.totalCount
+                    macFilesPage.value = message.page
+                    macFilesLoading.value = false
+                }
+            }
+            is Message.MacFileThumbnailResponse -> {
+                macFilesThumbnails.value = macFilesThumbnails.value + (message.path to message.data)
+            }
+            is Message.MacFolderStatsResponse -> {
+                macFolderStats.value = macFolderStats.value +
+                    (message.path to Triple(message.dirCount, message.fileCount, message.totalSize))
+            }
+            is Message.MacFileDownloadReady -> {
+                val name = pendingMacDownloads.remove(message.transferId) ?: message.filename
+                val host = connectedHost.value ?: run {
+                    Log.w(TAG, "MacFileDownloadReady: no host, cannot download ${message.transferId}")
+                    return
+                }
+                serviceScope.launch {
+                    transferFileName.value = name
+                    transferIsSending.value = false
+                    transferProgress.value = 0f
+                    val tempFile = httpFileDownloader.download(
+                        host = host,
+                        port = httpPort.value,
+                        certFingerprint = webSocketClient.certFingerprintInUse,
+                        transferId = message.transferId,
+                        filenameHint = name
+                    ) { bytesReceived, totalBytes ->
+                        updateTransferProgress(name, bytesReceived, totalBytes)
+                    }
+                    if (tempFile != null) {
+                        finalizeReceivedFile(name, tempFile)
+                    } else {
+                        Log.e(TAG, "MacFileDownloadReady: download failed for $name")
+                        transferProgress.value = null
+                        transferFileName.value = null
                     }
                 }
             }
