@@ -16,15 +16,19 @@ final class MacFilesService {
     func handle(_ message: Message, connectionId: String) {
         switch message {
         case .macFilesListRequest(let path, let page, let pageSize, let sortBy, let sortDir, let foldersFirst, let query):
-            let result: (entries: [FileEntry], total: Int, accessible: Bool)
-            if query.isEmpty {
-                result = provider.listDir(path, page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir, foldersFirst: foldersFirst)
-            } else {
-                let s = provider.searchDir(query, page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir, foldersFirst: foldersFirst)
-                result = (s.entries, s.total, true)
+            // Filesystem work runs off the main actor — a large directory or a
+            // recursive search must never block the Mac app's UI.
+            Task.detached { [provider, weak self] in
+                let result: (entries: [FileEntry], total: Int, accessible: Bool)
+                if query.isEmpty {
+                    result = provider.listDir(path, page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir, foldersFirst: foldersFirst)
+                } else {
+                    let s = provider.searchDir(query, page: page, pageSize: pageSize, sortBy: sortBy, sortDir: sortDir, foldersFirst: foldersFirst)
+                    result = (s.entries, s.total, true)
+                }
+                await self?.send(.macFilesListResponse(path: path, entries: result.entries, totalCount: result.total,
+                                                       page: page, needsPermission: !result.accessible), to: connectionId)
             }
-            send(.macFilesListResponse(path: path, entries: result.entries, totalCount: result.total,
-                                       page: page, needsPermission: !result.accessible), to: connectionId)
 
         case .macFileThumbnailRequest(let path):
             provider.thumbnailBase64(path) { [weak self] data in
@@ -33,8 +37,11 @@ final class MacFilesService {
             }
 
         case .macFolderStatsRequest(let path):
-            let s = provider.folderStats(path)
-            send(.macFolderStatsResponse(path: path, dirCount: s.dirCount, fileCount: s.fileCount, totalSize: s.totalSize), to: connectionId)
+            // folderStats does a recursive size walk — keep it off the main actor.
+            Task.detached { [provider, weak self] in
+                let s = provider.folderStats(path)
+                await self?.send(.macFolderStatsResponse(path: path, dirCount: s.dirCount, fileCount: s.fileCount, totalSize: s.totalSize), to: connectionId)
+            }
 
         case .macFileDownloadRequest(let transferId, let path):
             guard let url = provider.fileURL(path) else { return }

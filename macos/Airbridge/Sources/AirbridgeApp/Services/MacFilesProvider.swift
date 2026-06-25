@@ -6,7 +6,7 @@ import AppKit
 
 /// Browses the Mac's home directory for the phone. Relative paths use "/"; root ("") == home.
 /// Every resolve is contained to the root (symlink-resolved) — mirror of FilesProvider's guard.
-final class MacFilesProvider {
+final class MacFilesProvider: Sendable {
     private let root: URL
     private let rootCanonical: String
 
