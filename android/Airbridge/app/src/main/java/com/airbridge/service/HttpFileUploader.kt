@@ -26,6 +26,7 @@ class HttpFileUploader {
         certFingerprint: String,
         uri: Uri,
         contentResolver: ContentResolver,
+        destinationDir: String? = null,
         onProgress: (bytesSent: Long, totalBytes: Long) -> Unit
     ): Boolean {
         // Built per call: the TLS pin is per-host, so the client cannot be a
@@ -119,6 +120,7 @@ class HttpFileUploader {
             .url("https://$host:$port/upload")
             .header("X-Filename", encodedFilename)
             .header("X-Mime-Type", mimeType)
+            .apply { if (destinationDir != null) header("X-Destination-Dir", java.net.URLEncoder.encode(destinationDir, "UTF-8")) }
             .apply { if (checksum != null) header("X-Checksum-SHA256", checksum) }
             .post(body)
             .build()
