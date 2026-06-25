@@ -406,6 +406,81 @@ sealed class Message {
         }.toString()
     }
 
+    data class MacFilesListRequest(
+        val path: String, val page: Int, val pageSize: Int,
+        val sortBy: String = "name", val sortDir: String = "asc",
+        val foldersFirst: Boolean = true, val query: String = ""
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_files_list_request")
+            put("path", path); put("page", page); put("page_size", pageSize)
+            put("sort_by", sortBy); put("sort_dir", sortDir)
+            put("folders_first", foldersFirst); put("query", query)
+        }.toString()
+    }
+
+    data class MacFilesListResponse(
+        val path: String, val entries: List<FileEntry>,
+        val totalCount: Int, val page: Int, val needsPermission: Boolean
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_files_list_response")
+            put("path", path); put("total_count", totalCount)
+            put("page", page); put("needs_permission", needsPermission)
+            put("entries", JSONArray().apply {
+                entries.forEach { e ->
+                    put(JSONObject().apply {
+                        put("name", e.name); put("relative_path", e.relativePath)
+                        put("is_directory", e.isDirectory); put("size", e.size)
+                        put("modified", e.modified); put("mime_type", e.mimeType)
+                    })
+                }
+            })
+        }.toString()
+    }
+
+    data class MacFileThumbnailRequest(val path: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_file_thumbnail_request"); put("path", path)
+        }.toString()
+    }
+
+    data class MacFileThumbnailResponse(val path: String, val data: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_file_thumbnail_response"); put("path", path); put("data", data)
+        }.toString()
+    }
+
+    data class MacFolderStatsRequest(val path: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_folder_stats_request"); put("path", path)
+        }.toString()
+    }
+
+    data class MacFolderStatsResponse(
+        val path: String, val dirCount: Int, val fileCount: Int, val totalSize: Long
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_folder_stats_response"); put("path", path)
+            put("dir_count", dirCount); put("file_count", fileCount); put("total_size", totalSize)
+        }.toString()
+    }
+
+    data class MacFileDownloadRequest(val transferId: String, val path: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_file_download_request"); put("transfer_id", transferId); put("path", path)
+        }.toString()
+    }
+
+    data class MacFileDownloadReady(
+        val transferId: String, val filename: String, val mimeType: String, val fileSize: Long
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "mac_file_download_ready"); put("transfer_id", transferId)
+            put("filename", filename); put("mime_type", mimeType); put("file_size", fileSize)
+        }.toString()
+    }
+
     data class FileThumbnailRequest(
         val path: String
     ) : Message() {
@@ -1041,6 +1116,32 @@ sealed class Message {
                     notificationKey = obj.getString("notification_key"),
                     text = obj.getString("text")
                 )
+                "mac_files_list_request" -> MacFilesListRequest(
+                    path = obj.getString("path"), page = obj.optInt("page", 0),
+                    pageSize = obj.optInt("page_size", 200), sortBy = obj.optString("sort_by", "name"),
+                    sortDir = obj.optString("sort_dir", "asc"),
+                    foldersFirst = obj.optBoolean("folders_first", true), query = obj.optString("query", "")
+                )
+                "mac_files_list_response" -> {
+                    val arr = obj.getJSONArray("entries")
+                    val entries = (0 until arr.length()).map { i ->
+                        val e = arr.getJSONObject(i)
+                        FileEntry(e.getString("name"), e.getString("relative_path"),
+                            e.getBoolean("is_directory"), e.getLong("size"),
+                            e.getLong("modified"), e.getString("mime_type"))
+                    }
+                    MacFilesListResponse(obj.getString("path"), entries,
+                        obj.getInt("total_count"), obj.getInt("page"), obj.getBoolean("needs_permission"))
+                }
+                "mac_file_thumbnail_request" -> MacFileThumbnailRequest(obj.getString("path"))
+                "mac_file_thumbnail_response" -> MacFileThumbnailResponse(obj.getString("path"), obj.getString("data"))
+                "mac_folder_stats_request" -> MacFolderStatsRequest(obj.getString("path"))
+                "mac_folder_stats_response" -> MacFolderStatsResponse(
+                    obj.getString("path"), obj.getInt("dir_count"), obj.getInt("file_count"), obj.getLong("total_size"))
+                "mac_file_download_request" -> MacFileDownloadRequest(obj.getString("transfer_id"), obj.getString("path"))
+                "mac_file_download_ready" -> MacFileDownloadReady(
+                    obj.getString("transfer_id"), obj.getString("filename"),
+                    obj.getString("mime_type"), obj.getLong("file_size"))
                 else -> throw IllegalArgumentException("Unknown message type: $type")
             }
         }
