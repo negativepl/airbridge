@@ -27,6 +27,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val transferEtaSeconds: StateFlow<Int> = AirbridgeService.transferEtaSeconds
     val transferSpeedHistory: StateFlow<List<Float>> = AirbridgeService.transferSpeedHistory
 
+    // Mac Files Browser state
+    val macFilesEntries = AirbridgeService.macFilesEntries
+    val macFilesPath = AirbridgeService.macFilesPath
+    val macFilesNeedsPermission = AirbridgeService.macFilesNeedsPermission
+    val macFilesLoading = AirbridgeService.macFilesLoading
+    val macFilesThumbnails = AirbridgeService.macFilesThumbnails
+    val macFolderStats = AirbridgeService.macFolderStats
+
     private val _showQrScanner = MutableStateFlow(false)
     val showQrScanner: StateFlow<Boolean> = _showQrScanner.asStateFlow()
 
@@ -85,6 +93,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
             action = AirbridgeService.ACTION_SEND_FILE
             data = uri
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        getApplication<Application>().startService(intent)
+    }
+
+    // Mac Files Browser actions
+
+    fun openMacFolder(
+        path: String,
+        sortBy: String = "name",
+        sortDir: String = "asc",
+        foldersFirst: Boolean = true,
+        query: String = ""
+    ) = AirbridgeService.requestMacFilesList(path, 0, sortBy, sortDir, foldersFirst, query)
+
+    fun requestMacThumb(path: String) = AirbridgeService.requestMacFileThumbnail(path)
+
+    fun requestMacStats(path: String) = AirbridgeService.requestMacFolderStats(path)
+
+    fun downloadMacFile(path: String) = AirbridgeService.downloadMacFile(path)
+
+    fun uploadToMac(uri: Uri, destinationDir: String) {
+        val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
+            action = AirbridgeService.ACTION_SEND_FILE
+            putExtra(AirbridgeService.EXTRA_FILE_URI, uri)
+            putExtra(AirbridgeService.EXTRA_DESTINATION_DIR, destinationDir)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         getApplication<Application>().startService(intent)

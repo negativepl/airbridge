@@ -57,6 +57,8 @@ class AirbridgeService : Service() {
         const val EXTRA_HOST = "extra_host"
         const val EXTRA_PORT = "extra_port"
         const val EXTRA_CERT_FINGERPRINT = "extra_cert_fingerprint"
+        const val EXTRA_FILE_URI = "extra_file_uri"
+        const val EXTRA_DESTINATION_DIR = "extra_destination_dir"
 
         const val ACTION_REDISCOVER = "com.airbridge.action.REDISCOVER"
 
@@ -401,11 +403,12 @@ class AirbridgeService : Service() {
                 }
             }
             ACTION_SEND_FILE -> {
-                val uri: Uri? = intent.data
+                val uri: Uri? = intent.getParcelableExtra(EXTRA_FILE_URI, Uri::class.java) ?: intent.data
                 val text: String? = intent.getStringExtra(Intent.EXTRA_TEXT)
+                val destinationDir: String? = intent.getStringExtra(EXTRA_DESTINATION_DIR)
                 if (uri != null) {
-                    Log.d(TAG, "File transfer requested: $uri")
-                    handleSendFile(uri)
+                    Log.d(TAG, "File transfer requested: $uri (destinationDir=$destinationDir)")
+                    handleSendFile(uri, destinationDir)
                 } else if (!text.isNullOrEmpty()) {
                     Log.d(TAG, "Text share requested (${text.length} chars)")
                     sendClipboardToMac(ContentType.PLAIN_TEXT, text)
@@ -1334,7 +1337,7 @@ class AirbridgeService : Service() {
         }
     }
 
-    private fun handleSendFile(uri: Uri) {
+    private fun handleSendFile(uri: Uri, destinationDir: String? = null) {
         if (!webSocketClient.isConnected) {
             Log.w(TAG, "handleSendFile: not connected")
             android.widget.Toast.makeText(this, getString(com.airbridge.R.string.not_connected), android.widget.Toast.LENGTH_SHORT).show()
@@ -1441,7 +1444,8 @@ class AirbridgeService : Service() {
                 port = port,
                 certFingerprint = webSocketClient.certFingerprintInUse,
                 uri = uri,
-                contentResolver = applicationContext.contentResolver
+                contentResolver = applicationContext.contentResolver,
+                destinationDir = destinationDir
             ) { bytesSent, totalBytes ->
                 lastFileSize = totalBytes
                 val elapsed = System.currentTimeMillis() - startTime
