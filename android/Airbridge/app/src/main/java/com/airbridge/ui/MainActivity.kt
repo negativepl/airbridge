@@ -47,11 +47,11 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
@@ -221,6 +221,20 @@ class MainActivity : ComponentActivity() {
                             pendingIsPhoto = true
                         }
                     }
+                    // Mac Files upload — sends straight to the currently-browsed Mac folder
+                    // (no confirmation sheet; the user already chose this from the Files tab).
+                    val macFilesPath by viewModel.macFilesPath.collectAsState()
+                    val macUploadLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument()
+                    ) { uri: Uri? ->
+                        uri?.let { viewModel.uploadToMac(it, macFilesPath) }
+                    }
+                    // On the Files tab, Back walks up the Mac folder tree instead of
+                    // leaving the app. Gated on the tab being current AND being in a
+                    // subfolder, so it never hijacks Back on other screens or at root.
+                    BackHandler(enabled = pagerState.currentPage == 2 && macFilesPath.isNotEmpty()) {
+                        viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', ""))
+                    }
 
                     // Static top bar — no collapse. The bar would otherwise be shared
                     // across both pager pages, and a bar collapsed on Home looked broken
@@ -330,43 +344,57 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 ) {
-                                    FloatingActionButtonMenuItem(
-                                        onClick = {
-                                            fabMenuExpanded = false
-                                            filePickerLauncher.launch(arrayOf("*/*"))
-                                        },
-                                        icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                                        text = { Text(stringResource(R.string.action_send_file)) }
-                                    )
-                                    FloatingActionButtonMenuItem(
-                                        onClick = {
-                                            fabMenuExpanded = false
-                                            photoPickerLauncher.launch(
-                                                androidx.activity.result.PickVisualMediaRequest(
-                                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                                    // The same FAB adapts its options to the current tab:
+                                    // on the Files tab it uploads into the folder currently
+                                    // open on the Mac; elsewhere it sends file/photo/clipboard.
+                                    if (pagerState.currentPage == 2) {
+                                        FloatingActionButtonMenuItem(
+                                            onClick = {
+                                                fabMenuExpanded = false
+                                                macUploadLauncher.launch(arrayOf("*/*"))
+                                            },
+                                            icon = { Icon(Icons.Rounded.Upload, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.mac_files_upload)) }
+                                        )
+                                    } else {
+                                        FloatingActionButtonMenuItem(
+                                            onClick = {
+                                                fabMenuExpanded = false
+                                                filePickerLauncher.launch(arrayOf("*/*"))
+                                            },
+                                            icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.action_send_file)) }
+                                        )
+                                        FloatingActionButtonMenuItem(
+                                            onClick = {
+                                                fabMenuExpanded = false
+                                                photoPickerLauncher.launch(
+                                                    androidx.activity.result.PickVisualMediaRequest(
+                                                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                                                    )
                                                 )
-                                            )
-                                        },
-                                        icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
-                                        text = { Text(stringResource(R.string.action_send_photo)) }
-                                    )
-                                    FloatingActionButtonMenuItem(
-                                        onClick = {
-                                            fabMenuExpanded = false
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = clipboard.primaryClip
-                                            val text = if (clip != null && clip.itemCount > 0)
-                                                clip.getItemAt(0).coerceToText(context).toString() else ""
-                                            if (text.isNotEmpty()) {
-                                                viewModel.sendClipboard(text)
-                                                Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                        icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                                        text = { Text(stringResource(R.string.action_send_clipboard)) }
-                                    )
+                                            },
+                                            icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.action_send_photo)) }
+                                        )
+                                        FloatingActionButtonMenuItem(
+                                            onClick = {
+                                                fabMenuExpanded = false
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = clipboard.primaryClip
+                                                val text = if (clip != null && clip.itemCount > 0)
+                                                    clip.getItemAt(0).coerceToText(context).toString() else ""
+                                                if (text.isNotEmpty()) {
+                                                    viewModel.sendClipboard(text)
+                                                    Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.action_send_clipboard)) }
+                                        )
+                                    }
                                 }
                             }
                         },
@@ -380,7 +408,7 @@ class MainActivity : ComponentActivity() {
                             when (page) {
                                 0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true }, bottomClearance = fabClearance)
                                 1 -> ScreenShareScreen(bottomClearance = fabClearance)
-                                2 -> MacFilesScreen(viewModel = viewModel)
+                                2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
                             }
                         }
                     }

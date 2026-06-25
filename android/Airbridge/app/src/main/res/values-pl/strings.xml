@@ -147,6 +147,8 @@
     <string name="nav_mac_files">Pliki Maca</string>
     <string name="mac_files_permission_needed">Przyznaj dostęp do plików na Macu</string>
     <string name="mac_files_upload">Wgraj z telefonu</string>
+    <string name="mac_files_download">Pobierz na telefon</string>
+    <string name="mac_files_root">Mac</string>
     <string name="nav_history">Historia</string>
     <string name="nav_screen_sharing">Ekran</string>
     <string name="nav_send">Wyślij</string>

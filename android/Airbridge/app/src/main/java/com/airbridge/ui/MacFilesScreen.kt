@@ -3,33 +3,32 @@ package com.airbridge.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,12 +40,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 
+/**
+ * Browser for the Mac's home directory. Renders as plain content inside the
+ * shared [MainActivity] Scaffold — it does NOT create its own Scaffold (that
+ * would double the insets and collide with the global FAB). The upload action
+ * lives on the host's contextual FAB. [bottomClearance] keeps the list above
+ * that FAB and the dock.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MacFilesScreen(viewModel: MainViewModel) {
+fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
     val path by viewModel.macFilesPath.collectAsState()
     val entries by viewModel.macFilesEntries.collectAsState()
     val needsPermission by viewModel.macFilesNeedsPermission.collectAsState()
@@ -63,151 +71,173 @@ fun MacFilesScreen(viewModel: MainViewModel) {
         }
     }
 
-    val pickFile = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let { viewModel.uploadToMac(it, path) }
-    }
-
-    Scaffold(
-        floatingActionButton = {
-            if (isConnected) {
-                ExtendedFloatingActionButton(
-                    onClick = { pickFile.launch(arrayOf("*/*")) },
-                    icon = { Icon(Icons.Rounded.Upload, contentDescription = null) },
-                    text = { Text(stringResource(R.string.mac_files_upload)) }
-                )
-            }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Breadcrumb path bar — tappable segments, each jumps straight to that
+        // ancestor (mirror of the macOS FilesBrowserView path bar).
+        if (isConnected) {
+            MacPathBar(path = path, onNavigate = { viewModel.openMacFolder(it) })
         }
-    ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
-            // Breadcrumb / up navigation
-            if (path.isNotEmpty()) {
-                TextButton(
-                    onClick = {
-                        val parent = path.substringBeforeLast('/', "")
-                        viewModel.openMacFolder(parent)
-                    }
+
+        when {
+            !isConnected -> {
+                // Not connected — show a neutral empty state.
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = stringResource(R.string.nav_back),
-                        modifier = Modifier.size(18.dp)
-                    )
                     Text(
-                        text = "  /$path",
-                        style = MaterialTheme.typography.labelLarge
+                        text = stringResource(R.string.not_connected),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            when {
-                !isConnected -> {
-                    // Not connected — show a neutral empty state.
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.not_connected),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            loading && entries.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LoadingIndicator(modifier = Modifier.size(64.dp))
                 }
+            }
 
-                loading && entries.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+            needsPermission -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.mac_files_permission_needed),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
 
-                needsPermission -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.mac_files_permission_needed),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(entries, key = { it.relativePath }) { entry ->
-                            // Request thumbnails / folder stats on appearance.
-                            LaunchedEffect(entry.relativePath) {
-                                if (entry.isDirectory) {
-                                    viewModel.requestMacStats(entry.relativePath)
-                                } else if (entry.mimeType.startsWith("image/") ||
-                                    entry.mimeType.startsWith("video/")
-                                ) {
-                                    viewModel.requestMacThumb(entry.relativePath)
-                                }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = bottomClearance)
+                ) {
+                    items(entries, key = { it.relativePath }) { entry ->
+                        // Request a thumbnail for media files on appearance. Folder stats
+                        // are intentionally NOT requested in v1: they are not displayed, and
+                        // a recursive size walk per folder froze the Mac on large trees.
+                        LaunchedEffect(entry.relativePath) {
+                            if (!entry.isDirectory &&
+                                (entry.mimeType.startsWith("image/") || entry.mimeType.startsWith("video/"))
+                            ) {
+                                viewModel.requestMacThumb(entry.relativePath)
                             }
-
-                            val thumb = thumbs[entry.relativePath]
-
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = entry.name,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        maxLines = 1
-                                    )
-                                },
-                                supportingContent = if (!entry.isDirectory && entry.size > 0) {
-                                    {
-                                        Text(
-                                            text = formatFileSize(entry.size),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                } else null,
-                                leadingContent = {
-                                    if (thumb != null) {
-                                        ThumbImage(base64 = thumb)
-                                    } else {
-                                        Icon(
-                                            imageVector = if (entry.isDirectory) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
-                                            contentDescription = null,
-                                            tint = if (entry.isDirectory)
-                                                MaterialTheme.colorScheme.primary
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                    }
-                                },
-                                trailingContent = if (!entry.isDirectory) {
-                                    {
-                                        IconButton(
-                                            onClick = { viewModel.downloadMacFile(entry.relativePath) }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Download,
-                                                contentDescription = stringResource(R.string.action_send_file)
-                                            )
-                                        }
-                                    }
-                                } else null,
-                                modifier = Modifier.clickable(enabled = entry.isDirectory) {
-                                    viewModel.openMacFolder(entry.relativePath)
-                                }
-                            )
                         }
+
+                        val thumb = thumbs[entry.relativePath]
+
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = entry.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1
+                                )
+                            },
+                            supportingContent = if (!entry.isDirectory && entry.size > 0) {
+                                {
+                                    Text(
+                                        text = formatFileSize(entry.size),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else null,
+                            leadingContent = {
+                                if (thumb != null) {
+                                    ThumbImage(base64 = thumb)
+                                } else {
+                                    Icon(
+                                        imageVector = if (entry.isDirectory) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
+                                        contentDescription = null,
+                                        tint = if (entry.isDirectory)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                            },
+                            trailingContent = if (!entry.isDirectory) {
+                                {
+                                    IconButton(
+                                        onClick = { viewModel.downloadMacFile(entry.relativePath) }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Download,
+                                            contentDescription = stringResource(R.string.mac_files_download)
+                                        )
+                                    }
+                                }
+                            } else null,
+                            modifier = Modifier.clickable(enabled = entry.isDirectory) {
+                                viewModel.openMacFolder(entry.relativePath)
+                            }
+                        )
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Horizontally-scrollable breadcrumb. The root segment is the Mac itself; each
+ * path component is tappable and navigates straight to that ancestor. The last
+ * segment is the current directory (highlighted, not clickable).
+ */
+@Composable
+private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
+    val segments = remember(path) { path.split('/').filter { it.isNotEmpty() } }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PathSegment(
+            label = stringResource(R.string.mac_files_root),
+            isCurrent = segments.isEmpty(),
+            onClick = { onNavigate("") }
+        )
+        segments.forEachIndexed { index, segment ->
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            PathSegment(
+                label = segment,
+                isCurrent = index == segments.lastIndex,
+                onClick = { onNavigate(segments.take(index + 1).joinToString("/")) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PathSegment(label: String, isCurrent: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = !isCurrent, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    )
 }
 
 /**

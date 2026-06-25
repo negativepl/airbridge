@@ -147,6 +147,8 @@
     <string name="nav_mac_files">Mac files</string>
     <string name="mac_files_permission_needed">Grant file access on your Mac</string>
     <string name="mac_files_upload">Upload from phone</string>
+    <string name="mac_files_download">Download to phone</string>
+    <string name="mac_files_root">Mac</string>
     <string name="nav_history">History</string>
     <string name="nav_screen_sharing">Screen</string>
     <string name="nav_send">Send</string>
