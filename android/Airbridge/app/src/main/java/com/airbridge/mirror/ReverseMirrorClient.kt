@@ -39,10 +39,10 @@ class ReverseMirrorClient(
     fun connect() {
         val req = Request.Builder().url("wss://$host:$port/").build()
         webSocket = http.newWebSocket(req, object : WebSocketListener() {
-            override fun onOpen(ws: WebSocket, response: Response) {
-                ws.send(MirrorMessage.ReverseHello(pairingToken, screenWidth, screenHeight, mode).encode().toByteString())
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                webSocket.send(MirrorMessage.ReverseHello(pairingToken, screenWidth, screenHeight, mode).encode().toByteString())
             }
-            override fun onMessage(ws: WebSocket, bytes: ByteString) {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 runCatching { MirrorMessage.decode(bytes.toByteArray()) }
                     .onSuccess { msg ->
                         when (msg) {
@@ -53,11 +53,11 @@ class ReverseMirrorClient(
                         }
                     }
             }
-            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 android.util.Log.w("ReverseMirror", "onClosed code=$code reason=$reason")
                 onDisconnect()
             }
-            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 android.util.Log.w("ReverseMirror", "onFailure: ${t.javaClass.simpleName}: ${t.message} resp=${response?.code}")
                 onDisconnect()
             }

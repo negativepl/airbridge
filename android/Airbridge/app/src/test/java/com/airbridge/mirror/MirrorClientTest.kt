@@ -38,8 +38,10 @@ class MirrorClientTest {
         }
     }
     @After fun tearDown() {
-        // MockWebServer's internal task-runner threads may still be draining; ignore the timeout
-        try { server.shutdown() } catch (_: java.io.IOException) { }
+        // Best-effort teardown of the test double: MockWebServer's task-runner threads may
+        // still be draining the WebSocket queue, and okhttp 5's close() raises an
+        // AssertionError on that timeout. runCatching swallows it (also covers IOException).
+        runCatching { server.shutdown() }
     }
 
     @Test fun `sends HELLO on connect`() {

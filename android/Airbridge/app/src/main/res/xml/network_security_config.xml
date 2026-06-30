@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <!-- All outbound traffic is TLS: wss:// to the Mac (WebSocketClient) and https://
+         for file transfer (HttpFileDownloader/HttpFileUploader), validated by pinned
+         trust in PinnedTls. There is no cleartext client traffic, so it is disallowed.
+         The phone's inbound HttpFileServer uses a raw ServerSocket, which is not governed
+         by this config. -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

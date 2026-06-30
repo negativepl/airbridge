@@ -7,9 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import androidx.core.content.IntentCompat
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.os.Build
 import android.os.IBinder
 import android.util.DisplayMetrics
 import android.view.WindowManager
@@ -40,7 +40,7 @@ class MirrorService : Service() {
         stopMirror()
         startForegroundCompat()
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
-        val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA) ?: return stopSelf()
+        val data = IntentCompat.getParcelableExtra(intent, EXTRA_RESULT_DATA, Intent::class.java) ?: return stopSelf()
         val host = intent.getStringExtra(EXTRA_HOST) ?: return stopSelf()
         val port = intent.getIntExtra(EXTRA_PORT, 0)
         val token = intent.getByteArrayExtra(EXTRA_TOKEN) ?: return stopSelf()
@@ -93,25 +93,19 @@ class MirrorService : Service() {
 
     private fun startForegroundCompat() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(NotificationChannel(
-                CHANNEL, "Mirror", NotificationManager.IMPORTANCE_LOW))
-        }
+        nm.createNotificationChannel(NotificationChannel(
+            CHANNEL, "Mirror", NotificationManager.IMPORTANCE_LOW))
         val stopIntent = Intent(this, MirrorService::class.java).setAction(ACTION_STOP)
         val stopPi = PendingIntent.getService(this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE)
         val notif = Notification.Builder(this, CHANNEL)
             .setContentTitle(getString(R.string.app_name))
             .setContentText("Mirror trwa")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .addAction(0, "Stop", stopPi)
+            .addAction(Notification.Action.Builder(null, "Stop", stopPi).build())
             .setOngoing(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-        } else {
-            startForeground(NOTIF_ID, notif)
-        }
+        startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
     }
 
     @Suppress("DEPRECATION")

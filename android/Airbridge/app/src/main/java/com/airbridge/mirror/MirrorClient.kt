@@ -33,11 +33,11 @@ class MirrorClient(
     fun connect() {
         val req = Request.Builder().url("wss://$host:$port/").build()
         webSocket = http.newWebSocket(req, object : WebSocketListener() {
-            override fun onOpen(ws: WebSocket, response: Response) {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
                 val hello = MirrorMessage.Hello(pairingToken, screenWidth, screenHeight, orientation)
-                ws.send(hello.encode().toByteString())
+                webSocket.send(hello.encode().toByteString())
             }
-            override fun onMessage(ws: WebSocket, bytes: ByteString) {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 runCatching { MirrorMessage.decode(bytes.toByteArray()) }
                     .onSuccess { msg ->
                         when (msg) {
@@ -47,8 +47,8 @@ class MirrorClient(
                         }
                     }
             }
-            override fun onClosed(ws: WebSocket, code: Int, reason: String) { onDisconnect() }
-            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) { onDisconnect() }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { onDisconnect() }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { onDisconnect() }
         })
     }
 

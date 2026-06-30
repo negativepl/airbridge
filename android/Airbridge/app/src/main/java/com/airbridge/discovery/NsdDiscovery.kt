@@ -62,6 +62,10 @@ class NsdDiscovery(private val context: Context) {
         }
     }
 
+    // NsdManager.resolveService() is deprecated in API 34 in favour of
+    // registerServiceInfoCallback(), which does not exist below API 34. With minSdk 29
+    // the deprecated resolve is the only path that works across all supported versions.
+    @Suppress("DEPRECATION")
     private fun createDiscoveryListener() = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(TAG, "Discovery start failed: error $errorCode")
@@ -116,6 +120,10 @@ class NsdDiscovery(private val context: Context) {
         }
     }
 
+    // NsdServiceInfo.host is deprecated in API 34 in favour of getHostAddresses(), which
+    // does not exist below API 34. With minSdk 29 the deprecated accessor is the only one
+    // available across all supported versions.
+    @Suppress("DEPRECATION")
     private fun createResolveListener(owner: NsdManager.DiscoveryListener) = object : NsdManager.ResolveListener {
         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
             Log.e(TAG, "Resolve failed for ${serviceInfo.serviceName}: error $errorCode")

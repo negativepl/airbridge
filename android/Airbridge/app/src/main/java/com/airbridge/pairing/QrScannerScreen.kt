@@ -28,7 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -51,6 +51,9 @@ data class PairingPayload(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
+// imageProxy.image is opt-in (ExperimentalGetImage); we read it only to hand the frame
+// to ML Kit and close the proxy immediately afterwards.
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 fun QrScannerScreen(
     onScanned: (PairingPayload) -> Unit,

@@ -129,9 +129,9 @@ class HttpFileUploader {
             val response = client.newCall(request).execute()
             val success = response.isSuccessful
             if (!success) {
-                Log.e(TAG, "Upload failed: ${response.code} ${response.body?.string()}")
+                Log.e(TAG, "Upload failed: ${response.code} ${response.body.string()}")
             } else {
-                Log.d(TAG, "Upload successful: ${response.body?.string()}")
+                Log.d(TAG, "Upload successful: ${response.body.string()}")
             }
             response.close()
             success

@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -119,18 +120,22 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
         }
     }
 
-    // Keep the current folder's content on screen until the NEXT folder's listing has
-    // arrived, then swap with the slide. No loading flash between folders, and the
-    // directional transition gets real content on both sides (a true push).
-    var displayed by remember { mutableStateOf(FolderPage(path, entries, needsPermission)) }
-    LaunchedEffect(path, entries, loading, needsPermission) {
-        if (path != displayed.path) {
-            // New folder: hold the old page until its listing is ready (loading done).
-            if (!loading) displayed = FolderPage(path, entries, needsPermission)
-        } else {
-            // Same folder: keep content in sync (pagination, permission grant, refresh).
-            displayed = FolderPage(path, entries, needsPermission)
-        }
+    // Cache each folder's last-known listing. Every navigation clears entries and refetches
+    // from the Mac, so without this, going back (or re-entering a folder) would slide into an
+    // empty pane that then reloads. With the cache we show real content immediately and the
+    // background refresh updates it in place — making the back slide a true push.
+    val folderCache = remember { mutableStateMapOf<String, List<FileEntry>>() }
+    LaunchedEffect(path, entries) {
+        if (entries.isNotEmpty()) folderCache[path] = entries
+    }
+    val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
+
+    // Navigate optimistically: the slide starts the instant a folder is tapped. Forward
+    // re-entry and going back push real content (from the cache); a never-seen folder fills
+    // in during the ~330ms slide, or shows a delayed spinner if the listing is genuinely slow.
+    var displayed by remember { mutableStateOf(FolderPage(path, effectiveEntries, needsPermission)) }
+    LaunchedEffect(path, effectiveEntries, loading, needsPermission) {
+        displayed = FolderPage(path, effectiveEntries, needsPermission)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -180,6 +185,34 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                 ) {
                     Text(
                         text = stringResource(R.string.mac_files_permission_needed),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            page.entries.isEmpty() && loading -> {
+                // Listing still arriving. Reveal a spinner only if it is genuinely slow —
+                // on a fast load the content lands during the slide and we never flash one.
+                var showSpinner by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(200); showSpinner = true }
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showSpinner) CircularProgressIndicator()
+                }
+            }
+
+            page.entries.isEmpty() -> {
+                // Folder genuinely has no files or subfolders — say so explicitly,
+                // otherwise a blank screen reads like a failure.
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.mac_files_empty_folder),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -407,6 +440,6 @@ private fun ThumbImage(base64: String) {
 private fun formatFileSize(bytes: Long): String = when {
     bytes < 1024L -> "$bytes B"
     bytes < 1024L * 1024L -> "${bytes / 1024} KB"
-    bytes < 1024L * 1024L * 1024L -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
-    else -> String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+    bytes < 1024L * 1024L * 1024L -> String.format(java.util.Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024.0))
+    else -> String.format(java.util.Locale.getDefault(), "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
 }

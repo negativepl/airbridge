@@ -48,12 +48,8 @@ object DeviceInfoProvider {
             ?: BatteryManager.BATTERY_STATUS_UNKNOWN
         val charging = batteryStatusIsCharging(batteryStatus)
         val chargeTimeMs: Long =
-            if (charging && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                // computeChargeTimeRemaining(): ms do pełna, lub -1 gdy nieznany.
-                bm.computeChargeTimeRemaining()
-            } else {
-                -1L
-            }
+            // computeChargeTimeRemaining(): ms do pełna, lub -1 gdy nieznany.
+            if (charging) bm.computeChargeTimeRemaining() else -1L
 
         return DeviceInfo(
             name = name,

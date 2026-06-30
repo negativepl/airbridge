@@ -81,12 +81,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import com.airbridge.R
 import kotlinx.coroutines.launch
 
 private val PillShape = RoundedCornerShape(50)
+
+// "All files access" (MANAGE_EXTERNAL_STORAGE) only exists from API 30 (R). On API 29
+// the method is absent — calling it would crash — and the grant is unobtainable, so the
+// files feature is simply reported as ungranted there.
+private fun isAllFilesAccessGranted(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
 
 // "Next" page change: emphasized-easing tween, NOT a spring — a spring overshoots
 // (bounces) at the end, which reads as broken next to a standard app screen
@@ -365,7 +372,7 @@ private fun PermissionsPage() {
     var smsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_SMS)) }
     var photosGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_MEDIA_IMAGES)) }
     var contactsGranted by remember { mutableStateOf(checkPerm(android.Manifest.permission.READ_CONTACTS)) }
-    var hasFilesGrant by remember { mutableStateOf(Environment.isExternalStorageManager()) }
+    var hasFilesGrant by remember { mutableStateOf(isAllFilesAccessGranted()) }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsGranted = it }
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -376,7 +383,7 @@ private fun PermissionsPage() {
     val filesLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        hasFilesGrant = Environment.isExternalStorageManager()
+        hasFilesGrant = isAllFilesAccessGranted()
     }
     // Optional (mirror only): lets the Mac start screen mirroring while the app
     // is in the background. Not part of `allGranted` so it never blocks onboarding.

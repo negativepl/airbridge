@@ -188,6 +188,10 @@ class MainActivity : ComponentActivity() {
                     var pendingIsPhoto by remember { mutableStateOf(false) }
                     val context = LocalContext.current
                     val haptic = LocalHapticFeedback.current
+                    // Resolved in composition so they follow locale changes; the Toasts
+                    // below fire from click callbacks where stringResource() can't be called.
+                    val sentToMacMsg = stringResource(R.string.sent_to_mac)
+                    val clipboardEmptyMsg = stringResource(R.string.clipboard_empty)
 
                     // Measure the FAB and the nav dock in window coordinates so the
                     // home content can reserve a bottom clearance that leaves the
@@ -380,9 +384,9 @@ class MainActivity : ComponentActivity() {
                                                 clip.getItemAt(0).coerceToText(context).toString() else ""
                                             if (text.isNotEmpty()) {
                                                 viewModel.sendClipboard(text)
-                                                Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, sentToMacMsg, Toast.LENGTH_SHORT).show()
                                             } else {
-                                                Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, clipboardEmptyMsg, Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
@@ -445,19 +449,21 @@ class MainActivity : ComponentActivity() {
 
                     // File/photo confirmation sheet
                     if (pendingFileUri != null) {
+                        // rememberModalBottomSheetState is deprecated in favour of
+                        // rememberBottomSheetState(Hidden), which is not yet present in
+                        // material3 1.5.0-alpha22 — keep this until the replacement ships.
+                        @Suppress("DEPRECATION")
+                        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                         ModalBottomSheet(
                             onDismissRequest = { pendingFileUri = null },
-                            // rememberModalBottomSheetState is deprecated in favour of
-                            // rememberBottomSheetState(Hidden), which is not yet present in
-                            // material3 1.5.0-alpha22 — keep this until the replacement ships.
-                            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                            sheetState = sheetState
                         ) {
                             SendConfirmationSheet(
                                 uri = pendingFileUri!!,
                                 isPhoto = pendingIsPhoto,
                                 onConfirm = {
                                     viewModel.sendFile(pendingFileUri!!)
-                                    Toast.makeText(context, context.getString(R.string.sent_to_mac), Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, sentToMacMsg, Toast.LENGTH_SHORT).show()
                                     pendingFileUri = null
                                 },
                                 onCancel = { pendingFileUri = null }

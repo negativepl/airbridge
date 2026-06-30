@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AirBridge</string>
-    <string name="accessibility_description">AirBridge używa tego uprawnienia, by odczytywać zmiany w schowku w tle i synchronizować je z komputerem Mac. Żadne inne dane nie są pobierane.</string>
 
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">AirBridge</string>
@@ -10,7 +9,6 @@
     <string name="onboarding_feature_files">Przeglądaj i przesyłaj pliki oraz zdjęcia, bez chmury</string>
     <string name="onboarding_feature_notifications">Powiadomienia z telefonu na Macu</string>
     <string name="onboarding_feature_more">…i wiele więcej</string>
-    <string name="onboarding_feature_local">Wszystko zostaje w Twojej sieci — pełna prywatność</string>
     <string name="onboarding_connect_title">Jak to działa?</string>
     <string name="onboarding_connect_desc">Kilka rzeczy, które warto wiedzieć:</string>
     <string name="onboarding_how_wifi">Telefon i Mac muszą być w tej samej sieci Wi-Fi</string>
@@ -18,14 +16,8 @@
     <string name="onboarding_how_local">Nie potrzebujesz internetu — wszystko działa w Twojej sieci lokalnej</string>
     <string name="onboarding_how_privacy">Twoje dane nie opuszczają domu — nic nie trafia do chmury</string>
     <string name="onboarding_how_pairing">Parujesz raz kodem QR — potem łączy się samo</string>
-    <string name="onboarding_ready_title">Gotowe!</string>
-    <string name="onboarding_ready_desc">Zaznacz dowolny tekst w dowolnej aplikacji — pojawi się opcja „Wyślij do komputera Mac". Kliknij, by przesłać tekst natychmiast.</string>
     <string name="onboarding_permissions_title">Uprawnienia</string>
     <string name="onboarding_permissions_desc">AirBridge potrzebuje kilku uprawnień, aby działać w pełni prawidłowo.</string>
-    <string name="onboarding_perm_notifications">Powiadomienia o postępie przesyłania</string>
-    <string name="onboarding_perm_nearby">Sieć lokalna — aby znaleźć komputer Mac w pobliżu</string>
-    <string name="onboarding_perm_allow">Zezwól na powiadomienia</string>
-    <string name="onboarding_perm_granted">Gotowe — uprawnienia nadane</string>
     <string name="onboarding_perm_notifications_desc">Powiadomienia</string>
     <string name="onboarding_perm_notifications_why">Aby pokazywać postęp przesyłania plików i prośby o odbiór plików z komputera Mac</string>
     <string name="onboarding_perm_sms_desc">Wiadomości SMS</string>
@@ -48,54 +40,34 @@
     <string name="onboarding_perm_granted_short">Przyznano</string>
     <string name="onboarding_perm_all_granted">Wszystkie uprawnienia nadane</string>
     <string name="onboarding_next">Dalej</string>
-    <string name="onboarding_get_started">Zaczynamy</string>
 
     <!-- Main screen -->
     <string name="connected">Połączono</string>
     <string name="not_connected">Brak połączenia</string>
-    <string name="connected_to">Połączono z %s</string>
     <string name="searching">Szukam komputera Mac w Twojej sieci…</string>
     <string name="connecting">Łączenie…</string>
     <string name="disconnecting">Rozłączanie…</string>
-    <string name="clipboard_active">Synchronizacja schowka aktywna</string>
     <string name="send_to_mac">Wyślij do komputera Mac</string>
     <string name="disconnect">Rozłącz</string>
-    <string name="hint_title">Jak używać?</string>
-    <string name="hint_select_text">Zaznacz tekst w dowolnej aplikacji i wybierz „Wyślij do komputera Mac"</string>
     <string name="reconnect">Połącz ponownie</string>
 
     <!-- Quick actions -->
-    <string name="quick_actions">Szybkie akcje</string>
     <string name="action_send_file">Wyślij plik</string>
     <string name="action_send_photo">Wyślij zdjęcie</string>
     <string name="action_send_clipboard">Wyślij schowek</string>
     <string name="clipboard_empty">Schowek jest pusty</string>
-    <string name="action_ping">Ping</string>
 
     <!-- Activity -->
     <string name="recent_activity">Ostatnia aktywność</string>
     <string name="no_activity">Brak transferów</string>
     <string name="activity_sent">Wysłano do Maca</string>
     <string name="activity_received">Odebrano z Maca</string>
-    <string name="connected_for">Połączono od %s</string>
-    <string name="minutes_ago">%d min temu</string>
-    <string name="hours_ago">%d godz. temu</string>
-    <string name="just_now">Przed chwilą</string>
-    <string name="clipboard_sent_to_mac">Tekst wysłany do komputera Mac</string>
-    <string name="clipboard_received_from">Tekst odebrany z %s</string>
-    <string name="file_sent_to_mac">Plik wysłany do komputera Mac</string>
-    <string name="file_received_from">Plik odebrany z %s</string>
-    <string name="ping_sent">Ping wysłany</string>
-    <string name="pong_received">Pong!</string>
     <string name="time_now">teraz</string>
     <string name="time_minutes">%d min</string>
     <string name="time_hours">%d godz.</string>
     <string name="time_days">%d dn.</string>
 
     <!-- Permissions -->
-    <string name="permission_overlay_title">Wymagane uprawnienie</string>
-    <string name="permission_overlay_desc">Aby synchronizować schowek w tle, zezwól na wyświetlanie nad innymi aplikacjami.</string>
-    <string name="grant_permission">Nadaj uprawnienie</string>
 
     <!-- Send confirmation -->
     <string name="send_confirm_title">Gotowe do wysłania</string>
@@ -111,18 +83,11 @@
     <string name="notification_title_file_rejected">Plik odrzucony</string>
     <string name="notification_title_receiving">Odbieram plik od %s</string>
     <string name="notification_title_sending">Wysyłam do %s</string>
-    <string name="notification_file_sent">%s — wysłano</string>
-    <string name="notification_file_error">%s — błąd wysyłania</string>
     <string name="transfer_sending">Wysyłanie…</string>
-    <string name="transfer_receiving">Odbieranie…</string>
-    <string name="notification_file_received">%s — odebrano</string>
-    <string name="notification_receiving_from">Odbieranie od %s</string>
-    <string name="notification_receiving_size">%s — %s</string>
     <string name="notification_accept_file">%s chce wysłać Ci plik</string>
-    <string name="notification_accept_file_detail">%s (%s)</string>
+    <string name="notification_accept_file_detail">%1$s (%2$s)</string>
     <string name="notification_accept">Akceptuj</string>
     <string name="notification_reject">Odrzuć</string>
-    <string name="notification_file_rejected">%s — odrzucono</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Dotknij, aby zwinąć</string>
 
@@ -138,8 +103,18 @@
     <string name="share_sheet_no_devices">Brak sparowanych urządzeń</string>
     <string name="share_sheet_no_devices_desc">Sparuj komputer Mac otwierając aplikację AirBridge.</string>
     <string name="share_sheet_send">Wyślij</string>
-    <string name="share_sheet_text_preview">Tekst · %1$d znaków</string>
-    <string name="share_sheet_multiple_files">Plików: %1$d</string>
+    <plurals name="share_sheet_text_preview">
+        <item quantity="one">Tekst · %1$d znak</item>
+        <item quantity="few">Tekst · %1$d znaki</item>
+        <item quantity="many">Tekst · %1$d znaków</item>
+        <item quantity="other">Tekst · %1$d znaku</item>
+    </plurals>
+    <plurals name="share_sheet_multiple_files">
+        <item quantity="one">%1$d plik</item>
+        <item quantity="few">%1$d pliki</item>
+        <item quantity="many">%1$d plików</item>
+        <item quantity="other">%1$d pliku</item>
+    </plurals>
 
     <!-- Navigation -->
     <string name="fab_close_menu">Zamknij menu</string>
@@ -147,20 +122,15 @@
     <string name="nav_mac_files">Pliki z Maca</string>
     <string name="mac_files_permission_needed">Przyznaj dostęp do plików na Macu</string>
     <string name="mac_files_root">Mac</string>
-    <string name="nav_history">Historia</string>
+    <string name="mac_files_empty_folder">Ten folder jest pusty</string>
     <string name="nav_screen_sharing">Ekran</string>
     <string name="nav_send">Wyślij</string>
     <string name="nav_settings">Ustawienia</string>
     <string name="nav_about">O aplikacji</string>
     <string name="nav_back">Wstecz</string>
-    <string name="history_title">Historia</string>
-    <string name="history_empty">Brak transferów</string>
-    <string name="history_empty_desc">Historia synchronizacji i przesłanych plików pojawi się tutaj</string>
 
     <!-- Settings -->
-    <string name="settings_title">Ustawienia</string>
     <string name="settings_appearance">Wygląd</string>
-    <string name="settings_theme">Motyw</string>
     <string name="settings_theme_system">Systemowy</string>
     <string name="settings_theme_light">Jasny</string>
     <string name="settings_theme_dark">Ciemny</string>
@@ -170,9 +140,6 @@
     <string name="settings_notifications">Powiadomienia</string>
     <string name="settings_vibrate">Wibracja przy synchronizacji</string>
     <string name="settings_vibrate_desc">Krótka wibracja po zsynchronizowaniu schowka</string>
-    <string name="settings_about">Informacje</string>
-    <string name="settings_version">Wersja</string>
-    <string name="settings_licenses">Licencje open source</string>
     <string name="settings_hide_notification">Ukryj powiadomienie w tle</string>
     <string name="settings_hide_notification_desc">Otwiera ustawienia systemowe, by wyłączyć powiadomienie „Działa w tle"</string>
     <string name="channel_service_name">Usługa w tle</string>
@@ -181,10 +148,8 @@
     <string name="channel_files_desc">Powiadomienia o wysyłaniu i odbieraniu plików</string>
     <string name="settings_download_folder">Folder pobierania</string>
     <string name="settings_download_folder_desc">Odebrane pliki będą zapisywane tutaj</string>
-    <string name="settings_download_folder_default">Downloads/AirBridge</string>
 
     <!-- About -->
-    <string name="about_title">O aplikacji</string>
     <string name="about_description">Połącz telefon z komputerem Mac. Synchronizuj schowek, przesyłaj pliki — wszystko lokalnie, bez chmury.</string>
     <string name="about_created_by">Autor</string>
     <string name="about_author">Marcin Baszewski</string>
@@ -199,7 +164,6 @@
     <string name="pairing_scan_desc">Otwórz AirBridge na komputerze Mac i kliknij „Sparuj urządzenie"</string>
     <string name="pairing_camera_required">Uprawnienie do aparatu jest wymagane, aby zeskanować kod QR.</string>
     <string name="pairing_skip">Pomiń</string>
-    <string name="pairing_success">Sparowano z %s</string>
     <string name="pairing_no_devices">Brak sparowanych urządzeń</string>
     <string name="pairing_add_mac">Sparuj z komputerem Mac</string>
     <string name="pairing_paired_devices">Sparowane urządzenia</string>
@@ -217,9 +181,7 @@
     <string name="notification_ring_text">Dotknij Zatrzymaj, aby wyciszyć</string>
     <string name="notification_ring_stop">Zatrzymaj</string>
     <string name="pairing_success_desc">Połączono z %s</string>
-    <string name="pairing_success_connected">Połączenie aktywne</string>
     <string name="pairing_success_continue">Dalej</string>
-    <string name="screen_sharing_title">Udostępnianie ekranu</string>
     <string name="screen_sharing_show_mac">Pokaż ekran Maca</string>
     <string name="screen_sharing_show_mac_desc">Podgląd i sterowanie głównym ekranem Maca.</string>
     <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>

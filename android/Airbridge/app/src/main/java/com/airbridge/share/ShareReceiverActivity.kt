@@ -3,6 +3,7 @@ package com.airbridge.share
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.IntentCompat
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -55,7 +56,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -155,7 +158,7 @@ class ShareReceiverActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             )
                         )
@@ -229,7 +232,7 @@ class ShareReceiverActivity : ComponentActivity() {
     private fun parseShareIntent(intent: Intent): ParsedShare? {
         return when (intent.action) {
             Intent.ACTION_SEND -> {
-                val uri: Uri? = intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                val uri: Uri? = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT)
                 when {
                     uri != null -> ParsedShare(fileUris = listOf(uri), text = null)
@@ -239,7 +242,7 @@ class ShareReceiverActivity : ComponentActivity() {
             }
             Intent.ACTION_SEND_MULTIPLE -> {
                 val uris: ArrayList<Uri>? =
-                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                    IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                 if (uris.isNullOrEmpty()) null
                 else ParsedShare(fileUris = uris.toList(), text = null)
             }
@@ -408,7 +411,7 @@ private fun SharePreview(parsed: ParsedShare) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = stringResource(R.string.share_sheet_text_preview, parsed.text.length),
+                    text = pluralStringResource(R.plurals.share_sheet_text_preview, parsed.text.length, parsed.text.length),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -443,7 +446,7 @@ private fun SharePreview(parsed: ParsedShare) {
             }
             Spacer(Modifier.width(16.dp))
             Text(
-                text = stringResource(R.string.share_sheet_multiple_files, parsed.fileUris.size),
+                text = pluralStringResource(R.plurals.share_sheet_multiple_files, parsed.fileUris.size, parsed.fileUris.size),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -470,11 +473,13 @@ private fun SharePreview(parsed: ParsedShare) {
         Triple(name, size, mime.startsWith("image/"))
     }
 
+    // Read the locale from the composition so the formatted size follows a locale change.
+    val locale = LocalConfiguration.current.locales[0]
     val sizeText = when {
         fileSize <= 0 -> ""
         fileSize < 1024 -> "$fileSize B"
         fileSize < 1024 * 1024 -> "${fileSize / 1024} KB"
-        else -> String.format(java.util.Locale.getDefault(), "%.1f MB", fileSize / (1024.0 * 1024.0))
+        else -> String.format(locale, "%.1f MB", fileSize / (1024.0 * 1024.0))
     }
 
     if (isImage) {

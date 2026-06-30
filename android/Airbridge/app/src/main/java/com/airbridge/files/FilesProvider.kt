@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.util.Base64
 import android.util.Log
@@ -72,7 +73,11 @@ class FilesProvider(
 ) {
     private val root: File = Environment.getExternalStorageDirectory()
 
-    fun hasGrant(): Boolean = Environment.isExternalStorageManager()
+    // "All files access" (MANAGE_EXTERNAL_STORAGE) only exists from API 30 (R).
+    // On API 29 the method is absent — calling it would crash — and the grant is
+    // unobtainable anyway, so the feature is simply unavailable there.
+    fun hasGrant(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
 
     /** Listing katalogu (relPath="" = korzeń /sdcard). Zwraca (entries, totalCount). */
     fun listDir(

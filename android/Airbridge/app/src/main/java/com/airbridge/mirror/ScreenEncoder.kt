@@ -55,18 +55,14 @@ class ScreenEncoder(
             // feeds the encoder. Without it a 120 Hz panel pushes ~120 fps of
             // mostly-duplicate frames regardless of KEY_FRAME_RATE (which is
             // only a rate-control hint).
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, fps.toFloat())
-            }
+            setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, fps.toFloat())
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, keyframeIntervalSeconds)
             setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())
-                setInteger(MediaFormat.KEY_PRIORITY, 0)
-            }
+            setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())
+            setInteger(MediaFormat.KEY_PRIORITY, 0)
         }
         val codec = MediaCodec.createEncoderByType(mime)
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)

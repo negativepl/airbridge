@@ -30,7 +30,7 @@ class ScreenDecoder(
      */
     @Volatile private var stopped = false
 
-    private val lock = Object()
+    private val lock = Any()
     private val pendingFrames = ArrayDeque<Pair<ByteArray, Long>>()   // (annexB, ptsUs)
     private val freeInputs = ArrayDeque<Int>()
 

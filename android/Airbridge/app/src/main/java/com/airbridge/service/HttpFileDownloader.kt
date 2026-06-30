@@ -67,7 +67,7 @@ class HttpFileDownloader {
             val safeName = filenameHint.replace('/', '_').replace('\\', '_')
             val tempFile = File.createTempFile("airbridge_", "_$safeName")
             val digest = MessageDigest.getInstance("SHA-256")
-            response.body?.byteStream()?.use { input ->
+            response.body.byteStream().use { input ->
                 FileOutputStream(tempFile).use { out ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var totalRead = 0L

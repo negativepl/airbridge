@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
+import androidx.core.content.IntentCompat
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -419,7 +421,7 @@ class AirbridgeService : Service() {
                 }
             }
             ACTION_SEND_FILE -> {
-                val uri: Uri? = intent.getParcelableExtra(EXTRA_FILE_URI, Uri::class.java) ?: intent.data
+                val uri: Uri? = IntentCompat.getParcelableExtra(intent, EXTRA_FILE_URI, Uri::class.java) ?: intent.data
                 val text: String? = intent.getStringExtra(Intent.EXTRA_TEXT)
                 val destinationDir: String? = intent.getStringExtra(EXTRA_DESTINATION_DIR)
                 if (uri != null) {
@@ -687,8 +689,8 @@ class AirbridgeService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val sender = connectedDeviceName.value ?: "Mac"
             val sizeText = when {
-                totalBytes > 1024 * 1024 -> String.format("%.1f MB", totalBytes / (1024.0 * 1024.0))
-                totalBytes > 1024 -> String.format("%.0f KB", totalBytes / 1024.0)
+                totalBytes > 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f MB", totalBytes / (1024.0 * 1024.0))
+                totalBytes > 1024 -> String.format(Locale.getDefault(), "%.0f KB", totalBytes / 1024.0)
                 else -> "$totalBytes B"
             }
             val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
@@ -870,8 +872,8 @@ class AirbridgeService : Service() {
         pendingOffers[offer.transferId] = offer
         val sender = connectedDeviceName.value ?: "Mac"
         val sizeText = when {
-            offer.fileSize > 1024 * 1024 -> String.format("%.1f MB", offer.fileSize / (1024.0 * 1024.0))
-            offer.fileSize > 1024 -> String.format("%.0f KB", offer.fileSize / 1024.0)
+            offer.fileSize > 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f MB", offer.fileSize / (1024.0 * 1024.0))
+            offer.fileSize > 1024 -> String.format(Locale.getDefault(), "%.0f KB", offer.fileSize / 1024.0)
             else -> "${offer.fileSize} B"
         }
         val notifId = (offer.transferId.hashCode() and 0x7FFFFFFF) % 100000 + 100
@@ -1740,15 +1742,11 @@ class AirbridgeService : Service() {
 
     private fun startForegroundWithNotification(title: String, text: String) {
         val notification = buildNotification(title, text)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        startForeground(
+            NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        )
     }
 
 }
