@@ -42,26 +42,29 @@ struct AboutWindowView: View {
                 .padding(.horizontal, 24)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Credits
+            // Credits — the same team roster as the About tab: Marcin at the
+            // top, then the Claude crew with their roles.
             VStack(spacing: 0) {
                 creditRow(
                     image: loadBundledImage("logo_negative"),
                     fallback: "person.circle.fill",
-                    caption: L10n.isPL ? "Autor" : "Author",
+                    caption: L10n.isPL ? "Szef projektu" : "Project lead",
                     name: "Marcin Baszewski",
                     url: "https://github.com/negativepl"
                 )
 
-                Divider()
-                    .padding(.horizontal, 14)
+                ForEach(ClaudeTeam.members, id: \.name) { member in
+                    Divider()
+                        .padding(.horizontal, 14)
 
-                creditRow(
-                    image: loadBundledImage("logo_claude"),
-                    fallback: "sparkles",
-                    caption: L10n.isPL ? "Napędzane przez" : "Powered by",
-                    name: "Claude Opus 4.6",
-                    url: "https://anthropic.com"
-                )
+                    creditRow(
+                        image: loadBundledImage("logo_claude"),
+                        fallback: "sparkles",
+                        caption: member.role,
+                        name: member.name,
+                        url: "https://anthropic.com"
+                    )
+                }
             }
             .contentCard(cornerRadius: 14)
             .padding(.horizontal, 20)
@@ -95,7 +98,9 @@ struct AboutWindowView: View {
         }
         .padding(.top, 32)
         .padding(.bottom, 18)
-        .frame(width: 360, height: 540)
+        // Taller than the original two-row layout — the team roster adds three
+        // credit rows and the window must still fit without scrolling.
+        .frame(width: 360, height: 700)
     }
 
     // MARK: - Credit row

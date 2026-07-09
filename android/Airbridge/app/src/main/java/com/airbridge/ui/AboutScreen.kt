@@ -178,22 +178,32 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     }
                 )
 
-                // AI — Claude / Anthropic
-                ListItem(
-                    leadingContent = {
-                        Image(
-                            painter = painterResource(R.drawable.logo_claude),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Fit
-                        )
-                    },
-                    headlineContent = { Text(stringResource(R.string.about_powered_by)) },
-                    supportingContent = { Text("Anthropic") },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                // The Claude crew — a wink at how this app actually gets built:
+                // each model listed with the job it does around here.
+                val team = listOf(
+                    Triple("Claude Fable 5", R.string.about_role_manager, null),
+                    Triple("Claude Opus 4.8", R.string.about_role_foreman, null),
+                    Triple("Claude Sonnet 5", R.string.about_role_engineer, null),
+                    Triple("Claude Haiku 4.5", R.string.about_role_intern, R.string.about_intern_note)
                 )
+                team.forEach { (name, roleRes, noteRes) ->
+                    ListItem(
+                        leadingContent = {
+                            Image(
+                                painter = painterResource(R.drawable.logo_claude),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Fit
+                            )
+                        },
+                        overlineContent = { Text(stringResource(roleRes)) },
+                        headlineContent = { Text(name) },
+                        supportingContent = noteRes?.let { { Text(stringResource(it)) } },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
             }
         }
 

@@ -45,23 +45,27 @@ struct AboutTabView: View {
 
     // MARK: - Credits
 
+    /// The project team — mirrors the Android About screen's roster: Marcin at
+    /// the top, then the Claude crew with the job each model does around here.
     private var creditsSection: some View {
         GlassSection {
             creditRow(
                 image: loadBundledImage("logo_negative"),
                 fallback: "person.circle.fill",
-                caption: L10n.isPL ? "Autor" : "Created by",
+                caption: L10n.isPL ? "Szef projektu" : "Project lead",
                 name: "Marcin Baszewski",
                 url: "https://github.com/negativepl"
             )
-            Divider()
-            creditRow(
-                image: loadBundledImage("logo_claude"),
-                fallback: "sparkles",
-                caption: L10n.isPL ? "Napędzane przez" : "Powered by",
-                name: "Claude · Anthropic",
-                url: "https://anthropic.com"
-            )
+            ForEach(ClaudeTeam.members, id: \.name) { member in
+                Divider()
+                creditRow(
+                    image: loadBundledImage("logo_claude"),
+                    fallback: "sparkles",
+                    caption: member.role,
+                    name: member.name,
+                    url: "https://anthropic.com"
+                )
+            }
         }
     }
 
@@ -171,5 +175,27 @@ struct AboutTabView: View {
     private func loadBundledImage(_ name: String) -> NSImage? {
         guard let url = AppResources.bundle.url(forResource: name, withExtension: "png") else { return nil }
         return NSImage(contentsOf: url)
+    }
+}
+
+/// The Claude models credited in About, each with its role on the team.
+/// Shared by the About tab and the compact Apple-menu About window.
+enum ClaudeTeam {
+    struct Member {
+        let name: String
+        let role: String
+    }
+
+    static var members: [Member] {
+        [
+            Member(name: "Claude Fable 5",
+                   role: L10n.isPL ? "Menadżer projektu" : "Project manager"),
+            Member(name: "Claude Opus 4.8",
+                   role: L10n.isPL ? "Brygadzista" : "Foreman"),
+            Member(name: "Claude Sonnet 5",
+                   role: L10n.isPL ? "Programista" : "Software engineer"),
+            Member(name: "Claude Haiku 4.5",
+                   role: L10n.isPL ? "Stażysta — parzy kawę" : "Intern — makes the coffee")
+        ]
     }
 }

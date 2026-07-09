@@ -151,9 +151,13 @@
 
     <!-- About -->
     <string name="about_description">Połącz telefon z komputerem Mac. Synchronizuj schowek, przesyłaj pliki — wszystko lokalnie, bez chmury.</string>
-    <string name="about_created_by">Autor</string>
+    <string name="about_created_by">Szef projektu</string>
     <string name="about_author">Marcin Baszewski</string>
-    <string name="about_powered_by">Powered by Claude Opus 4.8</string>
+    <string name="about_role_manager">Menadżer projektu</string>
+    <string name="about_role_foreman">Brygadzista</string>
+    <string name="about_role_engineer">Programista</string>
+    <string name="about_role_intern">Stażysta</string>
+    <string name="about_intern_note">Parzy kawę</string>
     <string name="about_source_code">Kod źródłowy na GitHub</string>
     <string name="about_report_issue">Zgłoś problem</string>
     <string name="about_open_source">AirBridge jest open source</string>

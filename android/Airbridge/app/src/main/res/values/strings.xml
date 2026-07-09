@@ -147,9 +147,13 @@
 
     <!-- About -->
     <string name="about_description">Bridge the gap between your Android phone and Mac. Clipboard sync, file transfers, zero cloud — everything stays on your local network.</string>
-    <string name="about_created_by">Created by</string>
+    <string name="about_created_by">Project lead</string>
     <string name="about_author">Marcin Baszewski</string>
-    <string name="about_powered_by">Powered by Claude Opus 4.8</string>
+    <string name="about_role_manager">Project manager</string>
+    <string name="about_role_foreman">Foreman</string>
+    <string name="about_role_engineer">Software engineer</string>
+    <string name="about_role_intern">Intern</string>
+    <string name="about_intern_note">Makes the coffee</string>
     <string name="about_source_code">Source code on GitHub</string>
     <string name="about_report_issue">Report an issue</string>
     <string name="about_open_source">AirBridge is open source</string>
