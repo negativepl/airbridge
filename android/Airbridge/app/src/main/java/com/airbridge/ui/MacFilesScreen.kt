@@ -7,7 +7,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -130,14 +129,6 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    // Navigate optimistically: the slide starts the instant a folder is tapped. Forward
-    // re-entry and going back push real content (from the cache); a never-seen folder fills
-    // in during the ~330ms slide, or shows a delayed spinner if the listing is genuinely slow.
-    var displayed by remember { mutableStateOf(FolderPage(path, effectiveEntries, needsPermission)) }
-    LaunchedEffect(path, effectiveEntries, loading, needsPermission) {
-        displayed = FolderPage(path, effectiveEntries, needsPermission)
-    }
-
     Column(modifier = Modifier.fillMaxSize()) {
         // Breadcrumb path bar — tappable segments, each jumps straight to that
         // ancestor (mirror of the macOS FilesBrowserView path bar).
@@ -147,22 +138,32 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
 
         // Directional folder navigation: entering a folder pushes the new listing in
         // from the right, going up slides it back from the left (by path depth).
+        //
+        // Keyed by PATH ONLY — deliberately not by (path, entries). The slide starts
+        // the instant a folder is tapped (optimistic navigation), and the listing
+        // usually arrives from the Mac while those 330ms are still running; if the
+        // entries were part of the key, that mid-flight refresh would retarget the
+        // AnimatedContent and cut the slide short (the "animation sometimes doesn't
+        // play" bug). With the path as the key, content fills in by plain
+        // recomposition of the pane and the slide always completes. The exiting pane
+        // reads its listing from the cache so it keeps its content while sliding out.
         AnimatedContent(
-            targetState = displayed,
+            targetState = path,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                if (initialState.path == targetState.path) {
-                    // Same folder (content refresh) — swap instantly, no slide.
-                    (fadeIn(snap()) togetherWith fadeOut(snap())) using null
-                } else {
-                    val dir = if (folderDepth(targetState.path) >= folderDepth(initialState.path))
-                        SlideDirection.Left else SlideDirection.Right
-                    (slideIntoContainer(dir, tween(330, easing = FastOutSlowInEasing)) + fadeIn(tween(220))) togetherWith
-                        (slideOutOfContainer(dir, tween(300, easing = FastOutSlowInEasing)) + fadeOut(tween(200)))
-                }
+                val dir = if (folderDepth(targetState) >= folderDepth(initialState))
+                    SlideDirection.Left else SlideDirection.Right
+                (slideIntoContainer(dir, tween(330, easing = FastOutSlowInEasing)) + fadeIn(tween(220))) togetherWith
+                    (slideOutOfContainer(dir, tween(300, easing = FastOutSlowInEasing)) + fadeOut(tween(200)))
             },
             label = "folderNav"
-        ) { page ->
+        ) { panePath ->
+        // Live state for the current pane; the exiting pane falls back to the cache
+        // (its live flows already describe the NEW folder).
+        val isCurrentPane = panePath == path
+        val paneEntries = if (isCurrentPane) effectiveEntries else folderCache[panePath] ?: emptyList()
+        val paneNeedsPermission = isCurrentPane && needsPermission
+        val paneLoading = isCurrentPane && loading
         when {
             !isConnected -> {
                 // Not connected — show a neutral empty state.
@@ -178,7 +179,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                 }
             }
 
-            page.needsPermission -> {
+            paneNeedsPermission -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -191,7 +192,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                 }
             }
 
-            page.entries.isEmpty() && loading -> {
+            paneEntries.isEmpty() && paneLoading -> {
                 // Listing still arriving. Reveal a spinner only if it is genuinely slow —
                 // on a fast load the content lands during the slide and we never flash one.
                 var showSpinner by remember { mutableStateOf(false) }
@@ -204,7 +205,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                 }
             }
 
-            page.entries.isEmpty() -> {
+            paneEntries.isEmpty() -> {
                 // Folder genuinely has no files or subfolders — say so explicitly,
                 // otherwise a blank screen reads like a failure.
                 Box(
@@ -227,14 +228,14 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = bottomClearance)
                 ) {
-                    itemsIndexed(page.entries, key = { _, it -> it.relativePath }) { index, entry ->
+                    itemsIndexed(paneEntries, key = { _, it -> it.relativePath }) { index, entry ->
                         val thumb = thumbs[entry.relativePath]
                         val downloading = !entry.isDirectory && entry.name in downloadProgress
                         // Grouped-list shape: the first/last rows round their outer edges
                         // strongly, rows between are gently rounded. With a small gap the list
                         // reads as one rounded group (M3 Expressive style).
                         val isFirst = index == 0
-                        val isLast = index == page.entries.lastIndex
+                        val isLast = index == paneEntries.lastIndex
                         val shape = RoundedCornerShape(
                             topStart = if (isFirst) 20.dp else 8.dp,
                             topEnd = if (isFirst) 20.dp else 8.dp,
@@ -344,14 +345,6 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
         }
     }
 }
-
-/** A snapshot of one folder's renderable content, so the slide can keep showing the
- *  previous folder until the next one's listing is ready. */
-private data class FolderPage(
-    val path: String,
-    val entries: List<FileEntry>,
-    val needsPermission: Boolean
-)
 
 private fun folderDepth(path: String): Int =
     if (path.isEmpty()) 0 else path.split('/').count { it.isNotEmpty() }
