@@ -130,14 +130,24 @@ final class UpdateService {
         let script = """
         #!/bin/bash
         set -e
+        exec >> "$HOME/Library/Logs/AirBridge-update.log" 2>&1
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: begin"
         sleep 1                              # let the app finish quitting
         STAGE="$(mktemp -d)"
         /usr/bin/ditto -x -k "\(zipURL.path)" "$STAGE"
         /usr/bin/xattr -dr com.apple.quarantine "$STAGE/AirBridge.app" || true
-        rm -rf "/Applications/AirBridge.app"
-        /usr/bin/ditto "$STAGE/AirBridge.app" "/Applications/AirBridge.app"
+        [ -d "$STAGE/AirBridge.app" ] || { echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: extracted payload missing, aborting"; exit 1; }
+        mv "/Applications/AirBridge.app" "$STAGE/previous" 2>/dev/null || true
+        if ! /usr/bin/ditto "$STAGE/AirBridge.app" "/Applications/AirBridge.app"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: install failed, rolling back"
+            rm -rf "/Applications/AirBridge.app"
+            mv "$STAGE/previous" "/Applications/AirBridge.app"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: end (rollback)"
+            exit 1
+        fi
         rm -rf "$STAGE" "\(zipURL.path)"
         /usr/bin/open "/Applications/AirBridge.app"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: end (success)"
         """
         let scriptURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("airbridge-update-\(UUID().uuidString).sh")
