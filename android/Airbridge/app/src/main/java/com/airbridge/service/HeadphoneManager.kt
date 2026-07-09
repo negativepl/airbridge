@@ -120,8 +120,11 @@ class HeadphoneManager(private val context: Context) {
             Log.w(TAG, "BLUETOOTH_CONNECT not granted — headphone handoff inactive")
             return
         }
-        adapter?.getProfileProxy(context, profileListener, BluetoothProfile.A2DP)
-        adapter?.getProfileProxy(context, profileListener, BluetoothProfile.HEADSET)
+        // Only bind proxies not already held — start() is called on every
+        // reconnect and on every Settings refresh, and re-requesting an
+        // already-bound proxy leaks a binding each time.
+        if (a2dp == null) adapter?.getProfileProxy(context, profileListener, BluetoothProfile.A2DP)
+        if (headset == null) adapter?.getProfileProxy(context, profileListener, BluetoothProfile.HEADSET)
         if (!receiverRegistered) {
             ContextCompat.registerReceiver(
                 context,

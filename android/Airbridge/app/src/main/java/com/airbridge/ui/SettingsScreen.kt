@@ -1,9 +1,11 @@
 package com.airbridge.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.content.SharedPreferences
+import com.airbridge.service.AirbridgeService
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
@@ -428,6 +430,11 @@ private fun SettingsContent(
                         onValueChange = {
                             headphoneHandoff = it
                             prefs.edit { putBoolean("headphone_handoff_enabled", it) }
+                            ContextCompat.startForegroundService(
+                                context,
+                                Intent(context, AirbridgeService::class.java)
+                                    .setAction(AirbridgeService.ACTION_HEADPHONE_REFRESH)
+                            )
                         }
                     )
                 )
@@ -475,6 +482,11 @@ private fun SettingsContent(
                                             }
                                             headphoneName = device.name
                                             showHeadphonePicker = false
+                                            ContextCompat.startForegroundService(
+                                                context,
+                                                Intent(context, AirbridgeService::class.java)
+                                                    .setAction(AirbridgeService.ACTION_HEADPHONE_REFRESH)
+                                            )
                                         }
                                     )
                                 }

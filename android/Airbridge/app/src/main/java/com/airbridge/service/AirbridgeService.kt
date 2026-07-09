@@ -60,6 +60,7 @@ class AirbridgeService : Service() {
         const val ACTION_REJECT_FILE = "com.airbridge.action.REJECT_FILE"
         const val ACTION_STOP_RING = "com.airbridge.action.STOP_RING"
         const val ACTION_HEADPHONE_TAKEOVER = "com.airbridge.action.HEADPHONE_TAKEOVER"
+        const val ACTION_HEADPHONE_REFRESH = "com.airbridge.action.HEADPHONE_REFRESH"
         private const val RING_NOTIFICATION_ID = 7
 
         const val EXTRA_HOST = "extra_host"
@@ -295,6 +296,7 @@ class AirbridgeService : Service() {
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
     private var currentMirrorPort: Int? = null
     private lateinit var headphoneManager: HeadphoneManager
+    @Volatile
     private var pendingRelease: CompletableDeferred<Message.HeadphoneReleaseResponse>? = null
 
     private fun headphonePrefs() = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
@@ -388,6 +390,18 @@ class AirbridgeService : Service() {
         webSocketClient.forgetHost()
         connectedHost.value = null
         nsdDiscovery.restart()
+    }
+
+    /**
+     * The Mac's headphone state and any in-flight handoff belong to the
+     * connection that just went away — clear them so the Home screen doesn't
+     * show stale state (or a spinner that will never resolve) against nothing.
+     */
+    private fun clearHeadphoneHandoffState() {
+        macHeadphoneState.value = null
+        if (headphoneHandoffPhase.value != HandoffPhase.IDLE) {
+            headphoneHandoffPhase.value = HandoffPhase.IDLE
+        }
     }
 
     /** Zlicza czas trwającej sesji do statystyk i czyści znacznik startu. Idempotentne. */
@@ -539,14 +553,48 @@ class AirbridgeService : Service() {
                 connectedDeviceName.value = null
                 recordAndClearConnectedSince()
                 connectedHost.value = null
+                clearHeadphoneHandoffState()
                 stopSelf()
             }
             ACTION_STOP_RING -> {
                 stopRinging()
             }
             ACTION_HEADPHONE_TAKEOVER -> takeoverHeadphones()
+            ACTION_HEADPHONE_REFRESH -> refreshHeadphoneConfig()
         }
         return START_STICKY
+    }
+
+    /**
+     * Re-reads the headphone-handoff prefs so a Settings change takes effect
+     * immediately instead of waiting for the next reconnect.
+     */
+    private fun refreshHeadphoneConfig() {
+        val address = headphonePrefs().getString("headphone_address", null)
+        val name = headphonePrefs().getString("headphone_name", "") ?: ""
+        if (headphoneHandoffEnabled() && address != null) {
+            headphoneManager.selectedAddress = address
+            headphoneManager.start()
+            if (isConnected.value) {
+                webSocketClient.send(Message.HeadphoneState(
+                    connected = headphoneManager.isConnected(address),
+                    address = address,
+                    name = name
+                ))
+            }
+        } else {
+            headphoneManager.stop()
+            // Deliberate exception to the toggle gate: this announces the
+            // opt-out itself, so it must send even though handoff is now
+            // disabled — otherwise the Mac keeps showing a stale button.
+            if (isConnected.value && address != null) {
+                webSocketClient.send(Message.HeadphoneState(
+                    connected = false,
+                    address = address,
+                    name = name
+                ))
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -600,6 +648,7 @@ class AirbridgeService : Service() {
             recordAndClearConnectedSince()
             macInfo.value = null
             macWallpaper.value = null
+            clearHeadphoneHandoffState()
             // Keep connectedHost — WebSocket auto-reconnects to same host
             // status tracked via StateFlow, no notification update needed
         }
@@ -1319,11 +1368,18 @@ class AirbridgeService : Service() {
             }
             is Message.HeadphoneReleaseRequest -> {
                 // Mac is taking the headphones: disconnect locally, then confirm.
-                serviceScope.launch {
-                    val ok = headphoneManager.release(message.address)
-                    webSocketClient.send(
-                        Message.HeadphoneReleaseResponse(ok, if (ok) null else "release_failed")
-                    )
+                // Mirror the Mac's own validation — only honor the request when
+                // handoff is enabled and it targets the address we have configured.
+                if (!headphoneHandoffEnabled() ||
+                    message.address != headphonePrefs().getString("headphone_address", null)) {
+                    webSocketClient.send(Message.HeadphoneReleaseResponse(false, "not_configured"))
+                } else {
+                    serviceScope.launch {
+                        val ok = headphoneManager.release(message.address)
+                        webSocketClient.send(
+                            Message.HeadphoneReleaseResponse(ok, if (ok) null else "release_failed")
+                        )
+                    }
                 }
             }
             is Message.HeadphoneReleaseResponse -> {
@@ -1653,8 +1709,16 @@ class AirbridgeService : Service() {
     /** Take the headphones over from the Mac: ask it to release, wait for the
      *  confirmation, then connect locally. */
     private fun takeoverHeadphones() {
-        val address = headphonePrefs().getString("headphone_address", null) ?: return
-        if (!headphoneHandoffEnabled() || !isConnected.value) return
+        val address = headphonePrefs().getString("headphone_address", null)
+        if (address == null || !headphoneHandoffEnabled()) {
+            // The button may still be visible (stale state) even though the
+            // local config no longer supports a takeover — surface that via
+            // the existing FAILED-phase error text instead of a silent no-op.
+            Log.w(TAG, "Headphone takeover requested but not configured (address=$address, enabled=${headphoneHandoffEnabled()})")
+            headphoneHandoffPhase.value = HandoffPhase.FAILED
+            return
+        }
+        if (!isConnected.value) return
         if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) return
         headphoneHandoffPhase.value = HandoffPhase.IN_PROGRESS
         val pending = CompletableDeferred<Message.HeadphoneReleaseResponse>()
