@@ -662,6 +662,43 @@ sealed class Message {
         }.toString()
     }
 
+    /** Both directions: connection state of the user-selected headphones on the
+     *  sending side, so each device knows where the headphones currently are. */
+    data class HeadphoneState(
+        val connected: Boolean,
+        val address: String,
+        val name: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "headphone_state")
+            put("connected", connected)
+            put("address", address)
+            put("name", name)
+        }.toString()
+    }
+
+    /** Both directions: "release the headphones, I am taking them over". */
+    data class HeadphoneReleaseRequest(
+        val address: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "headphone_release_request")
+            put("address", address)
+        }.toString()
+    }
+
+    /** Reply to HeadphoneReleaseRequest, sent after the local disconnect finished. */
+    data class HeadphoneReleaseResponse(
+        val ok: Boolean,
+        val error: String?
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "headphone_release_response")
+            put("ok", ok)
+            if (error != null) put("error", error)
+        }.toString()
+    }
+
     /** Mac -> phone: "show MY screen on your phone" (reverse mirror).
      *  mode: 0 = mirror Mac main display, 1 = virtual display shaped to phone. */
     data class ReverseMirrorStart(
@@ -1051,6 +1088,18 @@ sealed class Message {
                 "mirror_stop" -> MirrorStop
                 "phone_ring" -> PhoneRing
                 "phone_ring_stop" -> PhoneRingStop
+                "headphone_state" -> HeadphoneState(
+                    connected = obj.getBoolean("connected"),
+                    address = obj.getString("address"),
+                    name = obj.getString("name")
+                )
+                "headphone_release_request" -> HeadphoneReleaseRequest(
+                    address = obj.getString("address")
+                )
+                "headphone_release_response" -> HeadphoneReleaseResponse(
+                    ok = obj.getBoolean("ok"),
+                    error = if (obj.has("error")) obj.getString("error") else null
+                )
                 "reverse_mirror_start" -> ReverseMirrorStart(
                     token = obj.getString("token"),
                     mode = if (obj.has("mode")) obj.getInt("mode") else 0

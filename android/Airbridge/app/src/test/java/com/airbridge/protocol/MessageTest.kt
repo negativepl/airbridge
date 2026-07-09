@@ -2,6 +2,7 @@ package com.airbridge.protocol
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,6 +98,36 @@ class MessageTest {
                 decoded::class
             )
         }
+    }
+
+    @Test
+    fun `HeadphoneState JSON round-trip`() {
+        val msg = Message.HeadphoneState(connected = true, address = "AA:BB:CC:DD:EE:FF", name = "Galaxy Buds3 Pro")
+        val obj = JSONObject(msg.toJson())
+        assertEquals("headphone_state", obj.getString("type"))
+        assertTrue(obj.getBoolean("connected"))
+        assertEquals("AA:BB:CC:DD:EE:FF", obj.getString("address"))
+        assertEquals("Galaxy Buds3 Pro", obj.getString("name"))
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    @Test
+    fun `HeadphoneReleaseRequest JSON round-trip`() {
+        val msg = Message.HeadphoneReleaseRequest(address = "AA:BB:CC:DD:EE:FF")
+        val obj = JSONObject(msg.toJson())
+        assertEquals("headphone_release_request", obj.getString("type"))
+        assertEquals("AA:BB:CC:DD:EE:FF", obj.getString("address"))
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    @Test
+    fun `HeadphoneReleaseResponse omits null error and round-trips`() {
+        val ok = Message.HeadphoneReleaseResponse(ok = true, error = null)
+        assertFalse(JSONObject(ok.toJson()).has("error"))
+        assertEquals(ok, Message.fromJson(ok.toJson()))
+        val failed = Message.HeadphoneReleaseResponse(ok = false, error = "release_failed")
+        assertEquals("release_failed", JSONObject(failed.toJson()).getString("error"))
+        assertEquals(failed, Message.fromJson(failed.toJson()))
     }
 
     @Test fun deviceInfoResponseIncludesChargingFields() {
