@@ -16,12 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LaptopMac
-import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -74,10 +72,9 @@ fun MacDeviceCard(
             }
         }
 
-        var menuExpanded by remember { mutableStateOf(false) }
-
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.padding(vertical = 6.dp),
             leadingContent = {
                 if (bitmap != null) {
                     Image(
@@ -85,13 +82,13 @@ fun MacDeviceCard(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(64.dp)
                             .clip(MaterialTheme.shapes.large)
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceContainer),
                         contentAlignment = Alignment.Center
@@ -100,7 +97,7 @@ fun MacDeviceCard(
                             imageVector = Icons.Rounded.LaptopMac,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -108,7 +105,7 @@ fun MacDeviceCard(
             headlineContent = {
                 Text(
                     text = info.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -136,22 +133,12 @@ fun MacDeviceCard(
                 }
             },
             trailingContent = {
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = null)
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.disconnect)) },
-                            onClick = {
-                                menuExpanded = false
-                                onDisconnect()
-                            }
-                        )
-                    }
+                IconButton(onClick = onDisconnect) {
+                    Icon(
+                        Icons.Rounded.LinkOff,
+                        contentDescription = stringResource(R.string.disconnect),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         )

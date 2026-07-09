@@ -68,11 +68,7 @@ import kotlinx.coroutines.delay
 fun MainScreen(
     viewModel: MainViewModel,
     onScanQr: () -> Unit = {},
-    bottomClearance: Dp = 88.dp,
-    onSendFile: () -> Unit = {},
-    onSendPhoto: () -> Unit = {},
-    onSendClipboard: () -> Unit = {},
-    onOpenScreen: () -> Unit = {}
+    bottomClearance: Dp = 88.dp
 ) {
     val isConnected by viewModel.isConnected.collectAsState()
     val connectedDeviceName by viewModel.connectedDeviceName.collectAsState()
@@ -163,13 +159,6 @@ fun MainScreen(
                                 info = macLocal,
                                 wallpaperBase64 = macWallpaper,
                                 onDisconnect = { viewModel.disconnect() }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            QuickActionsRow(
-                                onSendFile = onSendFile,
-                                onSendPhoto = onSendPhoto,
-                                onSendClipboard = onSendClipboard,
-                                onOpenScreen = onOpenScreen
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             MacMonitorRings(info = macLocal)

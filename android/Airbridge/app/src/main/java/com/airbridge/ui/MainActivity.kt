@@ -243,8 +243,7 @@ class MainActivity : ComponentActivity() {
                         viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', ""))
                     }
 
-                    // Shared action bodies — used by both the FAB menu items and the
-                    // Home quick actions row, so the two entry points stay in sync.
+                    // FAB menu action bodies, extracted so the menu items stay thin.
                     val sendFileAction = { filePickerLauncher.launch(arrayOf("*/*")) }
                     val sendPhotoAction = {
                         photoPickerLauncher.launch(
@@ -264,9 +263,6 @@ class MainActivity : ComponentActivity() {
                         } else {
                             Toast.makeText(context, clipboardEmptyMsg, Toast.LENGTH_SHORT).show()
                         }
-                    }
-                    val openScreenAction: () -> Unit = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
                     }
 
                     // Static top bar — no collapse. The bar would otherwise be shared
@@ -419,11 +415,7 @@ class MainActivity : ComponentActivity() {
                                 0 -> MainScreen(
                                     viewModel = viewModel,
                                     onScanQr = { showQrScanner = true },
-                                    bottomClearance = fabClearance,
-                                    onSendFile = sendFileAction,
-                                    onSendPhoto = sendPhotoAction,
-                                    onSendClipboard = sendClipboardAction,
-                                    onOpenScreen = openScreenAction
+                                    bottomClearance = fabClearance
                                 )
                                 1 -> ScreenShareScreen(bottomClearance = fabClearance)
                                 2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)

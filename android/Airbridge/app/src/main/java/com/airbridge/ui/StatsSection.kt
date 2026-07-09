@@ -69,6 +69,8 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
                         selected = showToday == value,
                         onClick = { showToday = value },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                        // Bez domyslnego ptaszka — sam stan tonalny wystarcza (decyzja UX).
+                        icon = {},
                         label = { Text(stringResource(labelRes)) }
                     )
                 }
