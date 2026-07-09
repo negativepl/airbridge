@@ -19,7 +19,8 @@ GRADLE="$ROOT/android/Airbridge/app/build.gradle.kts"
 BUILD_LOG=""
 ANDROID_BUILD_LOG=""
 APP_STAGE=""
-trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG"; [ -n "$APP_STAGE" ] && rm -rf "$APP_STAGE"' EXIT
+MANIFEST=""
+trap 'rm -f "$BUILD_LOG" "$ANDROID_BUILD_LOG" "$MANIFEST" "$MANIFEST.sig"; [ -n "$APP_STAGE" ] && rm -rf "$APP_STAGE"' EXIT
 
 # Read version from gradle. VERSION may carry a pre-release suffix (e.g.
 # "2.6.0-beta") — that drives the display string and tag; VERSION_BASE is the
@@ -36,6 +37,13 @@ if ! git tag -l "$TAG" | grep -q "$TAG"; then
     echo "Error: Tag $TAG not found. Run bump-version.sh first, commit, and tag."
     exit 1
 fi
+
+# Update-manifest changelog inputs — required up front so a missing file can
+# never abort AFTER the GitHub release is already live.
+RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:?Set RELEASE_NOTES_FILE (EN changelog, one bullet per line)}"
+RELEASE_NOTES_PL_FILE="${RELEASE_NOTES_PL_FILE:?Set RELEASE_NOTES_PL_FILE (PL changelog, one bullet per line)}"
+[ -f "$RELEASE_NOTES_FILE" ] || { echo "Error: RELEASE_NOTES_FILE not found: $RELEASE_NOTES_FILE"; exit 1; }
+[ -f "$RELEASE_NOTES_PL_FILE" ] || { echo "Error: RELEASE_NOTES_PL_FILE not found: $RELEASE_NOTES_PL_FILE"; exit 1; }
 
 # 1. Build macOS
 echo "--- Building macOS ---"
@@ -184,32 +192,9 @@ echo "  APK: $ROOT/AirBridge.apk"
 echo ""
 echo "--- Creating GitHub Release $TAG ---"
 
-# Changelog base: the tag immediately preceding $TAG; fall back to the last
-# 10 commits when there is no earlier tag.
-PREV_TAG="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
-if [ -n "$PREV_TAG" ]; then
-    CHANGELOG="$(git log --oneline "$PREV_TAG..$TAG" --no-decorate)"
-else
-    CHANGELOG="$(git log --oneline -10 --no-decorate "$TAG")"
-fi
-
-# Curated notes win when RELEASE_NOTES_FILE points at a readable file; otherwise
-# fall back to the auto changelog.
-if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "${RELEASE_NOTES_FILE}" ]; then
-    NOTES="$(cat "$RELEASE_NOTES_FILE")"
-else
-    NOTES="$(cat <<EOF
-## AirBridge $TAG
-
-### Downloads
-- **macOS**: AirBridge.dmg
-- **Android**: AirBridge.apk
-
-### Changes since last release
-$CHANGELOG
-EOF
-)"
-fi
+# RELEASE_NOTES_FILE is required and validated up front, so curated notes are
+# always used for the release body.
+NOTES="$(cat "$RELEASE_NOTES_FILE")"
 
 # The whole app is in beta (the "-beta" suffix in the tag/name and the README
 # status badge say so). Publish as a full release — not a GitHub pre-release —
@@ -233,8 +218,7 @@ echo "--- Publishing update manifest ---"
 UPDATES_SSH="CHANGEME_USER@CHANGEME_HOST"
 UPDATES_DIR="/CHANGEME/path/airbridge"
 UPDATE_KEY="$HOME/.airbridge/update-signing.pem"
-RELEASE_NOTES_PL_FILE="${RELEASE_NOTES_PL_FILE:?Set RELEASE_NOTES_PL_FILE (PL changelog, one bullet per line)}"
-# EN changelog: reuse RELEASE_NOTES_FILE (already required), one bullet per line.
+# RELEASE_NOTES_FILE / RELEASE_NOTES_PL_FILE are validated up front (top of script).
 
 APK_SHA=$(shasum -a 256 "$APK_PATH" | cut -d' ' -f1)
 ZIP_SHA=$(shasum -a 256 "$ZIP_PATH" | cut -d' ' -f1)
