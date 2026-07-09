@@ -18,6 +18,7 @@ struct MainWindow: View {
     let notificationService: NotificationService
     let hotkeyService: GlobalHotkeyService
     let mirrorService: MirrorService
+    let updateService: UpdateService
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -71,14 +72,15 @@ struct MainWindow: View {
                         connectionService: connectionService,
                         pairingService: pairingService,
                         hotkeyService: hotkeyService,
-                        notificationService: notificationService
+                        notificationService: notificationService,
+                        updateService: updateService
                     )
                 }
             }
 
             Tab(NavigationItem.about.title, systemImage: "info.circle.fill", value: .about) {
                 ScreenContainer {
-                    AboutTabView()
+                    AboutTabView(updateService: updateService)
                 }
             }
         }

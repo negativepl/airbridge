@@ -6,6 +6,8 @@ import AppKit
 /// platforms feel consistent. The compact Apple-menu About window
 /// (`AboutWindowView`) stays as the small popover variant.
 struct AboutTabView: View {
+    let updateService: UpdateService
+
     private let version: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
 
     var body: some View {
@@ -90,6 +92,73 @@ struct AboutTabView: View {
                 title: L10n.isPL ? "Wydania" : "Releases",
                 url: "https://github.com/negativepl/airbridge/releases"
             )
+            Divider()
+            updateRow
+        }
+    }
+
+    /// Unlike the other rows, this one doesn't open a URL — it triggers the
+    /// shared `UpdateService` check and shows the result inline. The full
+    /// changelog and "Update" install button live in the Settings tab's
+    /// dedicated section; this row is a compact entry point + status readout.
+    private var updateRow: some View {
+        Button {
+            guard case .idle = updateService.phase else {
+                if case .failed = updateService.phase {
+                    Task { await updateService.checkForUpdates() }
+                }
+                return
+            }
+            Task { await updateService.checkForUpdates() }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.ab(.body, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                Text(L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates")
+                    .font(.ab(.body))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+                updateRowTrailing
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var updateRowTrailing: some View {
+        switch updateService.phase {
+        case .idle:
+            Image(systemName: "arrow.up.right")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.tertiary)
+
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+
+        case .upToDate:
+            Label(L10n.isPL ? "Aktualne" : "Up to date", systemImage: "checkmark.circle.fill")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.green)
+                .labelStyle(.titleAndIcon)
+
+        case .available(let manifest):
+            Text(L10n.isPL ? "Dostępna: \(manifest.version)" : "Available: \(manifest.version)")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+
+        case .downloading, .installing:
+            ProgressView()
+                .controlSize(.small)
+
+        case .failed:
+            Label(L10n.isPL ? "Błąd" : "Failed", systemImage: "exclamationmark.triangle.fill")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.red)
+                .labelStyle(.titleAndIcon)
         }
     }
 

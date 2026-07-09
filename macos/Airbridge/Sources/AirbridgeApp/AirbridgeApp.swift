@@ -32,6 +32,7 @@ struct AirbridgeApp: App {
     @State private var notificationService: NotificationService
     @State private var hotkeyService: GlobalHotkeyService
     @State private var mirrorService: MirrorService
+    @State private var updateService: UpdateService
 
     init() {
         // Jeśli AirBridge już działa (np. LaunchServices odpalił drugą kopię po
@@ -53,6 +54,7 @@ struct AirbridgeApp: App {
         let hotkey = GlobalHotkeyService()
 
         let mirror = MirrorService(mirrorTokenValidator: { [weak pairing] token in pairing?.isValidMirrorToken(token) ?? false })
+        let update = UpdateService()
 
         clipboard.configure(connectionService: connection)
         fileTransfer.configure(connectionService: connection)
@@ -78,6 +80,7 @@ struct AirbridgeApp: App {
         _notificationService = State(initialValue: notifications)
         _hotkeyService = State(initialValue: hotkey)
         _mirrorService = State(initialValue: mirror)
+        _updateService = State(initialValue: update)
 
         Task { @MainActor in
             // The mirror listener needs the TLS identity before it starts;
@@ -122,7 +125,8 @@ struct AirbridgeApp: App {
                         filesBrowserService: filesBrowserService,
                         notificationService: notificationService,
                         hotkeyService: hotkeyService,
-                        mirrorService: mirrorService
+                        mirrorService: mirrorService,
+                        updateService: updateService
                     )
                     .onAppear { hotkeyService.start() }
                 } else {
