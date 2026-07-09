@@ -4,7 +4,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,47 +13,56 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.LinkOff
-import androidx.compose.material.icons.rounded.Battery0Bar
-import androidx.compose.material.icons.rounded.Battery1Bar
-import androidx.compose.material.icons.rounded.Battery2Bar
-import androidx.compose.material.icons.rounded.Battery3Bar
-import androidx.compose.material.icons.rounded.Battery4Bar
-import androidx.compose.material.icons.rounded.Battery5Bar
-import androidx.compose.material.icons.rounded.Battery6Bar
-import androidx.compose.material.icons.rounded.BatteryChargingFull
-import androidx.compose.material.icons.rounded.BatteryFull
+import androidx.compose.material.icons.rounded.LaptopMac
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbridge.BuildConfig
 import com.airbridge.R
 import com.airbridge.protocol.MacInfo
 import kotlin.math.roundToInt
 
+/**
+ * Compact Mac identity card: wallpaper thumbnail, name, connection/battery
+ * status, and a disconnect action. Replaces the old wallpaper-hero monolith —
+ * live resource bars now live in [MacMonitorRings].
+ */
 @Composable
-fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> Unit) {
+fun MacDeviceCard(
+    info: MacInfo,
+    wallpaperBase64: String?,
+    onDisconnect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.largeIncreased,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         val bitmap = remember(wallpaperBase64) {
@@ -65,104 +74,95 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
             }
         }
 
-        Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(300.dp)
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(MaterialTheme.colorScheme.primaryContainer))
-            }
-            Box(
-                modifier = Modifier.fillMaxWidth().height(300.dp).background(
-                    Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
-                )
-            )
-            Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                Text(info.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(
-                    text = "${info.model} · ${info.chip}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-            }
-            if (info.batteryPercent in 0..100) {
-                val powerLabel = when {
-                    info.batteryCharging -> stringResource(R.string.power_charging)
-                    info.onACPower -> stringResource(R.string.power_adapter)
-                    else -> stringResource(R.string.power_battery)
+        var menuExpanded by remember { mutableStateOf(false) }
+
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            leadingContent = {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(MaterialTheme.shapes.large)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.LaptopMac,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
-                val powerIcon = if (info.batteryCharging)
-                    Icons.Rounded.BatteryChargingFull
-                else
-                    batteryIcon(info.batteryPercent)
-                // Źródło zasilania — osobno, lewy górny róg
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.35f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            },
+            headlineContent = {
+                Text(
+                    text = info.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            supportingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF34C759))
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    val statusText = stringResource(R.string.home_connected_battery, info.batteryPercent).let {
+                        if (info.batteryCharging) "$it · ${stringResource(R.string.power_charging)}" else it
+                    }
                     Text(
-                        "${stringResource(R.string.power_source)}: $powerLabel",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White
+                        text = statusText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                // Bateria — prawy górny róg
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.35f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(powerIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(5.dp))
-                    Text("${info.batteryPercent}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            },
+            trailingContent = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.disconnect)) },
+                            onClick = {
+                                menuExpanded = false
+                                onDisconnect()
+                            }
+                        )
+                    }
                 }
             }
-            // Disconnect — woven into the wallpaper bottom-right like the battery and
-            // power-source pills, so it needs no dedicated row below the bars.
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(onClick = onDisconnect)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Rounded.LinkOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(5.dp))
-                Text(stringResource(R.string.disconnect), style = MaterialTheme.typography.labelLarge, color = Color.White)
-            }
-        }
+        )
 
-        Column(modifier = Modifier.padding(16.dp)) {
-            barRow("CPU", "${info.cpuLoadPercent}%", info.cpuLoadPercent / 100f)
-            Spacer(Modifier.size(14.dp))
-            barRow("RAM", "${gb(info.usedRamBytes)} / ${gb(info.totalRamBytes)}", frac(info.usedRamBytes, info.totalRamBytes))
-            Spacer(Modifier.size(14.dp))
-            barRow(stringResource(R.string.mac_disk), "${gb(info.totalStorageBytes - info.freeStorageBytes)} / ${gb(info.totalStorageBytes)}", frac(info.totalStorageBytes - info.freeStorageBytes, info.totalStorageBytes))
-
-            if (isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)) {
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    text = stringResource(R.string.update_version_mismatch, info.appVersion),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-            }
+        if (isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)) {
+            Text(
+                text = stringResource(R.string.update_version_mismatch, info.appVersion),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            )
         }
     }
 }
@@ -178,32 +178,71 @@ internal fun isVersionMismatch(remoteVersion: String, localVersion: String): Boo
 
 private fun versionBase(version: String): String = version.substringBefore("-")
 
+/** Live CPU/RAM/disk rings for the connected Mac. */
 @Composable
-private fun barRow(label: String, valueText: String, fraction: Float) {
-    Column {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text(valueText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        Spacer(Modifier.size(6.dp))
-        LinearProgressIndicator(
-            progress = { fraction.coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+    ) {
+        Text(
+            text = stringResource(R.string.home_monitor_title).uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 12.dp)
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            MonitorRing(
+                fraction = info.cpuLoadPercent / 100f,
+                centerText = "${info.cpuLoadPercent}%",
+                label = stringResource(R.string.home_monitor_cpu),
+                detail = null
+            )
+            MonitorRing(
+                fraction = frac(info.usedRamBytes, info.totalRamBytes),
+                centerText = "${(frac(info.usedRamBytes, info.totalRamBytes) * 100).roundToInt()}%",
+                label = stringResource(R.string.home_monitor_ram),
+                detail = "${gb(info.usedRamBytes)} / ${gb(info.totalRamBytes)}"
+            )
+            val usedStorage = info.totalStorageBytes - info.freeStorageBytes
+            MonitorRing(
+                fraction = frac(usedStorage, info.totalStorageBytes),
+                centerText = "${(frac(usedStorage, info.totalStorageBytes) * 100).roundToInt()}%",
+                label = stringResource(R.string.home_monitor_disk),
+                detail = "${gb(usedStorage)} / ${gb(info.totalStorageBytes)}"
+            )
+        }
     }
 }
 
-private fun batteryIcon(p: Int): ImageVector = when {
-    p >= 95 -> Icons.Rounded.BatteryFull
-    p >= 80 -> Icons.Rounded.Battery6Bar
-    p >= 60 -> Icons.Rounded.Battery5Bar
-    p >= 45 -> Icons.Rounded.Battery4Bar
-    p >= 30 -> Icons.Rounded.Battery3Bar
-    p >= 20 -> Icons.Rounded.Battery2Bar
-    p >= 10 -> Icons.Rounded.Battery1Bar
-    else -> Icons.Rounded.Battery0Bar
+@Composable
+private fun MonitorRing(fraction: Float, centerText: String, label: String, detail: String?) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                progress = { fraction.coerceIn(0f, 1f) },
+                modifier = Modifier.size(56.dp),
+                strokeWidth = 5.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+            Text(centerText, style = MaterialTheme.typography.labelMedium)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        if (detail != null) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 private fun frac(used: Long, total: Long): Float = if (total > 0) (used.toFloat() / total) else 0f

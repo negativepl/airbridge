@@ -191,12 +191,13 @@
     <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>
     <string name="screen_sharing_second_display_desc">Dodatkowy pulpit dopasowany do ekranu telefonu.</string>
     <string name="screen_sharing_connect_first">Połącz się z Makiem, aby udostępniać ekran.</string>
-    <string name="mac_disk">Dysk</string>
-    <string name="power_adapter">Zasilacz</string>
-    <string name="power_battery">Bateria</string>
     <string name="power_charging">Ładowanie</string>
-    <string name="power_source">Źródło zasilania</string>
     <string name="update_version_mismatch">Mac ma wersję AirBridge %1$s. Zaktualizuj obie aplikacje, aby zachować zgodność.</string>
+    <string name="home_connected_battery">Połączono · bateria %1$d%%</string>
+    <string name="home_monitor_title">Monitor Maca</string>
+    <string name="home_monitor_cpu">CPU</string>
+    <string name="home_monitor_ram">RAM</string>
+    <string name="home_monitor_disk">Dysk</string>
 
     <!-- Statistics -->
     <string name="stats_title">Statystyki</string>

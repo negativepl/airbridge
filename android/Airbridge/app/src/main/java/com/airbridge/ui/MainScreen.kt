@@ -150,7 +150,15 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}, bottomCleara
                 2 -> {
                     val macLocal = macInfo
                     if (macLocal != null) {
-                        MacMonitorCard(info = macLocal, wallpaperBase64 = macWallpaper, onDisconnect = { viewModel.disconnect() })
+                        Column {
+                            MacDeviceCard(
+                                info = macLocal,
+                                wallpaperBase64 = macWallpaper,
+                                onDisconnect = { viewModel.disconnect() }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MacMonitorRings(info = macLocal)
+                        }
                     }
                 }
                 // Połączono, ale dane Maca jeszcze nie dotarły — spójny stan ładowania
