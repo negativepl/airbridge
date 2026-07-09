@@ -9,6 +9,7 @@ import android.os.StatFs
 import android.provider.Settings
 import android.content.Intent
 import android.content.IntentFilter
+import com.airbridge.BuildConfig
 import com.airbridge.protocol.DeviceInfo
 
 /**
@@ -63,7 +64,8 @@ object DeviceInfoProvider {
             freeRamBytes = mem.availMem,
             batteryPercent = battery,
             batteryCharging = charging,
-            chargeTimeRemainingMs = chargeTimeMs
+            chargeTimeRemainingMs = chargeTimeMs,
+            appVersion = BuildConfig.VERSION_NAME
         )
     }
 

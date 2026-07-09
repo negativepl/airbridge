@@ -53,7 +53,8 @@ data class DeviceInfo(
     val freeRamBytes: Long,
     val batteryPercent: Int,
     val batteryCharging: Boolean = false,
-    val chargeTimeRemainingMs: Long = -1
+    val chargeTimeRemainingMs: Long = -1,
+    val appVersion: String = ""
 )
 
 /** The Mac's own system info — phone acts as a resource monitor for the computer. */
@@ -71,7 +72,8 @@ data class MacInfo(
     val batteryPercent: Int,
     val batteryCharging: Boolean,
     val onACPower: Boolean,
-    val uptimeSeconds: Long
+    val uptimeSeconds: Long,
+    val appVersion: String = ""
 )
 
 enum class ContentType(val value: String) {
@@ -723,6 +725,7 @@ sealed class Message {
                 put("battery_charging", info.batteryCharging)
                 put("on_ac_power", info.onACPower)
                 put("uptime_seconds", info.uptimeSeconds)
+                put("app_version", info.appVersion)
             })
         }.toString()
     }
@@ -756,6 +759,7 @@ sealed class Message {
                 put("battery_percent", info.batteryPercent)
                 put("battery_charging", info.batteryCharging)
                 put("charge_time_remaining_ms", info.chargeTimeRemainingMs)
+                put("app_version", info.appVersion)
             })
         }.toString()
     }
@@ -1066,7 +1070,8 @@ sealed class Message {
                         freeRamBytes = o.getLong("free_ram_bytes"),
                         batteryPercent = o.getInt("battery_percent"),
                         batteryCharging = o.optBoolean("battery_charging", false),
-                        chargeTimeRemainingMs = o.optLong("charge_time_remaining_ms", -1)
+                        chargeTimeRemainingMs = o.optLong("charge_time_remaining_ms", -1),
+                        appVersion = o.optString("app_version", "")
                     ))
                 }
                 "wallpaper_request" -> WallpaperRequest
@@ -1089,7 +1094,8 @@ sealed class Message {
                         batteryPercent = o.getInt("battery_percent"),
                         batteryCharging = o.optBoolean("battery_charging", false),
                         onACPower = o.optBoolean("on_ac_power", false),
-                        uptimeSeconds = o.optLong("uptime_seconds", 0)
+                        uptimeSeconds = o.optLong("uptime_seconds", 0),
+                        appVersion = o.optString("app_version", "")
                     ))
                 }
                 "mac_wallpaper_response" -> MacWallpaperResponse(obj.getString("image"))

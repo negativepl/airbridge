@@ -234,6 +234,9 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
     public let batteryPercent: Int
     public let batteryCharging: Bool
     public let chargeTimeRemainingMs: Int64
+    /// Sender's app version (e.g. "2.8.0-beta"). Optional so older phones that
+    /// don't send it decode fine — used only for the version-parity hint.
+    public let appVersion: String?
 
     private enum CodingKeys: String, CodingKey {
         case name, model, manufacturer
@@ -246,9 +249,10 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
         case batteryPercent     = "battery_percent"
         case batteryCharging      = "battery_charging"
         case chargeTimeRemainingMs = "charge_time_remaining_ms"
+        case appVersion            = "app_version"
     }
 
-    public init(name: String, model: String, manufacturer: String, androidVersion: String, sdkInt: Int, totalStorageBytes: Int64, freeStorageBytes: Int64, totalRamBytes: Int64, freeRamBytes: Int64, batteryPercent: Int, batteryCharging: Bool = false, chargeTimeRemainingMs: Int64 = -1) {
+    public init(name: String, model: String, manufacturer: String, androidVersion: String, sdkInt: Int, totalStorageBytes: Int64, freeStorageBytes: Int64, totalRamBytes: Int64, freeRamBytes: Int64, batteryPercent: Int, batteryCharging: Bool = false, chargeTimeRemainingMs: Int64 = -1, appVersion: String? = nil) {
         self.name = name
         self.model = model
         self.manufacturer = manufacturer
@@ -261,6 +265,7 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
         self.batteryPercent = batteryPercent
         self.batteryCharging = batteryCharging
         self.chargeTimeRemainingMs = chargeTimeRemainingMs
+        self.appVersion = appVersion
     }
 
     public init(from decoder: Decoder) throws {
@@ -277,6 +282,7 @@ public struct DeviceInfo: Codable, Equatable, Sendable {
         batteryPercent = try c.decode(Int.self, forKey: .batteryPercent)
         batteryCharging = try c.decodeIfPresent(Bool.self, forKey: .batteryCharging) ?? false
         chargeTimeRemainingMs = try c.decodeIfPresent(Int64.self, forKey: .chargeTimeRemainingMs) ?? -1
+        appVersion = try c.decodeIfPresent(String.self, forKey: .appVersion)
     }
 }
 
@@ -299,6 +305,9 @@ public struct MacInfo: Codable, Equatable, Sendable {
     public let batteryCharging: Bool
     public let onACPower: Bool
     public let uptimeSeconds: Int64
+    /// Mac's own app version (e.g. "2.8.0-beta"). Optional so older Macs that
+    /// don't send it decode fine — used only for the version-parity hint.
+    public let appVersion: String?
 
     private enum CodingKeys: String, CodingKey {
         case name, model, chip
@@ -313,15 +322,17 @@ public struct MacInfo: Codable, Equatable, Sendable {
         case batteryCharging    = "battery_charging"
         case onACPower          = "on_ac_power"
         case uptimeSeconds      = "uptime_seconds"
+        case appVersion         = "app_version"
     }
 
-    public init(name: String, model: String, chip: String, osVersion: String, cpuCores: Int, cpuLoadPercent: Int, totalRamBytes: Int64, usedRamBytes: Int64, totalStorageBytes: Int64, freeStorageBytes: Int64, batteryPercent: Int, batteryCharging: Bool, onACPower: Bool, uptimeSeconds: Int64) {
+    public init(name: String, model: String, chip: String, osVersion: String, cpuCores: Int, cpuLoadPercent: Int, totalRamBytes: Int64, usedRamBytes: Int64, totalStorageBytes: Int64, freeStorageBytes: Int64, batteryPercent: Int, batteryCharging: Bool, onACPower: Bool, uptimeSeconds: Int64, appVersion: String? = nil) {
         self.name = name; self.model = model; self.chip = chip; self.osVersion = osVersion
         self.cpuCores = cpuCores; self.cpuLoadPercent = cpuLoadPercent
         self.totalRamBytes = totalRamBytes; self.usedRamBytes = usedRamBytes
         self.totalStorageBytes = totalStorageBytes; self.freeStorageBytes = freeStorageBytes
         self.batteryPercent = batteryPercent; self.batteryCharging = batteryCharging
         self.onACPower = onACPower; self.uptimeSeconds = uptimeSeconds
+        self.appVersion = appVersion
     }
 
     /// Tolerant decoding mirroring the Android decoder (Message.kt), which
@@ -343,7 +354,18 @@ public struct MacInfo: Codable, Equatable, Sendable {
         batteryCharging = try c.decodeIfPresent(Bool.self, forKey: .batteryCharging) ?? false
         onACPower = try c.decodeIfPresent(Bool.self, forKey: .onACPower) ?? false
         uptimeSeconds = try c.decodeIfPresent(Int64.self, forKey: .uptimeSeconds) ?? 0
+        appVersion = try c.decodeIfPresent(String.self, forKey: .appVersion)
     }
+}
+
+// MARK: - Version parity helper
+
+/// Base version string ignoring a `-suffix` (e.g. "-beta"): `versionBase("2.8.0-beta") == "2.8.0"`.
+/// Used to compare the Mac's and phone's app versions for the cross-device
+/// version-parity hint — no update-server traffic involved, purely a
+/// comparison of versions already exchanged over the LAN.
+public func versionBase(_ version: String) -> String {
+    String(version.split(separator: "-", maxSplits: 1).first ?? Substring(version))
 }
 
 // MARK: - Codable

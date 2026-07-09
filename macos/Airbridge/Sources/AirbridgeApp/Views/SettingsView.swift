@@ -1,5 +1,6 @@
 import SwiftUI
 import AirbridgeSecurity
+import Protocol
 
 struct SettingsView: View {
     let connectionService: ConnectionService
@@ -314,7 +315,32 @@ struct SettingsView: View {
 
     private var updateSection: some View {
         GlassSection(title: LocalizedStringKey(L10n.isPL ? "Aktualizacje" : "Updates"), systemImage: "arrow.down.circle") {
-            switch updateService.phase {
+            VStack(alignment: .leading, spacing: 8) {
+                updatePhaseContent
+                if let mismatchedVersion {
+                    Text(L10n.isPL
+                         ? "Telefon ma wersję AirBridge \(mismatchedVersion). Zaktualizuj obie aplikacje, aby zachować zgodność."
+                         : "Your phone runs AirBridge \(mismatchedVersion). Update both apps to keep them in sync.")
+                        .font(.ab(.footnote))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// The phone's app version when it differs (ignoring a "-beta" suffix)
+    /// from this Mac's own version — purely a comparison of versions already
+    /// exchanged over the LAN, no update-server traffic involved.
+    private var mismatchedVersion: String? {
+        guard let remote = connectionService.deviceInfo?.appVersion, !remote.isEmpty else { return nil }
+        let local = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        guard !local.isEmpty, versionBase(remote) != versionBase(local) else { return nil }
+        return remote
+    }
+
+    @ViewBuilder
+    private var updatePhaseContent: some View {
+        switch updateService.phase {
             case .idle:
                 HStack {
                     Text(L10n.isPL ? "Sprawdź, czy dostępna jest nowsza wersja AirBridge."
@@ -410,7 +436,6 @@ struct SettingsView: View {
                 }
             }
         }
-    }
 
     private var checkButton: some View {
         Button(L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates") {

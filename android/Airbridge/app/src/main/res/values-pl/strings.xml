@@ -196,6 +196,7 @@
     <string name="power_battery">Bateria</string>
     <string name="power_charging">Ładowanie</string>
     <string name="power_source">Źródło zasilania</string>
+    <string name="update_version_mismatch">Mac ma wersję AirBridge %1$s. Zaktualizuj obie aplikacje, aby zachować zgodność.</string>
 
     <!-- Statistics -->
     <string name="stats_title">Statystyki</string>

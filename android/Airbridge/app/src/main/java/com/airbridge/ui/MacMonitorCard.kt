@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.airbridge.BuildConfig
 import com.airbridge.R
 import com.airbridge.protocol.MacInfo
 import kotlin.math.roundToInt
@@ -153,9 +154,29 @@ fun MacMonitorCard(info: MacInfo, wallpaperBase64: String?, onDisconnect: () -> 
             barRow("RAM", "${gb(info.usedRamBytes)} / ${gb(info.totalRamBytes)}", frac(info.usedRamBytes, info.totalRamBytes))
             Spacer(Modifier.size(14.dp))
             barRow(stringResource(R.string.mac_disk), "${gb(info.totalStorageBytes - info.freeStorageBytes)} / ${gb(info.totalStorageBytes)}", frac(info.totalStorageBytes - info.freeStorageBytes, info.totalStorageBytes))
+
+            if (isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)) {
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    text = stringResource(R.string.update_version_mismatch, info.appVersion),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
         }
     }
 }
+
+/**
+ * True when both sides reported a (non-empty) app version and their base
+ * versions differ, ignoring a "-beta"/"-alpha" suffix. Purely a comparison of
+ * versions already exchanged over the LAN — no update-server traffic.
+ */
+internal fun isVersionMismatch(remoteVersion: String, localVersion: String): Boolean =
+    remoteVersion.isNotEmpty() && localVersion.isNotEmpty() &&
+        versionBase(remoteVersion) != versionBase(localVersion)
+
+private fun versionBase(version: String): String = version.substringBefore("-")
 
 @Composable
 private fun barRow(label: String, valueText: String, fraction: Float) {

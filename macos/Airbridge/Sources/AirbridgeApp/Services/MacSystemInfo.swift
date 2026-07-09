@@ -28,7 +28,8 @@ enum MacSystemInfo {
             batteryPercent: battery.percent,
             batteryCharging: battery.charging,
             onACPower: battery.ac,
-            uptimeSeconds: Int64(pi.systemUptime)
+            uptimeSeconds: Int64(pi.systemUptime),
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         )
     }
 

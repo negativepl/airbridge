@@ -475,6 +475,54 @@ final class MessageTests: XCTestCase {
         let decoded = try JSONDecoder().decode(DeviceInfo.self, from: Data(legacy.utf8))
         XCTAssertEqual(decoded.batteryCharging, false)
         XCTAssertEqual(decoded.chargeTimeRemainingMs, -1)
+        XCTAssertNil(decoded.appVersion)
+    }
+
+    // MARK: - DeviceInfo / MacInfo app_version (cross-device version parity)
+
+    func testDeviceInfoDecodesAppVersionWhenPresent() throws {
+        let json = #"""
+        {"name":"G","model":"M","manufacturer":"S","android_version":"16","sdk_int":34,"total_storage_bytes":1,"free_storage_bytes":1,"total_ram_bytes":1,"free_ram_bytes":1,"battery_percent":80,"app_version":"2.8.0-beta"}
+        """#
+        let decoded = try JSONDecoder().decode(DeviceInfo.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.appVersion, "2.8.0-beta")
+    }
+
+    func testDeviceInfoAppVersionRoundTrip() throws {
+        let info = DeviceInfo(name: "Galaxy", model: "SM", manufacturer: "Samsung",
+                              androidVersion: "16", sdkInt: 34,
+                              totalStorageBytes: 1, freeStorageBytes: 1,
+                              totalRamBytes: 1, freeRamBytes: 1, batteryPercent: 80,
+                              appVersion: "2.7.6-beta")
+        let data = try JSONEncoder().encode(info)
+        let decoded = try JSONDecoder().decode(DeviceInfo.self, from: data)
+        XCTAssertEqual(decoded.appVersion, "2.7.6-beta")
+    }
+
+    func testMacInfoLegacyDecodeWithoutAppVersion() throws {
+        let legacy = #"""
+        {"name":"MBP","model":"MacBook Pro","chip":"Apple M3 Pro","os_version":"macOS 26.0","cpu_cores":12,"total_ram_bytes":1,"used_ram_bytes":1,"total_storage_bytes":1,"free_storage_bytes":1,"battery_percent":80}
+        """#
+        let decoded = try JSONDecoder().decode(MacInfo.self, from: Data(legacy.utf8))
+        XCTAssertNil(decoded.appVersion)
+    }
+
+    func testMacInfoAppVersionRoundTrip() throws {
+        let info = MacInfo(name: "MBP", model: "MacBook Pro", chip: "Apple M3 Pro",
+                           osVersion: "macOS 26.0", cpuCores: 12, cpuLoadPercent: 37,
+                           totalRamBytes: 1, usedRamBytes: 1,
+                           totalStorageBytes: 1, freeStorageBytes: 1,
+                           batteryPercent: 80, batteryCharging: true, onACPower: true,
+                           uptimeSeconds: 3600, appVersion: "2.8.0-beta")
+        let data = try JSONEncoder().encode(info)
+        let decoded = try JSONDecoder().decode(MacInfo.self, from: data)
+        XCTAssertEqual(decoded.appVersion, "2.8.0-beta")
+    }
+
+    func testVersionBaseStripsSuffix() {
+        XCTAssertEqual(versionBase("2.8.0-beta"), "2.8.0")
+        XCTAssertEqual(versionBase("2.8.0"), "2.8.0")
+        XCTAssertEqual(versionBase("2.7.6-beta"), "2.7.6")
     }
 
     // MARK: - Mirror Message Round-trips

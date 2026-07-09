@@ -191,6 +191,7 @@
     <string name="power_battery">Battery</string>
     <string name="power_charging">Charging</string>
     <string name="power_source">Power source</string>
+    <string name="update_version_mismatch">Your Mac runs AirBridge %1$s. Update both apps to keep them in sync.</string>
 
     <!-- Statistics -->
     <string name="stats_title">Statistics</string>

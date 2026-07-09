@@ -191,7 +191,7 @@ struct AirbridgeApp: App {
         .windowResizability(.contentMinSize)
 
         MenuBarExtra {
-            MenuBarView(connectionService: connectionService, clipboardService: clipboardService)
+            MenuBarView(connectionService: connectionService, clipboardService: clipboardService, updateService: updateService)
         } label: {
             if connectionService.isConnected, let info = connectionService.deviceInfo {
                 Label {

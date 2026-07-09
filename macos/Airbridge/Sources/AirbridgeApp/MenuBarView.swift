@@ -4,6 +4,7 @@ import Protocol
 struct MenuBarView: View {
     let connectionService: ConnectionService
     let clipboardService: ClipboardService
+    let updateService: UpdateService
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -77,6 +78,20 @@ struct MenuBarView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
 
+            MenuRow(title: L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    trailing: { AnyView(updateRowTrailing) }) {
+                switch updateService.phase {
+                case .idle, .failed:
+                    Task { await updateService.checkForUpdates() }
+                case .available:
+                    openWindow(id: "main")
+                    NSApp.activate(ignoringOtherApps: true)
+                case .checking, .upToDate, .downloading, .installing:
+                    break
+                }
+            }
+
             MenuRow(title: L10n.quit, systemImage: "xmark.circle") {
                 clipboardService.stopMonitoring()
                 Task {
@@ -116,6 +131,39 @@ struct MenuBarView: View {
             return L10n.isPL ? "Zadzwoń: \(name)" : "Ring \(name)"
         }
         return L10n.isPL ? "Zadzwoń na telefon" : "Ring phone"
+    }
+
+    /// Mirrors `AboutTabView.updateRowTrailing` — compact status readout next
+    /// to the "Check for updates" row.
+    @ViewBuilder
+    private var updateRowTrailing: some View {
+        switch updateService.phase {
+        case .idle:
+            EmptyView()
+
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+
+        case .upToDate:
+            Text(L10n.isPL ? "Aktualne" : "Up to date")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.green)
+
+        case .available(let manifest):
+            Text(L10n.isPL ? "Dostępna: \(manifest.version)" : "Available: \(manifest.version)")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+
+        case .downloading, .installing:
+            ProgressView()
+                .controlSize(.small)
+
+        case .failed:
+            Text(L10n.isPL ? "Błąd" : "Failed")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.red)
+        }
     }
 }
 
@@ -233,6 +281,7 @@ private struct BatteryRow: View {
 private struct MenuRow: View {
     let title: String
     let systemImage: String
+    var trailing: () -> AnyView = { AnyView(EmptyView()) }
     let action: () -> Void
 
     @State private var isHovered = false
@@ -248,6 +297,7 @@ private struct MenuRow: View {
                 .font(.ab(.subheadline))
                 .foregroundStyle(.primary)
             Spacer(minLength: 0)
+            trailing()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

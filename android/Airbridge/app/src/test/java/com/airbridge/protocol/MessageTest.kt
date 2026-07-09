@@ -231,6 +231,45 @@ class MessageTest {
         assertEquals(info, decoded.info)
     }
 
+    // app_version — cross-device version parity hint (present + absent/legacy).
+
+    @Test fun deviceInfoResponseRoundTripWithAppVersion() {
+        val info = DeviceInfo(
+            name = "Galaxy", model = "SM", manufacturer = "Samsung",
+            androidVersion = "16", sdkInt = 34,
+            totalStorageBytes = 1, freeStorageBytes = 1,
+            totalRamBytes = 1, freeRamBytes = 1, batteryPercent = 80,
+            appVersion = "2.7.6-beta"
+        )
+        val decoded = Message.fromJson(Message.DeviceInfoResponse(info).toJson()) as Message.DeviceInfoResponse
+        assertEquals("2.7.6-beta", decoded.info.appVersion)
+    }
+
+    @Test fun deviceInfoResponseLegacyWithoutAppVersionDefaultsToEmpty() {
+        val legacy = """{"type":"device_info_response","info":{"name":"G","model":"M","manufacturer":"S","android_version":"16","sdk_int":34,"total_storage_bytes":1,"free_storage_bytes":1,"total_ram_bytes":1,"free_ram_bytes":1,"battery_percent":80}}"""
+        val decoded = Message.fromJson(legacy) as Message.DeviceInfoResponse
+        assertEquals("", decoded.info.appVersion)
+    }
+
+    @Test fun macInfoResponseRoundTripWithAppVersion() {
+        val info = MacInfo(
+            name = "MBP", model = "MacBook Pro", chip = "Apple M3 Pro",
+            osVersion = "macOS 26.0", cpuCores = 12, cpuLoadPercent = 37,
+            totalRamBytes = 1, usedRamBytes = 1,
+            totalStorageBytes = 1, freeStorageBytes = 1,
+            batteryPercent = 80, batteryCharging = true, onACPower = true,
+            uptimeSeconds = 3600, appVersion = "2.8.0-beta"
+        )
+        val decoded = Message.fromJson(Message.MacInfoResponse(info).toJson()) as Message.MacInfoResponse
+        assertEquals("2.8.0-beta", decoded.info.appVersion)
+    }
+
+    @Test fun macInfoResponseLegacyWithoutAppVersionDefaultsToEmpty() {
+        val legacy = """{"type":"mac_info_response","info":{"name":"MBP","model":"MacBook Pro","chip":"Apple M3 Pro","os_version":"macOS 26.0","cpu_cores":12,"total_ram_bytes":1,"used_ram_bytes":1,"total_storage_bytes":1,"free_storage_bytes":1,"battery_percent":80}}"""
+        val decoded = Message.fromJson(legacy) as Message.MacInfoResponse
+        assertEquals("", decoded.info.appVersion)
+    }
+
     @Test fun wallpaperResponseRoundTrip() {
         val msg = Message.WallpaperResponse(imageBase64 = "QkFTRTY0")
         assertEquals(msg, Message.fromJson(msg.toJson()))

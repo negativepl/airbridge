@@ -29,7 +29,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     testOptions {
         // android.util.Log w czystych unit testach: no-op zamiast "not mocked".
         unitTests.isReturnDefaultValues = true
