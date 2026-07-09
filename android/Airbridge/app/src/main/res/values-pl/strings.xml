@@ -57,6 +57,12 @@
     <string name="action_send_clipboard">Wyślij schowek</string>
     <string name="clipboard_empty">Schowek jest pusty</string>
 
+    <!-- Kafle szybkich akcji na Home (krótkie etykiety do rzędu 4 kafli) -->
+    <string name="home_action_file">Plik</string>
+    <string name="home_action_photo">Zdjęcie</string>
+    <string name="home_action_clipboard">Schowek</string>
+    <string name="home_action_screen">Ekran</string>
+
     <!-- Activity -->
     <string name="recent_activity">Ostatnia aktywność</string>
     <string name="no_activity">Brak transferów</string>

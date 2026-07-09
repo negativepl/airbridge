@@ -243,6 +243,32 @@ class MainActivity : ComponentActivity() {
                         viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', ""))
                     }
 
+                    // Shared action bodies — used by both the FAB menu items and the
+                    // Home quick actions row, so the two entry points stay in sync.
+                    val sendFileAction = { filePickerLauncher.launch(arrayOf("*/*")) }
+                    val sendPhotoAction = {
+                        photoPickerLauncher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                            )
+                        )
+                    }
+                    val sendClipboardAction = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = clipboard.primaryClip
+                        val text = if (clip != null && clip.itemCount > 0)
+                            clip.getItemAt(0).coerceToText(context).toString() else ""
+                        if (text.isNotEmpty()) {
+                            viewModel.sendClipboard(text)
+                            Toast.makeText(context, sentToMacMsg, Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, clipboardEmptyMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    val openScreenAction: () -> Unit = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                    }
+
                     // Static top bar — no collapse. The bar would otherwise be shared
                     // across both pager pages, and a bar collapsed on Home looked broken
                     // on the short Screen page (and jumped when resetting). A fixed bar is
@@ -358,7 +384,7 @@ class MainActivity : ComponentActivity() {
                                     FloatingActionButtonMenuItem(
                                         onClick = {
                                             fabMenuExpanded = false
-                                            filePickerLauncher.launch(arrayOf("*/*"))
+                                            sendFileAction()
                                         },
                                         icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
                                         text = { Text(stringResource(R.string.action_send_file)) }
@@ -366,11 +392,7 @@ class MainActivity : ComponentActivity() {
                                     FloatingActionButtonMenuItem(
                                         onClick = {
                                             fabMenuExpanded = false
-                                            photoPickerLauncher.launch(
-                                                androidx.activity.result.PickVisualMediaRequest(
-                                                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                                                )
-                                            )
+                                            sendPhotoAction()
                                         },
                                         icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
                                         text = { Text(stringResource(R.string.action_send_photo)) }
@@ -378,16 +400,7 @@ class MainActivity : ComponentActivity() {
                                     FloatingActionButtonMenuItem(
                                         onClick = {
                                             fabMenuExpanded = false
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = clipboard.primaryClip
-                                            val text = if (clip != null && clip.itemCount > 0)
-                                                clip.getItemAt(0).coerceToText(context).toString() else ""
-                                            if (text.isNotEmpty()) {
-                                                viewModel.sendClipboard(text)
-                                                Toast.makeText(context, sentToMacMsg, Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, clipboardEmptyMsg, Toast.LENGTH_SHORT).show()
-                                            }
+                                            sendClipboardAction()
                                         },
                                         icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
                                         text = { Text(stringResource(R.string.action_send_clipboard)) }
@@ -403,7 +416,15 @@ class MainActivity : ComponentActivity() {
                             beyondViewportPageCount = 1,
                         ) { page ->
                             when (page) {
-                                0 -> MainScreen(viewModel = viewModel, onScanQr = { showQrScanner = true }, bottomClearance = fabClearance)
+                                0 -> MainScreen(
+                                    viewModel = viewModel,
+                                    onScanQr = { showQrScanner = true },
+                                    bottomClearance = fabClearance,
+                                    onSendFile = sendFileAction,
+                                    onSendPhoto = sendPhotoAction,
+                                    onSendClipboard = sendClipboardAction,
+                                    onOpenScreen = openScreenAction
+                                )
                                 1 -> ScreenShareScreen(bottomClearance = fabClearance)
                                 2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
                             }

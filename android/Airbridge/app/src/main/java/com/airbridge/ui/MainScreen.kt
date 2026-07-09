@@ -65,7 +65,15 @@ import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 
 @Composable
-fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}, bottomClearance: Dp = 88.dp) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    onScanQr: () -> Unit = {},
+    bottomClearance: Dp = 88.dp,
+    onSendFile: () -> Unit = {},
+    onSendPhoto: () -> Unit = {},
+    onSendClipboard: () -> Unit = {},
+    onOpenScreen: () -> Unit = {}
+) {
     val isConnected by viewModel.isConnected.collectAsState()
     val connectedDeviceName by viewModel.connectedDeviceName.collectAsState()
     val transferProgress by viewModel.transferProgress.collectAsState()
@@ -158,6 +166,13 @@ fun MainScreen(viewModel: MainViewModel, onScanQr: () -> Unit = {}, bottomCleara
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             MacMonitorRings(info = macLocal)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            QuickActionsRow(
+                                onSendFile = onSendFile,
+                                onSendPhoto = onSendPhoto,
+                                onSendClipboard = onSendClipboard,
+                                onOpenScreen = onOpenScreen
+                            )
                         }
                     }
                 }
