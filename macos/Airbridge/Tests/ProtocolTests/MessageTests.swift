@@ -674,4 +674,35 @@ final class MessageTests: XCTestCase {
         let decoded = try JSONDecoder().decode(QRPayload.self, from: data)
         XCTAssertEqual(decoded.certFingerprint, "ab12")
     }
+
+    // MARK: - Headphone handoff
+
+    func testHeadphoneStateRoundTrip() throws {
+        let msg = Message.headphoneState(connected: true, address: "AA:BB:CC:DD:EE:FF", name: "Galaxy Buds3 Pro")
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "headphone_state")
+        XCTAssertEqual(json["connected"] as? Bool, true)
+        XCTAssertEqual(json["address"] as? String, "AA:BB:CC:DD:EE:FF")
+        XCTAssertEqual(json["name"] as? String, "Galaxy Buds3 Pro")
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testHeadphoneReleaseRequestRoundTrip() throws {
+        let msg = Message.headphoneReleaseRequest(address: "AA:BB:CC:DD:EE:FF")
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "headphone_release_request")
+        XCTAssertEqual(json["address"] as? String, "AA:BB:CC:DD:EE:FF")
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testHeadphoneReleaseResponseOmitsNilError() throws {
+        let msg = Message.headphoneReleaseResponse(ok: true, error: nil)
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "headphone_release_response")
+        XCTAssertEqual(json["ok"] as? Bool, true)
+        XCTAssertNil(json["error"])
+        XCTAssertEqual(try decode(json), msg)
+        let failed = Message.headphoneReleaseResponse(ok: false, error: "release_failed")
+        XCTAssertEqual(try decode(try encode(failed)), failed)
+    }
 }

@@ -104,6 +104,13 @@ public enum Message: Equatable, Sendable {
     case macFileDownloadReady(transferId: String, filename: String, mimeType: String, fileSize: Int64)
     case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String, notificationKey: String, canReply: Bool)
     case notificationReply(notificationKey: String, text: String)
+    /// Both directions: connection state of the selected headphones on the
+    /// sending side, so each device knows where the headphones currently are.
+    case headphoneState(connected: Bool, address: String, name: String)
+    /// Both directions: "release the headphones, I am taking them over".
+    case headphoneReleaseRequest(address: String)
+    /// Reply to headphoneReleaseRequest, sent after the local disconnect finished.
+    case headphoneReleaseResponse(ok: Bool, error: String?)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -419,6 +426,9 @@ extension Message: Codable {
         case mirrorStop               = "mirror_stop"
         case phoneRing                = "phone_ring"
         case phoneRingStop            = "phone_ring_stop"
+        case headphoneState           = "headphone_state"
+        case headphoneReleaseRequest  = "headphone_release_request"
+        case headphoneReleaseResponse = "headphone_release_response"
         case mirrorError              = "mirror_error"
         case deviceInfoRequest        = "device_info_request"
         case deviceInfoResponse       = "device_info_response"
@@ -499,6 +509,9 @@ extension Message: Codable {
         case appIcon            = "app_icon"
         case notificationKey    = "notification_key"
         case canReply           = "can_reply"
+        case connected
+        case name
+        case ok
     }
 
     // MARK: Encode
@@ -719,6 +732,21 @@ extension Message: Codable {
 
         case .phoneRingStop:
             try container.encode(TypeKey.phoneRingStop.rawValue, forKey: .type)
+
+        case let .headphoneState(connected, address, name):
+            try container.encode(TypeKey.headphoneState.rawValue, forKey: .type)
+            try container.encode(connected, forKey: .connected)
+            try container.encode(address, forKey: .address)
+            try container.encode(name, forKey: .name)
+
+        case let .headphoneReleaseRequest(address):
+            try container.encode(TypeKey.headphoneReleaseRequest.rawValue, forKey: .type)
+            try container.encode(address, forKey: .address)
+
+        case let .headphoneReleaseResponse(ok, error):
+            try container.encode(TypeKey.headphoneReleaseResponse.rawValue, forKey: .type)
+            try container.encode(ok, forKey: .ok)
+            try container.encodeIfPresent(error, forKey: .error)
 
         case let .mirrorError(reason):
             try container.encode(TypeKey.mirrorError.rawValue, forKey: .type)
@@ -1066,6 +1094,21 @@ extension Message: Codable {
 
         case .phoneRingStop:
             self = .phoneRingStop
+
+        case .headphoneState:
+            let connected = try container.decode(Bool.self, forKey: .connected)
+            let address = try container.decode(String.self, forKey: .address)
+            let name = try container.decode(String.self, forKey: .name)
+            self = .headphoneState(connected: connected, address: address, name: name)
+
+        case .headphoneReleaseRequest:
+            let address = try container.decode(String.self, forKey: .address)
+            self = .headphoneReleaseRequest(address: address)
+
+        case .headphoneReleaseResponse:
+            let ok = try container.decode(Bool.self, forKey: .ok)
+            let error = try container.decodeIfPresent(String.self, forKey: .error)
+            self = .headphoneReleaseResponse(ok: ok, error: error)
 
         case .mirrorError:
             let reason = try container.decode(String.self, forKey: .reason)
