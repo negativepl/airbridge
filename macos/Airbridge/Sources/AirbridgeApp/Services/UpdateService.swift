@@ -140,8 +140,13 @@ final class UpdateService {
         mv "/Applications/AirBridge.app" "$STAGE/previous" 2>/dev/null || true
         if ! /usr/bin/ditto "$STAGE/AirBridge.app" "/Applications/AirBridge.app"; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: install failed, rolling back"
-            rm -rf "/Applications/AirBridge.app"
-            mv "$STAGE/previous" "/Applications/AirBridge.app"
+            # Restore only when the aside-move actually produced a backup — if it
+            # silently failed, the original is still in /Applications and deleting
+            # it here would remove the only good copy.
+            if [ -d "$STAGE/previous" ]; then
+                rm -rf "/Applications/AirBridge.app"
+                mv "$STAGE/previous" "/Applications/AirBridge.app"
+            fi
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] update: end (rollback)"
             exit 1
         fi
