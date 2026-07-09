@@ -40,7 +40,7 @@ final class BluetoothAudioService {
     }
 
     static func pairedAudioDevices() -> [PairedAudioDevice] {
-        let devices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
+        let devices = (IOBluetoothDevice.pairedDevices() ?? []).compactMap { $0 as? IOBluetoothDevice }
         return devices
             .filter { $0.deviceClassMajor == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio) }
             .compactMap { dev in
@@ -63,24 +63,37 @@ final class BluetoothAudioService {
         monitorTask?.cancel()
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
-                self?.pollOnce()
+                await self?.pollOnce()
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
     }
 
-    private func pollOnce() {
-        guard enabled, let device = selectedDevice(),
-              let address = selectedAddress else { return }
-        let connected = device.isConnected()
-        if connected && Date() < guardUntil {
-            // Headphones sneaked back during a handoff — release them again.
-            device.closeConnection()
-            return
-        }
-        if connected != selectedConnected {
-            selectedConnected = connected
-            onStateChanged?(connected, address, selectedName ?? address)
+    deinit {
+        monitorTask?.cancel()
+    }
+
+    private func pollOnce() async {
+        guard enabled, let address = selectedAddress else { return }
+        // IOBluetoothDevice isn't Sendable and both isConnected() and
+        // closeConnection() are blocking IOBluetooth IPC calls; resolve the
+        // device and perform them off the main actor, capturing only the
+        // Sendable address string and a snapshot of the guard deadline.
+        let guardDeadline = guardUntil
+        let result: (connected: Bool, closed: Bool)? = await Task.detached {
+            guard let device = IOBluetoothDevice(addressString: address) else { return nil }
+            let connected = device.isConnected()
+            if connected && Date() < guardDeadline {
+                // Headphones sneaked back during a handoff — release them again.
+                device.closeConnection()
+                return (connected, true)
+            }
+            return (connected, false)
+        }.value
+        guard let result, !result.closed else { return }
+        if result.connected != selectedConnected {
+            selectedConnected = result.connected
+            onStateChanged?(result.connected, address, selectedName ?? address)
         }
     }
 
@@ -101,10 +114,12 @@ final class BluetoothAudioService {
 
     /// Connect the headphones to this Mac and route audio to them.
     func takeover() async -> Bool {
-        guard let device = selectedDevice(), let address = selectedAddress,
-              let name = selectedName else { return false }
+        guard let address = selectedAddress, let name = selectedName else { return false }
         guardUntil = .distantPast
-        if !device.isConnected() {
+        let isConnected = await Task.detached {
+            IOBluetoothDevice(addressString: address)?.isConnected() ?? false
+        }.value
+        if !isConnected {
             let status = await Task.detached {
                 IOBluetoothDevice(addressString: address)?.openConnection() ?? kIOReturnError
             }.value
