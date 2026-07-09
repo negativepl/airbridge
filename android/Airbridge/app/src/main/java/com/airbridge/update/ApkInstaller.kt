@@ -62,6 +62,8 @@ class ApkInstaller(private val context: Context) {
             onProgress: (Float) -> Unit
         ): File? = withContext(Dispatchers.IO) {
             try {
+                // System CA trust on purpose: this downloads from public HTTPS
+                // (GitHub Releases), not a paired LAN peer — PinnedTls does not apply.
                 val client = OkHttpClient()
                 client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
                     if (!resp.isSuccessful) return@withContext null
