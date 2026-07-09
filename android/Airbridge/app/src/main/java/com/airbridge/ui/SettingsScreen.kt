@@ -1,5 +1,8 @@
 package com.airbridge.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -68,6 +71,8 @@ import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.airbridge.service.HeadphoneManager
 
 @Composable
 fun SettingsScreen(
@@ -113,6 +118,17 @@ private fun SettingsContent(
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
     var autoConnect by remember { mutableStateOf(prefs.getBoolean("auto_connect", true)) }
     var vibrateOnSync by remember { mutableStateOf(prefs.getBoolean("vibrate_on_sync", false)) }
+    var headphoneHandoff by remember {
+        mutableStateOf(prefs.getBoolean("headphone_handoff_enabled", false))
+    }
+    var headphoneName by remember {
+        mutableStateOf(prefs.getString("headphone_name", null))
+    }
+    var showHeadphonePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val btPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) showHeadphonePicker = true }
 
     val scrollState = rememberScrollState()
     ScrollLimitHaptics(scrollState)
@@ -385,6 +401,90 @@ private fun SettingsContent(
                             prefs.edit().putBoolean("auto_connect", it).apply()
                         }
                     )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            SectionHeader(text = stringResource(R.string.settings_headphones))
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_headphone_handoff)) },
+                    supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
+                    trailingContent = {
+                        Switch(checked = headphoneHandoff, onCheckedChange = null)
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.toggleable(
+                        value = headphoneHandoff,
+                        role = Role.Switch,
+                        onValueChange = {
+                            headphoneHandoff = it
+                            prefs.edit().putBoolean("headphone_handoff_enabled", it).apply()
+                        }
+                    )
+                )
+                if (headphoneHandoff) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_headphone_device)) },
+                        supportingContent = {
+                            Text(headphoneName ?: stringResource(R.string.settings_headphone_device_none))
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.BLUETOOTH_CONNECT
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                            } else {
+                                showHeadphonePicker = true
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (showHeadphonePicker) {
+                val devices = remember { HeadphoneManager(context).bondedAudioDevices() }
+                AlertDialog(
+                    onDismissRequest = { showHeadphonePicker = false },
+                    title = { Text(stringResource(R.string.settings_headphone_device)) },
+                    text = {
+                        if (devices.isEmpty()) {
+                            Text(stringResource(R.string.settings_headphone_permission))
+                        } else {
+                            Column {
+                                devices.forEach { device ->
+                                    ListItem(
+                                        headlineContent = { Text(device.name) },
+                                        supportingContent = { Text(device.address) },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        modifier = Modifier.clickable {
+                                            prefs.edit()
+                                                .putString("headphone_address", device.address)
+                                                .putString("headphone_name", device.name)
+                                                .apply()
+                                            headphoneName = device.name
+                                            showHeadphonePicker = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showHeadphonePicker = false }) {
+                            Text(stringResource(android.R.string.cancel))
+                        }
+                    }
                 )
             }
 

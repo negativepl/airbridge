@@ -37,6 +37,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val macDownloadedNames = AirbridgeService.macDownloadedNames
     val macDownloadProgress = AirbridgeService.macDownloadProgress
 
+    // Headphone handoff
+    val macHeadphoneState = AirbridgeService.macHeadphoneState
+    val headphoneHandoffPhase = AirbridgeService.headphoneHandoffPhase
+
     private val _showQrScanner = MutableStateFlow(false)
     val showQrScanner: StateFlow<Boolean> = _showQrScanner.asStateFlow()
 
@@ -65,6 +69,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = AirbridgeService.ACTION_DISCONNECT
         }
         getApplication<Application>().startService(intent)
+    }
+
+    fun takeoverHeadphones() {
+        val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
+            action = AirbridgeService.ACTION_HEADPHONE_TAKEOVER
+        }
+        getApplication<Application>().startForegroundService(intent)
     }
 
     fun showQrScanner() {

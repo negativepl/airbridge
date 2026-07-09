@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.DesktopMac
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Refresh
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import com.airbridge.service.AirbridgeService
+import com.airbridge.service.HandoffPhase
 import com.airbridge.util.formatTransferSpeed
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
@@ -79,6 +81,8 @@ fun MainScreen(
     val transferSpeedHistory by viewModel.transferSpeedHistory.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val activity by viewModel.recentActivity.collectAsState()
+    val macHeadphoneState by viewModel.macHeadphoneState.collectAsState()
+    val handoffPhase by viewModel.headphoneHandoffPhase.collectAsState()
 
     val context = LocalContext.current
     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
@@ -177,7 +181,10 @@ fun MainScreen(
                     isConnected = isConnected,
                     deviceName = connectedDeviceName,
                     onDisconnect = { viewModel.disconnect() },
-                    onReconnect = { viewModel.reconnect() }
+                    onReconnect = { viewModel.reconnect() },
+                    headphonesOnMac = macHeadphoneState?.connected == true,
+                    handoffPhase = handoffPhase,
+                    onHeadphoneTakeover = { viewModel.takeoverHeadphones() }
                 )
             }
         }
@@ -413,7 +420,10 @@ private fun DeviceCard(
     isConnected: Boolean,
     deviceName: String?,
     onDisconnect: () -> Unit,
-    onReconnect: () -> Unit
+    onReconnect: () -> Unit,
+    headphonesOnMac: Boolean,
+    handoffPhase: HandoffPhase,
+    onHeadphoneTakeover: () -> Unit
 ) {
     val connectedHost by AirbridgeService.connectedHost.collectAsState()
 
@@ -527,6 +537,37 @@ private fun DeviceCard(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.disconnect))
+                        }
+
+                        if (headphonesOnMac) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = onHeadphoneTakeover,
+                                enabled = handoffPhase != HandoffPhase.IN_PROGRESS
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Headphones,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    stringResource(
+                                        if (handoffPhase == HandoffPhase.IN_PROGRESS)
+                                            R.string.headphone_takeover_in_progress
+                                        else R.string.headphone_takeover
+                                    )
+                                )
+                            }
+                            if (handoffPhase == HandoffPhase.FAILED) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(R.string.headphone_takeover_failed),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
                         }
                     }
                     1 -> {
