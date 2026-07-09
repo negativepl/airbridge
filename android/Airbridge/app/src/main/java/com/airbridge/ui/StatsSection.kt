@@ -46,7 +46,7 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
             stringResource(R.string.stats_title),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
         )
 
         Card(
