@@ -389,7 +389,7 @@ private fun SettingsContent(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Updates section — manual check only, never on a schedule.
-            SectionHeader(text = stringResource(R.string.update_check))
+            SectionHeader(text = stringResource(R.string.update_section_title))
             Spacer(modifier = Modifier.height(8.dp))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             Card(

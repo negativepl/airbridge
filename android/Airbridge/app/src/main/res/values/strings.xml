@@ -202,6 +202,7 @@
     <string name="stats_data_received">Data received</string>
 
     <!-- Update check -->
+    <string name="update_section_title">Updates</string>
     <string name="update_check">Check for updates</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You are on the latest version</string>

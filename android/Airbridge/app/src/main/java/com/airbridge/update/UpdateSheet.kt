@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,10 +89,12 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
         }
     }
 
-    // Checking is a brief, invisible beat — the row's own click feedback is
-    // enough; the sheet only appears once an update is actually available.
+    // The sheet appears as soon as the check starts (Checking), then morphs
+    // its content into the changelog once an update is found (Available).
+    // UpToDate/Failed never reach here — they resolve straight back to Idle
+    // above, after their toast, so the sheet simply isn't shown for them.
     val currentState = state
-    if (currentState is FlowState.Available) {
+    if (currentState is FlowState.Checking || currentState is FlowState.Available) {
         @Suppress("DEPRECATION")
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
@@ -99,14 +104,37 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
             },
             sheetState = sheetState
         ) {
-            UpdateAvailableSheet(
-                manifest = currentState.manifest,
-                onInstalled = {
-                    state = FlowState.Idle
-                    onDone()
-                }
-            )
+            when (currentState) {
+                is FlowState.Checking -> UpdateCheckingSheet()
+                is FlowState.Available -> UpdateAvailableSheet(
+                    manifest = currentState.manifest,
+                    onInstalled = {
+                        state = FlowState.Idle
+                        onDone()
+                    }
+                )
+                FlowState.Idle -> {}
+            }
         }
+    }
+}
+
+@Composable
+private fun UpdateCheckingSheet() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.update_checking),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
