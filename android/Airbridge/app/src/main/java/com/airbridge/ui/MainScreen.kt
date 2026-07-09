@@ -165,14 +165,14 @@ fun MainScreen(
                                 onDisconnect = { viewModel.disconnect() }
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            MacMonitorRings(info = macLocal)
-                            Spacer(modifier = Modifier.height(8.dp))
                             QuickActionsRow(
                                 onSendFile = onSendFile,
                                 onSendPhoto = onSendPhoto,
                                 onSendClipboard = onSendClipboard,
                                 onOpenScreen = onOpenScreen
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MacMonitorRings(info = macLocal)
                         }
                     }
                 }
@@ -196,7 +196,7 @@ fun MainScreen(
             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
             Column {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
@@ -244,7 +244,7 @@ fun MainScreen(
             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
             Column {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Card(
                 onClick = { transferExpanded = !transferExpanded },
@@ -364,7 +364,7 @@ fun MainScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         StatsSection(stats)
         ActivityFeed(activity)
 
