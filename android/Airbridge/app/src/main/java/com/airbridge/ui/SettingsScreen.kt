@@ -72,6 +72,7 @@ import com.airbridge.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.airbridge.service.HeadphoneManager
 
 @Composable
@@ -426,7 +427,7 @@ private fun SettingsContent(
                         role = Role.Switch,
                         onValueChange = {
                             headphoneHandoff = it
-                            prefs.edit().putBoolean("headphone_handoff_enabled", it).apply()
+                            prefs.edit { putBoolean("headphone_handoff_enabled", it) }
                         }
                     )
                 )
@@ -468,10 +469,10 @@ private fun SettingsContent(
                                         supportingContent = { Text(device.address) },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         modifier = Modifier.clickable {
-                                            prefs.edit()
-                                                .putString("headphone_address", device.address)
-                                                .putString("headphone_name", device.name)
-                                                .apply()
+                                            prefs.edit {
+                                                putString("headphone_address", device.address)
+                                                putString("headphone_name", device.name)
+                                            }
                                             headphoneName = device.name
                                             showHeadphonePicker = false
                                         }

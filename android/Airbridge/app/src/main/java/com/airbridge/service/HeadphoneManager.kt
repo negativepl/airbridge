@@ -93,6 +93,11 @@ class HeadphoneManager(private val context: Context) {
             if (!hasPermission()) return
             val address = device.address ?: return
             if (address != selectedAddress) return
+            val name = try {
+                device.name ?: address
+            } catch (e: SecurityException) {
+                address
+            }
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
                     if (guard.isActive) {
@@ -101,11 +106,11 @@ class HeadphoneManager(private val context: Context) {
                         Log.d(TAG, "Guard active — re-releasing $address")
                         invokeProfile("disconnect", device)
                     } else {
-                        onStateChanged?.invoke(true, address, device.name ?: address)
+                        onStateChanged?.invoke(true, address, name)
                     }
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED ->
-                    onStateChanged?.invoke(false, address, device.name ?: address)
+                    onStateChanged?.invoke(false, address, name)
             }
         }
     }
