@@ -127,7 +127,9 @@ fun MacDeviceCard(
                         text = statusText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        // Z dopiskiem o ładowaniu linia bywa dłuższa niż karta —
+                        // zawijamy zamiast ucinać w połowie słowa.
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

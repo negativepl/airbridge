@@ -143,7 +143,7 @@
     <string name="settings_vibrate">Wibracja przy synchronizacji</string>
     <string name="settings_vibrate_desc">Krótka wibracja po zsynchronizowaniu schowka</string>
     <string name="settings_hide_notification">Ukryj powiadomienie w tle</string>
-    <string name="settings_hide_notification_desc">Otwiera ustawienia systemowe, by wyłączyć powiadomienie „Działa w tle"</string>
+    <string name="settings_hide_notification_desc">Otwiera ustawienia systemowe, by wyłączyć powiadomienie „Działa w tle”</string>
     <string name="channel_service_name">Usługa w tle</string>
     <string name="channel_service_desc">Utrzymuje AirBridge aktywne w tle</string>
     <string name="channel_files_name">Przesyłanie plików</string>

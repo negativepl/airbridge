@@ -202,9 +202,11 @@ private fun SettingsContent(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    // Jasny | Systemowy | Ciemny — systemowy w środku jako
+                    // punkt neutralny między dwoma jawnymi motywami.
                     val themeOptions = listOf(
-                        "system" to stringResource(R.string.settings_theme_system),
                         "light" to stringResource(R.string.settings_theme_light),
+                        "system" to stringResource(R.string.settings_theme_system),
                         "dark" to stringResource(R.string.settings_theme_dark)
                     )
 
