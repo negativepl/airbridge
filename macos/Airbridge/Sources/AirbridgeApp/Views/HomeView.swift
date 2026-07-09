@@ -5,6 +5,7 @@ struct HomeView: View {
     let connectionService: ConnectionService
     let fileTransferService: FileTransferService
     let pairingService: PairingService
+    let bluetoothAudio: BluetoothAudioService
 
     @State private var viewModel: HomeViewModel
     @State private var showPairing = false
@@ -12,11 +13,13 @@ struct HomeView: View {
     init(
         connectionService: ConnectionService,
         fileTransferService: FileTransferService,
-        pairingService: PairingService
+        pairingService: PairingService,
+        bluetoothAudio: BluetoothAudioService
     ) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
         self.pairingService = pairingService
+        self.bluetoothAudio = bluetoothAudio
         self._viewModel = State(initialValue: HomeViewModel(
             connectionService: connectionService,
             fileTransferService: fileTransferService
@@ -216,6 +219,32 @@ struct HomeView: View {
                     switchable: switchable,
                     onSelect: { connectionService.setActiveDevice(device.connectionId) }
                 )
+            }
+
+            if bluetoothAudio.enabled,
+               connectionService.phoneHeadphoneState?.connected == true {
+                HStack {
+                    Image(systemName: "headphones")
+                        .foregroundStyle(.secondary)
+                    Text(L10n.isPL ? "Słuchawki są połączone z telefonem"
+                                   : "Headphones are connected to the phone")
+                        .font(.ab(.subheadline))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(connectionService.headphoneHandoffPhase == .inProgress
+                            ? (L10n.isPL ? "Przenoszenie…" : "Moving…")
+                            : (L10n.isPL ? "Przenieś tutaj" : "Move here")) {
+                        connectionService.takeoverHeadphones()
+                    }
+                    .disabled(connectionService.headphoneHandoffPhase == .inProgress)
+                }
+                if connectionService.headphoneHandoffPhase == .failed {
+                    Text(L10n.isPL
+                        ? "Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami."
+                        : "Headphone handoff failed. Make sure the headphones are on and paired with both devices.")
+                        .font(.ab(.caption))
+                        .foregroundStyle(.red)
+                }
             }
         }
     }

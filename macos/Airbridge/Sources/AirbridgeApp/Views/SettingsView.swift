@@ -8,8 +8,10 @@ struct SettingsView: View {
     let hotkeyService: GlobalHotkeyService
     let notificationService: NotificationService
     let updateService: UpdateService
+    let bluetoothAudio: BluetoothAudioService
 
     @State private var viewModel: SettingsViewModel
+    @State private var pairedAudio: [BluetoothAudioService.PairedAudioDevice] = []
     @State private var accessibilityGranted: Bool = AXIsProcessTrusted()
     @State private var accessibilityAwaitingRestart = false
     @AppStorage("launchAtLogin") private var launchAtLogin = false
@@ -23,12 +25,13 @@ struct SettingsView: View {
     @State private var accessibilityPollTimer: Timer?
     @State private var launchAtLoginError: String?
 
-    init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService, notificationService: NotificationService, updateService: UpdateService) {
+    init(connectionService: ConnectionService, pairingService: PairingService, hotkeyService: GlobalHotkeyService, notificationService: NotificationService, updateService: UpdateService, bluetoothAudio: BluetoothAudioService) {
         self.connectionService = connectionService
         self.pairingService = pairingService
         self.hotkeyService = hotkeyService
         self.notificationService = notificationService
         self.updateService = updateService
+        self.bluetoothAudio = bluetoothAudio
         self._viewModel = State(initialValue: SettingsViewModel(
             connectionService: connectionService,
             pairingService: pairingService
@@ -40,6 +43,7 @@ struct SettingsView: View {
         VStack(spacing: 16) {
             pairedDevicesSection(vm)
             generalSection
+            headphoneSection
             notificationsSection
             quickDropSection
             fileTransferSection
@@ -211,6 +215,41 @@ struct SettingsView: View {
             ))
             .font(.ab(.body))
         }
+    }
+
+    private var headphoneSection: some View {
+        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Słuchawki" : "Headphones"),
+                     systemImage: "headphones") {
+            Toggle(L10n.isPL ? "Przełączanie słuchawek" : "Headphone handoff", isOn: Binding(
+                get: { bluetoothAudio.enabled },
+                set: { bluetoothAudio.enabled = $0 }
+            ))
+            .font(.ab(.body))
+
+            if bluetoothAudio.enabled {
+                Picker(L10n.isPL ? "Słuchawki:" : "Headphones:", selection: Binding(
+                    get: { bluetoothAudio.selectedAddress ?? "" },
+                    set: { address in
+                        bluetoothAudio.selectedAddress = address.isEmpty ? nil : address
+                        bluetoothAudio.selectedName =
+                            pairedAudio.first(where: { $0.address == address })?.name
+                    }
+                )) {
+                    Text(L10n.isPL ? "Nie wybrano" : "Not selected").tag("")
+                    ForEach(pairedAudio) { device in
+                        Text(device.name).tag(device.address)
+                    }
+                }
+                .font(.ab(.body))
+
+                Text(L10n.isPL
+                    ? "Słuchawki muszą być sparowane zarówno z tym Makiem, jak i z telefonem."
+                    : "The headphones must be paired with both this Mac and the phone.")
+                    .font(.ab(.caption))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear { pairedAudio = BluetoothAudioService.pairedAudioDevices() }
     }
 
     private var quickDropSection: some View {

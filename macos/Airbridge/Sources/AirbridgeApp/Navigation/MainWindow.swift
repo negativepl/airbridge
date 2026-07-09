@@ -19,6 +19,7 @@ struct MainWindow: View {
     let hotkeyService: GlobalHotkeyService
     let mirrorService: MirrorService
     let updateService: UpdateService
+    let bluetoothAudioService: BluetoothAudioService
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -27,7 +28,8 @@ struct MainWindow: View {
                     HomeView(
                         connectionService: connectionService,
                         fileTransferService: fileTransferService,
-                        pairingService: pairingService
+                        pairingService: pairingService,
+                        bluetoothAudio: bluetoothAudioService
                     )
                 }
             }
@@ -73,7 +75,8 @@ struct MainWindow: View {
                         pairingService: pairingService,
                         hotkeyService: hotkeyService,
                         notificationService: notificationService,
-                        updateService: updateService
+                        updateService: updateService,
+                        bluetoothAudio: bluetoothAudioService
                     )
                 }
             }

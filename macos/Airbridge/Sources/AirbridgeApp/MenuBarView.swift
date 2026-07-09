@@ -5,6 +5,7 @@ struct MenuBarView: View {
     let connectionService: ConnectionService
     let clipboardService: ClipboardService
     let updateService: UpdateService
+    let bluetoothAudio: BluetoothAudioService
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -66,6 +67,16 @@ struct MenuBarView: View {
                     MenuRow(title: ringTitle,
                             systemImage: "iphone.radiowaves.left.and.right") {
                         connectionService.ringPhone()
+                    }
+                }
+
+                if bluetoothAudio.enabled,
+                   connectionService.phoneHeadphoneState?.connected == true {
+                    MenuRow(title: connectionService.headphoneHandoffPhase == .inProgress
+                                ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
+                                : (L10n.isPL ? "Przenieś słuchawki tutaj" : "Move headphones here"),
+                            systemImage: "headphones") {
+                        connectionService.takeoverHeadphones()
                     }
                 }
 

@@ -137,7 +137,8 @@ struct AirbridgeApp: App {
                         notificationService: notificationService,
                         hotkeyService: hotkeyService,
                         mirrorService: mirrorService,
-                        updateService: updateService
+                        updateService: updateService,
+                        bluetoothAudioService: bluetoothAudioService
                     )
                     .onAppear { hotkeyService.start() }
                 } else {
@@ -202,7 +203,7 @@ struct AirbridgeApp: App {
         .windowResizability(.contentMinSize)
 
         MenuBarExtra {
-            MenuBarView(connectionService: connectionService, clipboardService: clipboardService, updateService: updateService)
+            MenuBarView(connectionService: connectionService, clipboardService: clipboardService, updateService: updateService, bluetoothAudio: bluetoothAudioService)
         } label: {
             if connectionService.isConnected, let info = connectionService.deviceInfo {
                 Label {
