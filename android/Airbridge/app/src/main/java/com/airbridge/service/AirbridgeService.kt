@@ -1327,7 +1327,13 @@ class AirbridgeService : Service() {
                 }
             }
             is Message.HeadphoneReleaseResponse -> {
-                pendingRelease?.complete(message)
+                // Drop responses arriving after the takeover timed out. A stale
+                // response can still land inside a quickly retried attempt's
+                // window (no request id in the protocol); worst case is one
+                // failed attempt the user retries, so it is accepted here.
+                if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) {
+                    pendingRelease?.complete(message)
+                }
             }
             is Message.DeviceInfoRequest -> {
                 serviceScope.launch {
