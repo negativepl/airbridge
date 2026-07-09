@@ -20,6 +20,7 @@ import com.airbridge.gallery.GalleryProvider
 import com.airbridge.protocol.ContentType
 import com.airbridge.protocol.Message
 import com.airbridge.sms.SmsProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -57,6 +59,7 @@ class AirbridgeService : Service() {
         const val ACTION_ACCEPT_FILE = "com.airbridge.action.ACCEPT_FILE"
         const val ACTION_REJECT_FILE = "com.airbridge.action.REJECT_FILE"
         const val ACTION_STOP_RING = "com.airbridge.action.STOP_RING"
+        const val ACTION_HEADPHONE_TAKEOVER = "com.airbridge.action.HEADPHONE_TAKEOVER"
         private const val RING_NOTIFICATION_ID = 7
 
         const val EXTRA_HOST = "extra_host"
@@ -83,6 +86,11 @@ class AirbridgeService : Service() {
         val macWallpaper = MutableStateFlow<String?>(null)  // base64 JPEG
         val connectedSince = MutableStateFlow<Long?>(null)
         val recentActivity = MutableStateFlow<List<ActivityItem>>(emptyList())
+
+        // Headphone handoff: where the Mac says its headphones are, and the
+        // local takeover progress (drives the Home button state).
+        val macHeadphoneState = MutableStateFlow<Message.HeadphoneState?>(null)
+        val headphoneHandoffPhase = MutableStateFlow(HandoffPhase.IDLE)
 
         // Stats mirror: bridges StatsStore.stats → here so ViewModel can observe
         // without a Context. Initialised in onCreate() via serviceScope.collect.
@@ -286,6 +294,13 @@ class AirbridgeService : Service() {
     private lateinit var keyManager: com.airbridge.security.KeyManager
     private lateinit var pairedDeviceStore: com.airbridge.security.PairedDeviceStore
     private var currentMirrorPort: Int? = null
+    private lateinit var headphoneManager: HeadphoneManager
+    private var pendingRelease: CompletableDeferred<Message.HeadphoneReleaseResponse>? = null
+
+    private fun headphonePrefs() = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
+
+    private fun headphoneHandoffEnabled() =
+        headphonePrefs().getBoolean("headphone_handoff_enabled", false)
 
     /**
      * The Mac's public key from the scanned QR code, set when a PairRequest is
@@ -318,6 +333,15 @@ class AirbridgeService : Service() {
         smsProvider = SmsProvider(applicationContext)
         keyManager = com.airbridge.security.KeyManager(this)
         pairedDeviceStore = com.airbridge.security.PairedDeviceStore(this)
+        headphoneManager = HeadphoneManager(this).apply {
+            selectedAddress = headphonePrefs().getString("headphone_address", null)
+            onStateChanged = { connected, address, name ->
+                if (headphoneHandoffEnabled() && isConnected.value) {
+                    webSocketClient.send(Message.HeadphoneState(connected, address, name))
+                }
+            }
+            if (headphoneHandoffEnabled()) start()
+        }
 
         loadActivityLog(applicationContext)
         // Bridge StatsStore.stats → companion statsFlow so the ViewModel can
@@ -520,6 +544,7 @@ class AirbridgeService : Service() {
             ACTION_STOP_RING -> {
                 stopRinging()
             }
+            ACTION_HEADPHONE_TAKEOVER -> takeoverHeadphones()
         }
         return START_STICKY
     }
@@ -532,6 +557,7 @@ class AirbridgeService : Service() {
         nsdDiscovery.stopDiscovery()
         webSocketClient.disconnect()
         httpFileServer.stop()
+        headphoneManager.stop()
         // Kills the rediscovery-watchdog loop and any in-flight coroutines;
         // without this each service recreation stacks another zombie watchdog
         // that keeps forcing NSD discovery on dead instances.
@@ -974,6 +1000,18 @@ class AirbridgeService : Service() {
                     // Pull the Mac's system info + wallpaper for the Home monitor.
                     webSocketClient.send(Message.MacInfoRequest)
                     webSocketClient.send(Message.MacWallpaperRequest)
+                    // Tell the Mac where the headphones are right now (it has no
+                    // other way to learn the phone-side state after a reconnect).
+                    val hpAddress = headphonePrefs().getString("headphone_address", null)
+                    if (headphoneHandoffEnabled() && hpAddress != null) {
+                        headphoneManager.selectedAddress = hpAddress
+                        headphoneManager.start()
+                        webSocketClient.send(Message.HeadphoneState(
+                            connected = headphoneManager.isConnected(hpAddress),
+                            address = hpAddress,
+                            name = headphonePrefs().getString("headphone_name", "") ?: ""
+                        ))
+                    }
                     // connection status tracked via StateFlow
                 } else {
                     Log.w(TAG, "Auth rejected: ${message.reason}")
@@ -1276,6 +1314,21 @@ class AirbridgeService : Service() {
             }
             is Message.PhoneRing -> startRinging()
             is Message.PhoneRingStop -> stopRinging()
+            is Message.HeadphoneState -> {
+                macHeadphoneState.value = message
+            }
+            is Message.HeadphoneReleaseRequest -> {
+                // Mac is taking the headphones: disconnect locally, then confirm.
+                serviceScope.launch {
+                    val ok = headphoneManager.release(message.address)
+                    webSocketClient.send(
+                        Message.HeadphoneReleaseResponse(ok, if (ok) null else "release_failed")
+                    )
+                }
+            }
+            is Message.HeadphoneReleaseResponse -> {
+                pendingRelease?.complete(message)
+            }
             is Message.DeviceInfoRequest -> {
                 serviceScope.launch {
                     try {
@@ -1591,6 +1644,27 @@ class AirbridgeService : Service() {
      * One UI (Samsung), więc przycisk „Zatrzymaj" był nieskuteczny. MediaPlayer
      * daje deterministyczne stop()/release().
      */
+    /** Take the headphones over from the Mac: ask it to release, wait for the
+     *  confirmation, then connect locally. */
+    private fun takeoverHeadphones() {
+        val address = headphonePrefs().getString("headphone_address", null) ?: return
+        if (!headphoneHandoffEnabled() || !isConnected.value) return
+        if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) return
+        headphoneHandoffPhase.value = HandoffPhase.IN_PROGRESS
+        val pending = CompletableDeferred<Message.HeadphoneReleaseResponse>()
+        pendingRelease = pending
+        webSocketClient.send(Message.HeadphoneReleaseRequest(address))
+        serviceScope.launch {
+            val response = withTimeoutOrNull(10_000L) { pending.await() }
+            pendingRelease = null
+            val connected = response?.ok == true && headphoneManager.takeover(address)
+            headphoneHandoffPhase.value = if (connected) HandoffPhase.IDLE else HandoffPhase.FAILED
+            if (!connected) {
+                Log.w(TAG, "Headphone takeover failed (releaseOk=${response?.ok}, error=${response?.error})")
+            }
+        }
+    }
+
     private fun startRinging() {
         if (ringPlayer?.isPlaying == true) return
         try {
@@ -1755,3 +1829,5 @@ class AirbridgeService : Service() {
     }
 
 }
+
+enum class HandoffPhase { IDLE, IN_PROGRESS, FAILED }
