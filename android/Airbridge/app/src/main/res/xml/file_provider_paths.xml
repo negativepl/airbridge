@@ -8,4 +8,5 @@
      a broad root here doesn't expose anything we don't explicitly hand out. -->
 <paths>
     <external-path name="external_files" path="." />
+    <cache-path name="updates" path="updates/" />
 </paths>

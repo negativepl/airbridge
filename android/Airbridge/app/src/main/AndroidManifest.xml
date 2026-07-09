@@ -23,6 +23,7 @@
     <!-- Lets the background service launch the screen-capture consent dialog
          when the Mac requests a mirror, without the user opening the app first. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Camera (QR pairing) and telephony (SMS forwarding) are optional: the app stays
          installable and usable on devices without them (e.g. ChromeOS, Wi-Fi tablets),
