@@ -20,15 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,36 +38,16 @@ import com.airbridge.stats.formatBytes
  *  and two rows (sent / received) with file count + human-readable size. */
 @Composable
 fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
-    var showToday by remember { mutableStateOf(false) }
-    val c: StatCounters = if (showToday) stats.today else stats.total
-    val options = listOf(true to R.string.stats_today, false to R.string.stats_total)
+    // Tylko licznik łączny — przełącznik Dziś/Łącznie usunięty (decyzja UX).
+    val c: StatCounters = stats.total
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Nagłówek sekcji POZA kartą — ta sama gramatyka co "Ostatnia aktywność",
-        // z przełącznikiem Dziś/Łącznie po prawej.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                stringResource(R.string.stats_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
-            )
-            SingleChoiceSegmentedButtonRow {
-                options.forEachIndexed { index, (value, labelRes) ->
-                    SegmentedButton(
-                        selected = showToday == value,
-                        onClick = { showToday = value },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                        // Bez domyslnego ptaszka — sam stan tonalny wystarcza (decyzja UX).
-                        icon = {},
-                        label = { Text(stringResource(labelRes)) }
-                    )
-                }
-            }
-        }
+        Text(
+            stringResource(R.string.stats_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)
+        )
 
         Card(
         modifier = Modifier.fillMaxWidth(),

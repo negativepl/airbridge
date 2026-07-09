@@ -203,8 +203,6 @@
 
     <!-- Statistics -->
     <string name="stats_title">Statistics</string>
-    <string name="stats_today">Today</string>
-    <string name="stats_total">Total</string>
     <string name="stats_sent_row">Sent</string>
     <string name="stats_received_row">Received</string>
     <plurals name="stats_row_value_files">

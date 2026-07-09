@@ -208,8 +208,6 @@
 
     <!-- Statistics -->
     <string name="stats_title">Statystyki</string>
-    <string name="stats_today">Dziś</string>
-    <string name="stats_total">Łącznie</string>
     <string name="stats_sent_row">Wysłane</string>
     <string name="stats_received_row">Odebrane</string>
     <plurals name="stats_row_value_files">
