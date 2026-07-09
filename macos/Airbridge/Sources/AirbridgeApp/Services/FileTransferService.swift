@@ -21,7 +21,7 @@ final class FileTransferService: MessageHandler {
     private(set) var isRejected: Bool = false
     private(set) var incomingOfferTransferId: String? = nil
     private(set) var incomingOfferFileSize: Int64 = 0
-    var hasIncomingOffer: Bool { !pendingOfferIds.isEmpty }
+    var hasIncomingOffer: Bool { !pendingOffers.isEmpty }
 
     // MARK: - Private
 
@@ -32,8 +32,15 @@ final class FileTransferService: MessageHandler {
     @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
     /// All incoming offers awaiting one accept/reject (the phone can share many
     /// files at once — accept/reject must cover every offer, not just the last).
-    @ObservationIgnored private var pendingOfferIds: [String] = []
+    /// Each offer remembers its originating connection so the accept/reject
+    /// goes back to THAT phone, not to every connected device.
+    @ObservationIgnored private var pendingOffers: [(transferId: String, fileSize: Int64, connectionId: String)] = []
     @ObservationIgnored private var pendingOffersTotalSize: Int64 = 0
+    /// "host|filename" of the upload that owns the transfer popup. With two
+    /// phones uploading concurrently, only the owner drives the shared popup
+    /// fields — the other transfer still lands on disk, just without fighting
+    /// over the progress UI.
+    @ObservationIgnored private var receivingOwnerKey: String? = nil
     /// Gdy ustawione, najbliższy przychodzący plik o tej nazwie idzie do cache
     /// podglądu (a nie do Downloads) i wywołuje completion z URL-em. Korelacja po
     /// nazwie wystarcza, bo apka prowadzi jeden transfer naraz.
@@ -49,9 +56,13 @@ final class FileTransferService: MessageHandler {
     // MARK: - MessageHandler
 
     func handleMessage(_ message: Message) {
+        handleMessage(message, from: "")
+    }
+
+    func handleMessage(_ message: Message, from connectionId: String) {
         switch message {
         case .fileTransferOffer(let transferId, let filename, _, let fileSize, _):
-            handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize)
+            handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize, connectionId: connectionId)
         case .fileTransferAccept:
             offerResponseStream?.yield(true)
             offerResponseStream?.finish()
@@ -67,18 +78,18 @@ final class FileTransferService: MessageHandler {
 
     // MARK: - Incoming Offer (file from phone)
 
-    private func handleIncomingOffer(transferId: String, filename: String, fileSize: Int64) {
+    private func handleIncomingOffer(transferId: String, filename: String, fileSize: Int64, connectionId: String) {
         // No withAnimation here — TransferPopupView has .animation(value:
         // stateKind) which catches state changes and animates them. Wrapping
         // in withAnimation creates a competing transaction that conflicts.
         // Accumulate offers — the phone can share several files at once, each
         // arriving as its own offer within milliseconds.
-        pendingOfferIds.append(transferId)
+        pendingOffers.append((transferId, fileSize, connectionId))
         pendingOffersTotalSize += fileSize
         incomingOfferTransferId = transferId
         incomingOfferFileSize = pendingOffersTotalSize
-        fileTransferFileName = pendingOfferIds.count > 1
-            ? (L10n.isPL ? "\(pendingOfferIds.count) plików" : "\(pendingOfferIds.count) files")
+        fileTransferFileName = pendingOffers.count > 1
+            ? (L10n.isPL ? "\(pendingOffers.count) plików" : "\(pendingOffers.count) files")
             : filename
         isReceivingFile = true
         isWaitingForAccept = false
@@ -88,20 +99,20 @@ final class FileTransferService: MessageHandler {
     }
 
     func acceptIncomingOffer() {
-        let ids = pendingOfferIds
-        pendingOfferIds = []
+        let offers = pendingOffers
+        pendingOffers = []
         pendingOffersTotalSize = 0
         incomingOfferTransferId = nil
         // Nothing to accept (e.g. the offer was cleared by a dropped connection)
         // — don't strand the popup on screen; just dismiss it.
-        guard !ids.isEmpty else {
+        guard !offers.isEmpty else {
             TransferPopup.shared.hide(delay: 0)
             return
         }
         let connectionService = self.connectionService
         Task {
-            for id in ids {
-                try? await connectionService?.broadcast(Message.fileTransferAccept(transferId: id))
+            for offer in offers {
+                try? await connectionService?.sendTo(Message.fileTransferAccept(transferId: offer.transferId), connectionId: offer.connectionId)
             }
         }
         // Keep the popup visible — receive HTTP upload progress will replace it
@@ -111,14 +122,14 @@ final class FileTransferService: MessageHandler {
         // Always dismiss locally, even if the offer state is already empty (a
         // dropped connection can clear it while the popup is still on screen).
         // The reject broadcast is best-effort over whatever connection exists.
-        let ids = pendingOfferIds
-        pendingOfferIds = []
+        let offers = pendingOffers
+        pendingOffers = []
         pendingOffersTotalSize = 0
-        if !ids.isEmpty {
+        if !offers.isEmpty {
             let connectionService = self.connectionService
             Task {
-                for id in ids {
-                    try? await connectionService?.broadcast(Message.fileTransferReject(transferId: id))
+                for offer in offers {
+                    try? await connectionService?.sendTo(Message.fileTransferReject(transferId: offer.transferId), connectionId: offer.connectionId)
                 }
             }
         }
@@ -143,8 +154,9 @@ final class FileTransferService: MessageHandler {
     /// dismiss the popup instead of leaving it orphaned (the bug where "Reject"
     /// appeared to do nothing after the connection died).
     func connectionLost() {
+        receivingOwnerKey = nil
         guard hasIncomingOffer else { return }
-        pendingOfferIds = []
+        pendingOffers = []
         pendingOffersTotalSize = 0
         incomingOfferTransferId = nil
         isWaitingForAccept = false
@@ -152,6 +164,24 @@ final class FileTransferService: MessageHandler {
         fileTransferFileName = ""
         isReceivingFile = false
         TransferPopup.shared.hide(delay: 0)
+    }
+
+    /// One device (of possibly several) disconnected: drop only ITS pending
+    /// offers. Offers and uploads from the remaining phones stay untouched.
+    func deviceDisconnected(connectionId: String) {
+        let remaining = pendingOffers.filter { $0.connectionId != connectionId }
+        guard remaining.count != pendingOffers.count else { return }
+        pendingOffers = remaining
+        pendingOffersTotalSize = remaining.reduce(0) { $0 + $1.fileSize }
+        incomingOfferTransferId = remaining.last?.transferId
+        incomingOfferFileSize = pendingOffersTotalSize
+        if remaining.isEmpty {
+            isWaitingForAccept = false
+            isRejected = false
+            fileTransferFileName = ""
+            isReceivingFile = false
+            TransferPopup.shared.hide(delay: 0)
+        }
     }
 
     // MARK: - Sending
@@ -335,13 +365,20 @@ final class FileTransferService: MessageHandler {
         // The server hands over a temp file URL (ownership included — we must
         // move or delete it). Streaming to disk on the server side keeps
         // multi-GB uploads out of RAM; here we only move files around.
-        let onFileReceived: @Sendable (String, String, String, URL, String?) -> Void = { [weak self] filename, _, _, tempURL, destinationDir in
+        let onFileReceived: @Sendable (String, String, String, URL, String?, String) -> Void = { [weak self] filename, _, _, tempURL, destinationDir, senderHost in
             Task { @MainActor in
                 guard let self else {
                     try? FileManager.default.removeItem(at: tempURL)
                     return
                 }
-                self.fileTransferProgress = 1.0
+                // Only the popup-owning upload drives the shared progress
+                // fields; a concurrent upload from another phone still gets
+                // saved below, it just doesn't touch the UI state.
+                let ownerKey = "\(senderHost)|\(filename)"
+                let ownsPopup = self.receivingOwnerKey == nil || self.receivingOwnerKey == ownerKey
+                if ownsPopup {
+                    self.fileTransferProgress = 1.0
+                }
                 // Keep `isReceivingFile = true` until the whole complete
                 // sequence has played. Flipping it false here made the popup
                 // briefly compute `.transferring(isReceiving: false)` → flash
@@ -402,6 +439,8 @@ final class FileTransferService: MessageHandler {
                     }
                 }
 
+                guard ownsPopup else { return }
+                self.receivingOwnerKey = nil
                 TransferPopup.shared.hide()
 
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -411,7 +450,7 @@ final class FileTransferService: MessageHandler {
             }
         }
 
-        let onProgress: @Sendable (String, Int, Int) -> Void = { [weak self] filename, bytesReceived, totalBytes in
+        let onProgress: @Sendable (String, Int, Int, String) -> Void = { [weak self] filename, bytesReceived, totalBytes, senderHost in
             Task { @MainActor in
                 guard let self else { return }
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
@@ -421,6 +460,15 @@ final class FileTransferService: MessageHandler {
                     preview.onProgress(progress)
                     return
                 }
+
+                // First upload to report progress claims the popup; a
+                // concurrent upload from another phone runs headless until
+                // the owner finishes.
+                let ownerKey = "\(senderHost)|\(filename)"
+                if self.receivingOwnerKey == nil {
+                    self.receivingOwnerKey = ownerKey
+                }
+                guard self.receivingOwnerKey == ownerKey else { return }
 
                 self.fileTransferFileName = filename
                 self.fileTransferProgress = progress

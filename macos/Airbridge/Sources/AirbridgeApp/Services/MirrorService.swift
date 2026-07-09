@@ -158,6 +158,11 @@ public final class MirrorService {
     public var tlsIdentity: SecIdentity?
 
     private let server: WebSocketServer
+    /// Connections that presented a valid HELLO/REVERSE_HELLO token. Every
+    /// other frame type is dropped until the connection appears here — without
+    /// this gate any LAN client that completes the TLS handshake could feed
+    /// frames straight into the video decoder or inject reverse input.
+    private var authenticatedMirrorConnections: Set<String> = []
     /// Returns true if the 16-byte hello token matches a paired device (its
     /// public-key prefix). Checks ALL paired devices, so any connected phone —
     /// not just the first — can open the mirror.
@@ -210,12 +215,12 @@ public final class MirrorService {
         }
         await server.setCallbacks(
             onMessage: nil,
-            onBinaryMessage: { [weak self] data in
-                Task { @MainActor in self?.handleBinaryFrame(data) }
+            onBinaryMessage: { [weak self] data, connectionId in
+                Task { @MainActor in self?.handleBinaryFrame(data, from: connectionId) }
             },
             onClientConnected: { _ in },
-            onClientDisconnected: { [weak self] _ in
-                Task { @MainActor in self?.handleDisconnect() }
+            onClientDisconnected: { [weak self] connectionId in
+                Task { @MainActor in self?.handleDisconnect(connectionId) }
             }
         )
         try await server.start(tlsIdentity: tlsIdentity)
@@ -225,6 +230,7 @@ public final class MirrorService {
 
     public func stop() async {
         await server.disconnectAllClients()
+        authenticatedMirrorConnections.removeAll()
         stopReverseMirror()
         actualPort = nil
         isStreaming = false
@@ -261,17 +267,33 @@ public final class MirrorService {
         }
     }
 
-    private func handleBinaryFrame(_ data: Data) {
+    private func handleBinaryFrame(_ data: Data, from connectionId: String) {
         do {
             let msg = try MirrorMessage.decode(data)
+
+            // Auth gate: only HELLO/REVERSE_HELLO may arrive on a connection
+            // that hasn't validated its token yet; everything else is dropped
+            // and the connection torn down.
+            switch msg {
+            case .hello, .reverseHello:
+                break
+            default:
+                guard authenticatedMirrorConnections.contains(connectionId) else {
+                    MirrorDebugLog.write("dropping pre-auth frame from \(connectionId)")
+                    Task { await server.disconnectClient(connectionId) }
+                    return
+                }
+            }
+
             switch msg {
             case let .hello(token, screenWidth, screenHeight, _):
                 MirrorDebugLog.write("received HELLO tokenBytes=\(token.count)")
                 guard mirrorTokenValidator(token) else {
                     MirrorDebugLog.write("HELLO rejected")
-                    Task { await server.disconnectAllClients() }
+                    Task { await server.disconnectClient(connectionId) }
                     return
                 }
+                authenticatedMirrorConnections.insert(connectionId)
                 remoteScreenWidth = CGFloat(screenWidth)
                 remoteScreenHeight = CGFloat(screenHeight)
                 let q = quality(.forward)
@@ -291,7 +313,7 @@ public final class MirrorService {
                 fpsWindowStartedAt = Date()
                 fpsFrameCount = 0
                 MirrorDebugLog.write("sending HELLO_ACK fps=\(q.fps) size=\(targetStreamWidth)x\(targetStreamHeight) aspect=\(remoteScreenWidth)x\(remoteScreenHeight)")
-                Task { try? await server.broadcastBinary(ack.encode()) }
+                Task { try? await server.sendBinary(ack.encode(), connectionId: connectionId) }
             case let .videoConfig(sps, pps):
                 MirrorDebugLog.write("received VIDEO_CONFIG H264 sps=\(sps.count) pps=\(pps.count)")
                 let dec = makeForwardDecoder()
@@ -347,9 +369,10 @@ public final class MirrorService {
                 MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
                 guard mirrorTokenValidator(token) else {
                     MirrorDebugLog.write("REVERSE_HELLO rejected")
-                    Task { await server.disconnectAllClients() }
+                    Task { await server.disconnectClient(connectionId) }
                     return
                 }
+                authenticatedMirrorConnections.insert(connectionId)
                 startReverseMirror(mode: mode, phoneWidth: Int(w), phoneHeight: Int(h))
 
             case .status, .helloAck:
@@ -361,7 +384,8 @@ public final class MirrorService {
         }
     }
 
-    private func handleDisconnect() {
+    private func handleDisconnect(_ connectionId: String) {
+        authenticatedMirrorConnections.remove(connectionId)
         stopReverseMirror()
         isStreaming = false
         decoder?.invalidate()

@@ -22,6 +22,7 @@ import com.airbridge.protocol.Message
 import com.airbridge.sms.SmsProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -531,6 +532,10 @@ class AirbridgeService : Service() {
         nsdDiscovery.stopDiscovery()
         webSocketClient.disconnect()
         httpFileServer.stop()
+        // Kills the rediscovery-watchdog loop and any in-flight coroutines;
+        // without this each service recreation stacks another zombie watchdog
+        // that keeps forcing NSD discovery on dead instances.
+        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

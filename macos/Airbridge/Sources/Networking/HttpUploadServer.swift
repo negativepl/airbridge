@@ -21,20 +21,23 @@ public actor HttpUploadServer {
 
     /// Called when a complete file has been received (on actor context).
     /// Arguments: filename, mimeType, SHA-256 hex checksum, the URL of a
-    /// temporary file holding the uploaded bytes, and an optional destination
-    /// directory relative to home (percent-decoded from X-Destination-Dir).
+    /// temporary file holding the uploaded bytes, an optional destination
+    /// directory relative to home (percent-decoded from X-Destination-Dir),
+    /// and the normalized sender host — with several phones connected the
+    /// consumer must key transfer state by (host, filename), not filename.
     /// The callback OWNS the temp file — it must move or delete it.
-    public var onFileReceived: (@Sendable (String, String, String, URL, String?) -> Void)?
+    public var onFileReceived: (@Sendable (String, String, String, URL, String?, String) -> Void)?
 
-    /// Called periodically as body bytes arrive.
+    /// Called periodically as body bytes arrive: (filename, bytesReceived,
+    /// totalBytes, senderHost).
     /// Marked nonisolated(unsafe) so it can be called from receive callbacks
     /// without hopping to the actor (which causes blocking).
-    public nonisolated(unsafe) var onProgress: (@Sendable (String, Int, Int) -> Void)?
+    public nonisolated(unsafe) var onProgress: (@Sendable (String, Int, Int, String) -> Void)?
 
     /// Sets both callbacks at once.
     public func setCallbacks(
-        onFileReceived: (@Sendable (String, String, String, URL, String?) -> Void)?,
-        onProgress: (@Sendable (String, Int, Int) -> Void)?
+        onFileReceived: (@Sendable (String, String, String, URL, String?, String) -> Void)?,
+        onProgress: (@Sendable (String, Int, Int, String) -> Void)?
     ) {
         self.onFileReceived = onFileReceived
         self.onProgress = onProgress
@@ -257,7 +260,7 @@ public actor HttpUploadServer {
             if case .cancelled = state { Task { [weak self] in guard let self else { return }; await self.removeConnection(id: id) } }
         }
         connection.start(queue: .global(qos: .userInitiated))
-        receiveHTTPRequest(on: connection, buffer: Data())
+        receiveHTTPRequest(on: connection, buffer: Data(), senderHost: Self.normalizeHost(remoteHost))
     }
 
     private func removeConnection(id: ObjectIdentifier) {
@@ -280,7 +283,7 @@ public actor HttpUploadServer {
 
     /// Reads data from the connection until the full HTTP header block is found,
     /// then hands off to body streaming.
-    private nonisolated func receiveHTTPRequest(on connection: NWConnection, buffer: Data) {
+    private nonisolated func receiveHTTPRequest(on connection: NWConnection, buffer: Data, senderHost: String) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 1_048_576) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
@@ -308,7 +311,8 @@ public actor HttpUploadServer {
                     await self.processRequest(
                         headerString: headerString,
                         bodyPrefix: Data(bodyPrefix),
-                        connection: connection
+                        connection: connection,
+                        senderHost: senderHost
                     )
                 }
                 return
@@ -326,7 +330,7 @@ public actor HttpUploadServer {
             }
 
             // Keep reading until we find the header terminator
-            self.receiveHTTPRequest(on: connection, buffer: accumulated)
+            self.receiveHTTPRequest(on: connection, buffer: accumulated, senderHost: senderHost)
         }
     }
 
@@ -334,7 +338,8 @@ public actor HttpUploadServer {
     private func processRequest(
         headerString: String,
         bodyPrefix: Data,
-        connection: NWConnection
+        connection: NWConnection,
+        senderHost: String
     ) {
         let lines = headerString.components(separatedBy: "\r\n")
         guard let requestLine = lines.first else {
@@ -414,7 +419,8 @@ public actor HttpUploadServer {
             expectedChecksum: expectedChecksum,
             destinationDir: destinationDir,
             contentLength: contentLength,
-            sink: sink
+            sink: sink,
+            senderHost: senderHost
         )
     }
 
@@ -498,10 +504,11 @@ public actor HttpUploadServer {
         expectedChecksum: String?,
         destinationDir: String?,
         contentLength: Int,
-        sink: UploadSink
+        sink: UploadSink,
+        senderHost: String
     ) {
         // Report progress — call directly, not via actor hop
-        self.onProgress?(filename, sink.bytesWritten, contentLength)
+        self.onProgress?(filename, sink.bytesWritten, contentLength, senderHost)
 
         if sink.bytesWritten >= contentLength {
             Task {
@@ -511,7 +518,8 @@ public actor HttpUploadServer {
                     mimeType: mimeType,
                     expectedChecksum: expectedChecksum,
                     destinationDir: destinationDir,
-                    sink: sink
+                    sink: sink,
+                    senderHost: senderHost
                 )
             }
             return
@@ -553,7 +561,8 @@ public actor HttpUploadServer {
                 expectedChecksum: expectedChecksum,
                 destinationDir: destinationDir,
                 contentLength: contentLength,
-                sink: sink
+                sink: sink,
+                senderHost: senderHost
             )
         }
     }
@@ -565,7 +574,8 @@ public actor HttpUploadServer {
         mimeType: String,
         expectedChecksum: String?,
         destinationDir: String?,
-        sink: UploadSink
+        sink: UploadSink,
+        senderHost: String
     ) {
         let computedChecksum: String
         do {
@@ -590,7 +600,7 @@ public actor HttpUploadServer {
 
         if let onFileReceived {
             // Ownership of the temp file passes to the callback.
-            onFileReceived(filename, mimeType, computedChecksum, sink.tempURL, destinationDir)
+            onFileReceived(filename, mimeType, computedChecksum, sink.tempURL, destinationDir, senderHost)
         } else {
             // finish() already closed the handle — nobody wants the file.
             sink.deleteTempFile()

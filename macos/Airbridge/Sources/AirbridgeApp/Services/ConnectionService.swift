@@ -15,6 +15,15 @@ import Pairing
 @MainActor
 protocol MessageHandler: AnyObject {
     func handleMessage(_ message: Message)
+    /// Variant carrying the originating connection — implemented by handlers
+    /// that must reply to (or key state by) the sending device.
+    func handleMessage(_ message: Message, from connectionId: String)
+}
+
+extension MessageHandler {
+    func handleMessage(_ message: Message, from connectionId: String) {
+        handleMessage(message)
+    }
 }
 
 /// Manages WebSocket + HTTP server lifecycle, Bonjour advertisement,
@@ -514,7 +523,7 @@ final class ConnectionService {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
         case .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
-            fileTransferHandler?.handleMessage(message)
+            fileTransferHandler?.handleMessage(message, from: connectionId)
         case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse:
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
@@ -565,6 +574,9 @@ final class ConnectionService {
                 self.connectedDevices.removeAll { $0.connectionId == endpoint }
                 self.refreshAllowedUploadHosts()
                 self.ensureActiveDeviceValid()
+                // Drop only this device's pending offers — other phones' offers
+                // (and their in-flight uploads) stay untouched.
+                self.fileTransferService?.deviceDisconnected(connectionId: endpoint)
                 Diag.log("Connection", "client disconnected: \(endpoint) — remaining=\(self.connectedDevices.count)")
                 if self.connectedDevices.isEmpty {
                     // Dismiss any incoming-file popup orphaned by the dropped link.

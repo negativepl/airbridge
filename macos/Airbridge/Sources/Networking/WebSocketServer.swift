@@ -30,7 +30,9 @@ public actor WebSocketServer {
     public var onMessage: (@Sendable (Message, String) -> Void)?
 
     /// Called whenever a binary frame arrives (used for raw file chunks).
-    public var onBinaryMessage: (@Sendable (Data) -> Void)?
+    /// Includes connectionId so the consumer can enforce per-connection
+    /// authentication and target replies/disconnects at the sender.
+    public var onBinaryMessage: (@Sendable (Data, String) -> Void)?
 
     /// Called when a client connects. Passes the connection endpoint description.
     public var onClientConnected: (@Sendable (String) -> Void)?
@@ -46,7 +48,7 @@ public actor WebSocketServer {
     /// Convenience method to set all callbacks at once from outside the actor.
     public func setCallbacks(
         onMessage: (@Sendable (Message, String) -> Void)?,
-        onBinaryMessage: (@Sendable (Data) -> Void)? = nil,
+        onBinaryMessage: (@Sendable (Data, String) -> Void)? = nil,
         onClientConnected: (@Sendable (String) -> Void)?,
         onClientDisconnected: (@Sendable (String) -> Void)?
     ) {
@@ -265,6 +267,19 @@ public actor WebSocketServer {
         }
     }
 
+    /// Sends raw binary data to a single connected client as a WebSocket binary frame.
+    public func sendBinary(_ data: Data, connectionId: String) async throws {
+        guard let conn = connections[connectionId] else { return }
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .binary)
+        let context = NWConnection.ContentContext(identifier: "binary", metadata: [metadata])
+        try await withCheckedThrowingContinuation { (cc: CheckedContinuation<Void, Error>) in
+            conn.send(content: data, contentContext: context, isComplete: true,
+                      completion: .contentProcessed { err in
+                          if let err { cc.resume(throwing: err) } else { cc.resume(returning: ()) }
+                      })
+        }
+    }
+
     // MARK: - Send to Single Client
 
     /// JSON-encodes `message` and sends it to a specific connected client.
@@ -397,7 +412,7 @@ public actor WebSocketServer {
 
     private func handleReceivedData(_ data: Data, isBinary: Bool, from id: String) {
         if isBinary {
-            onBinaryMessage?(data)
+            onBinaryMessage?(data, id)
         } else {
             guard let message = try? JSONDecoder().decode(Message.self, from: data) else {
                 return
