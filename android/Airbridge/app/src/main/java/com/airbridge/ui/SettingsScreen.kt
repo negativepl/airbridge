@@ -50,6 +50,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -384,6 +385,45 @@ private fun SettingsContent(
                     )
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Updates section — manual check only, never on a schedule.
+            SectionHeader(text = stringResource(R.string.update_check))
+            Spacer(modifier = Modifier.height(8.dp))
+            var checkUpdateTrigger by remember { mutableStateOf(false) }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { checkUpdateTrigger = true },
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) {
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            Icons.Rounded.SystemUpdate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    headlineContent = { Text(stringResource(R.string.update_check)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+            com.airbridge.update.UpdateFlowHost(
+                trigger = checkUpdateTrigger,
+                onDone = { checkUpdateTrigger = false }
+            )
 
         Spacer(modifier = Modifier.height(32.dp))
     }

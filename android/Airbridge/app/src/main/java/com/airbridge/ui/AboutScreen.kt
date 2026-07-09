@@ -19,11 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,7 +39,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -209,6 +215,8 @@ private fun AboutContent(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        var checkUpdateTrigger by remember { mutableStateOf(false) }
+
         // Links card
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -218,6 +226,29 @@ private fun AboutContent(modifier: Modifier = Modifier) {
             )
         ) {
             Column {
+                // Check for updates — opens the changelog/download sheet.
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            Icons.Rounded.SystemUpdate,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    headlineContent = { Text(stringResource(R.string.update_check)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { checkUpdateTrigger = true }
+                )
+
                 // Source code
                 ListItem(
                     leadingContent = {
@@ -273,6 +304,11 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                 )
             }
         }
+
+        com.airbridge.update.UpdateFlowHost(
+            trigger = checkUpdateTrigger,
+            onDone = { checkUpdateTrigger = false }
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 

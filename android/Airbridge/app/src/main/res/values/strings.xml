@@ -200,4 +200,16 @@
     <string name="stats_files_received">Files received</string>
     <string name="stats_data_sent">Data sent</string>
     <string name="stats_data_received">Data received</string>
+
+    <!-- Update check -->
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You are on the latest version</string>
+    <string name="update_failed">Could not check for updates</string>
+    <string name="update_available_title">Update available: %1$s</string>
+    <string name="update_published">Released %1$s</string>
+    <string name="update_whats_new">What\'s new</string>
+    <string name="update_download_install">Download and install</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_verify_failed">Downloaded file failed verification</string>
 </resources>
