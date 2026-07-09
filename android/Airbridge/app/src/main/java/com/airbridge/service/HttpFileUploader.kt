@@ -117,7 +117,7 @@ class HttpFileUploader {
 
         val encodedFilename = java.net.URLEncoder.encode(filename, "UTF-8")
         val request = Request.Builder()
-            .url("https://$host:$port/upload")
+            .url("https://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/upload")
             .header("X-Filename", encodedFilename)
             .header("X-Mime-Type", mimeType)
             .apply { if (destinationDir != null) header("X-Destination-Dir", java.net.URLEncoder.encode(destinationDir, "UTF-8")) }

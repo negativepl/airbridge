@@ -211,4 +211,25 @@ class WebSocketClientTest {
         assertEquals(original.chunkIndex, decoded.chunkIndex)
         assertEquals(original.data, decoded.data)
     }
+
+    // Regresja: NSD potrafi zwrócić IPv6 link-local ze strefą ("%wlan0") —
+    // niebrakietowany literał IPv6 w "wss://$host:$port" wywalał cały proces
+    // IllegalArgumentException("Invalid URL port") na wątku NSD.
+    @Test
+    fun `formatUrlHost brackets ipv6 and strips zone`() {
+        assertEquals("192.168.1.5", WebSocketClient.formatUrlHost("192.168.1.5"))
+        assertEquals("[2001:db8::1]", WebSocketClient.formatUrlHost("2001:db8::1"))
+        assertEquals(
+            "[fe80::1461:edd7:c992:2a66]",
+            WebSocketClient.formatUrlHost("fe80::1461:edd7:c992:2a66%wlan0")
+        )
+    }
+
+    @Test
+    fun `ipv6 host with zone builds a valid request url`() {
+        val host = WebSocketClient.formatUrlHost("fe80::1461:edd7:c992:2a66%wlan0")
+        val req = okhttp3.Request.Builder().url("wss://$host:8765").build()
+        assertEquals("fe80::1461:edd7:c992:2a66", req.url.host)
+        assertEquals(8765, req.url.port)
+    }
 }

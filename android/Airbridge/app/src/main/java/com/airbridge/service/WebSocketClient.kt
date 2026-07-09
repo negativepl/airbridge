@@ -21,6 +21,16 @@ class WebSocketClient {
     companion object {
         private const val TAG = "WebSocketClient"
         private const val PING_INTERVAL_SECONDS = 15L
+
+        /**
+         * IPv6 literals must be bracketed inside URLs. A link-local zone id
+         * ("%wlan0") cannot be expressed in a URL at all, so it is stripped —
+         * such an address may still be routable on the single-interface phone,
+         * and even when it is not, the result is a clean connection failure
+         * followed by rediscovery instead of an okhttp parse crash.
+         */
+        internal fun formatUrlHost(host: String): String =
+            if (host.contains(':')) "[${host.substringBefore('%')}]" else host
     }
 
     var onMessage: ((Message) -> Unit)? = null
@@ -181,9 +191,18 @@ class WebSocketClient {
             OkHttpClient.Builder().pingInterval(PING_INTERVAL_SECONDS, TimeUnit.SECONDS),
             certFingerprint
         ).build()
-        val request = Request.Builder()
-            .url("wss://$host:$port")
-            .build()
+        val request = try {
+            Request.Builder()
+                .url("wss://${formatUrlHost(host)}:$port")
+                .build()
+        } catch (e: IllegalArgumentException) {
+            // A malformed endpoint (e.g. an exotic address form) must degrade to
+            // "no connection, rediscovery will retry" — this used to crash the
+            // whole process on the NSD callback thread.
+            Log.e(TAG, "Unusable endpoint $host:$port — waiting for rediscovery", e)
+            currentHost = null
+            return
+        }
         webSocket = client.newWebSocket(request, listener)
     }
 

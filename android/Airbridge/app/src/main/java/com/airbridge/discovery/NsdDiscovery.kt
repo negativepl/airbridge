@@ -139,7 +139,17 @@ class NsdDiscovery(private val context: Context) {
                     return
                 }
             }
-            val host = serviceInfo.host?.hostAddress ?: return
+            // Prefer IPv4: the Mac advertises A and AAAA records and the resolver
+            // sometimes surfaces an IPv6 link-local first, which cannot be put in
+            // a URL (zone id) and used to crash the connect path. IPv6 is only a
+            // fallback when no IPv4 address was resolved at all.
+            val addresses =
+                if (android.os.Build.VERSION.SDK_INT >= 34) serviceInfo.hostAddresses
+                else @Suppress("DEPRECATION") listOfNotNull(serviceInfo.host)
+            val address = addresses.firstOrNull { it is java.net.Inet4Address }
+                ?: addresses.firstOrNull()
+                ?: return
+            val host = address.hostAddress ?: return
             val port = serviceInfo.port
             val name = serviceInfo.serviceName ?: "Mac"
             val httpPortStr = serviceInfo.attributes["http_port"]?.let { String(it, Charsets.UTF_8) }

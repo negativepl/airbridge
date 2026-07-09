@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
@@ -113,7 +114,7 @@ private fun StatRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label
         headlineContent = { Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge) },
         trailingContent = {
             Text(
-                stringResource(R.string.stats_row_value, files, formatBytes(bytes)),
+                pluralStringResource(R.plurals.stats_row_value_files, files, files, formatBytes(bytes)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

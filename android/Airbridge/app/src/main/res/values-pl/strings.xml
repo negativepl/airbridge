@@ -211,7 +211,12 @@
     <string name="stats_total">Łącznie</string>
     <string name="stats_sent_row">Wysłane</string>
     <string name="stats_received_row">Odebrane</string>
-    <string name="stats_row_value">%1$d plików · %2$s</string>
+    <plurals name="stats_row_value_files">
+        <item quantity="one">%1$d plik · %2$s</item>
+        <item quantity="few">%1$d pliki · %2$s</item>
+        <item quantity="many">%1$d plików · %2$s</item>
+        <item quantity="other">%1$d pliku · %2$s</item>
+    </plurals>
 
     <!-- Update check -->
     <string name="update_section_title">Aktualizacje</string>

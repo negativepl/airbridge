@@ -37,7 +37,7 @@ class ReverseMirrorClient(
     private var webSocket: WebSocket? = null
 
     fun connect() {
-        val req = Request.Builder().url("wss://$host:$port/").build()
+        val req = Request.Builder().url("wss://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/").build()
         webSocket = http.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 webSocket.send(MirrorMessage.ReverseHello(pairingToken, screenWidth, screenHeight, mode).encode().toByteString())

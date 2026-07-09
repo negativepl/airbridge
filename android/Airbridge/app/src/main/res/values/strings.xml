@@ -206,7 +206,10 @@
     <string name="stats_total">Total</string>
     <string name="stats_sent_row">Sent</string>
     <string name="stats_received_row">Received</string>
-    <string name="stats_row_value">%1$d files · %2$s</string>
+    <plurals name="stats_row_value_files">
+        <item quantity="one">%1$d file · %2$s</item>
+        <item quantity="other">%1$d files · %2$s</item>
+    </plurals>
 
     <!-- Update check -->
     <string name="update_section_title">Updates</string>

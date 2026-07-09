@@ -47,7 +47,7 @@ class HttpFileDownloader {
                 .readTimeout(5, TimeUnit.MINUTES),
             certFingerprint
         ).build()
-        val url = "https://$host:$port/send/$transferId"
+        val url = "https://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/send/$transferId"
         Log.d(TAG, "GET $url")
 
         val request = Request.Builder().url(url).get().build()
