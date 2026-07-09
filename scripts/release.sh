@@ -140,6 +140,12 @@ rm -f "$DMG_RW"
 rm -rf "$DMG_STAGE"
 echo "  DMG: $DMG_PATH"
 
+# Zip the staged bundle for the in-app updater (macOS side downloads this,
+# not the DMG — no Finder chrome/Applications-symlink needed for a silent swap).
+ZIP_PATH="$APP_STAGE/AirBridge-$VERSION.zip"
+ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
+echo "  ZIP: $ZIP_PATH"
+
 # 2. Build Android
 echo "--- Building Android ---"
 cd "$ROOT/android/Airbridge"
@@ -167,8 +173,11 @@ else
     APK_PATH="$APK_DEBUG"
 fi
 
-# Copy to root
+# Copy to root — a plain, stable name for the README's "latest" link, plus a
+# versioned copy for the in-app updater manifest (which pins an exact URL per
+# release rather than "latest").
 cp "$APK_PATH" "$ROOT/AirBridge.apk"
+cp "$APK_PATH" "$ROOT/AirBridge-$VERSION.apk"
 echo "  APK: $ROOT/AirBridge.apk"
 
 # 3. Create GitHub release
@@ -210,8 +219,41 @@ gh release create "$TAG" \
     --notes "$NOTES" \
     --latest \
     "$ROOT/AirBridge.dmg#AirBridge.dmg" \
-    "$ROOT/AirBridge.apk#AirBridge.apk"
+    "$ROOT/AirBridge.apk#AirBridge.apk" \
+    "$ROOT/AirBridge-$VERSION.apk#AirBridge-$VERSION.apk" \
+    "$ZIP_PATH#AirBridge-$VERSION.zip"
 
 echo ""
 echo "=== Release $TAG published ==="
 echo "https://github.com/negativepl/airbridge/releases/tag/$TAG"
+
+# --- Update manifest (in-app updater) ---
+echo ""
+echo "--- Publishing update manifest ---"
+UPDATES_SSH="CHANGEME_USER@CHANGEME_HOST"
+UPDATES_DIR="/CHANGEME/path/airbridge"
+UPDATE_KEY="$HOME/.airbridge/update-signing.pem"
+RELEASE_NOTES_PL_FILE="${RELEASE_NOTES_PL_FILE:?Set RELEASE_NOTES_PL_FILE (PL changelog, one bullet per line)}"
+# EN changelog: reuse RELEASE_NOTES_FILE (already required), one bullet per line.
+
+APK_SHA=$(shasum -a 256 "$APK_PATH" | cut -d' ' -f1)
+ZIP_SHA=$(shasum -a 256 "$ZIP_PATH" | cut -d' ' -f1)
+APK_SIZE=$(stat -f%z "$APK_PATH")
+ZIP_SIZE=$(stat -f%z "$ZIP_PATH")
+VERSION_CODE=$(grep 'versionCode' "$GRADLE" | head -1 | grep -o '[0-9]*')
+BASE_URL="https://github.com/negativepl/airbridge/releases/download/$TAG"
+
+json_lines() {  # file with one bullet per line -> JSON string array items
+    python3 -c 'import json,sys; print(",".join(json.dumps(l.strip()) for l in sys.stdin if l.strip()))' < "$1"
+}
+MANIFEST="$(mktemp -t airbridge-manifest)"
+cat > "$MANIFEST" <<EOF
+{"version":"$VERSION","versionCode":$VERSION_CODE,"publishedAt":"$(date +%Y-%m-%d)",
+"android":{"url":"$BASE_URL/AirBridge-$VERSION.apk","sha256":"$APK_SHA","size":$APK_SIZE},
+"macos":{"url":"$BASE_URL/AirBridge-$VERSION.zip","sha256":"$ZIP_SHA","size":$ZIP_SIZE},
+"changelog":{"pl":[$(json_lines "$RELEASE_NOTES_PL_FILE")],"en":[$(json_lines "$RELEASE_NOTES_FILE")]}}
+EOF
+openssl pkeyutl -sign -inkey "$UPDATE_KEY" -rawin -in "$MANIFEST" | base64 > "$MANIFEST.sig"
+scp "$MANIFEST" "$UPDATES_SSH:$UPDATES_DIR/manifest.json"
+scp "$MANIFEST.sig" "$UPDATES_SSH:$UPDATES_DIR/manifest.json.sig"
+echo "  Update manifest published"

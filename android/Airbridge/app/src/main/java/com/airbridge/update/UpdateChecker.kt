@@ -51,6 +51,6 @@ class UpdateChecker(
 
     companion object {
         const val DEFAULT_MANIFEST_URL = "https://updates.CHANGEME.pl/airbridge/manifest.json"
-        const val UPDATE_PUBLIC_KEY_B64 = "UPDATE_PUBKEY_B64_CHANGEME"
+        const val UPDATE_PUBLIC_KEY_B64 = "842aa+wK7BUs8CVyg/d2cgyKYC6IGQ2kiYgeyR9YxTo="
     }
 }
