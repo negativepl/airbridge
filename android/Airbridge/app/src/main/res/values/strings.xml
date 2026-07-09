@@ -191,6 +191,7 @@
     <string name="power_charging">Charging</string>
     <string name="update_version_mismatch">Your Mac runs AirBridge %1$s. Update both apps to keep them in sync.</string>
     <string name="home_status_connected">Connected</string>
+    <string name="home_disconnect_confirm">Disconnect from %1$s?</string>
     <string name="home_battery_percent">Battery %1$d%%</string>
     <string name="home_battery_to_full_hm">%1$d%% · %2$d h %3$d min to full</string>
     <string name="home_battery_to_full_m">%1$d%% · %2$d min to full</string>

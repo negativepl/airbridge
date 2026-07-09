@@ -196,6 +196,7 @@
     <string name="power_charging">Ładowanie</string>
     <string name="update_version_mismatch">Mac ma wersję AirBridge %1$s. Zaktualizuj obie aplikacje, aby zachować zgodność.</string>
     <string name="home_status_connected">Połączono</string>
+    <string name="home_disconnect_confirm">Rozłączyć z %1$s?</string>
     <string name="home_battery_percent">Bateria %1$d%%</string>
     <string name="home_battery_to_full_hm">%1$d%% · %2$d godz. %3$d min do pełna</string>
     <string name="home_battery_to_full_m">%1$d%% · %2$d min do pełna</string>
