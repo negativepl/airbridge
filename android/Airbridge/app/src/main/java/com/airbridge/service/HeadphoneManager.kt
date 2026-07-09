@@ -1,11 +1,9 @@
 package com.airbridge.service
 
 import android.Manifest
-import android.bluetooth.BluetoothA2dp
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothHeadset
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
@@ -120,10 +118,15 @@ class HeadphoneManager(private val context: Context) {
         adapter?.getProfileProxy(context, profileListener, BluetoothProfile.A2DP)
         adapter?.getProfileProxy(context, profileListener, BluetoothProfile.HEADSET)
         if (!receiverRegistered) {
-            context.registerReceiver(aclReceiver, IntentFilter().apply {
-                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
-                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
-            })
+            ContextCompat.registerReceiver(
+                context,
+                aclReceiver,
+                IntentFilter().apply {
+                    addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                    addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                },
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             receiverRegistered = true
         }
     }
