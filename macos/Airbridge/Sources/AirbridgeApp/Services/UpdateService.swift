@@ -22,7 +22,7 @@ final class UpdateService {
         }
     }
 
-    static let manifestURL = URL(string: "https://updates.CHANGEME.pl/airbridge/manifest.json")!
+    static let manifestURL = URL(string: "https://updates.vintrhall.com/airbridge/manifest.json")!
     static let publicKeyB64 = "842aa+wK7BUs8CVyg/d2cgyKYC6IGQ2kiYgeyR9YxTo="
 
     private(set) var phase: Phase = .idle

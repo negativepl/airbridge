@@ -215,8 +215,8 @@ echo "https://github.com/negativepl/airbridge/releases/tag/$TAG"
 # --- Update manifest (in-app updater) ---
 echo ""
 echo "--- Publishing update manifest ---"
-UPDATES_SSH="CHANGEME_USER@CHANGEME_HOST"
-UPDATES_DIR="/CHANGEME/path/airbridge"
+UPDATES_SSH="root@178.104.224.23"
+UPDATES_DIR="/data/airbridge-updates/airbridge"
 UPDATE_KEY="$HOME/.airbridge/update-signing.pem"
 # RELEASE_NOTES_FILE / RELEASE_NOTES_PL_FILE are validated up front (top of script).
 
