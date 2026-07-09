@@ -264,6 +264,25 @@ class MessageTest {
         assertEquals("2.8.0-beta", decoded.info.appVersion)
     }
 
+    @Test fun macInfoResponseCarriesChargeTime() {
+        val info = MacInfo(
+            name = "MBP", model = "MacBook Pro", chip = "Apple M3 Pro",
+            osVersion = "macOS 26.0", cpuCores = 12, cpuLoadPercent = 37,
+            totalRamBytes = 1, usedRamBytes = 1,
+            totalStorageBytes = 1, freeStorageBytes = 1,
+            batteryPercent = 80, batteryCharging = true, chargeTimeRemainingMs = 3_660_000,
+            onACPower = true, uptimeSeconds = 3600
+        )
+        val decoded = Message.fromJson(Message.MacInfoResponse(info).toJson()) as Message.MacInfoResponse
+        assertEquals(3_660_000L, decoded.info.chargeTimeRemainingMs)
+    }
+
+    @Test fun macInfoResponseLegacyWithoutChargeTimeDefaultsToMinusOne() {
+        val legacy = """{"type":"mac_info_response","info":{"name":"MBP","model":"MacBook Pro","chip":"Apple M3 Pro","os_version":"macOS 26.0","cpu_cores":12,"total_ram_bytes":1,"used_ram_bytes":1,"total_storage_bytes":1,"free_storage_bytes":1,"battery_percent":80}}"""
+        val decoded = Message.fromJson(legacy) as Message.MacInfoResponse
+        assertEquals(-1L, decoded.info.chargeTimeRemainingMs)
+    }
+
     @Test fun macInfoResponseLegacyWithoutAppVersionDefaultsToEmpty() {
         val legacy = """{"type":"mac_info_response","info":{"name":"MBP","model":"MacBook Pro","chip":"Apple M3 Pro","os_version":"macOS 26.0","cpu_cores":12,"total_ram_bytes":1,"used_ram_bytes":1,"total_storage_bytes":1,"free_storage_bytes":1,"battery_percent":80}}"""
         val decoded = Message.fromJson(legacy) as Message.MacInfoResponse

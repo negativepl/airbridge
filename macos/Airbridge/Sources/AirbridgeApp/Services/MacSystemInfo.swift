@@ -27,6 +27,7 @@ enum MacSystemInfo {
             freeStorageBytes: storageFree,
             batteryPercent: battery.percent,
             batteryCharging: battery.charging,
+            chargeTimeRemainingMs: battery.timeToFullMin > 0 ? Int64(battery.timeToFullMin) * 60_000 : -1,
             onACPower: battery.ac,
             uptimeSeconds: Int64(pi.systemUptime),
             appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -92,19 +93,21 @@ enum MacSystemInfo {
         return (0, 0)
     }
 
-    private static func batteryInfo() -> (percent: Int, charging: Bool, ac: Bool) {
+    private static func batteryInfo() -> (percent: Int, charging: Bool, ac: Bool, timeToFullMin: Int) {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else { return (-1, false, true) }
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else { return (-1, false, true, -1) }
         for src in sources {
             if let desc = IOPSGetPowerSourceDescription(snapshot, src)?.takeUnretainedValue() as? [String: Any],
                let capacity = desc[kIOPSCurrentCapacityKey as String] as? Int {
                 let charging = desc[kIOPSIsChargingKey as String] as? Bool ?? false
                 let state = desc[kIOPSPowerSourceStateKey as String] as? String
                 let ac = (state == (kIOPSACPowerValue as String))
-                return (capacity, charging, ac)
+                // -1 = still estimating; only meaningful while charging.
+                let toFull = desc[kIOPSTimeToFullChargeKey as String] as? Int ?? -1
+                return (capacity, charging, ac, charging ? toFull : -1)
             }
         }
-        return (-1, false, true)   // no battery = desktop on AC
+        return (-1, false, true, -1)   // no battery = desktop on AC
     }
 
     private static func friendlyModel() -> String {

@@ -160,7 +160,12 @@ fun MainScreen(
                                 wallpaperBase64 = macWallpaper,
                                 onDisconnect = { viewModel.disconnect() }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.home_monitor_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)
+                            )
                             MacMonitorRings(info = macLocal)
                         }
                     }

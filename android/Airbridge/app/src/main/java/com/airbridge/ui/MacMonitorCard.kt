@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -112,34 +115,40 @@ fun MacDeviceCard(
                 )
             },
             supportingContent = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF34C759))
-                    )
-                    Spacer(Modifier.size(6.dp))
-                    val statusText = stringResource(R.string.home_connected_battery, info.batteryPercent).let {
-                        if (info.batteryCharging) "$it · ${stringResource(R.string.power_charging)}" else it
-                    }
+                Column {
                     Text(
-                        text = statusText,
+                        text = stringResource(R.string.home_status_connected),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        // Z dopiskiem o ładowaniu linia bywa dłuższa niż karta —
-                        // zawijamy zamiast ucinać w połowie słowa.
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
                     )
+                    if (info.batteryPercent >= 0) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (info.batteryCharging) Icons.Rounded.BatteryChargingFull
+                                              else Icons.Rounded.BatteryFull,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.size(4.dp))
+                            Text(
+                                text = batteryLine(info),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             },
             trailingContent = {
-                IconButton(onClick = onDisconnect) {
+                FilledTonalIconButton(onClick = onDisconnect) {
                     Icon(
                         Icons.Rounded.LinkOff,
-                        contentDescription = stringResource(R.string.disconnect),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = stringResource(R.string.disconnect)
                     )
                 }
             }
@@ -154,6 +163,20 @@ fun MacDeviceCard(
             )
         }
     }
+}
+
+
+/** Jedna linia o baterii Maca: "%", a przy ładowaniu czas do pełna gdy znany. */
+@Composable
+private fun batteryLine(info: MacInfo): String {
+    if (!info.batteryCharging) return stringResource(R.string.home_battery_percent, info.batteryPercent)
+    val ms = info.chargeTimeRemainingMs
+    if (ms <= 0) return stringResource(R.string.home_battery_charging, info.batteryPercent)
+    val totalMin = (ms / 60_000L).toInt()
+    val h = totalMin / 60
+    val m = totalMin % 60
+    return if (h > 0) stringResource(R.string.home_battery_to_full_hm, info.batteryPercent, h, m)
+    else stringResource(R.string.home_battery_to_full_m, info.batteryPercent, totalMin)
 }
 
 /**
@@ -175,16 +198,10 @@ fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
-        Text(
-            text = stringResource(R.string.home_monitor_title).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 12.dp)
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             MonitorRing(

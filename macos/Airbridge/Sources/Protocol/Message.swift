@@ -303,6 +303,8 @@ public struct MacInfo: Codable, Equatable, Sendable {
     public let freeStorageBytes: Int64
     public let batteryPercent: Int       // -1 if no battery (desktop)
     public let batteryCharging: Bool
+    /// Milliseconds until fully charged; -1 when unknown or not charging.
+    public let chargeTimeRemainingMs: Int64
     public let onACPower: Bool
     public let uptimeSeconds: Int64
     /// Mac's own app version (e.g. "2.8.0-beta"). Optional so older Macs that
@@ -320,17 +322,19 @@ public struct MacInfo: Codable, Equatable, Sendable {
         case freeStorageBytes   = "free_storage_bytes"
         case batteryPercent     = "battery_percent"
         case batteryCharging    = "battery_charging"
+        case chargeTimeRemainingMs = "charge_time_remaining_ms"
         case onACPower          = "on_ac_power"
         case uptimeSeconds      = "uptime_seconds"
         case appVersion         = "app_version"
     }
 
-    public init(name: String, model: String, chip: String, osVersion: String, cpuCores: Int, cpuLoadPercent: Int, totalRamBytes: Int64, usedRamBytes: Int64, totalStorageBytes: Int64, freeStorageBytes: Int64, batteryPercent: Int, batteryCharging: Bool, onACPower: Bool, uptimeSeconds: Int64, appVersion: String? = nil) {
+    public init(name: String, model: String, chip: String, osVersion: String, cpuCores: Int, cpuLoadPercent: Int, totalRamBytes: Int64, usedRamBytes: Int64, totalStorageBytes: Int64, freeStorageBytes: Int64, batteryPercent: Int, batteryCharging: Bool, chargeTimeRemainingMs: Int64 = -1, onACPower: Bool, uptimeSeconds: Int64, appVersion: String? = nil) {
         self.name = name; self.model = model; self.chip = chip; self.osVersion = osVersion
         self.cpuCores = cpuCores; self.cpuLoadPercent = cpuLoadPercent
         self.totalRamBytes = totalRamBytes; self.usedRamBytes = usedRamBytes
         self.totalStorageBytes = totalStorageBytes; self.freeStorageBytes = freeStorageBytes
         self.batteryPercent = batteryPercent; self.batteryCharging = batteryCharging
+        self.chargeTimeRemainingMs = chargeTimeRemainingMs
         self.onACPower = onACPower; self.uptimeSeconds = uptimeSeconds
         self.appVersion = appVersion
     }
@@ -352,6 +356,7 @@ public struct MacInfo: Codable, Equatable, Sendable {
         freeStorageBytes = try c.decode(Int64.self, forKey: .freeStorageBytes)
         batteryPercent = try c.decode(Int.self, forKey: .batteryPercent)
         batteryCharging = try c.decodeIfPresent(Bool.self, forKey: .batteryCharging) ?? false
+        chargeTimeRemainingMs = try c.decodeIfPresent(Int64.self, forKey: .chargeTimeRemainingMs) ?? -1
         onACPower = try c.decodeIfPresent(Bool.self, forKey: .onACPower) ?? false
         uptimeSeconds = try c.decodeIfPresent(Int64.self, forKey: .uptimeSeconds) ?? 0
         appVersion = try c.decodeIfPresent(String.self, forKey: .appVersion)

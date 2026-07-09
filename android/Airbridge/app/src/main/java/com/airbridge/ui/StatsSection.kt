@@ -3,6 +3,7 @@ package com.airbridge.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,19 +49,17 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
     val c: StatCounters = if (showToday) stats.today else stats.total
     val options = listOf(true to R.string.stats_today, false to R.string.stats_total)
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Nagłówek sekcji POZA kartą — ta sama gramatyka co "Ostatnia aktywność",
+        // z przełącznikiem Dziś/Łącznie po prawej.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp, 16.dp, 16.dp, 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                stringResource(R.string.stats_title).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                stringResource(R.string.stats_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
             SingleChoiceSegmentedButtonRow {
@@ -77,6 +76,12 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
             }
         }
 
+        Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+    ) {
+        Spacer(Modifier.height(8.dp))
         StatRow(
             icon = Icons.Rounded.ArrowUpward,
             labelRes = R.string.stats_sent_row,
@@ -90,6 +95,7 @@ fun StatsSection(stats: Stats, modifier: Modifier = Modifier) {
             bytes = c.bytesReceived
         )
         Spacer(Modifier.height(8.dp))
+    }
     }
 }
 

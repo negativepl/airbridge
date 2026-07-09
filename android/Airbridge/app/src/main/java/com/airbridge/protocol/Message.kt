@@ -71,6 +71,8 @@ data class MacInfo(
     val freeStorageBytes: Long,
     val batteryPercent: Int,
     val batteryCharging: Boolean,
+    /** Milisekundy do pełnego naładowania; -1 gdy nieznane lub nie ładuje. */
+    val chargeTimeRemainingMs: Long = -1,
     val onACPower: Boolean,
     val uptimeSeconds: Long,
     val appVersion: String = ""
@@ -723,6 +725,7 @@ sealed class Message {
                 put("free_storage_bytes", info.freeStorageBytes)
                 put("battery_percent", info.batteryPercent)
                 put("battery_charging", info.batteryCharging)
+                put("charge_time_remaining_ms", info.chargeTimeRemainingMs)
                 put("on_ac_power", info.onACPower)
                 put("uptime_seconds", info.uptimeSeconds)
                 put("app_version", info.appVersion)
@@ -1093,6 +1096,7 @@ sealed class Message {
                         freeStorageBytes = o.getLong("free_storage_bytes"),
                         batteryPercent = o.getInt("battery_percent"),
                         batteryCharging = o.optBoolean("battery_charging", false),
+                        chargeTimeRemainingMs = o.optLong("charge_time_remaining_ms", -1),
                         onACPower = o.optBoolean("on_ac_power", false),
                         uptimeSeconds = o.optLong("uptime_seconds", 0),
                         appVersion = o.optString("app_version", "")
