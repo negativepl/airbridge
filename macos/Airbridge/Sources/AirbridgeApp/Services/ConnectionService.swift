@@ -45,6 +45,15 @@ enum ConnectionPhase: Equatable {
     case error
 }
 
+enum HeadphoneHandoffPhase: Equatable { case idle, inProgress, failed }
+
+/// Last headphone state the phone reported.
+struct PhoneHeadphoneState: Equatable {
+    let connected: Bool
+    let address: String
+    let name: String
+}
+
 @Observable
 @MainActor
 final class ConnectionService {
@@ -115,6 +124,11 @@ final class ConnectionService {
     var pairingService: PairingService?
     /// Typed ref so a dropped connection can dismiss an orphaned incoming-file popup.
     var fileTransferService: FileTransferService?
+    var bluetoothAudio: BluetoothAudioService?
+    /// Last headphone state the phone reported (nil until it says anything).
+    var phoneHeadphoneState: PhoneHeadphoneState?
+    var headphoneHandoffPhase: HeadphoneHandoffPhase = .idle
+    @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
     private let macFilesService = MacFilesService()
     private var serverStarted = false
     @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
@@ -365,6 +379,53 @@ final class ConnectionService {
         ringResetTask?.cancel()
     }
 
+    // MARK: - Headphone Handoff
+
+    /// Phone asked us to release the headphones so it can take them.
+    private func handleHeadphoneReleaseRequest(address: String, from connectionId: String) {
+        guard let ba = bluetoothAudio, ba.enabled, ba.selectedAddress == address else {
+            Task { try? await server.sendTo(
+                .headphoneReleaseResponse(ok: false, error: "not_configured"),
+                connectionId: connectionId) }
+            return
+        }
+        Task {
+            let ok = await ba.release()
+            try? await server.sendTo(
+                .headphoneReleaseResponse(ok: ok, error: ok ? nil : "release_failed"),
+                connectionId: connectionId)
+        }
+    }
+
+    /// Mac-initiated takeover: ask the phone to release, then connect locally.
+    func takeoverHeadphones() {
+        guard let ba = bluetoothAudio, ba.enabled, let address = ba.selectedAddress,
+              headphoneHandoffPhase != .inProgress else { return }
+        headphoneHandoffPhase = .inProgress
+        Task { try? await sendToActive(.headphoneReleaseRequest(address: address)) }
+        handoffTimeoutTask?.cancel()
+        handoffTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            if self.headphoneHandoffPhase == .inProgress {
+                self.headphoneHandoffPhase = .failed
+            }
+        }
+    }
+
+    private func handleHeadphoneReleaseResponse(ok: Bool, error: String?) {
+        guard headphoneHandoffPhase == .inProgress else { return }
+        handoffTimeoutTask?.cancel()
+        guard ok, let ba = bluetoothAudio else {
+            headphoneHandoffPhase = .failed
+            return
+        }
+        Task {
+            let connected = await ba.takeover()
+            self.headphoneHandoffPhase = connected ? .idle : .failed
+        }
+    }
+
     // MARK: - Device Bookkeeping
 
     /// Add a new connection or update the existing one for `connectionId`.
@@ -552,6 +613,12 @@ final class ConnectionService {
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:
             handlePhoneRingStopped()
+        case let .headphoneState(connected, address, name):
+            phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name)
+        case let .headphoneReleaseRequest(address):
+            handleHeadphoneReleaseRequest(address: address, from: connectionId)
+        case let .headphoneReleaseResponse(ok, error):
+            handleHeadphoneReleaseResponse(ok: ok, error: error)
         default:
             break
         }

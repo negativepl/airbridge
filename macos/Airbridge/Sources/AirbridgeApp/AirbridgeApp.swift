@@ -33,6 +33,7 @@ struct AirbridgeApp: App {
     @State private var hotkeyService: GlobalHotkeyService
     @State private var mirrorService: MirrorService
     @State private var updateService: UpdateService
+    @State private var bluetoothAudioService: BluetoothAudioService
 
     init() {
         // Jeśli AirBridge już działa (np. LaunchServices odpalił drugą kopię po
@@ -70,6 +71,15 @@ struct AirbridgeApp: App {
         connection.pairingService = pairing
         connection.fileTransferService = fileTransfer
 
+        let bluetoothAudio = BluetoothAudioService()
+        connection.bluetoothAudio = bluetoothAudio
+        bluetoothAudio.onStateChanged = { [weak connection] connected, address, name in
+            guard let connection, bluetoothAudio.enabled else { return }
+            Task { try? await connection.server.broadcast(
+                .headphoneState(connected: connected, address: address, name: name)) }
+        }
+        bluetoothAudio.startMonitoring()
+
         _connectionService = State(initialValue: connection)
         _clipboardService = State(initialValue: clipboard)
         _fileTransferService = State(initialValue: fileTransfer)
@@ -81,6 +91,7 @@ struct AirbridgeApp: App {
         _hotkeyService = State(initialValue: hotkey)
         _mirrorService = State(initialValue: mirror)
         _updateService = State(initialValue: update)
+        _bluetoothAudioService = State(initialValue: bluetoothAudio)
 
         Task { @MainActor in
             // The mirror listener needs the TLS identity before it starts;
