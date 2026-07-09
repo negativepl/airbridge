@@ -417,6 +417,7 @@ final class ConnectionService {
         guard headphoneHandoffPhase == .inProgress else { return }
         handoffTimeoutTask?.cancel()
         guard ok, let ba = bluetoothAudio else {
+            Diag.log("Headphone", "release refused by phone: \(error ?? "unknown")")
             headphoneHandoffPhase = .failed
             return
         }
@@ -555,6 +556,16 @@ final class ConnectionService {
             // device gets its own data instead of a lossy broadcast.
             try? await self.server.sendTo(.deviceInfoRequest, connectionId: connectionId)
             try? await self.server.sendTo(.wallpaperRequest, connectionId: connectionId)
+
+            // Let the newly authenticated phone know the current headphone state
+            // right away, instead of waiting for the next poll-driven change.
+            if let ba = self.bluetoothAudio, ba.enabled, let address = ba.selectedAddress {
+                let name = ba.selectedName ?? address
+                let connected = ba.selectedConnected
+                try? await self.server.sendTo(
+                    .headphoneState(connected: connected, address: address, name: name),
+                    connectionId: connectionId)
+            }
         }
     }
 
@@ -648,6 +659,11 @@ final class ConnectionService {
                 if self.connectedDevices.isEmpty {
                     // Dismiss any incoming-file popup orphaned by the dropped link.
                     self.fileTransferService?.connectionLost()
+                    // Stale headphone/handoff state belonged to the phone that just
+                    // dropped — clear it rather than showing it against nothing.
+                    self.phoneHeadphoneState = nil
+                    self.handoffTimeoutTask?.cancel()
+                    self.headphoneHandoffPhase = .idle
                     if !self.manuallyDisconnected {
                         self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                         self.phase = .listening
