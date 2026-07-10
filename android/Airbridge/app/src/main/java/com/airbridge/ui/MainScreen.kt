@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -198,7 +200,11 @@ fun MainScreen(
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = { viewModel.takeoverHeadphones() },
                                     enabled = handoffPhase != HandoffPhase.IN_PROGRESS && !showTakeoverSuccess,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 56.dp),
+                                    shape = MaterialTheme.shapes.extraLarge,
+                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                                 ) {
                                     val takeoverEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                                     val takeoverEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
@@ -224,18 +230,18 @@ fun MainScreen(
                                                 TakeoverButtonState.SUCCESS -> Icon(
                                                     Icons.Rounded.Check,
                                                     contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(24.dp)
                                                 )
                                                 TakeoverButtonState.IN_PROGRESS -> LoadingIndicator(
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(24.dp)
                                                 )
                                                 TakeoverButtonState.IDLE -> Icon(
                                                     Icons.Rounded.Headphones,
                                                     contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(24.dp)
                                                 )
                                             }
-                                            Spacer(Modifier.width(8.dp))
+                                            Spacer(Modifier.width(12.dp))
                                             Text(
                                                 stringResource(
                                                     when (contentState) {
@@ -243,7 +249,8 @@ fun MainScreen(
                                                         TakeoverButtonState.IN_PROGRESS -> R.string.headphone_takeover_in_progress
                                                         TakeoverButtonState.IDLE -> R.string.headphone_takeover
                                                     }
-                                                )
+                                                ),
+                                                style = MaterialTheme.typography.titleSmall
                                             )
                                         }
                                     }
