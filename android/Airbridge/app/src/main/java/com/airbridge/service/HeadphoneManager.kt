@@ -1,9 +1,12 @@
 package com.airbridge.service
 
 import android.Manifest
+import android.bluetooth.BluetoothA2dp
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothHeadset
+import android.bluetooth.BluetoothLeAudio
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
@@ -61,6 +64,10 @@ class HeadphoneManager(private val context: Context) {
     private val guard = ReconnectGuard { SystemClock.elapsedRealtime() }
     private var receiverRegistered = false
 
+    /** De-bounce: several profiles (A2DP/HEADSET/LE_AUDIO) fire per physical
+     *  connect/disconnect. Only forward onStateChanged on an actual transition. */
+    private var lastReportedConnected: Boolean? = null
+
     private val adapter: BluetoothAdapter?
         get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
@@ -108,10 +115,33 @@ class HeadphoneManager(private val context: Context) {
         } catch (e: SecurityException) {
             address
         }
-        onStateChanged?.invoke(true, address, name)
+        reportStateChange(true, address, name, device)
     }
 
-    private val aclReceiver = object : BroadcastReceiver() {
+    /** Forward a connected/disconnected transition, de-bounced against
+     *  repeated events from multiple profiles/sources reporting the same
+     *  effective state (see [lastReportedConnected]). */
+    private fun reportStateChange(connected: Boolean, address: String, name: String, device: BluetoothDevice) {
+        if (connected && guard.isActive) {
+            // The headphones auto-reconnected during the handoff window —
+            // release them again so the Mac can connect.
+            Log.d(TAG, "Guard active — re-releasing $address")
+            invokeProfile("disconnect", device)
+            return
+        }
+        if (lastReportedConnected == connected) return
+        lastReportedConnected = connected
+        onStateChanged?.invoke(connected, address, name)
+    }
+
+    // Samsung's Galaxy Buds (LE Audio dual mode) keep the classic ACL link up
+    // across a "reconnect" — only the audio profile activates. That means
+    // BluetoothDevice.ACTION_ACL_CONNECTED never fires on reconnect, and we'd
+    // miss the event entirely. Profile-level connection-state broadcasts
+    // (A2DP/HEADSET/LE_AUDIO) fire in both cases and are the reliable source
+    // of truth; ACL_DISCONNECTED is kept as a belt-and-suspenders signal for
+    // a full link drop (e.g. out of range, powered off).
+    private val stateReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             val device = IntentCompat.getParcelableExtra(
                 intent, BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java
@@ -124,19 +154,21 @@ class HeadphoneManager(private val context: Context) {
             } catch (e: SecurityException) {
                 address
             }
-            when (intent.action) {
-                BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    if (guard.isActive) {
-                        // The headphones auto-reconnected during the handoff
-                        // window — release them again so the Mac can connect.
-                        Log.d(TAG, "Guard active — re-releasing $address")
-                        invokeProfile("disconnect", device)
-                    } else {
-                        onStateChanged?.invoke(true, address, name)
+            val isProfileStateAction = intent.action == BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED ||
+                intent.action == BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    intent.action == BluetoothLeAudio.ACTION_LE_AUDIO_CONNECTION_STATE_CHANGED)
+            when {
+                isProfileStateAction ->
+                    when (intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)) {
+                        BluetoothProfile.STATE_CONNECTED ->
+                            reportStateChange(true, address, name, device)
+                        BluetoothProfile.STATE_DISCONNECTED ->
+                            reportStateChange(isConnected(address), address, name, device)
+                        // CONNECTING/DISCONNECTING are intermediate — ignore.
                     }
-                }
-                BluetoothDevice.ACTION_ACL_DISCONNECTED ->
-                    onStateChanged?.invoke(false, address, name)
+                intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED ->
+                    reportStateChange(isConnected(address), address, name, device)
             }
         }
     }
@@ -154,9 +186,16 @@ class HeadphoneManager(private val context: Context) {
         if (!receiverRegistered) {
             ContextCompat.registerReceiver(
                 context,
-                aclReceiver,
+                stateReceiver,
                 IntentFilter().apply {
-                    addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                    addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)
+                    addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        addAction(BluetoothLeAudio.ACTION_LE_AUDIO_CONNECTION_STATE_CHANGED)
+                    }
+                    // Belt-and-suspenders: a full link drop (out of range, powered
+                    // off) always fires ACL_DISCONNECTED even when no profile
+                    // broadcast does.
                     addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
                 },
                 ContextCompat.RECEIVER_NOT_EXPORTED
@@ -167,13 +206,14 @@ class HeadphoneManager(private val context: Context) {
 
     fun stop() {
         if (receiverRegistered) {
-            context.unregisterReceiver(aclReceiver)
+            context.unregisterReceiver(stateReceiver)
             receiverRegistered = false
         }
         a2dp?.let { adapter?.closeProfileProxy(BluetoothProfile.A2DP, it) }
         headset?.let { adapter?.closeProfileProxy(BluetoothProfile.HEADSET, it) }
         a2dp = null
         headset = null
+        lastReportedConnected = null
     }
 
     /** Bonded devices in the audio major class (headphones, headsets, speakers). */
