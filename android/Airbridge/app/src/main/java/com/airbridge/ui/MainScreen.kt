@@ -175,19 +175,42 @@ fun MainScreen(
                                     enabled = handoffPhase != HandoffPhase.IN_PROGRESS,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.Headphones,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        stringResource(
-                                            if (handoffPhase == HandoffPhase.IN_PROGRESS)
-                                                R.string.headphone_takeover_in_progress
-                                            else R.string.headphone_takeover
-                                        )
-                                    )
+                                    val takeoverEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                                    val takeoverEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+                                    val takeoverExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                                    androidx.compose.animation.AnimatedContent(
+                                        targetState = handoffPhase == HandoffPhase.IN_PROGRESS,
+                                        transitionSpec = {
+                                            (androidx.compose.animation.fadeIn(animationSpec = takeoverEnterFade) +
+                                                androidx.compose.animation.scaleIn(
+                                                    initialScale = 0.95f,
+                                                    animationSpec = takeoverEnterScale
+                                                )) togetherWith (androidx.compose.animation.fadeOut(animationSpec = takeoverExitFade))
+                                        },
+                                        label = "headphoneTakeoverState"
+                                    ) { inProgress ->
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (inProgress) {
+                                                LoadingIndicator(
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            } else {
+                                                Icon(
+                                                    Icons.Rounded.Headphones,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                stringResource(
+                                                    if (inProgress)
+                                                        R.string.headphone_takeover_in_progress
+                                                    else R.string.headphone_takeover
+                                                )
+                                            )
+                                        }
+                                    }
                                 }
                                 if (handoffPhase == HandoffPhase.FAILED) {
                                     Spacer(modifier = Modifier.height(4.dp))
