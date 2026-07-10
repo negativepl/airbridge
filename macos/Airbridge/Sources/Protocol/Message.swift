@@ -106,11 +106,16 @@ public enum Message: Equatable, Sendable {
     case notificationReply(notificationKey: String, text: String)
     /// Both directions: connection state of the selected headphones on the
     /// sending side, so each device knows where the headphones currently are.
-    case headphoneState(connected: Bool, address: String, name: String)
+    case headphoneState(connected: Bool, address: String, name: String, audioActive: Bool?)
     /// Both directions: "release the headphones, I am taking them over".
     case headphoneReleaseRequest(address: String)
     /// Reply to headphoneReleaseRequest, sent after the local disconnect finished.
     case headphoneReleaseResponse(ok: Bool, error: String?)
+    /// Either direction: "take the headphones back", used for the Move-back action
+    /// from an auto-switch notification, bypassing cooldowns.
+    case headphoneTakeoverRequest
+    /// Either direction: cancel an in-flight or pending file transfer.
+    case fileTransferCancel(transferId: String)
 }
 
 // MARK: - GalleryPhotoMeta
@@ -429,6 +434,8 @@ extension Message: Codable {
         case headphoneState           = "headphone_state"
         case headphoneReleaseRequest  = "headphone_release_request"
         case headphoneReleaseResponse = "headphone_release_response"
+        case headphoneTakeoverRequest = "headphone_takeover_request"
+        case fileTransferCancel       = "file_transfer_cancel"
         case mirrorError              = "mirror_error"
         case deviceInfoRequest        = "device_info_request"
         case deviceInfoResponse       = "device_info_response"
@@ -512,6 +519,7 @@ extension Message: Codable {
         case connected
         case name
         case ok
+        case audioActive        = "audio_active"
     }
 
     // MARK: Encode
@@ -733,11 +741,12 @@ extension Message: Codable {
         case .phoneRingStop:
             try container.encode(TypeKey.phoneRingStop.rawValue, forKey: .type)
 
-        case let .headphoneState(connected, address, name):
+        case let .headphoneState(connected, address, name, audioActive):
             try container.encode(TypeKey.headphoneState.rawValue, forKey: .type)
             try container.encode(connected, forKey: .connected)
             try container.encode(address, forKey: .address)
             try container.encode(name, forKey: .name)
+            try container.encodeIfPresent(audioActive, forKey: .audioActive)
 
         case let .headphoneReleaseRequest(address):
             try container.encode(TypeKey.headphoneReleaseRequest.rawValue, forKey: .type)
@@ -747,6 +756,13 @@ extension Message: Codable {
             try container.encode(TypeKey.headphoneReleaseResponse.rawValue, forKey: .type)
             try container.encode(ok, forKey: .ok)
             try container.encodeIfPresent(error, forKey: .error)
+
+        case .headphoneTakeoverRequest:
+            try container.encode(TypeKey.headphoneTakeoverRequest.rawValue, forKey: .type)
+
+        case let .fileTransferCancel(transferId):
+            try container.encode(TypeKey.fileTransferCancel.rawValue, forKey: .type)
+            try container.encode(transferId, forKey: .transferId)
 
         case let .mirrorError(reason):
             try container.encode(TypeKey.mirrorError.rawValue, forKey: .type)
@@ -1099,7 +1115,8 @@ extension Message: Codable {
             let connected = try container.decode(Bool.self, forKey: .connected)
             let address = try container.decode(String.self, forKey: .address)
             let name = try container.decode(String.self, forKey: .name)
-            self = .headphoneState(connected: connected, address: address, name: name)
+            let audioActive = try container.decodeIfPresent(Bool.self, forKey: .audioActive)
+            self = .headphoneState(connected: connected, address: address, name: name, audioActive: audioActive)
 
         case .headphoneReleaseRequest:
             let address = try container.decode(String.self, forKey: .address)
@@ -1109,6 +1126,13 @@ extension Message: Codable {
             let ok = try container.decode(Bool.self, forKey: .ok)
             let error = try container.decodeIfPresent(String.self, forKey: .error)
             self = .headphoneReleaseResponse(ok: ok, error: error)
+
+        case .headphoneTakeoverRequest:
+            self = .headphoneTakeoverRequest
+
+        case .fileTransferCancel:
+            let transferId = try container.decode(String.self, forKey: .transferId)
+            self = .fileTransferCancel(transferId: transferId)
 
         case .mirrorError:
             let reason = try container.decode(String.self, forKey: .reason)

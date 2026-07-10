@@ -77,7 +77,7 @@ struct AirbridgeApp: App {
             guard let connection, bluetoothAudio.enabled else { return }
             Diag.log("Headphone", "mac state changed: connected=\(connected) (\(name))")
             Task { try? await connection.server.broadcast(
-                .headphoneState(connected: connected, address: address, name: name)) }
+                .headphoneState(connected: connected, address: address, name: name, audioActive: nil)) }
         }
         bluetoothAudio.startMonitoring()
 

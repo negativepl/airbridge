@@ -564,7 +564,7 @@ final class ConnectionService {
                 let name = ba.selectedName ?? address
                 let connected = ba.selectedConnected
                 try? await self.server.sendTo(
-                    .headphoneState(connected: connected, address: address, name: name),
+                    .headphoneState(connected: connected, address: address, name: name, audioActive: nil),
                     connectionId: connectionId)
             }
         }
@@ -625,7 +625,7 @@ final class ConnectionService {
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:
             handlePhoneRingStopped()
-        case let .headphoneState(connected, address, name):
+        case let .headphoneState(connected, address, name, _):
             Diag.log("Headphone", "phone reports connected=\(connected) (\(name))")
             phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name)
         case let .headphoneReleaseRequest(address):

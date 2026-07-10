@@ -678,12 +678,49 @@ final class MessageTests: XCTestCase {
     // MARK: - Headphone handoff
 
     func testHeadphoneStateRoundTrip() throws {
-        let msg = Message.headphoneState(connected: true, address: "AA:BB:CC:DD:EE:FF", name: "Galaxy Buds3 Pro")
+        let msg = Message.headphoneState(connected: true, address: "AA:BB:CC:DD:EE:FF", name: "Galaxy Buds3 Pro", audioActive: nil)
         let json = try encode(msg)
         XCTAssertEqual(json["type"] as? String, "headphone_state")
         XCTAssertEqual(json["connected"] as? Bool, true)
         XCTAssertEqual(json["address"] as? String, "AA:BB:CC:DD:EE:FF")
         XCTAssertEqual(json["name"] as? String, "Galaxy Buds3 Pro")
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testHeadphoneStateWithoutAudioActiveOmitsKeyAndDecodesToNil() throws {
+        let msg = Message.headphoneState(connected: true, address: "AA:BB:CC:DD:EE:FF", name: "Galaxy Buds3 Pro", audioActive: nil)
+        let json = try encode(msg)
+        XCTAssertNil(json["audio_active"])
+        guard case let .headphoneState(_, _, _, audioActive) = try decode(json) else {
+            return XCTFail("expected headphoneState")
+        }
+        XCTAssertNil(audioActive)
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testHeadphoneStateWithAudioActiveTrueRoundTrips() throws {
+        let msg = Message.headphoneState(connected: true, address: "AA:BB:CC:DD:EE:FF", name: "Galaxy Buds3 Pro", audioActive: true)
+        let json = try encode(msg)
+        XCTAssertEqual(json["audio_active"] as? Bool, true)
+        guard case let .headphoneState(_, _, _, audioActive) = try decode(json) else {
+            return XCTFail("expected headphoneState")
+        }
+        XCTAssertEqual(audioActive, true)
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testHeadphoneTakeoverRequestRoundTrip() throws {
+        let msg = Message.headphoneTakeoverRequest
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "headphone_takeover_request")
+        XCTAssertEqual(try decode(json), msg)
+    }
+
+    func testFileTransferCancelRoundTrip() throws {
+        let msg = Message.fileTransferCancel(transferId: "tr-42")
+        let json = try encode(msg)
+        XCTAssertEqual(json["type"] as? String, "file_transfer_cancel")
+        XCTAssertEqual(json["transfer_id"] as? String, "tr-42")
         XCTAssertEqual(try decode(json), msg)
     }
 
