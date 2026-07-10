@@ -27,6 +27,7 @@ class HttpFileUploader {
         uri: Uri,
         contentResolver: ContentResolver,
         destinationDir: String? = null,
+        onCallCreated: (okhttp3.Call) -> Unit = {},
         onProgress: (bytesSent: Long, totalBytes: Long) -> Unit
     ): Boolean {
         // Built per call: the TLS pin is per-host, so the client cannot be a
@@ -125,8 +126,10 @@ class HttpFileUploader {
             .post(body)
             .build()
 
+        val call = client.newCall(request)
+        onCallCreated(call)
         return try {
-            val response = client.newCall(request).execute()
+            val response = call.execute()
             val success = response.isSuccessful
             if (!success) {
                 Log.e(TAG, "Upload failed: ${response.code} ${response.body.string()}")

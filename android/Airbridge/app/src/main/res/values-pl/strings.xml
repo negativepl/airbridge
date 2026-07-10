@@ -92,6 +92,8 @@
     <string name="notification_reject">Odrzuć</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Dotknij, aby zwinąć</string>
+    <string name="transfer_offer_timeout">Mac nie odpowiedział — transfer anulowany</string>
+    <string name="transfer_cancel">Anuluj transfer</string>
 
     <!-- Feedback -->
     <string name="sent_to_mac">Wysłano do komputera Mac</string>

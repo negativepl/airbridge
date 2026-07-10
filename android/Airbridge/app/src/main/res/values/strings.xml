@@ -92,6 +92,8 @@
     <string name="notification_reject">Reject</string>
     <string name="transfer_progress">%d%%</string>
     <string name="transfer_tap_collapse">Tap to collapse</string>
+    <string name="transfer_offer_timeout">The Mac did not respond — transfer cancelled</string>
+    <string name="transfer_cancel">Cancel transfer</string>
 
     <!-- Feedback -->
     <string name="sent_to_mac">Sent to Mac</string>

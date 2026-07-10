@@ -64,7 +64,9 @@ class AirbridgeService : Service() {
         const val ACTION_HEADPHONE_TAKEOVER = "com.airbridge.action.HEADPHONE_TAKEOVER"
         const val ACTION_HEADPHONE_REFRESH = "com.airbridge.action.HEADPHONE_REFRESH"
         const val ACTION_HEADPHONE_MOVE_BACK = "com.airbridge.action.HEADPHONE_MOVE_BACK"
+        const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
         private const val RING_NOTIFICATION_ID = 7
+        private const val TRANSFER_NOTIFICATION_ID = 2
 
         /** SharedPreferences key for the auto-switch toggle (default OFF). */
         const val AUTO_SWITCH_PREF = "headphone_auto_switch"
@@ -583,6 +585,32 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            ACTION_CANCEL_TRANSFER -> {
+                val transferId = pendingOfferTransferId
+                if (transferId != null) {
+                    Log.d(TAG, "Cancelling outgoing transfer $transferId")
+                    // Abort the OkHttp call first (thread-safe, aborts a
+                    // blocking execute() from any thread); cancelling the Job
+                    // only interrupts the coroutine while it's suspended
+                    // (i.e. still waiting for accept/reject).
+                    activeUploadCall?.cancel()
+                    activeUploadCall = null
+                    outgoingTransferJob?.cancel()
+                    outgoingTransferJob = null
+                    pendingOutgoingOffers.remove(transferId)
+                    pendingOfferTransferId = null
+                    webSocketClient.send(Message.FileTransferCancel(transferId))
+                    transferIsSending.value = false
+                    transferProgress.value = null
+                    transferFileName.value = null
+                    transferSpeedBps.value = 0
+                    transferEtaSeconds.value = 0
+                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                        .cancel(TRANSFER_NOTIFICATION_ID)
+                } else {
+                    Log.d(TAG, "ACTION_CANCEL_TRANSFER: no pending outgoing transfer")
+                }
+            }
             ACTION_DISCONNECT -> {
                 Log.d(TAG, "Disconnecting and stopping service")
                 nsdDiscovery.stopDiscovery()
@@ -822,6 +850,21 @@ class AirbridgeService : Service() {
     private val pendingOffers = ConcurrentHashMap<String, Message.FileTransferOffer>() // transferId -> offer
     private val pendingOutgoingOffers = ConcurrentHashMap<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
     private var lastProgressNotifUpdate = 0L
+
+    // Outgoing transfer cancellation (offer wait + upload). Set when an offer
+    // is sent, cleared once the transfer finishes/fails/times out/is cancelled.
+    @Volatile private var pendingOfferTransferId: String? = null
+
+    // The coroutine driving the current outgoing transfer (offer wait +
+    // upload). Cancelling it interrupts the offer wait immediately; it does
+    // NOT abort an in-flight OkHttp call (see activeUploadCall).
+    @Volatile private var outgoingTransferJob: kotlinx.coroutines.Job? = null
+
+    // OkHttp cancels are thread-safe and abort a blocking execute() from any
+    // thread with an IOException — this is what actually stops bytes going
+    // out mid-upload (coroutine cancellation alone can't interrupt a blocking
+    // synchronous call with no suspension points).
+    @Volatile private var activeUploadCall: okhttp3.Call? = null
 
     private fun setupHttpFileServer() {
         // Deliberately NOT started: the Mac cannot initiate outbound TCP to
@@ -1226,6 +1269,15 @@ class AirbridgeService : Service() {
             }
             is Message.FileTransferReject -> {
                 pendingOutgoingOffers.remove(message.transferId)?.complete(false)
+            }
+            is Message.FileTransferCancel -> {
+                // Mac cancelled an offer it sent us before we accepted/rejected it.
+                val offer = pendingOffers.remove(message.transferId)
+                if (offer != null) {
+                    val notifId = (message.transferId.hashCode() and 0x7FFFFFFF) % 100000 + 100
+                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(notifId)
+                    Log.d(TAG, "Incoming offer cancelled by Mac: ${offer.filename}")
+                }
             }
             is Message.Pong -> {
                 addActivity(applicationContext, ActivityItem("ping", "Pong!", System.currentTimeMillis()))
@@ -1635,7 +1687,7 @@ class AirbridgeService : Service() {
         transferSpeedHistory.value = emptyList()
 
         // Show transfer notification with tap-to-open
-        val transferNotifId = 2
+        val transferNotifId = TRANSFER_NOTIFICATION_ID
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val openIntent = android.app.PendingIntent.getActivity(
             this, 0,
@@ -1668,32 +1720,53 @@ class AirbridgeService : Service() {
         }
         updateTransferNotification(0, "")
 
-        serviceScope.launch {
+        val transferId = java.util.UUID.randomUUID().toString()
+        pendingOfferTransferId = transferId
+
+        outgoingTransferJob = serviceScope.launch {
             // 1. Send offer and wait for accept/reject
-            val transferId = java.util.UUID.randomUUID().toString()
             val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
             pendingOutgoingOffers[transferId] = deferred
             val mime = applicationContext.contentResolver.getType(uri) ?: "application/octet-stream"
             webSocketClient.send(Message.FileTransferOffer(transferId, filename, mime, fileSize))
 
-            val accepted = try {
-                kotlinx.coroutines.withTimeoutOrNull(60_000) { deferred.await() } ?: false
-            } catch (_: Exception) { false }
+            // Distinguish an explicit reject (deferred completes before the
+            // timeout) from silence (withTimeoutOrNull returns null) — a
+            // timeout needs its own notification and must tell the Mac to
+            // stop expecting this transfer via FileTransferCancel.
+            val rawResult = try {
+                kotlinx.coroutines.withTimeoutOrNull(60_000) { deferred.await() }
+            } catch (_: Exception) { null }
+            val timedOut = rawResult == null
+            val accepted = rawResult ?: false
 
             if (!accepted) {
                 pendingOutgoingOffers.remove(transferId)
-                Log.d(TAG, "Offer rejected or timed out for $filename")
+                pendingOfferTransferId = null
+                Log.d(TAG, "Offer rejected or timed out for $filename (timedOut=$timedOut)")
                 transferIsSending.value = false
                 transferProgress.value = null
                 transferFileName.value = null
-                val rejNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_rejected))
-                    .setContentText(filename)
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setContentIntent(openAppPendingIntent())
-                    .setAutoCancel(true)
-                    .build()
-                manager.notify(transferNotifId, rejNotif)
+                if (timedOut) {
+                    webSocketClient.send(Message.FileTransferCancel(transferId))
+                    val timeoutNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                        .setContentTitle(getString(com.airbridge.R.string.transfer_offer_timeout))
+                        .setContentText(filename)
+                        .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                        .setContentIntent(openAppPendingIntent())
+                        .setAutoCancel(true)
+                        .build()
+                    manager.notify(transferNotifId, timeoutNotif)
+                } else {
+                    val rejNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                        .setContentTitle(getString(com.airbridge.R.string.notification_title_file_rejected))
+                        .setContentText(filename)
+                        .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                        .setContentIntent(openAppPendingIntent())
+                        .setAutoCancel(true)
+                        .build()
+                    manager.notify(transferNotifId, rejNotif)
+                }
                 return@launch
             }
 
@@ -1709,7 +1782,8 @@ class AirbridgeService : Service() {
                 certFingerprint = webSocketClient.certFingerprintInUse,
                 uri = uri,
                 contentResolver = applicationContext.contentResolver,
-                destinationDir = destinationDir
+                destinationDir = destinationDir,
+                onCallCreated = { activeUploadCall = it }
             ) { bytesSent, totalBytes ->
                 lastFileSize = totalBytes
                 val elapsed = System.currentTimeMillis() - startTime
@@ -1745,33 +1819,44 @@ class AirbridgeService : Service() {
             }
 
             val elapsed = System.currentTimeMillis() - startTime
-            if (success) {
-                val speedMBs = if (elapsed > 0) lastFileSize / 1024.0 / 1024.0 / (elapsed / 1000.0) else 0.0
-                Log.d(TAG, "HTTP transfer complete: $filename in ${elapsed}ms (%.2f MB/s)".format(speedMBs))
-                addActivity(applicationContext, ActivityItem("file_sent", filename, System.currentTimeMillis()))
-                statsStore.recordFileSent(lastFileSize)
-                // Complete notification
-                val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_sent))
-                    .setContentText(filename)
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setOngoing(false)
-                    .setContentIntent(openIntent)
-                    .setAutoCancel(true)
-                    .build()
-                manager.notify(transferNotifId, doneNotif)
-            } else {
-                Log.e(TAG, "HTTP transfer failed: $filename")
-                val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
-                    .setContentTitle(getString(com.airbridge.R.string.notification_title_file_error))
-                    .setContentText(filename)
-                    .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                    .setOngoing(false)
-                    .setContentIntent(openIntent)
-                    .setAutoCancel(true)
-                    .build()
-                manager.notify(transferNotifId, failNotif)
+            // ACTION_CANCEL_TRANSFER clears pendingOfferTransferId as soon as
+            // it fires (it can't reliably preempt an in-flight synchronous
+            // upload() call — see the cancel handler). If it already cleared
+            // this transfer, upload() failing here is the expected result of
+            // that cancel, not a real error — the cancel handler already sent
+            // FileTransferCancel and updated the UI, so skip these notifications.
+            val wasCancelled = pendingOfferTransferId != transferId
+            if (!wasCancelled) {
+                if (success) {
+                    val speedMBs = if (elapsed > 0) lastFileSize / 1024.0 / 1024.0 / (elapsed / 1000.0) else 0.0
+                    Log.d(TAG, "HTTP transfer complete: $filename in ${elapsed}ms (%.2f MB/s)".format(speedMBs))
+                    addActivity(applicationContext, ActivityItem("file_sent", filename, System.currentTimeMillis()))
+                    statsStore.recordFileSent(lastFileSize)
+                    // Complete notification
+                    val doneNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                        .setContentTitle(getString(com.airbridge.R.string.notification_title_file_sent))
+                        .setContentText(filename)
+                        .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                        .setOngoing(false)
+                        .setContentIntent(openIntent)
+                        .setAutoCancel(true)
+                        .build()
+                    manager.notify(transferNotifId, doneNotif)
+                } else {
+                    Log.e(TAG, "HTTP transfer failed: $filename")
+                    val failNotif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                        .setContentTitle(getString(com.airbridge.R.string.notification_title_file_error))
+                        .setContentText(filename)
+                        .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                        .setOngoing(false)
+                        .setContentIntent(openIntent)
+                        .setAutoCancel(true)
+                        .build()
+                    manager.notify(transferNotifId, failNotif)
+                }
+                pendingOfferTransferId = null
             }
+            activeUploadCall = null
 
             transferProgress.value = null
             transferFileName.value = null

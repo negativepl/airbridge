@@ -102,6 +102,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         AirbridgeService.sendPing()
     }
 
+    fun cancelTransfer() {
+        val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
+            action = AirbridgeService.ACTION_CANCEL_TRANSFER
+        }
+        getApplication<Application>().startService(intent)
+    }
+
     fun sendFile(uri: Uri) {
         val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
             action = AirbridgeService.ACTION_SEND_FILE
