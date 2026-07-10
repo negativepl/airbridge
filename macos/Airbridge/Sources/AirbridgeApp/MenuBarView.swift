@@ -7,6 +7,7 @@ struct MenuBarView: View {
     let updateService: UpdateService
     let bluetoothAudio: BluetoothAudioService
     @Environment(\.openWindow) private var openWindow
+    @State private var showHandoffSuccess = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -71,15 +72,19 @@ struct MenuBarView: View {
                 }
 
                 if bluetoothAudio.enabled,
-                   connectionService.phoneHeadphoneState?.connected == true {
-                    MenuRow(title: connectionService.headphoneHandoffPhase == .inProgress
-                                ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
-                                : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac"),
-                            systemImage: "headphones",
-                            trailing: connectionService.headphoneHandoffPhase == .inProgress
+                   connectionService.phoneHeadphoneState?.connected == true
+                        || connectionService.headphoneHandoffPhase == .inProgress
+                        || showHandoffSuccess {
+                    MenuRow(title: showHandoffSuccess
+                                ? (L10n.isPL ? "Słuchawki połączone z Makiem" : "Headphones connected to Mac")
+                                : (connectionService.headphoneHandoffPhase == .inProgress
+                                    ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
+                                    : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac")),
+                            systemImage: showHandoffSuccess ? "checkmark.circle" : "headphones",
+                            trailing: (!showHandoffSuccess && connectionService.headphoneHandoffPhase == .inProgress)
                                 ? { AnyView(ProgressView().controlSize(.small)) }
                                 : { AnyView(EmptyView()) }) {
-                        guard connectionService.headphoneHandoffPhase != .inProgress else { return }
+                        guard !showHandoffSuccess, connectionService.headphoneHandoffPhase != .inProgress else { return }
                         connectionService.takeoverHeadphones()
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -125,6 +130,16 @@ struct MenuBarView: View {
         .fixedSize(horizontal: true, vertical: false)
         .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
         .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
+        .animation(.airbridgeQuick, value: showHandoffSuccess)
+        .onChange(of: connectionService.headphoneHandoffPhase) { old, new in
+            if old == .inProgress && new == .idle {
+                showHandoffSuccess = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_600_000_000)
+                    showHandoffSuccess = false
+                }
+            }
+        }
     }
 
     private var connectionHeadline: String {
