@@ -142,23 +142,23 @@ final class BluetoothAudioService {
     }
 
     /// Connect the headphones to this Mac and route audio to them.
+    ///
+    /// LE Audio gear (Galaxy Buds) may never bring the classic BR/EDR link up:
+    /// openConnection() can then block for its full page timeout (30 s+) while
+    /// the LE Audio route is already playing. So the classic connect is only a
+    /// best-effort nudge fired in the background, and the authoritative success
+    /// signal is the CoreAudio output device appearing — the same source of
+    /// truth the state poll uses.
     func takeover() async -> Bool {
         guard let address = selectedAddress, let name = selectedName else { return false }
         guardUntil = .distantPast
-        // With LE Audio the classic link can be down while audio still routes
-        // here; in that case isConnected() is false and openConnection() below
-        // runs harmlessly (opens/confirms the classic link), and the retry
-        // loop below finds the CoreAudio device already present.
-        let isConnected = await Task.detached {
-            IOBluetoothDevice(addressString: address)?.isConnected() ?? false
-        }.value
-        if !isConnected {
-            let status = await Task.detached {
-                IOBluetoothDevice(addressString: address)?.openConnection() ?? kIOReturnError
-            }.value
-            guard status == kIOReturnSuccess else { return false }
+        Task.detached {
+            let device = IOBluetoothDevice(addressString: address)
+            if device?.isConnected() != true {
+                _ = device?.openConnection()
+            }
         }
-        // The CoreAudio device appears a moment after the BT link is up.
+        // Wait for the audio route (up to 10 s), not for the classic link.
         for _ in 0..<20 {
             if let audioID = Self.outputDeviceID(named: name) {
                 return Self.setDefaultOutput(audioID)
