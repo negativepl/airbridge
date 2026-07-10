@@ -21,8 +21,8 @@ struct MenuBarView: View {
                     Text(L10n.notConnected).font(.ab(.subheadline)).foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
 
             let devices = connectionService.connectedDevices
             if !devices.isEmpty {
@@ -49,7 +49,7 @@ struct MenuBarView: View {
                         charging: info.batteryCharging,
                         chargeTimeRemainingMs: info.chargeTimeRemainingMs
                     )
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 4)
                 }
             }
@@ -120,7 +120,7 @@ struct MenuBarView: View {
         // Size to content (narrow for short names, wide for long ones) instead of
         // a fixed width, clamped so it is never cramped nor absurdly wide.
         .fixedSize(horizontal: true, vertical: false)
-        .frame(minWidth: 240, maxWidth: 420)
+        .frame(minWidth: 220, maxWidth: 320)
         .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
         .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
     }
@@ -167,11 +167,13 @@ struct MenuBarView: View {
             Text(L10n.isPL ? "Aktualne" : "Up to date")
                 .font(.ab(.caption, weight: .semibold))
                 .foregroundStyle(.green)
+                .lineLimit(1)
 
         case .available(let manifest):
             Text(L10n.isPL ? "Dostępna: \(manifest.version)" : "Available: \(manifest.version)")
                 .font(.ab(.caption, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
+                .lineLimit(1)
 
         case .downloading, .installing:
             ProgressView()
@@ -181,6 +183,7 @@ struct MenuBarView: View {
             Text(L10n.isPL ? "Błąd" : "Failed")
                 .font(.ab(.caption, weight: .semibold))
                 .foregroundStyle(.red)
+                .lineLimit(1)
         }
     }
 }
@@ -206,15 +209,15 @@ private struct DeviceSelectRow: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isHovered ? Color.primary.opacity(0.08) : .clear)
         )
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .onHover { isHovered = $0 }
         .onTapGesture { onSelect() }
     }
@@ -314,18 +317,19 @@ private struct MenuRow: View {
             Text(title)
                 .font(.ab(.subheadline))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
             Spacer(minLength: 0)
             trailing()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(backgroundFill)
         )
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .onHover { isHovered = $0 }
         .gesture(
             DragGesture(minimumDistance: 0)
