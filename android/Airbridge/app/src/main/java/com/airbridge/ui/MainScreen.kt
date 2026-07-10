@@ -168,7 +168,19 @@ fun MainScreen(
                             // ── Headphone takeover — own element right below the
                             // Mac hero banner, only surfaced while the Mac reports
                             // headphones connected on its side.
-                            if (macHeadphoneState?.connected == true) {
+                            val macHeadphoneStateLocal = macHeadphoneState
+                            val takeoverVisEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                            val takeoverVisEnterSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                            val takeoverVisExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                            val takeoverVisExitSpatial = MaterialTheme.motionScheme.fastSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = macHeadphoneStateLocal?.connected == true,
+                                enter = androidx.compose.animation.fadeIn(animationSpec = takeoverVisEnterFade) +
+                                    androidx.compose.animation.expandVertically(animationSpec = takeoverVisEnterSpatial),
+                                exit = androidx.compose.animation.fadeOut(animationSpec = takeoverVisExitFade) +
+                                    androidx.compose.animation.shrinkVertically(animationSpec = takeoverVisExitSpatial)
+                            ) {
+                                Column {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = { viewModel.takeoverHeadphones() },
@@ -221,6 +233,7 @@ fun MainScreen(
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth()
                                     )
+                                }
                                 }
                             }
 

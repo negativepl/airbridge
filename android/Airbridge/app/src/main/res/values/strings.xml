@@ -143,7 +143,7 @@
     <string name="settings_headphone_device">Headphones</string>
     <string name="settings_headphone_device_none">Not selected</string>
     <string name="settings_headphone_permission">Bluetooth permission is required to manage headphones</string>
-    <string name="headphone_takeover">Move headphones here</string>
+    <string name="headphone_takeover">Headphones on Mac — move to phone</string>
     <string name="headphone_takeover_in_progress">Moving headphones…</string>
     <string name="headphone_takeover_failed">Headphone handoff failed. Make sure the headphones are on and paired with both devices.</string>
 
