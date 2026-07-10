@@ -626,6 +626,7 @@ final class ConnectionService {
         case .phoneRingStop:
             handlePhoneRingStopped()
         case let .headphoneState(connected, address, name):
+            Diag.log("Headphone", "phone reports connected=\(connected) (\(name))")
             phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name)
         case let .headphoneReleaseRequest(address):
             handleHeadphoneReleaseRequest(address: address, from: connectionId)

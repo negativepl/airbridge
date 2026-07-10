@@ -339,6 +339,7 @@ class AirbridgeService : Service() {
             selectedAddress = headphonePrefs().getString("headphone_address", null)
             onStateChanged = { connected, address, name ->
                 if (headphoneHandoffEnabled() && isConnected.value) {
+                    Log.d(TAG, "Headphone state -> Mac: connected=$connected ($name)")
                     webSocketClient.send(Message.HeadphoneState(connected, address, name))
                 }
             }
