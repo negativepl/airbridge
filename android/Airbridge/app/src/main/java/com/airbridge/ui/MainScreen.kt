@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.DesktopMac
 import androidx.compose.material.icons.rounded.Headphones
@@ -65,6 +66,8 @@ import com.airbridge.service.HandoffPhase
 import com.airbridge.util.formatTransferSpeed
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
+
+private enum class TakeoverButtonState { IDLE, IN_PROGRESS, SUCCESS }
 
 @Composable
 fun MainScreen(
@@ -169,12 +172,22 @@ fun MainScreen(
                             // Mac hero banner, only surfaced while the Mac reports
                             // headphones connected on its side.
                             val macHeadphoneStateLocal = macHeadphoneState
+                            var lastHandoffPhase by remember { mutableStateOf(handoffPhase) }
+                            var showTakeoverSuccess by remember { mutableStateOf(false) }
+                            LaunchedEffect(handoffPhase) {
+                                if (lastHandoffPhase == HandoffPhase.IN_PROGRESS && handoffPhase == HandoffPhase.IDLE) {
+                                    showTakeoverSuccess = true
+                                    delay(1600)
+                                    showTakeoverSuccess = false
+                                }
+                                lastHandoffPhase = handoffPhase
+                            }
                             val takeoverVisEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                             val takeoverVisEnterSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
-                            val takeoverVisExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                            val takeoverVisExitSpatial = MaterialTheme.motionScheme.fastSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                            val takeoverVisExitFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                            val takeoverVisExitSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
                             androidx.compose.animation.AnimatedVisibility(
-                                visible = macHeadphoneStateLocal?.connected == true,
+                                visible = macHeadphoneStateLocal?.connected == true || showTakeoverSuccess,
                                 enter = androidx.compose.animation.fadeIn(animationSpec = takeoverVisEnterFade) +
                                     androidx.compose.animation.expandVertically(animationSpec = takeoverVisEnterSpatial),
                                 exit = androidx.compose.animation.fadeOut(animationSpec = takeoverVisExitFade) +
@@ -184,14 +197,19 @@ fun MainScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = { viewModel.takeoverHeadphones() },
-                                    enabled = handoffPhase != HandoffPhase.IN_PROGRESS,
+                                    enabled = handoffPhase != HandoffPhase.IN_PROGRESS && !showTakeoverSuccess,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     val takeoverEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                                     val takeoverEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
                                     val takeoverExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                                    val takeoverContentState = when {
+                                        showTakeoverSuccess -> TakeoverButtonState.SUCCESS
+                                        handoffPhase == HandoffPhase.IN_PROGRESS -> TakeoverButtonState.IN_PROGRESS
+                                        else -> TakeoverButtonState.IDLE
+                                    }
                                     androidx.compose.animation.AnimatedContent(
-                                        targetState = handoffPhase == HandoffPhase.IN_PROGRESS,
+                                        targetState = takeoverContentState,
                                         transitionSpec = {
                                             (androidx.compose.animation.fadeIn(animationSpec = takeoverEnterFade) +
                                                 androidx.compose.animation.scaleIn(
@@ -200,14 +218,18 @@ fun MainScreen(
                                                 )) togetherWith (androidx.compose.animation.fadeOut(animationSpec = takeoverExitFade))
                                         },
                                         label = "headphoneTakeoverState"
-                                    ) { inProgress ->
+                                    ) { contentState ->
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (inProgress) {
-                                                LoadingIndicator(
+                                            when (contentState) {
+                                                TakeoverButtonState.SUCCESS -> Icon(
+                                                    Icons.Rounded.Check,
+                                                    contentDescription = null,
                                                     modifier = Modifier.size(18.dp)
                                                 )
-                                            } else {
-                                                Icon(
+                                                TakeoverButtonState.IN_PROGRESS -> LoadingIndicator(
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                TakeoverButtonState.IDLE -> Icon(
                                                     Icons.Rounded.Headphones,
                                                     contentDescription = null,
                                                     modifier = Modifier.size(18.dp)
@@ -216,23 +238,31 @@ fun MainScreen(
                                             Spacer(Modifier.width(8.dp))
                                             Text(
                                                 stringResource(
-                                                    if (inProgress)
-                                                        R.string.headphone_takeover_in_progress
-                                                    else R.string.headphone_takeover
+                                                    when (contentState) {
+                                                        TakeoverButtonState.SUCCESS -> R.string.headphone_takeover_done
+                                                        TakeoverButtonState.IN_PROGRESS -> R.string.headphone_takeover_in_progress
+                                                        TakeoverButtonState.IDLE -> R.string.headphone_takeover
+                                                    }
                                                 )
                                             )
                                         }
                                     }
                                 }
-                                if (handoffPhase == HandoffPhase.FAILED) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = stringResource(R.string.headphone_takeover_failed),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = handoffPhase == HandoffPhase.FAILED,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+                                ) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = stringResource(R.string.headphone_takeover_failed),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                                 }
                             }

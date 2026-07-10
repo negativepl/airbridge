@@ -150,6 +150,7 @@
     <string name="headphone_takeover">Przenieś słuchawki na telefon</string>
     <string name="headphone_takeover_in_progress">Przenoszenie słuchawek…</string>
     <string name="headphone_takeover_failed">Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami.</string>
+    <string name="headphone_takeover_done">Słuchawki przeniesione na telefon</string>
 
     <string name="settings_notifications">Powiadomienia</string>
     <string name="settings_vibrate">Wibracja przy synchronizacji</string>

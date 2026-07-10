@@ -146,6 +146,7 @@
     <string name="headphone_takeover">Move headphones to phone</string>
     <string name="headphone_takeover_in_progress">Moving headphones…</string>
     <string name="headphone_takeover_failed">Headphone handoff failed. Make sure the headphones are on and paired with both devices.</string>
+    <string name="headphone_takeover_done">Headphones moved to this phone</string>
 
     <string name="settings_notifications">Notifications</string>
     <string name="settings_vibrate">Vibrate on sync</string>
