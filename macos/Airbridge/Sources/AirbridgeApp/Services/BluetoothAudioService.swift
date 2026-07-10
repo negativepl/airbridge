@@ -30,6 +30,11 @@ final class BluetoothAudioService {
     private(set) var selectedConnected = false
     var onStateChanged: ((Bool, String, String) -> Void)?
 
+    /// Whether the system default output device is currently playing audio
+    /// ("running somewhere" — CoreAudio's transport-agnostic activity signal).
+    private(set) var systemAudioActive = false
+    var onAudioActivityChanged: ((Bool) -> Void)?
+
     @ObservationIgnored private var guardUntil = Date.distantPast
     @ObservationIgnored private var monitorTask: Task<Void, Never>?
 
@@ -44,6 +49,11 @@ final class BluetoothAudioService {
     var selectedName: String? {
         get { UserDefaults.standard.string(forKey: "headphoneName") }
         set { UserDefaults.standard.set(newValue, forKey: "headphoneName") }
+    }
+    /// AirPods-style automatic switching on playback start; off by default.
+    var autoSwitchEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "headphoneAutoSwitch") }
+        set { UserDefaults.standard.set(newValue, forKey: "headphoneAutoSwitch") }
     }
 
     /// IOBluetooth enumeration is blocking IPC; run it off the main actor so the
@@ -96,7 +106,7 @@ final class BluetoothAudioService {
         // Sendable address string and a snapshot of the guard deadline.
         let guardDeadline = guardUntil
         let name = selectedName
-        let result: (connected: Bool, closed: Bool)? = await Task.detached {
+        let result: (connected: Bool, closed: Bool, audioActive: Bool)? = await Task.detached {
             guard let device = IOBluetoothDevice(addressString: address) else { return nil }
             // LE Audio (e.g. Galaxy Buds4 Pro) is invisible to IOBluetooth:
             // isConnected() only reflects the classic BR/EDR link, which may be
@@ -108,6 +118,7 @@ final class BluetoothAudioService {
             let classicConnected = device.isConnected()
             let coreAudioConnected = name.flatMap { Self.outputDeviceID(named: $0) } != nil
             let connected = classicConnected || coreAudioConnected
+            let audioActive = Self.defaultOutputIsRunning()
             if connected && Date() < guardDeadline {
                 // Headphones sneaked back during a handoff — release them again.
                 // NOTE: closeConnection() only tears down the classic BR/EDR
@@ -115,14 +126,18 @@ final class BluetoothAudioService {
                 // release the phone's grip on it — known limitation, revisit
                 // if the hardware pass shows the guard window failing.
                 device.closeConnection()
-                return (connected, true)
+                return (connected, true, audioActive)
             }
-            return (connected, false)
+            return (connected, false, audioActive)
         }.value
         guard let result, !result.closed else { return }
         if result.connected != selectedConnected {
             selectedConnected = result.connected
             onStateChanged?(result.connected, address, selectedName ?? address)
+        }
+        if result.audioActive != systemAudioActive {
+            systemAudioActive = result.audioActive
+            onAudioActivityChanged?(result.audioActive)
         }
     }
 
@@ -210,6 +225,34 @@ final class BluetoothAudioService {
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr else { return false }
         return size > 0
+    }
+
+    /// Whether the CURRENT default output device is playing audio right now
+    /// (`kAudioDevicePropertyDeviceIsRunningSomewhere`, global scope). Used to
+    /// detect playback starting/stopping for the auto-switch engine —
+    /// transport-agnostic, so it works for the built-in speakers as well as
+    /// whatever Bluetooth output happens to be selected.
+    nonisolated private static func defaultOutputIsRunning() -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var deviceID: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID) == noErr
+        else { return false }
+
+        var runningAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var isRunning: UInt32 = 0
+        var runningSize = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(
+            deviceID, &runningAddress, 0, nil, &runningSize, &isRunning) == noErr
+        else { return false }
+        return isRunning != 0
     }
 
     private static func setDefaultOutput(_ id: AudioDeviceID) -> Bool {

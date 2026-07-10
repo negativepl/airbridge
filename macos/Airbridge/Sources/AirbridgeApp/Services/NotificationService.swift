@@ -25,6 +25,10 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
     private static let replyActionId = "AIRBRIDGE_REPLY"
 
     @ObservationIgnored private weak var connectionService: ConnectionService?
+    /// Set by `AirbridgeApp` so action taps on its category (posted through
+    /// the same, single `UNUserNotificationCenter.delegate` slot this class
+    /// owns) can be forwarded instead of requiring a second delegate.
+    @ObservationIgnored private weak var handoffNotifier: HandoffNotifier?
 
     override init() {
         super.init()
@@ -55,6 +59,10 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
+    }
+
+    func configureHandoff(_ notifier: HandoffNotifier) {
+        self.handoffNotifier = notifier
     }
 
     func setEnabled(_ value: Bool) {
@@ -120,6 +128,8 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
             let reply = textResponse.userText
             Task { @MainActor in self.sendReply(notificationKey: key, text: reply) }
         }
+        let actionIdentifier = response.actionIdentifier
+        Task { @MainActor in self.handoffNotifier?.handleAction(actionIdentifier) }
         completionHandler()
     }
 

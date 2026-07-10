@@ -47,11 +47,16 @@ enum ConnectionPhase: Equatable {
 
 enum HeadphoneHandoffPhase: Equatable { case idle, inProgress, failed }
 
+/// Why a headphone handoff was initiated — drives cooldown bookkeeping and
+/// whether a Move-back notification follows a successful takeover.
+enum HandoffTrigger { case manual, auto, moveBack }
+
 /// Last headphone state the phone reported.
 struct PhoneHeadphoneState: Equatable {
     let connected: Bool
     let address: String
     let name: String
+    let audioActive: Bool?
 }
 
 @Observable
@@ -125,10 +130,19 @@ final class ConnectionService {
     /// Typed ref so a dropped connection can dismiss an orphaned incoming-file popup.
     var fileTransferService: FileTransferService?
     var bluetoothAudio: BluetoothAudioService?
+    /// Posts the "switched to Mac" notification for auto-triggered handoffs.
+    var handoffNotifier: HandoffNotifier?
     /// Last headphone state the phone reported (nil until it says anything).
     var phoneHeadphoneState: PhoneHeadphoneState?
     var headphoneHandoffPhase: HeadphoneHandoffPhase = .idle
     @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingHandoffTrigger: HandoffTrigger = .manual
+    /// Cooldowns so auto-switch doesn't fight a handoff that just happened —
+    /// 20 s after ANY handoff, 30 s after a manually-triggered one. Move-back
+    /// bypasses both (it isn't gated by `autoSwitchIfAppropriate`) and re-arms
+    /// them like any other successful handoff.
+    @ObservationIgnored private var lastHandoffAt: Date = .distantPast
+    @ObservationIgnored private var lastManualHandoffAt: Date = .distantPast
     private let macFilesService = MacFilesService()
     private var serverStarted = false
     @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
@@ -395,14 +409,23 @@ final class ConnectionService {
             try? await server.sendTo(
                 .headphoneReleaseResponse(ok: ok, error: ok ? nil : "release_failed"),
                 connectionId: connectionId)
+            // The phone just took the headphones over — this is a completed
+            // handoff in the other direction, so it still arms the cooldown.
+            if ok {
+                self.lastHandoffAt = Date()
+            }
         }
     }
 
     /// Mac-initiated takeover: ask the phone to release, then connect locally.
-    func takeoverHeadphones() {
+    /// `trigger` is bookkeeping only — cooldowns are enforced by
+    /// `autoSwitchIfAppropriate`, not here, so `.moveBack` callers bypass them
+    /// simply by calling this directly.
+    func takeoverHeadphones(trigger: HandoffTrigger = .manual) {
         guard let ba = bluetoothAudio, ba.enabled, let address = ba.selectedAddress,
               headphoneHandoffPhase != .inProgress else { return }
         headphoneHandoffPhase = .inProgress
+        pendingHandoffTrigger = trigger
         Task { try? await sendToActive(.headphoneReleaseRequest(address: address)) }
         handoffTimeoutTask?.cancel()
         handoffTimeoutTask = Task { [weak self] in
@@ -414,9 +437,26 @@ final class ConnectionService {
         }
     }
 
+    /// Auto-switch engine: called on the rising edge of `bluetoothAudio`'s
+    /// system audio activity. Steals the headphones from the phone only when
+    /// it isn't already the one playing through them, and only outside the
+    /// post-handoff cooldown windows.
+    func autoSwitchIfAppropriate() {
+        guard let ba = bluetoothAudio, ba.enabled, ba.autoSwitchEnabled,
+              isConnected,
+              phoneHeadphoneState?.connected == true,
+              phoneHeadphoneState?.audioActive != true,
+              headphoneHandoffPhase != .inProgress,
+              Date().timeIntervalSince(lastHandoffAt) > 20,
+              Date().timeIntervalSince(lastManualHandoffAt) > 30
+        else { return }
+        takeoverHeadphones(trigger: .auto)
+    }
+
     private func handleHeadphoneReleaseResponse(ok: Bool, error: String?) {
         guard headphoneHandoffPhase == .inProgress else { return }
         handoffTimeoutTask?.cancel()
+        let trigger = pendingHandoffTrigger
         guard ok, let ba = bluetoothAudio else {
             Diag.log("Headphone", "release refused by phone: \(error ?? "unknown")")
             headphoneHandoffPhase = .failed
@@ -425,6 +465,22 @@ final class ConnectionService {
         Task {
             let connected = await ba.takeover()
             self.headphoneHandoffPhase = connected ? .idle : .failed
+            guard connected else { return }
+            self.lastHandoffAt = Date()
+            switch trigger {
+            case .manual:
+                self.lastManualHandoffAt = Date()
+            case .auto:
+                self.handoffNotifier?.postSwitched { [weak self] in
+                    guard let self else { return }
+                    Task {
+                        try? await self.sendToActive(.headphoneTakeoverRequest)
+                        self.lastHandoffAt = Date()
+                    }
+                }
+            case .moveBack:
+                break
+            }
         }
     }
 
@@ -564,7 +620,7 @@ final class ConnectionService {
                 let name = ba.selectedName ?? address
                 let connected = ba.selectedConnected
                 try? await self.server.sendTo(
-                    .headphoneState(connected: connected, address: address, name: name, audioActive: nil),
+                    .headphoneState(connected: connected, address: address, name: name, audioActive: ba.systemAudioActive),
                     connectionId: connectionId)
             }
         }
@@ -625,13 +681,17 @@ final class ConnectionService {
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:
             handlePhoneRingStopped()
-        case let .headphoneState(connected, address, name, _):
+        case let .headphoneState(connected, address, name, audioActive):
             Diag.log("Headphone", "phone reports connected=\(connected) (\(name))")
-            phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name)
+            phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name, audioActive: audioActive)
         case let .headphoneReleaseRequest(address):
             handleHeadphoneReleaseRequest(address: address, from: connectionId)
         case let .headphoneReleaseResponse(ok, error):
             handleHeadphoneReleaseResponse(ok: ok, error: error)
+        case .headphoneTakeoverRequest:
+            // The phone is asking for the headphones back (its own Move-back
+            // notification action) — honor it directly, bypassing cooldowns.
+            takeoverHeadphones(trigger: .moveBack)
         default:
             break
         }

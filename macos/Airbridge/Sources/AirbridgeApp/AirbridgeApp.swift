@@ -73,11 +73,23 @@ struct AirbridgeApp: App {
 
         let bluetoothAudio = BluetoothAudioService()
         connection.bluetoothAudio = bluetoothAudio
+        let handoffNotifier = HandoffNotifier()
+        connection.handoffNotifier = handoffNotifier
+        notifications.configureHandoff(handoffNotifier)
         bluetoothAudio.onStateChanged = { [weak connection] connected, address, name in
             guard let connection, bluetoothAudio.enabled else { return }
             Diag.log("Headphone", "mac state changed: connected=\(connected) (\(name))")
             Task { try? await connection.server.broadcast(
-                .headphoneState(connected: connected, address: address, name: name, audioActive: nil)) }
+                .headphoneState(connected: connected, address: address, name: name, audioActive: bluetoothAudio.systemAudioActive)) }
+        }
+        bluetoothAudio.onAudioActivityChanged = { [weak connection] active in
+            guard let connection, bluetoothAudio.enabled, let address = bluetoothAudio.selectedAddress else { return }
+            Diag.log("Headphone", "mac audio activity changed: \(active)")
+            Task { try? await connection.server.broadcast(
+                .headphoneState(connected: bluetoothAudio.selectedConnected, address: address, name: bluetoothAudio.selectedName ?? address, audioActive: active)) }
+            if active {
+                connection.autoSwitchIfAppropriate()
+            }
         }
         bluetoothAudio.startMonitoring()
 
