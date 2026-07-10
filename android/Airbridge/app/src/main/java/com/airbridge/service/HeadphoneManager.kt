@@ -14,6 +14,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
@@ -76,6 +79,55 @@ class HeadphoneManager(private val context: Context) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
                 PackageManager.PERMISSION_GRANTED
 
+    /** LE Audio dual mode keeps profile links alive on both hosts; the honest
+     *  "headphones are here" signal is whether the system audio routing exposes
+     *  them as an output device (symmetric to CoreAudio presence on the Mac). */
+    private fun isAudioRoutedHere(address: String): Boolean {
+        if (!hasPermission()) return false
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+        val isLeAudioType: (AudioDeviceInfo) -> Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            { it.type == AudioDeviceInfo.TYPE_BLE_HEADSET || it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER }
+        } else {
+            { false }
+        }
+        return try {
+            am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+                (it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || isLeAudioType(it)) &&
+                    it.address.equals(address, ignoreCase = true)
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "isAudioRoutedHere: $e")
+            false
+        }
+    }
+
+    /** Reacts to any change in the system's audio output device set. This is
+     *  the primary state source (see [isAudioRoutedHere]) — profile broadcasts
+     *  and proxy-bind catch-up below are kept only as redundant backup triggers,
+     *  since they still fire correctly for classic (non-LE-Audio) headsets and
+     *  are cheap and harmless to leave in place. */
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            handleAudioRouteChange()
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            handleAudioRouteChange()
+        }
+    }
+
+    private fun handleAudioRouteChange() {
+        val address = selectedAddress ?: return
+        if (!hasPermission()) return
+        val device = remoteDevice(address) ?: return
+        val name = try {
+            device.name ?: address
+        } catch (e: SecurityException) {
+            address
+        }
+        reportStateChange(isAudioRoutedHere(address), address, name, device)
+    }
+
     private val profileListener = object : BluetoothProfile.ServiceListener {
         override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
             when (profile) {
@@ -115,7 +167,10 @@ class HeadphoneManager(private val context: Context) {
         } catch (e: SecurityException) {
             address
         }
-        reportStateChange(true, address, name, device)
+        // Proxy-bind catch-up is a backup trigger — recompute the real state
+        // via isAudioRoutedHere rather than assuming "profile connected" means
+        // "audio here" (false on LE Audio dual mode, see class doc above).
+        reportStateChange(isAudioRoutedHere(address), address, name, device)
     }
 
     /** Forward a connected/disconnected transition, de-bounced against
@@ -158,17 +213,16 @@ class HeadphoneManager(private val context: Context) {
                 intent.action == BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED ||
                 (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     intent.action == BluetoothLeAudio.ACTION_LE_AUDIO_CONNECTION_STATE_CHANGED)
-            when {
-                isProfileStateAction ->
-                    when (intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)) {
-                        BluetoothProfile.STATE_CONNECTED ->
-                            reportStateChange(true, address, name, device)
-                        BluetoothProfile.STATE_DISCONNECTED ->
-                            reportStateChange(isConnected(address), address, name, device)
-                        // CONNECTING/DISCONNECTING are intermediate — ignore.
-                    }
-                intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED ->
-                    reportStateChange(isConnected(address), address, name, device)
+            // Profile broadcasts are now a backup trigger — the AudioDeviceCallback
+            // registered in start() is the primary source. Recompute the real
+            // state via isConnected() (== isAudioRoutedHere) rather than assuming
+            // "profile connected" means "audio here" (false on LE Audio dual mode).
+            val state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
+            val isSettledProfileState = isProfileStateAction &&
+                (state == BluetoothProfile.STATE_CONNECTED || state == BluetoothProfile.STATE_DISCONNECTED)
+            // CONNECTING/DISCONNECTING are intermediate — ignore.
+            if (isSettledProfileState || intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                reportStateChange(isConnected(address), address, name, device)
             }
         }
     }
@@ -202,6 +256,8 @@ class HeadphoneManager(private val context: Context) {
             )
             receiverRegistered = true
         }
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        am?.registerAudioDeviceCallback(audioDeviceCallback, null)
     }
 
     fun stop() {
@@ -209,6 +265,8 @@ class HeadphoneManager(private val context: Context) {
             context.unregisterReceiver(stateReceiver)
             receiverRegistered = false
         }
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        am?.unregisterAudioDeviceCallback(audioDeviceCallback)
         a2dp?.let { adapter?.closeProfileProxy(BluetoothProfile.A2DP, it) }
         headset?.let { adapter?.closeProfileProxy(BluetoothProfile.HEADSET, it) }
         a2dp = null
@@ -232,16 +290,12 @@ class HeadphoneManager(private val context: Context) {
         }
     }
 
-    fun isConnected(address: String): Boolean {
-        if (!hasPermission()) return false
-        return try {
-            a2dp?.connectedDevices.orEmpty().any { it.address == address } ||
-                headset?.connectedDevices.orEmpty().any { it.address == address }
-        } catch (e: SecurityException) {
-            Log.w(TAG, "isConnected: $e")
-            false
-        }
-    }
+    /** Whether audio is currently routed to these headphones on this phone.
+     *  This is NOT profile connection state — on LE Audio dual-mode gear the
+     *  classic/profile link can stay up on both hosts while audio actually
+     *  plays elsewhere, so the audio route (see [isAudioRoutedHere]) is the
+     *  only honest signal. */
+    fun isConnected(address: String): Boolean = isAudioRoutedHere(address)
 
     /** Disconnect the headphones and hold off their auto-reconnect. */
     fun release(address: String): Boolean {
