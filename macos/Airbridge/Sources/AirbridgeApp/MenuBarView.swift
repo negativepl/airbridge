@@ -8,6 +8,7 @@ struct MenuBarView: View {
     let bluetoothAudio: BluetoothAudioService
     @Environment(\.openWindow) private var openWindow
     @State private var showHandoffSuccess = false
+    @State private var showUpToDateBeat = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -116,18 +117,29 @@ struct MenuBarView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
 
-            MenuRow(title: L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    loading: updateService.phase == .checking,
-                    trailing: { AnyView(updateRowTrailing) }) {
+            MenuRow(title: updateRowTitle,
+                    systemImage: updateRowIcon,
+                    loading: updateService.phase == .checking) {
                 switch updateService.phase {
-                case .idle, .failed:
+                case .idle, .failed, .upToDate:
                     Task { await updateService.checkForUpdates() }
                 case .available:
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
-                case .checking, .upToDate, .downloading, .installing:
+                case .checking, .downloading, .installing:
                     break
+                }
+            }
+            .onChange(of: updateService.phase) { _, new in
+                // "Up to date" replaces the row text for a beat, then the row
+                // returns to its idle label — same in-place pattern as the
+                // headphone handoff, no trailing badges.
+                if new == .upToDate {
+                    showUpToDateBeat = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        showUpToDateBeat = false
+                    }
                 }
             }
 
@@ -186,40 +198,33 @@ struct MenuBarView: View {
         return L10n.isPL ? "Zadzwoń na telefon" : "Ring phone"
     }
 
-    /// Mirrors `AboutTabView.updateRowTrailing` — compact status readout next
-    /// to the "Check for updates" row.
-    @ViewBuilder
-    private var updateRowTrailing: some View {
+    /// Update row states replace the row's own text in place (like the
+    /// headphone handoff row) — no trailing badges that widen the menu.
+    private var updateRowTitle: String {
         switch updateService.phase {
-        case .idle:
-            EmptyView()
-
         case .checking:
-            // Spinner lives in the row's leading icon slot (MenuRow.loading);
-            // nothing on the right, so the row width stays put.
-            EmptyView()
-
-        case .upToDate:
-            Text(L10n.isPL ? "Aktualne" : "Up to date")
-                .font(.ab(.caption, weight: .semibold))
-                .foregroundStyle(.green)
-                .lineLimit(1)
-
+            return L10n.isPL ? "Sprawdzanie aktualizacji…" : "Checking for updates…"
+        case .upToDate where showUpToDateBeat:
+            return L10n.isPL ? "Aplikacja jest aktualna" : "App is up to date"
         case .available(let manifest):
-            Text(L10n.isPL ? "Dostępna: \(manifest.version)" : "Available: \(manifest.version)")
-                .font(.ab(.caption, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .lineLimit(1)
-
+            return L10n.isPL ? "Dostępna aktualizacja \(manifest.version)" : "Update \(manifest.version) available"
         case .downloading, .installing:
-            ProgressView()
-                .controlSize(.small)
-
+            return L10n.isPL ? "Instalowanie aktualizacji…" : "Installing update…"
         case .failed:
-            Text(L10n.isPL ? "Błąd" : "Failed")
-                .font(.ab(.caption, weight: .semibold))
-                .foregroundStyle(.red)
-                .lineLimit(1)
+            return L10n.isPL ? "Sprawdzanie nie powiodło się — spróbuj ponownie" : "Check failed — try again"
+        default:
+            return L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates"
+        }
+    }
+
+    private var updateRowIcon: String {
+        switch updateService.phase {
+        case .upToDate where showUpToDateBeat:
+            return "checkmark.circle"
+        case .available:
+            return "arrow.down.circle"
+        default:
+            return "arrow.triangle.2.circlepath"
         }
     }
 }
