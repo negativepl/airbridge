@@ -509,7 +509,7 @@ public actor HttpUploadServer {
     ) {
         // Report progress — call directly, not via actor hop
         if sink.bytesWritten % (50 * 1024 * 1024) < 65536 {
-            Diag.log("HTTP", "streamBody \(filename) \(sink.bytesWritten)/\(contentLength) cb=\(self.onProgress != nil)")
+            NSLog("AB-HTTP streamBody %@ %d/%d cb=%d", filename, sink.bytesWritten, contentLength, self.onProgress != nil ? 1 : 0)
         }
         self.onProgress?(filename, sink.bytesWritten, contentLength, senderHost)
 
