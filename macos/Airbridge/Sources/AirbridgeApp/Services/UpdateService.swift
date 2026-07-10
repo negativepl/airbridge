@@ -29,6 +29,19 @@ final class UpdateService {
 
     func checkForUpdates() async {
         phase = .checking
+        // A fast manifest fetch can finish in ~100 ms — quicker than the
+        // "checking" state can even render. Hold the phase briefly so the
+        // check is visible instead of the result appearing to teleport in.
+        let startedAt = ContinuousClock.now
+        let result = await performCheck()
+        let elapsed = ContinuousClock.now - startedAt
+        if elapsed < .milliseconds(800) {
+            try? await Task.sleep(for: .milliseconds(800) - elapsed)
+        }
+        phase = result
+    }
+
+    private func performCheck() async -> Phase {
         do {
             let (manifestData, _) = try await URLSession.shared.data(from: Self.manifestURL)
             let sigURL = URL(string: Self.manifestURL.absoluteString + ".sig")!
@@ -38,14 +51,13 @@ final class UpdateService {
             guard UpdateManifest.verifySignature(
                 manifestBytes: manifestData, signatureBase64: sigB64,
                 publicKeyRawBase64: Self.publicKeyB64) else {
-                phase = .failed(L10n.isPL ? "Nieprawidłowy podpis manifestu" : "Invalid manifest signature")
-                return
+                return .failed(L10n.isPL ? "Nieprawidłowy podpis manifestu" : "Invalid manifest signature")
             }
             let manifest = try JSONDecoder().decode(UpdateManifest.self, from: manifestData)
             let installed = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-            phase = manifest.isNewer(thanInstalled: installed) ? .available(manifest) : .upToDate
+            return manifest.isNewer(thanInstalled: installed) ? .available(manifest) : .upToDate
         } catch {
-            phase = .failed(error.localizedDescription)
+            return .failed(error.localizedDescription)
         }
     }
 
