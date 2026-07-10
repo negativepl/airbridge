@@ -33,6 +33,8 @@
 	<array>
 		<string>_airbridge._tcp</string>
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>AirBridge uses Bluetooth to move your headphones between this Mac and your phone with one click.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
