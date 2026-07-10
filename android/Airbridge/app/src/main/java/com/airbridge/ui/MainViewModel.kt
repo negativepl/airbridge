@@ -26,6 +26,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val transferSpeedBps: StateFlow<Long> = AirbridgeService.transferSpeedBps
     val transferEtaSeconds: StateFlow<Int> = AirbridgeService.transferEtaSeconds
     val transferSpeedHistory: StateFlow<List<Float>> = AirbridgeService.transferSpeedHistory
+    val transferIsSending: StateFlow<Boolean> = AirbridgeService.transferIsSending
 
     // Mac Files Browser state
     val macFilesEntries = AirbridgeService.macFilesEntries

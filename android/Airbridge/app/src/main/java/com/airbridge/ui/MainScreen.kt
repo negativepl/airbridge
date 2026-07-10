@@ -408,12 +408,19 @@ fun MainScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        IconButton(onClick = { viewModel.cancelTransfer() }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = stringResource(R.string.transfer_cancel),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                        // Cancel applies only to OUTGOING transfers (offer wait +
+                        // upload); the service has no handle on an incoming
+                        // download, so hide the button there instead of showing
+                        // a dead control.
+                        val transferIsSending by viewModel.transferIsSending.collectAsState()
+                        if (transferIsSending) {
+                            IconButton(onClick = { viewModel.cancelTransfer() }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = stringResource(R.string.transfer_cancel),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
                     }
 
