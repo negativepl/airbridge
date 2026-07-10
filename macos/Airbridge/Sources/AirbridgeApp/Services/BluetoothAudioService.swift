@@ -10,10 +10,17 @@ import Observation
 @Observable
 final class BluetoothAudioService {
 
-    struct PairedAudioDevice: Identifiable, Equatable {
+    struct PairedAudioDevice: Identifiable, Equatable, Sendable {
         let name: String
         let address: String
         var id: String { address }
+    }
+
+    /// IOBluetooth reports "5c-d3-3d-1e-3f-d1"; Android reports "5C:D3:3D:1E:3F:D1".
+    /// The wire and stored format is the Android one; IOBluetoothDevice(addressString:)
+    /// accepts both, so canonicalizing here is safe.
+    nonisolated static func canonicalAddress(_ raw: String) -> String {
+        raw.replacingOccurrences(of: "-", with: ":").uppercased()
     }
 
     /// Window after a release during which the headphones' auto-reconnect to
@@ -31,7 +38,7 @@ final class BluetoothAudioService {
         set { UserDefaults.standard.set(newValue, forKey: "headphoneHandoff") }
     }
     var selectedAddress: String? {
-        get { UserDefaults.standard.string(forKey: "headphoneAddress") }
+        get { UserDefaults.standard.string(forKey: "headphoneAddress").map(Self.canonicalAddress) }
         set { UserDefaults.standard.set(newValue, forKey: "headphoneAddress") }
     }
     var selectedName: String? {
@@ -39,14 +46,22 @@ final class BluetoothAudioService {
         set { UserDefaults.standard.set(newValue, forKey: "headphoneName") }
     }
 
-    static func pairedAudioDevices() -> [PairedAudioDevice] {
-        let devices = (IOBluetoothDevice.pairedDevices() ?? []).compactMap { $0 as? IOBluetoothDevice }
-        return devices
-            .filter { $0.deviceClassMajor == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio) }
-            .compactMap { dev in
-                guard let address = dev.addressString else { return nil }
-                return PairedAudioDevice(name: dev.name ?? address, address: address)
+    /// IOBluetooth enumeration is blocking IPC; run it off the main actor so the
+    /// Settings UI doesn't stall while it re-runs on section re-render.
+    static func pairedAudioDevices() async -> [PairedAudioDevice] {
+        await Task.detached {
+            let devices = (IOBluetoothDevice.pairedDevices() ?? []).compactMap { $0 as? IOBluetoothDevice }
+            var seen = Set<String>()
+            var result: [PairedAudioDevice] = []
+            for dev in devices {
+                guard dev.deviceClassMajor == BluetoothDeviceClassMajor(kBluetoothDeviceClassMajorAudio),
+                      let rawAddress = dev.addressString else { continue }
+                let address = canonicalAddress(rawAddress)
+                guard seen.insert(address).inserted else { continue }
+                result.append(PairedAudioDevice(name: dev.name ?? address, address: address))
             }
+            return result
+        }.value
     }
 
     private func selectedDevice() -> IOBluetoothDevice? {

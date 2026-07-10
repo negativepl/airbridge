@@ -383,6 +383,7 @@ final class ConnectionService {
 
     /// Phone asked us to release the headphones so it can take them.
     private func handleHeadphoneReleaseRequest(address: String, from connectionId: String) {
+        let address = BluetoothAudioService.canonicalAddress(address)
         guard let ba = bluetoothAudio, ba.enabled, ba.selectedAddress == address else {
             Task { try? await server.sendTo(
                 .headphoneReleaseResponse(ok: false, error: "not_configured"),

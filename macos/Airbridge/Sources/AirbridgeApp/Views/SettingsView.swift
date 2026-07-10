@@ -249,7 +249,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onAppear { pairedAudio = BluetoothAudioService.pairedAudioDevices() }
+        .task { pairedAudio = await BluetoothAudioService.pairedAudioDevices() }
     }
 
     private var quickDropSection: some View {
