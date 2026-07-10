@@ -88,6 +88,22 @@ struct MenuBarView: View {
                         connectionService.takeoverHeadphones()
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if bluetoothAudio.enabled, bluetoothAudio.selectedConnected {
+                    // Headphones already on this Mac: passive status row (styled
+                    // like the battery row, not clickable) so the menu says where
+                    // they are instead of showing nothing.
+                    HStack(spacing: 8) {
+                        Image(systemName: "headphones")
+                            .font(.ab(.subheadline))
+                            .frame(width: 18, alignment: .center)
+                        Text(L10n.isPL ? "Słuchawki połączone z Makiem" : "Headphones connected to Mac")
+                            .font(.ab(.subheadline))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 Divider()
@@ -131,6 +147,7 @@ struct MenuBarView: View {
         .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
         .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
         .animation(.airbridgeQuick, value: showHandoffSuccess)
+        .animation(.airbridgeQuick, value: bluetoothAudio.selectedConnected)
         .onChange(of: connectionService.headphoneHandoffPhase) { old, new in
             if old == .inProgress && new == .idle {
                 showHandoffSuccess = true
