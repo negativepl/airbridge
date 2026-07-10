@@ -127,6 +127,9 @@ private fun SettingsContent(
     var headphoneName by remember {
         mutableStateOf(prefs.getString("headphone_name", null))
     }
+    var headphoneAutoSwitch by remember {
+        mutableStateOf(prefs.getBoolean("headphone_auto_switch", false))
+    }
     var showHeadphonePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val btPermissionLauncher = rememberLauncherForActivityResult(
@@ -456,6 +459,27 @@ private fun SettingsContent(
                                 showHeadphonePicker = true
                             }
                         }
+                    )
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_headphone_auto)) },
+                        supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
+                        trailingContent = {
+                            Switch(checked = headphoneAutoSwitch, onCheckedChange = null)
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.toggleable(
+                            value = headphoneAutoSwitch,
+                            role = Role.Switch,
+                            onValueChange = {
+                                headphoneAutoSwitch = it
+                                prefs.edit { putBoolean("headphone_auto_switch", it) }
+                                ContextCompat.startForegroundService(
+                                    context,
+                                    Intent(context, AirbridgeService::class.java)
+                                        .setAction(AirbridgeService.ACTION_HEADPHONE_REFRESH)
+                                )
+                            }
+                        )
                     )
                 }
             }

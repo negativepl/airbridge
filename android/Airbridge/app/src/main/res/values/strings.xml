@@ -143,6 +143,8 @@
     <string name="settings_headphone_device">Headphones</string>
     <string name="settings_headphone_device_none">Not selected</string>
     <string name="settings_headphone_permission">Bluetooth permission is required to manage headphones</string>
+    <string name="settings_headphone_auto">Switch automatically</string>
+    <string name="settings_headphone_auto_desc">Move the headphones to the device that starts playing</string>
     <string name="headphone_takeover">Move headphones to phone</string>
     <string name="headphone_takeover_in_progress">Moving headphones…</string>
     <string name="headphone_takeover_failed">Headphone handoff failed. Make sure the headphones are on and paired with both devices.</string>
