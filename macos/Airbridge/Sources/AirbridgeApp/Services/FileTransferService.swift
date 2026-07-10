@@ -486,6 +486,7 @@ final class FileTransferService: MessageHandler {
                         self.transferSpeed = speed
                         let remaining = totalBytes - bytesReceived
                         self.transferEta = speed > 0 ? Int(Double(remaining) / speed) : 0
+                        Diag.log("Transfer", "recv progress=\(String(format: "%.2f", progress)) bytes=\(bytesReceived)/\(totalBytes) speed=\(Int(speed)) eta=\(self.transferEta)")
                     }
                 }
             }
