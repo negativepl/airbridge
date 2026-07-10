@@ -81,9 +81,7 @@ struct MenuBarView: View {
                                     ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
                                     : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac")),
                             systemImage: showHandoffSuccess ? "checkmark.circle" : "headphones",
-                            trailing: (!showHandoffSuccess && connectionService.headphoneHandoffPhase == .inProgress)
-                                ? { AnyView(ProgressView().controlSize(.small)) }
-                                : { AnyView(EmptyView()) }) {
+                            loading: !showHandoffSuccess && connectionService.headphoneHandoffPhase == .inProgress) {
                         guard !showHandoffSuccess, connectionService.headphoneHandoffPhase != .inProgress else { return }
                         connectionService.takeoverHeadphones()
                     }
@@ -120,6 +118,7 @@ struct MenuBarView: View {
 
             MenuRow(title: L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates",
                     systemImage: "arrow.triangle.2.circlepath",
+                    loading: updateService.phase == .checking,
                     trailing: { AnyView(updateRowTrailing) }) {
                 switch updateService.phase {
                 case .idle, .failed:
@@ -196,8 +195,9 @@ struct MenuBarView: View {
             EmptyView()
 
         case .checking:
-            ProgressView()
-                .controlSize(.small)
+            // Spinner lives in the row's leading icon slot (MenuRow.loading);
+            // nothing on the right, so the row width stays put.
+            EmptyView()
 
         case .upToDate:
             Text(L10n.isPL ? "Aktualne" : "Up to date")
@@ -338,6 +338,9 @@ private struct BatteryRow: View {
 private struct MenuRow: View {
     let title: String
     let systemImage: String
+    /// Swap the leading icon for a small spinner in the same 18pt slot, so a
+    /// busy row never changes width — only the icon and title change.
+    var loading: Bool = false
     var trailing: () -> AnyView = { AnyView(EmptyView()) }
     let action: () -> Void
 
@@ -346,10 +349,18 @@ private struct MenuRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.ab(.subheadline))
-                .frame(width: 18, alignment: .center)
-                .foregroundStyle(.primary)
+            Group {
+                if loading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.7)
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.ab(.subheadline))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .frame(width: 18, height: 18, alignment: .center)
             Text(title)
                 .font(.ab(.subheadline))
                 .foregroundStyle(.primary)
