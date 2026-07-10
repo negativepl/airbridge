@@ -87,7 +87,6 @@ struct MenuBarView: View {
                         guard !showHandoffSuccess, connectionService.headphoneHandoffPhase != .inProgress else { return }
                         connectionService.takeoverHeadphones()
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
                 } else if bluetoothAudio.enabled, bluetoothAudio.selectedConnected {
                     // Headphones already on this Mac: passive status row. Shares
                     // MenuRow's exact geometry (spacing/font/padding/minHeight) so
@@ -108,7 +107,6 @@ struct MenuBarView: View {
                     .padding(.vertical, 4)
                     .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
                     .padding(.horizontal, 6)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 Divider()
@@ -149,10 +147,9 @@ struct MenuBarView: View {
         // window's full proposed width clamped to maxWidth — always maximal.
         .frame(minWidth: 220)
         .fixedSize(horizontal: true, vertical: false)
-        .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
-        .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
-        .animation(.airbridgeQuick, value: showHandoffSuccess)
-        .animation(.airbridgeQuick, value: bluetoothAudio.selectedConnected)
+        // No row/layout animations on purpose: native NSMenus never animate
+        // their items, and animated inserts inside a fixedSize popover read as
+        // the menu "jumping". State changes swap content instantly.
         .onChange(of: connectionService.headphoneHandoffPhase) { old, new in
             if old == .inProgress && new == .idle {
                 showHandoffSuccess = true
