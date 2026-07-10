@@ -362,7 +362,8 @@ fun MainScreen(
             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
             Column {
-            Spacer(modifier = Modifier.height(8.dp))
+            // Section rhythm on Home: 16dp above, same as the section headers.
+            Spacer(modifier = Modifier.height(16.dp))
 
             Card(
                 onClick = { transferExpanded = !transferExpanded },
