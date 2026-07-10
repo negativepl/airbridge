@@ -561,7 +561,7 @@ struct TransferPopupView: View {
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce)
 
-            Text(L10n.isPL ? "Przełączyć słuchawki na Maca?" : "Switch the headphones to this Mac?")
+            Text(L10n.isPL ? "Przełączyć słuchawki na Maka?" : "Switch the headphones to this Mac?")
                 .font(.ab(.callout, weight: .semibold))
                 .foregroundStyle(.primary)
 

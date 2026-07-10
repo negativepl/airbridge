@@ -464,7 +464,9 @@ final class ConnectionService {
         guard let ba = bluetoothAudio, ba.enabled, ba.autoSwitchEnabled,
               isConnected,
               phoneHeadphoneState?.connected == true,
-              phoneHeadphoneState?.audioActive != true,
+              // Deliberately NOT gated on the phone's audioActive: activity
+              // signals linger after playback stops and were blocking the
+              // prompt. Ask-first makes the question cheap — the user decides.
               headphoneHandoffPhase != .inProgress,
               !headphonePromptVisible,
               !isTransferPopupBusy(),

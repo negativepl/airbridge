@@ -7,7 +7,7 @@
     <string name="onboarding_welcome_desc">Twój telefon i komputer Mac, połączone jak nigdy dotąd.</string>
     <string name="onboarding_feature_clipboard">Synchronizuj schowek między telefonem, a Makiem</string>
     <string name="onboarding_feature_files">Przeglądaj i przesyłaj pliki oraz zdjęcia, bez chmury</string>
-    <string name="onboarding_feature_notifications">Powiadomienia z telefonu na Macu</string>
+    <string name="onboarding_feature_notifications">Powiadomienia z telefonu na Maku</string>
     <string name="onboarding_feature_more">…i wiele więcej</string>
     <string name="onboarding_connect_title">Jak to działa?</string>
     <string name="onboarding_connect_desc">Kilka rzeczy, które warto wiedzieć:</string>
@@ -29,13 +29,13 @@
     <string name="onboarding_perm_files_desc">Pliki</string>
     <string name="onboarding_perm_files_why">Aby przeglądać i przesyłać pliki telefonu z komputera Mac. Pliki przesyłane są bezpośrednio przez sieć lokalną — nic nie trafia do chmury</string>
     <string name="onboarding_perm_overlay_desc">Wyświetlanie nad aplikacjami</string>
-    <string name="onboarding_perm_overlay_why">Aby mirror ekranu mógł wystartować zdalnie z Maca, nawet gdy aplikacja jest w tle. Bez tego trzeba najpierw otworzyć aplikację</string>
-    <string name="onboarding_perm_notiflistener_desc">Powiadomienia na Macu</string>
-    <string name="onboarding_perm_notiflistener_why">Aby powiadomienia z telefonu pojawiały się natywnie na Macu. Wybierzesz w ustawieniach Maca, które aplikacje pokazywać</string>
-    <string name="onboarding_perm_accessibility_desc">Sterowanie z Maca</string>
-    <string name="onboarding_perm_accessibility_why">Aby sterować telefonem z Maca podczas mirrora (dotyk, pisanie). Opcjonalne — tylko do zdalnego sterowania</string>
-    <string name="onboarding_perm_optional_header">Dodatkowe — mirror i powiadomienia na Macu</string>
-    <string name="onboarding_feature_mirror">Pokaż ekran telefonu na Macu — i odwrotnie</string>
+    <string name="onboarding_perm_overlay_why">Aby mirror ekranu mógł wystartować zdalnie z Maka, nawet gdy aplikacja jest w tle. Bez tego trzeba najpierw otworzyć aplikację</string>
+    <string name="onboarding_perm_notiflistener_desc">Powiadomienia na Maku</string>
+    <string name="onboarding_perm_notiflistener_why">Aby powiadomienia z telefonu pojawiały się natywnie na Maku. Wybierzesz w ustawieniach Maka, które aplikacje pokazywać</string>
+    <string name="onboarding_perm_accessibility_desc">Sterowanie z Maka</string>
+    <string name="onboarding_perm_accessibility_why">Aby sterować telefonem z Maka podczas mirrora (dotyk, pisanie). Opcjonalne — tylko do zdalnego sterowania</string>
+    <string name="onboarding_perm_optional_header">Dodatkowe — mirror i powiadomienia na Maku</string>
+    <string name="onboarding_feature_mirror">Pokaż ekran telefonu na Maku — i odwrotnie</string>
     <string name="onboarding_perm_allow_btn">Zezwól</string>
     <string name="onboarding_perm_granted_short">Przyznano</string>
     <string name="onboarding_perm_all_granted">Wszystkie uprawnienia nadane</string>
@@ -62,8 +62,8 @@
     <!-- Activity -->
     <string name="recent_activity">Ostatnia aktywność</string>
     <string name="no_activity">Brak transferów</string>
-    <string name="activity_sent">Wysłano do Maca</string>
-    <string name="activity_received">Odebrano z Maca</string>
+    <string name="activity_sent">Wysłano do Maka</string>
+    <string name="activity_received">Odebrano z Maka</string>
     <string name="time_now">teraz</string>
     <string name="time_minutes">%d min</string>
     <string name="time_hours">%d godz.</string>
@@ -123,8 +123,8 @@
     <!-- Navigation -->
     <string name="fab_close_menu">Zamknij menu</string>
     <string name="nav_home">Główna</string>
-    <string name="nav_mac_files">Pliki z Maca</string>
-    <string name="mac_files_permission_needed">Przyznaj dostęp do plików na Macu</string>
+    <string name="nav_mac_files">Pliki z Maka</string>
+    <string name="mac_files_permission_needed">Przyznaj dostęp do plików na Maku</string>
     <string name="mac_files_root">Mac</string>
     <string name="mac_files_empty_folder">Ten folder jest pusty</string>
     <string name="nav_screen_sharing">Ekran</string>
@@ -204,16 +204,16 @@
     <string name="pairing_in_progress">Parowanie…</string>
     <string name="pairing_in_progress_desc">Łączenie z komputerem Mac</string>
     <string name="pairing_success_title">Sparowano!</string>
-    <string name="repair_needed_no_pin">%s wymaga ponownego sparowania po aktualizacji zabezpieczeń. Otwórz AirBridge na Macu i zeskanuj kod QR.</string>
-    <string name="repair_needed_cert_changed">Certyfikat bezpieczeństwa komputera %s się zmienił. AirBridge nie połączy się, dopóki nie sparujesz ponownie, skanując kod QR na Macu.</string>
+    <string name="repair_needed_no_pin">%s wymaga ponownego sparowania po aktualizacji zabezpieczeń. Otwórz AirBridge na Maku i zeskanuj kod QR.</string>
+    <string name="repair_needed_cert_changed">Certyfikat bezpieczeństwa komputera %s się zmienił. AirBridge nie połączy się, dopóki nie sparujesz ponownie, skanując kod QR na Maku.</string>
     <string name="repair_action_scan">Sparuj ponownie</string>
     <string name="notification_ring_title">AirBridge dzwoni</string>
     <string name="notification_ring_text">Dotknij Zatrzymaj, aby wyciszyć</string>
     <string name="notification_ring_stop">Zatrzymaj</string>
     <string name="pairing_success_desc">Połączono z %s</string>
     <string name="pairing_success_continue">Dalej</string>
-    <string name="screen_sharing_show_mac">Pokaż ekran Maca</string>
-    <string name="screen_sharing_show_mac_desc">Podgląd i sterowanie głównym ekranem Maca.</string>
+    <string name="screen_sharing_show_mac">Pokaż ekran Maka</string>
+    <string name="screen_sharing_show_mac_desc">Podgląd i sterowanie głównym ekranem Maka.</string>
     <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>
     <string name="screen_sharing_second_display_desc">Dodatkowy pulpit dopasowany do ekranu telefonu.</string>
     <string name="screen_sharing_connect_first">Połącz się z Makiem, aby udostępniać ekran.</string>
@@ -225,7 +225,7 @@
     <string name="home_battery_to_full_hm">%1$d%% · %2$d godz. %3$d min do pełna</string>
     <string name="home_battery_to_full_m">%1$d%% · %2$d min do pełna</string>
     <string name="home_battery_charging">%1$d%% · ładowanie</string>
-    <string name="home_monitor_title">Monitor Maca</string>
+    <string name="home_monitor_title">Monitor Maka</string>
     <string name="home_monitor_cpu">CPU</string>
     <string name="home_monitor_ram">RAM</string>
     <string name="home_monitor_disk">Dysk</string>

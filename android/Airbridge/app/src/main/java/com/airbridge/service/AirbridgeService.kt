@@ -748,7 +748,10 @@ class AirbridgeService : Service() {
         if (!isConnected.value) return
         val mac = macHeadphoneState.value
         if (mac?.connected != true) return
-        if (mac.audioActive == true) return
+        // Deliberately NOT gated on mac.audioActive: browsers keep the Mac's
+        // output device "running" long after playback stops, which blocked the
+        // prompt entirely. Ask-first makes the question cheap — the user
+        // arbitrates, so a prompt while the Mac still plays is acceptable.
         if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastHandoffAtMs <= 20_000L) return

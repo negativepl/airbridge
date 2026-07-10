@@ -62,7 +62,7 @@ final class HandoffNotifier {
 
         let content = UNMutableNotificationContent()
         content.title = "AirBridge"
-        content.body = L10n.isPL ? "Słuchawki przełączone na Maca" : "Headphones switched to Mac"
+        content.body = L10n.isPL ? "Słuchawki przełączone na Maka" : "Headphones switched to Mac"
         content.sound = .default
         content.categoryIdentifier = Self.categoryId
 

@@ -210,13 +210,13 @@ struct OnboardingView: View {
                 featureRow(
                     icon: "rectangle.on.rectangle",
                     text: isPL
-                        ? "Pokaż ekran telefonu na Macu — i odwrotnie"
+                        ? "Pokaż ekran telefonu na Maku — i odwrotnie"
                         : "Mirror your phone screen on your Mac — and back"
                 )
                 featureRow(
                     icon: "bell.badge",
                     text: isPL
-                        ? "Powiadomienia z telefonu na Macu"
+                        ? "Powiadomienia z telefonu na Maku"
                         : "Your phone notifications on your Mac"
                 )
                 featureRow(
@@ -322,7 +322,7 @@ struct OnboardingView: View {
             permissionRow(
                 icon: "bell.badge",
                 title: isPL ? "Powiadomienia" : "Notifications",
-                why: isPL ? "Powiadomienia z telefonu na Macu" : "Phone notifications on your Mac",
+                why: isPL ? "Powiadomienia z telefonu na Maku" : "Phone notifications on your Mac",
                 granted: notificationsAuthorized,
                 grant: {
                     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
@@ -345,7 +345,7 @@ struct OnboardingView: View {
             permissionRow(
                 icon: "macwindow",
                 title: isPL ? "Nagrywanie ekranu" : "Screen recording",
-                why: isPL ? "Pokazywanie ekranu Maca na telefonie" : "Show your Mac's screen on your phone",
+                why: isPL ? "Pokazywanie ekranu Maka na telefonie" : "Show your Mac's screen on your phone",
                 granted: screenRecordingGranted,
                 grant: {
                     _ = CGRequestScreenCaptureAccess()

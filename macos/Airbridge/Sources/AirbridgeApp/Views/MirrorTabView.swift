@@ -100,7 +100,7 @@ struct MirrorTabView: View {
                     icon: "macbook.and.iphone",
                     title: L10n.isPL ? "Mój ekran na telefonie" : "My Screen on Phone",
                     subtitle: L10n.isPL
-                        ? "Lustro głównego ekranu Maca."
+                        ? "Lustro głównego ekranu Maka."
                         : "Mirror this Mac's main screen.",
                     showResolution: false,
                     action: { startReverse(mode: 0) }

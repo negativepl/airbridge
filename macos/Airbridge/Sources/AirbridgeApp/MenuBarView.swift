@@ -80,7 +80,7 @@ struct MenuBarView: View {
                                 ? (L10n.isPL ? "Słuchawki połączone z Makiem" : "Headphones connected to Mac")
                                 : (connectionService.headphoneHandoffPhase == .inProgress
                                     ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
-                                    : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac")),
+                                    : (L10n.isPL ? "Przenieś słuchawki na Maka" : "Move headphones to Mac")),
                             systemImage: showHandoffSuccess ? "checkmark.circle" : "headphones",
                             loading: !showHandoffSuccess && connectionService.headphoneHandoffPhase == .inProgress) {
                         guard !showHandoffSuccess, connectionService.headphoneHandoffPhase != .inProgress else { return }
