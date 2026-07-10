@@ -71,6 +71,8 @@ final class FileTransferService: MessageHandler {
             offerResponseStream?.yield(false)
             offerResponseStream?.finish()
             offerResponseStream = nil
+        case .fileTransferCancel(let transferId):
+            handleIncomingOfferCancelled(transferId: transferId)
         default:
             break
         }
@@ -171,6 +173,26 @@ final class FileTransferService: MessageHandler {
     func deviceDisconnected(connectionId: String) {
         let remaining = pendingOffers.filter { $0.connectionId != connectionId }
         guard remaining.count != pendingOffers.count else { return }
+        pendingOffers = remaining
+        pendingOffersTotalSize = remaining.reduce(0) { $0 + $1.fileSize }
+        incomingOfferTransferId = remaining.last?.transferId
+        incomingOfferFileSize = pendingOffersTotalSize
+        if remaining.isEmpty {
+            isWaitingForAccept = false
+            isRejected = false
+            fileTransferFileName = ""
+            isReceivingFile = false
+            TransferPopup.shared.hide(delay: 0)
+        }
+    }
+
+    /// The sender (phone) cancelled an offer before we accepted/rejected it —
+    /// its 60s wait for our response ran out, or the user tapped cancel while
+    /// waiting. Drop just that offer and, if none remain, dismiss the popup.
+    /// Mirrors deviceDisconnected's partial-removal logic below.
+    private func handleIncomingOfferCancelled(transferId: String) {
+        let remaining = pendingOffers.filter { $0.transferId != transferId }
+        guard remaining.count != pendingOffers.count else { return } // unknown id — ignore
         pendingOffers = remaining
         pendingOffersTotalSize = remaining.reduce(0) { $0 + $1.fileSize }
         incomingOfferTransferId = remaining.last?.transferId

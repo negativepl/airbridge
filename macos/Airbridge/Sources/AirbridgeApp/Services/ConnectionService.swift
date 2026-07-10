@@ -651,7 +651,7 @@ final class ConnectionService {
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
-        case .fileTransferAccept, .fileTransferReject, .fileTransferOffer:
+        case .fileTransferAccept, .fileTransferReject, .fileTransferOffer, .fileTransferCancel:
             fileTransferHandler?.handleMessage(message, from: connectionId)
         case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse:
             galleryHandler?.handleMessage(message)
