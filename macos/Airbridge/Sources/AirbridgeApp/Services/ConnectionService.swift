@@ -492,7 +492,17 @@ final class ConnectionService {
         headphonePromptAutoHideTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             guard let self, !Task.isCancelled else { return }
-            self.headphonePromptVisible = false
+            self.hideHeadphonePrompt()
+        }
+    }
+
+    /// Clears the prompt AND puts the island window away — without the hide
+    /// the popup falls back to the idle "drop file here" state and lingers
+    /// on screen. A transfer that grabbed the popup meanwhile keeps it.
+    private func hideHeadphonePrompt() {
+        headphonePromptVisible = false
+        if !isTransferPopupBusy() {
+            TransferPopup.shared.hide(delay: 0)
         }
     }
 
@@ -501,7 +511,7 @@ final class ConnectionService {
     func confirmHeadphoneSwitch() {
         headphonePromptAutoHideTask?.cancel()
         headphonePromptAutoHideTask = nil
-        headphonePromptVisible = false
+        hideHeadphonePrompt()
         takeoverHeadphones()
     }
 
@@ -510,7 +520,7 @@ final class ConnectionService {
     func dismissHeadphonePrompt() {
         headphonePromptAutoHideTask?.cancel()
         headphonePromptAutoHideTask = nil
-        headphonePromptVisible = false
+        hideHeadphonePrompt()
     }
 
     private func handleHeadphoneReleaseResponse(ok: Bool, error: String?) {

@@ -112,11 +112,8 @@ struct MenuBarView: View {
                     .padding(.horizontal, 8)
             }
 
-            MenuRow(title: L10n.openAirbridge, systemImage: "macwindow") {
-                openWindow(id: "main")
-                NSApp.activate(ignoringOtherApps: true)
-            }
-
+            // Updates get their own divider-separated section between the
+            // device actions above and the app controls below.
             MenuRow(title: updateRowTitle,
                     systemImage: updateRowIcon,
                     loading: updateService.phase == .checking) {
@@ -141,6 +138,14 @@ struct MenuBarView: View {
                         showUpToDateBeat = false
                     }
                 }
+            }
+
+            Divider()
+                .padding(.horizontal, 8)
+
+            MenuRow(title: L10n.openAirbridge, systemImage: "macwindow") {
+                openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
             }
 
             MenuRow(title: L10n.quit, systemImage: "xmark.circle") {
