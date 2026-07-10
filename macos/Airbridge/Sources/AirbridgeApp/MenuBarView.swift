@@ -117,10 +117,12 @@ struct MenuBarView: View {
             }
         }
         .padding(.vertical, 6)
-        // Size to content (narrow for short names, wide for long ones) instead of
-        // a fixed width, clamped so it is never cramped nor absurdly wide.
+        // Size to content like a native NSMenu: the frame goes FIRST so it only
+        // raises the floor, then fixedSize collapses the whole stack to its ideal
+        // (content) width. With the frame outermost it would instead absorb the
+        // window's full proposed width clamped to maxWidth — always maximal.
+        .frame(minWidth: 220)
         .fixedSize(horizontal: true, vertical: false)
-        .frame(minWidth: 220, maxWidth: 320)
         .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
         .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
     }
