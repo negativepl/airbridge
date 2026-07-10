@@ -47,9 +47,12 @@ enum ConnectionPhase: Equatable {
 
 enum HeadphoneHandoffPhase: Equatable { case idle, inProgress, failed }
 
-/// Why a headphone handoff was initiated — drives cooldown bookkeeping and
-/// whether a Move-back notification follows a successful takeover.
-enum HandoffTrigger { case manual, auto, moveBack }
+/// Why a headphone handoff was initiated — drives cooldown bookkeeping.
+/// There is no `.auto` case: the auto-switch engine only ever shows the
+/// ask-first island prompt (`ConnectionService.confirmHeadphoneSwitch`),
+/// which fires a `.manual` takeover once the user confirms — the same path
+/// the Home button uses.
+enum HandoffTrigger { case manual, moveBack }
 
 /// Last headphone state the phone reported.
 struct PhoneHeadphoneState: Equatable {
@@ -130,19 +133,29 @@ final class ConnectionService {
     /// Typed ref so a dropped connection can dismiss an orphaned incoming-file popup.
     var fileTransferService: FileTransferService?
     var bluetoothAudio: BluetoothAudioService?
-    /// Posts the "switched to Mac" notification for auto-triggered handoffs.
+    /// Unused on the success path now that auto-switch only ever shows the
+    /// ask-first island prompt (never switches silently); kept so
+    /// `clearDelivered()` can still clean up a stale "switched to Mac"
+    /// notification a user might have delivered from a previous build.
     var handoffNotifier: HandoffNotifier?
     /// Last headphone state the phone reported (nil until it says anything).
     var phoneHeadphoneState: PhoneHeadphoneState?
     var headphoneHandoffPhase: HeadphoneHandoffPhase = .idle
+    /// Drives the island's ask-first prompt state (`TransferPopupState.headphonePrompt`).
+    /// Observed by `TransferPopupView`; set/cleared only from this file.
+    var headphonePromptVisible = false
     @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
     @ObservationIgnored private var pendingHandoffTrigger: HandoffTrigger = .manual
+    @ObservationIgnored private var headphonePromptAutoHideTask: Task<Void, Never>?
     /// Cooldowns so auto-switch doesn't fight a handoff that just happened —
     /// 20 s after ANY handoff, 30 s after a manually-triggered one. Move-back
     /// bypasses both (it isn't gated by `autoSwitchIfAppropriate`) and re-arms
     /// them like any other successful handoff.
     @ObservationIgnored private var lastHandoffAt: Date = .distantPast
     @ObservationIgnored private var lastManualHandoffAt: Date = .distantPast
+    /// Min gap between ask-first prompts, and de-dup while one is showing
+    /// (a shown prompt auto-hides after 10 s, well inside this window).
+    @ObservationIgnored private var lastPromptAt: Date = .distantPast
     private let macFilesService = MacFilesService()
     private var serverStarted = false
     @ObservationIgnored private var pathMonitor: NetworkChangeMonitor?
@@ -440,20 +453,64 @@ final class ConnectionService {
         }
     }
 
-    /// Auto-switch engine: called on the rising edge of `bluetoothAudio`'s
-    /// system audio activity. Steals the headphones from the phone only when
-    /// it isn't already the one playing through them, and only outside the
-    /// post-handoff cooldown windows.
+    /// Ask-first engine: called on the rising edge of `bluetoothAudio`'s
+    /// system audio activity. Never switches silently — instead it shows the
+    /// island's headphone prompt (`headphonePromptVisible`) so the user can
+    /// confirm the takeover with one click, only when the phone isn't already
+    /// the one playing through them and outside the post-handoff/prompt
+    /// cooldown windows. Skips the prompt entirely while the island is busy
+    /// with a file transfer — those take priority over the question.
     func autoSwitchIfAppropriate() {
         guard let ba = bluetoothAudio, ba.enabled, ba.autoSwitchEnabled,
               isConnected,
               phoneHeadphoneState?.connected == true,
               phoneHeadphoneState?.audioActive != true,
               headphoneHandoffPhase != .inProgress,
+              !headphonePromptVisible,
+              !isTransferPopupBusy(),
               Date().timeIntervalSince(lastHandoffAt) > 20,
-              Date().timeIntervalSince(lastManualHandoffAt) > 30
+              Date().timeIntervalSince(lastManualHandoffAt) > 30,
+              Date().timeIntervalSince(lastPromptAt) > 30
         else { return }
-        takeoverHeadphones(trigger: .auto)
+        showHeadphonePrompt()
+    }
+
+    /// Whether the island is currently occupied by a file-transfer state
+    /// (incoming offer, waiting for accept, rejected, or actively
+    /// transferring) — those take priority over the ask-first prompt.
+    private func isTransferPopupBusy() -> Bool {
+        guard let fts = fileTransferService else { return false }
+        return fts.hasIncomingOffer || fts.isWaitingForAccept || fts.isRejected || fts.fileTransferProgress > 0
+    }
+
+    /// Show the island's ask-first prompt and arm its own 10 s auto-hide.
+    private func showHeadphonePrompt() {
+        lastPromptAt = Date()
+        headphonePromptVisible = true
+        TransferPopup.shared.show()
+        headphonePromptAutoHideTask?.cancel()
+        headphonePromptAutoHideTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.headphonePromptVisible = false
+        }
+    }
+
+    /// User tapped "Switch" on the island prompt — same manual takeover the
+    /// Home button uses.
+    func confirmHeadphoneSwitch() {
+        headphonePromptAutoHideTask?.cancel()
+        headphonePromptAutoHideTask = nil
+        headphonePromptVisible = false
+        takeoverHeadphones()
+    }
+
+    /// User tapped "Not now" (or the prompt auto-hid) — dismiss without
+    /// switching.
+    func dismissHeadphonePrompt() {
+        headphonePromptAutoHideTask?.cancel()
+        headphonePromptAutoHideTask = nil
+        headphonePromptVisible = false
     }
 
     private func handleHeadphoneReleaseResponse(ok: Bool, error: String?) {
@@ -473,14 +530,6 @@ final class ConnectionService {
             switch trigger {
             case .manual:
                 self.lastManualHandoffAt = Date()
-            case .auto:
-                self.handoffNotifier?.postSwitched { [weak self] in
-                    guard let self else { return }
-                    Task {
-                        try? await self.sendToActive(.headphoneTakeoverRequest)
-                        self.lastHandoffAt = Date()
-                    }
-                }
             case .moveBack:
                 // Move-back is a manual action too — re-arm both cooldowns so
                 // the auto-switch engine doesn't immediately fight it.

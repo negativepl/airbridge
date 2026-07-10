@@ -100,6 +100,11 @@ struct TransferPopupView: View {
                 isReceiving: fileTransferService.isReceivingFile
             )
         }
+        // Ask-first headphone prompt — below every transfer state (those
+        // take priority over the question) but above idle.
+        if connectionService.headphonePromptVisible {
+            return .headphonePrompt
+        }
         // Nothing active → idle drop zone
         return .idle(connected: connectionService.isConnected)
     }
@@ -107,7 +112,7 @@ struct TransferPopupView: View {
     private func tint(for state: TransferPopupState) -> Color {
         switch state {
         case .idle: return .accentColor
-        case .incoming, .waiting, .transferring: return .accentColor
+        case .incoming, .waiting, .transferring, .headphonePrompt: return .accentColor
         case .complete: return .green
         case .rejected: return .red
         }
@@ -118,7 +123,7 @@ struct TransferPopupView: View {
     /// changes, so transitions blend the three colors smoothly.
     private func palette(for state: TransferPopupState) -> GradientPalette {
         switch state {
-        case .idle, .incoming, .waiting, .transferring:
+        case .idle, .incoming, .waiting, .transferring, .headphonePrompt:
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
         case .complete:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
@@ -135,6 +140,7 @@ struct TransferPopupView: View {
         case .transferring: return 1.0
         case .complete: return 0.95
         case .rejected: return 0.85
+        case .headphonePrompt: return 0.9
         }
     }
 
@@ -174,6 +180,7 @@ struct TransferPopupView: View {
         case .transferring: return 3
         case .complete: return 4
         case .rejected: return 5
+        case .headphonePrompt: return 6
         }
     }
 
@@ -196,6 +203,8 @@ struct TransferPopupView: View {
             completeView(isReceiving: receiving)
         case .rejected(let name):
             rejectedView(name: name)
+        case .headphonePrompt:
+            headphonePromptView()
         }
     }
 
@@ -540,6 +549,36 @@ struct TransferPopupView: View {
                     .truncationMode(.middle)
             }
             Spacer()
+        }
+    }
+
+    /// Ask-first: playback started on this Mac while the phone holds idle
+    /// headphones. One click confirms — nothing moves until then.
+    private func headphonePromptView() -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: "headphones")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce)
+
+            Text(L10n.isPL ? "Przełączyć słuchawki na Maca?" : "Switch the headphones to this Mac?")
+                .font(.ab(.callout, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Button(L10n.isPL ? "Nie teraz" : "Not now") {
+                    connectionService.dismissHeadphonePrompt()
+                }
+                .controlSize(.large)
+
+                Button(L10n.isPL ? "Przełącz" : "Switch") {
+                    connectionService.confirmHeadphoneSwitch()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
         }
     }
 

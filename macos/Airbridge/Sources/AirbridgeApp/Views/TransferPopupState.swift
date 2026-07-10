@@ -9,10 +9,13 @@ enum TransferPopupState: Equatable {
     case transferring(filename: String, progress: Double, isReceiving: Bool)
     case complete(filename: String, isReceiving: Bool)
     case rejected(filename: String)
+    /// Ask-first headphone-switch prompt: playback started on this Mac while
+    /// the phone holds idle headphones, and the user hasn't confirmed yet.
+    case headphonePrompt
 
     var filename: String {
         switch self {
-        case .idle:
+        case .idle, .headphonePrompt:
             return ""
         case .incoming(let f, _),
              .waiting(let f),

@@ -248,12 +248,12 @@ struct SettingsView: View {
                     .font(.ab(.caption))
                     .foregroundStyle(.secondary)
 
-                Toggle(L10n.isPL ? "Przełączaj automatycznie" : "Switch automatically", isOn: Binding(
+                Toggle(L10n.isPL ? "Proponuj przełączanie" : "Suggest switching", isOn: Binding(
                     get: { bluetoothAudio.autoSwitchEnabled },
                     set: { bluetoothAudio.autoSwitchEnabled = $0 }
                 ))
                 .font(.ab(.body))
-                Text(L10n.isPL ? "Przenoś słuchawki na urządzenie, które zaczyna odtwarzać." : "Move the headphones to the device that starts playing.")
+                Text(L10n.isPL ? "Pytaj przed przeniesieniem słuchawek na urządzenie, które zaczyna odtwarzać." : "Ask before moving the headphones to the device that starts playing.")
                     .font(.ab(.caption))
                     .foregroundStyle(.secondary)
             }
