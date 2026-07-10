@@ -447,21 +447,20 @@ final class FileTransferService: MessageHandler {
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
                 self.isReceivingFile = false
+                // Fresh speed/ETA baseline for the next receive.
+                self.transferStartTime = nil
+                self.transferSpeed = 0
+                self.transferEta = 0
             }
         }
 
         let onProgress: @Sendable (String, Int, Int, String) -> Void = { [weak self] filename, bytesReceived, totalBytes, senderHost in
-            if bytesReceived % (50 * 1024 * 1024) < 65536 {
-                Diag.log("Transfer", "onProgress enter \(filename) \(bytesReceived)/\(totalBytes) self=\(self != nil)")
-            }
             Task { @MainActor in
                 guard let self else { return }
-                let probe = bytesReceived % (50 * 1024 * 1024) < 65536
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
 
                 // Transfer-podgląd: postęp ląduje w oknie podglądu, BEZ globalnego popovera.
                 if let preview = self.pendingPreview, preview.filename == filename {
-                    if probe { Diag.log("Transfer", "onProgress -> preview path (\(preview.filename))") }
                     preview.onProgress(progress)
                     return
                 }
@@ -473,19 +472,21 @@ final class FileTransferService: MessageHandler {
                 if self.receivingOwnerKey == nil {
                     self.receivingOwnerKey = ownerKey
                 }
-                guard self.receivingOwnerKey == ownerKey else {
-                    if probe { Diag.log("Transfer", "onProgress -> owner mismatch (owner=\(self.receivingOwnerKey ?? "nil") key=\(ownerKey))") }
-                    return
-                }
-                if probe { Diag.log("Transfer", "onProgress -> UI path, isReceiving=\(self.isReceivingFile) start=\(String(describing: self.transferStartTime))") }
+                guard self.receivingOwnerKey == ownerKey else { return }
 
                 self.fileTransferFileName = filename
                 self.fileTransferProgress = progress
 
                 if !self.isReceivingFile {
                     self.isReceivingFile = true
-                    self.transferStartTime = Date()
                     TransferPopup.shared.show()
+                }
+                // Set on the first progress tick, NOT inside the branch above:
+                // the accept flow already flips isReceivingFile before any byte
+                // arrives, which used to leave startTime forever nil — so speed
+                // and ETA were never computed ("Remaining: calculating…").
+                if self.transferStartTime == nil {
+                    self.transferStartTime = Date()
                 }
 
                 if let start = self.transferStartTime {
@@ -495,7 +496,6 @@ final class FileTransferService: MessageHandler {
                         self.transferSpeed = speed
                         let remaining = totalBytes - bytesReceived
                         self.transferEta = speed > 0 ? Int(Double(remaining) / speed) : 0
-                        Diag.log("Transfer", "recv progress=\(String(format: "%.2f", progress)) bytes=\(bytesReceived)/\(totalBytes) speed=\(Int(speed)) eta=\(self.transferEta)")
                     }
                 }
             }
