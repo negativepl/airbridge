@@ -508,6 +508,9 @@ public actor HttpUploadServer {
         senderHost: String
     ) {
         // Report progress — call directly, not via actor hop
+        if sink.bytesWritten % (50 * 1024 * 1024) < 65536 {
+            Diag.log("HTTP", "streamBody \(filename) \(sink.bytesWritten)/\(contentLength) cb=\(self.onProgress != nil)")
+        }
         self.onProgress?(filename, sink.bytesWritten, contentLength, senderHost)
 
         if sink.bytesWritten >= contentLength {

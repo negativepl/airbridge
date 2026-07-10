@@ -451,6 +451,9 @@ final class FileTransferService: MessageHandler {
         }
 
         let onProgress: @Sendable (String, Int, Int, String) -> Void = { [weak self] filename, bytesReceived, totalBytes, senderHost in
+            if bytesReceived % (50 * 1024 * 1024) < 65536 {
+                Diag.log("Transfer", "onProgress enter \(filename) \(bytesReceived)/\(totalBytes) self=\(self != nil)")
+            }
             Task { @MainActor in
                 guard let self else { return }
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
