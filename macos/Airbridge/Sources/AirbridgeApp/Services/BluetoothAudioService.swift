@@ -95,11 +95,25 @@ final class BluetoothAudioService {
         // device and perform them off the main actor, capturing only the
         // Sendable address string and a snapshot of the guard deadline.
         let guardDeadline = guardUntil
+        let name = selectedName
         let result: (connected: Bool, closed: Bool)? = await Task.detached {
             guard let device = IOBluetoothDevice(addressString: address) else { return nil }
-            let connected = device.isConnected()
+            // LE Audio (e.g. Galaxy Buds4 Pro) is invisible to IOBluetooth:
+            // isConnected() only reflects the classic BR/EDR link, which may be
+            // down even while audio is actively routed to the headset over LE
+            // Audio. CoreAudio doesn't distinguish transports, so the presence
+            // of an output device with the paired headphones' name is the
+            // reliable source of truth for "audio is here" — treat either
+            // signal as "connected".
+            let classicConnected = device.isConnected()
+            let coreAudioConnected = name.flatMap { Self.outputDeviceID(named: $0) } != nil
+            let connected = classicConnected || coreAudioConnected
             if connected && Date() < guardDeadline {
                 // Headphones sneaked back during a handoff — release them again.
+                // NOTE: closeConnection() only tears down the classic BR/EDR
+                // link. If the route is actually LE Audio, this may not
+                // release the phone's grip on it — known limitation, revisit
+                // if the hardware pass shows the guard window failing.
                 device.closeConnection()
                 return (connected, true)
             }
@@ -131,6 +145,10 @@ final class BluetoothAudioService {
     func takeover() async -> Bool {
         guard let address = selectedAddress, let name = selectedName else { return false }
         guardUntil = .distantPast
+        // With LE Audio the classic link can be down while audio still routes
+        // here; in that case isConnected() is false and openConnection() below
+        // runs harmlessly (opens/confirms the classic link), and the retry
+        // loop below finds the CoreAudio device already present.
         let isConnected = await Task.detached {
             IOBluetoothDevice(addressString: address)?.isConnected() ?? false
         }.value
@@ -152,7 +170,7 @@ final class BluetoothAudioService {
 
     // MARK: - CoreAudio
 
-    private static func outputDeviceID(named name: String) -> AudioDeviceID? {
+    nonisolated private static func outputDeviceID(named name: String) -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -171,7 +189,7 @@ final class BluetoothAudioService {
         return nil
     }
 
-    private static func deviceName(_ id: AudioDeviceID) -> String? {
+    nonisolated private static func deviceName(_ id: AudioDeviceID) -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceNameCFString,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -184,7 +202,7 @@ final class BluetoothAudioService {
         return err == noErr ? (name as String) : nil
     }
 
-    private static func hasOutputStreams(_ id: AudioDeviceID) -> Bool {
+    nonisolated private static func hasOutputStreams(_ id: AudioDeviceID) -> Bool {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreams,
             mScope: kAudioObjectPropertyScopeOutput,
