@@ -83,6 +83,17 @@ Browse your phone's **entire storage** from the Mac in a Finder-like view:
 
 When connected, the phone shows a **Phone Link-style card for your Mac**: the Mac's wallpaper as a hero banner with computer name, model and chip, plus **live CPU load, RAM, disk usage, and battery** (with charging / AC-power state). The Mac's Home tab mirrors this back — showing **each connected phone's wallpaper, model, battery, storage and RAM** in a glass hero card (one per device when several phones are connected).
 
+### Headphone Handoff (beta)
+
+Move your Bluetooth headphones between the phone and the Mac with one click — the continuity trick vendors reserve for their own ecosystems, now for Android + macOS:
+
+- **One-click transfer both ways** — the Mac's menu bar offers "Move headphones to Mac" while they play on the phone; the phone's Home screen offers the reverse. AirBridge coordinates the release-and-connect over its own channel, so single-point headphones (e.g. Galaxy Buds) switch reliably instead of fighting over the link.
+- **Switching suggestions** — optionally, when you start playback on the device that does not have the headphones, AirBridge asks ("Switch the headphones to this Mac?") — on the Mac in the transfer island, on the phone as a heads-up notification. Nothing ever switches without your confirmation. Off by default.
+- **LE Audio aware** — presence is detected from the actual audio route (CoreAudio on the Mac, `AudioManager` on Android), which keeps state truthful on modern earbuds where the classic Bluetooth link and the audio stream live separate lives.
+- **Setup** — pair the headphones with both devices once, then select them in each app's Settings. Requires Bluetooth permission on Android.
+
+> This feature is in **beta**: manual transfer is solid; switching suggestions may occasionally not appear depending on how apps hold the audio device.
+
 ### Clipboard Sync
 Copy text on your phone, paste on your Mac — and vice versa. Works automatically in the background. Supports plain text and HTML.
 
@@ -101,6 +112,7 @@ You can also send selected text directly from any Android app:
 - **Mac → Android**: Drag & drop files onto the Send tab, or click to select. Android shows an accept/reject notification before any file is transferred.
 - **Quick Drop (macOS)**: Press the global hotkey from anywhere (default `⌃⌥⌘A`) — a drop zone slides down from the top of the screen. Drop a file or folder onto it and it's instantly sent to your phone. Requires Accessibility permission for the global hotkey (the shortcut is configurable in Settings).
 - **Unified transfer popup**: A single floating "island" at the top of the screen handles every state — waiting for acceptance, sending, complete, or rejected — with smooth in-place transitions. You can cancel a pending transfer with one click while waiting.
+- **Cancellable and self-recovering**: Outgoing transfers from the phone can be cancelled at any point — while waiting for acceptance or mid-upload — and both sides clean up. An offer that is never answered times out after 60 seconds instead of hanging.
 - **Speed**: Direct HTTP transfer over your local network. No chunking, no base64, no cloud relay. Limited only by your Wi-Fi speed.
 
 ### Photo Gallery

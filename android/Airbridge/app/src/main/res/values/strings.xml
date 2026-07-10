@@ -139,7 +139,7 @@
     <string name="settings_auto_connect_desc">Automatically search for Mac when app starts</string>
 
     <!-- Headphone handoff -->
-    <string name="settings_headphones">Headphones</string>
+    <string name="settings_headphones">Headphones (beta)</string>
     <string name="settings_headphone_handoff">Headphone handoff</string>
     <string name="settings_headphone_handoff_desc">Move the selected Bluetooth headphones between this phone and the Mac with one tap</string>
     <string name="settings_headphone_device">Headphones</string>

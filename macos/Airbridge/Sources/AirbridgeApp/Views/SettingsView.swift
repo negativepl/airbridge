@@ -218,7 +218,7 @@ struct SettingsView: View {
     }
 
     private var headphoneSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Słuchawki" : "Headphones"),
+        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Słuchawki (beta)" : "Headphones (beta)"),
                      systemImage: "headphones") {
             Toggle(L10n.isPL ? "Przełączanie słuchawek" : "Headphone handoff", isOn: Binding(
                 get: { bluetoothAudio.enabled },
