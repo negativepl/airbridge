@@ -247,6 +247,15 @@ struct SettingsView: View {
                     : "The headphones must be paired with both this Mac and the phone.")
                     .font(.ab(.caption))
                     .foregroundStyle(.secondary)
+
+                Toggle(L10n.isPL ? "Przełączaj automatycznie" : "Switch automatically", isOn: Binding(
+                    get: { bluetoothAudio.autoSwitchEnabled },
+                    set: { bluetoothAudio.autoSwitchEnabled = $0 }
+                ))
+                .font(.ab(.body))
+                Text(L10n.isPL ? "Przenoś słuchawki na urządzenie, które zaczyna odtwarzać." : "Move the headphones to the device that starts playing.")
+                    .font(.ab(.caption))
+                    .foregroundStyle(.secondary)
             }
         }
         .task { pairedAudio = await BluetoothAudioService.pairedAudioDevices() }
