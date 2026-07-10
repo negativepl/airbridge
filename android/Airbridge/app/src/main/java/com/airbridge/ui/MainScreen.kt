@@ -68,6 +68,7 @@ import com.airbridge.service.HandoffPhase
 import com.airbridge.util.formatTransferSpeed
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 private enum class TakeoverButtonState { IDLE, IN_PROGRESS, SUCCESS }
 
@@ -180,6 +181,13 @@ fun MainScreen(
                                 if (lastHandoffPhase == HandoffPhase.IN_PROGRESS && handoffPhase == HandoffPhase.IDLE) {
                                     showTakeoverSuccess = true
                                     delay(1600)
+                                    // Hold the checkmark until the Mac's own report
+                                    // catches up, so the button collapses straight
+                                    // from the success state instead of flashing the
+                                    // idle label first. Capped so it can never hang.
+                                    kotlinx.coroutines.withTimeoutOrNull(3_400) {
+                                        viewModel.macHeadphoneState.first { it?.connected != true }
+                                    }
                                     showTakeoverSuccess = false
                                 }
                                 lastHandoffPhase = handoffPhase
@@ -196,7 +204,9 @@ fun MainScreen(
                                     androidx.compose.animation.shrinkVertically(animationSpec = takeoverVisExitSpatial)
                             ) {
                                 Column {
-                                Spacer(modifier = Modifier.height(8.dp))
+                                // Section rhythm on Home: 16dp above, like the
+                                // headers of Monitor/Statystyki below.
+                                Spacer(modifier = Modifier.height(16.dp))
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = { viewModel.takeoverHeadphones() },
                                     enabled = handoffPhase != HandoffPhase.IN_PROGRESS && !showTakeoverSuccess,
@@ -250,7 +260,7 @@ fun MainScreen(
                                                         TakeoverButtonState.IDLE -> R.string.headphone_takeover
                                                     }
                                                 ),
-                                                style = MaterialTheme.typography.titleSmall
+                                                style = MaterialTheme.typography.titleMedium
                                             )
                                         }
                                     }
