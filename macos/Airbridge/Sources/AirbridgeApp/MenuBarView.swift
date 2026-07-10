@@ -74,7 +74,7 @@ struct MenuBarView: View {
                    connectionService.phoneHeadphoneState?.connected == true {
                     MenuRow(title: connectionService.headphoneHandoffPhase == .inProgress
                                 ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
-                                : (L10n.isPL ? "Przenieś słuchawki tutaj" : "Move headphones here"),
+                                : (L10n.isPL ? "Słuchawki na telefonie — przenieś na Maca" : "Headphones on phone — move to Mac"),
                             systemImage: "headphones") {
                         connectionService.takeoverHeadphones()
                     }
