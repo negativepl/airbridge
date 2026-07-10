@@ -456,10 +456,12 @@ final class FileTransferService: MessageHandler {
             }
             Task { @MainActor in
                 guard let self else { return }
+                let probe = bytesReceived % (50 * 1024 * 1024) < 65536
                 let progress = totalBytes > 0 ? Double(bytesReceived) / Double(totalBytes) : 0
 
                 // Transfer-podgląd: postęp ląduje w oknie podglądu, BEZ globalnego popovera.
                 if let preview = self.pendingPreview, preview.filename == filename {
+                    if probe { Diag.log("Transfer", "onProgress -> preview path (\(preview.filename))") }
                     preview.onProgress(progress)
                     return
                 }
@@ -471,7 +473,11 @@ final class FileTransferService: MessageHandler {
                 if self.receivingOwnerKey == nil {
                     self.receivingOwnerKey = ownerKey
                 }
-                guard self.receivingOwnerKey == ownerKey else { return }
+                guard self.receivingOwnerKey == ownerKey else {
+                    if probe { Diag.log("Transfer", "onProgress -> owner mismatch (owner=\(self.receivingOwnerKey ?? "nil") key=\(ownerKey))") }
+                    return
+                }
+                if probe { Diag.log("Transfer", "onProgress -> UI path, isReceiving=\(self.isReceivingFile) start=\(String(describing: self.transferStartTime))") }
 
                 self.fileTransferFileName = filename
                 self.fileTransferProgress = progress
