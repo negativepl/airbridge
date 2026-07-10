@@ -151,6 +151,8 @@
     <string name="headphone_takeover_in_progress">Przenoszenie słuchawek…</string>
     <string name="headphone_takeover_failed">Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami.</string>
     <string name="headphone_takeover_done">Słuchawki przeniesione na telefon</string>
+    <string name="headphone_auto_switched_phone">Słuchawki przełączone na telefon</string>
+    <string name="headphone_move_back">Przenieś z powrotem</string>
 
     <string name="settings_notifications">Powiadomienia</string>
     <string name="settings_vibrate">Wibracja przy synchronizacji</string>
@@ -161,6 +163,8 @@
     <string name="channel_service_desc">Utrzymuje AirBridge aktywne w tle</string>
     <string name="channel_files_name">Przesyłanie plików</string>
     <string name="channel_files_desc">Powiadomienia o wysyłaniu i odbieraniu plików</string>
+    <string name="channel_headphone_name">Przełączanie słuchawek</string>
+    <string name="channel_headphone_desc">Powiadomienia o automatycznym przełączaniu słuchawek</string>
     <string name="settings_download_folder">Folder pobierania</string>
     <string name="settings_download_folder_desc">Odebrane pliki będą zapisywane tutaj</string>
 

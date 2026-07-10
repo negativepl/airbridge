@@ -147,6 +147,8 @@
     <string name="headphone_takeover_in_progress">Moving headphones…</string>
     <string name="headphone_takeover_failed">Headphone handoff failed. Make sure the headphones are on and paired with both devices.</string>
     <string name="headphone_takeover_done">Headphones moved to this phone</string>
+    <string name="headphone_auto_switched_phone">Headphones switched to this phone</string>
+    <string name="headphone_move_back">Move back</string>
 
     <string name="settings_notifications">Notifications</string>
     <string name="settings_vibrate">Vibrate on sync</string>
@@ -157,6 +159,8 @@
     <string name="channel_service_desc">Keeps AirBridge running in the background</string>
     <string name="channel_files_name">File transfers</string>
     <string name="channel_files_desc">Notifications about sending and receiving files</string>
+    <string name="channel_headphone_name">Headphone handoff</string>
+    <string name="channel_headphone_desc">Notifications about automatic headphone switching</string>
     <string name="settings_download_folder">Download folder</string>
     <string name="settings_download_folder_desc">Received files will be saved here</string>
 

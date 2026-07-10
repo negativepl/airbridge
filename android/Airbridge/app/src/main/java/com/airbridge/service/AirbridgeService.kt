@@ -50,7 +50,9 @@ class AirbridgeService : Service() {
 
         const val CHANNEL_ID = "airbridge_service"
         const val CHANNEL_FILES_ID = "airbridge_files"
+        const val CHANNEL_HEADPHONE_ID = "airbridge_headphone"
         const val NOTIFICATION_ID = 1
+        private const val AUTO_SWITCH_NOTIFICATION_ID = 8
 
         const val ACTION_START_DISCOVERY = "com.airbridge.action.START_DISCOVERY"
         const val ACTION_CONNECT = "com.airbridge.action.CONNECT"
@@ -61,7 +63,11 @@ class AirbridgeService : Service() {
         const val ACTION_STOP_RING = "com.airbridge.action.STOP_RING"
         const val ACTION_HEADPHONE_TAKEOVER = "com.airbridge.action.HEADPHONE_TAKEOVER"
         const val ACTION_HEADPHONE_REFRESH = "com.airbridge.action.HEADPHONE_REFRESH"
+        const val ACTION_HEADPHONE_MOVE_BACK = "com.airbridge.action.HEADPHONE_MOVE_BACK"
         private const val RING_NOTIFICATION_ID = 7
+
+        /** SharedPreferences key for the auto-switch toggle (default OFF). */
+        const val AUTO_SWITCH_PREF = "headphone_auto_switch"
 
         const val EXTRA_HOST = "extra_host"
         const val EXTRA_PORT = "extra_port"
@@ -299,6 +305,36 @@ class AirbridgeService : Service() {
     @Volatile
     private var pendingRelease: CompletableDeferred<Message.HeadphoneReleaseResponse>? = null
 
+    // Playback-driven auto-switch: whether THIS phone currently has any active
+    // audio playback (music, video, etc.), independent of headphone routing.
+    @Volatile
+    private var localAudioActive = false
+    private var playbackCallbackRegistered = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val audioManager by lazy {
+        getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    }
+    private val audioPlaybackCallback = object : android.media.AudioManager.AudioPlaybackCallback() {
+        override fun onPlaybackConfigChanged(configs: MutableList<android.media.AudioPlaybackConfiguration>?) {
+            val nowActive = audioManager.activePlaybackConfigurations.isNotEmpty()
+            if (nowActive == localAudioActive) return
+            val wasActive = localAudioActive
+            localAudioActive = nowActive
+            resendHeadphoneStateOnAudioChange()
+            if (nowActive && !wasActive) {
+                maybeAutoSwitch()
+            }
+        }
+    }
+
+    // Cooldowns (elapsedRealtime-based): re-armed on every successful handoff
+    // completion so the auto-switch engine doesn't fight a just-finished
+    // handoff (manual or automatic) or steal the headphones back too soon.
+    @Volatile
+    private var lastHandoffAtMs = -100_000L
+    @Volatile
+    private var lastManualHandoffAtMs = -100_000L
+
     private fun headphonePrefs() = getSharedPreferences("airbridge_prefs", MODE_PRIVATE)
 
     private fun headphoneHandoffEnabled() =
@@ -340,11 +376,12 @@ class AirbridgeService : Service() {
             onStateChanged = { connected, address, name ->
                 if (headphoneHandoffEnabled() && isConnected.value) {
                     Log.d(TAG, "Headphone state -> Mac: connected=$connected ($name)")
-                    webSocketClient.send(Message.HeadphoneState(connected, address, name))
+                    webSocketClient.send(Message.HeadphoneState(connected, address, name, audioActive = localAudioActive))
                 }
             }
             if (headphoneHandoffEnabled()) start()
         }
+        updatePlaybackCallbackRegistration()
 
         loadActivityLog(applicationContext)
         // Bridge StatsStore.stats → companion statsFlow so the ViewModel can
@@ -560,8 +597,16 @@ class AirbridgeService : Service() {
             ACTION_STOP_RING -> {
                 stopRinging()
             }
-            ACTION_HEADPHONE_TAKEOVER -> takeoverHeadphones()
+            ACTION_HEADPHONE_TAKEOVER -> takeoverHeadphones(HandoffTrigger.MANUAL)
             ACTION_HEADPHONE_REFRESH -> refreshHeadphoneConfig()
+            ACTION_HEADPHONE_MOVE_BACK -> {
+                (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                    .cancel(AUTO_SWITCH_NOTIFICATION_ID)
+                webSocketClient.send(Message.HeadphoneTakeoverRequest)
+                // Re-arm the cooldown so the local auto-switch engine doesn't
+                // immediately try to grab the headphones back.
+                lastHandoffAtMs = android.os.SystemClock.elapsedRealtime()
+            }
         }
         return START_STICKY
     }
@@ -580,7 +625,8 @@ class AirbridgeService : Service() {
                 webSocketClient.send(Message.HeadphoneState(
                     connected = headphoneManager.isConnected(address),
                     address = address,
-                    name = name
+                    name = name,
+                    audioActive = localAudioActive
                 ))
             }
         } else {
@@ -592,10 +638,63 @@ class AirbridgeService : Service() {
                 webSocketClient.send(Message.HeadphoneState(
                     connected = false,
                     address = address,
-                    name = name
+                    name = name,
+                    audioActive = localAudioActive
                 ))
             }
         }
+        updatePlaybackCallbackRegistration()
+    }
+
+    /** Registers/unregisters [audioPlaybackCallback] to match whether the
+     *  handoff feature is currently active — called from onCreate and every
+     *  Settings refresh. */
+    private fun updatePlaybackCallbackRegistration() {
+        val shouldRegister = headphoneHandoffEnabled()
+        if (shouldRegister && !playbackCallbackRegistered) {
+            audioManager.registerAudioPlaybackCallback(audioPlaybackCallback, mainHandler)
+            playbackCallbackRegistered = true
+        } else if (!shouldRegister && playbackCallbackRegistered) {
+            audioManager.unregisterAudioPlaybackCallback(audioPlaybackCallback)
+            playbackCallbackRegistered = false
+        }
+    }
+
+    /** Resend the current headphone state (now carrying the fresh
+     *  [localAudioActive]) whenever local playback activity flips, subject to
+     *  the same gating as every other HeadphoneState send site. */
+    private fun resendHeadphoneStateOnAudioChange() {
+        val address = headphoneManager.selectedAddress ?: return
+        if (!headphoneHandoffEnabled() || !isConnected.value) return
+        webSocketClient.send(Message.HeadphoneState(
+            connected = headphoneManager.isConnected(address),
+            address = address,
+            name = headphonePrefs().getString("headphone_name", "") ?: "",
+            audioActive = localAudioActive
+        ))
+    }
+
+    /**
+     * Auto-switch engine: on the rising edge of local playback, pull the
+     * headphones over from the Mac if it's holding them idle. Bails out on
+     * any of the standard gates (feature/pref off, no headphones connected,
+     * Mac not holding them, Mac itself already playing, an in-flight handoff,
+     * or either cooldown still active) — see Global Constraints in the
+     * auto-switch plan for the full rationale.
+     */
+    private fun maybeAutoSwitch() {
+        if (!headphoneHandoffEnabled()) return
+        if (!headphonePrefs().getBoolean(AUTO_SWITCH_PREF, false)) return
+        if (!isConnected.value) return
+        val mac = macHeadphoneState.value
+        if (mac?.connected != true) return
+        if (mac.audioActive == true) return
+        if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastHandoffAtMs <= 20_000L) return
+        if (now - lastManualHandoffAtMs <= 30_000L) return
+        Log.d(TAG, "Auto-switch: playback started locally and Mac holds idle headphones — taking over")
+        takeoverHeadphones(HandoffTrigger.AUTO)
     }
 
     override fun onDestroy() {
@@ -607,6 +706,10 @@ class AirbridgeService : Service() {
         webSocketClient.disconnect()
         httpFileServer.stop()
         headphoneManager.stop()
+        if (playbackCallbackRegistered) {
+            audioManager.unregisterAudioPlaybackCallback(audioPlaybackCallback)
+            playbackCallbackRegistered = false
+        }
         // Kills the rediscovery-watchdog loop and any in-flight coroutines;
         // without this each service recreation stacks another zombie watchdog
         // that keeps forcing NSD discovery on dead instances.
@@ -1059,7 +1162,8 @@ class AirbridgeService : Service() {
                         webSocketClient.send(Message.HeadphoneState(
                             connected = headphoneManager.isConnected(hpAddress),
                             address = hpAddress,
-                            name = headphonePrefs().getString("headphone_name", "") ?: ""
+                            name = headphonePrefs().getString("headphone_name", "") ?: "",
+                            audioActive = localAudioActive
                         ))
                     }
                     // connection status tracked via StateFlow
@@ -1377,6 +1481,10 @@ class AirbridgeService : Service() {
                 } else {
                     serviceScope.launch {
                         val ok = headphoneManager.release(message.address)
+                        // The Mac just took the headphones — that's a handoff
+                        // too, so the general cooldown applies here as well
+                        // (not the manual one: this phone didn't trigger it).
+                        if (ok) lastHandoffAtMs = android.os.SystemClock.elapsedRealtime()
                         webSocketClient.send(
                             Message.HeadphoneReleaseResponse(ok, if (ok) null else "release_failed")
                         )
@@ -1391,6 +1499,12 @@ class AirbridgeService : Service() {
                 if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) {
                     pendingRelease?.complete(message)
                 }
+            }
+            is Message.HeadphoneTakeoverRequest -> {
+                // The Mac is asking for the headphones back (its own
+                // Move-back action) — bypass cooldowns, this is not the local
+                // auto-switch engine acting on its own.
+                takeoverHeadphones(HandoffTrigger.MOVE_BACK)
             }
             is Message.DeviceInfoRequest -> {
                 serviceScope.launch {
@@ -1708,8 +1822,10 @@ class AirbridgeService : Service() {
      * daje deterministyczne stop()/release().
      */
     /** Take the headphones over from the Mac: ask it to release, wait for the
-     *  confirmation, then connect locally. */
-    private fun takeoverHeadphones() {
+     *  confirmation, then connect locally. [trigger] records who asked for it
+     *  (manual button, the auto-switch engine, or a Move-back request) so the
+     *  cooldown timestamps and post-success notification behave correctly. */
+    private fun takeoverHeadphones(trigger: HandoffTrigger) {
         val address = headphonePrefs().getString("headphone_address", null)
         if (address == null || !headphoneHandoffEnabled()) {
             // The button may still be visible (stale state) even though the
@@ -1737,10 +1853,42 @@ class AirbridgeService : Service() {
             val elapsedMs = android.os.SystemClock.elapsedRealtime() - startedAt
             if (elapsedMs < 900L) kotlinx.coroutines.delay(900L - elapsedMs)
             headphoneHandoffPhase.value = if (connected) HandoffPhase.IDLE else HandoffPhase.FAILED
-            if (!connected) {
+            if (connected) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                lastHandoffAtMs = now
+                if (trigger == HandoffTrigger.MANUAL) lastManualHandoffAtMs = now
+                if (trigger == HandoffTrigger.AUTO) postAutoSwitchNotification(address)
+            } else {
                 Log.w(TAG, "Headphone takeover failed (releaseOk=${response?.ok}, error=${response?.error})")
             }
         }
+    }
+
+    /** Posted after the auto-switch engine successfully pulls the headphones
+     *  onto this phone, offering a one-tap way back to the Mac. */
+    private fun postAutoSwitchNotification(address: String) {
+        val title = headphonePrefs().getString("headphone_name", null)
+            ?.takeIf { it.isNotBlank() } ?: getString(com.airbridge.R.string.app_name)
+        val moveBackIntent = android.app.PendingIntent.getService(
+            this, AUTO_SWITCH_NOTIFICATION_ID,
+            Intent(this, AirbridgeService::class.java).apply { action = ACTION_HEADPHONE_MOVE_BACK },
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val moveBackAction = Notification.Action.Builder(
+            null as android.graphics.drawable.Icon?,
+            getString(com.airbridge.R.string.headphone_move_back),
+            moveBackIntent
+        ).build()
+        val notif = Notification.Builder(this, CHANNEL_HEADPHONE_ID)
+            .setContentTitle(title)
+            .setContentText(getString(com.airbridge.R.string.headphone_auto_switched_phone))
+            .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+            .setContentIntent(openAppPendingIntent())
+            .addAction(moveBackAction)
+            .setAutoCancel(true)
+            .build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(AUTO_SWITCH_NOTIFICATION_ID, notif)
     }
 
     private fun startRinging() {
@@ -1874,8 +2022,16 @@ class AirbridgeService : Service() {
         ).apply {
             description = getString(com.airbridge.R.string.channel_files_desc)
         }
+        val headphoneChannel = NotificationChannel(
+            CHANNEL_HEADPHONE_ID,
+            getString(com.airbridge.R.string.channel_headphone_name),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(com.airbridge.R.string.channel_headphone_desc)
+        }
         manager.createNotificationChannel(serviceChannel)
         manager.createNotificationChannel(fileChannel)
+        manager.createNotificationChannel(headphoneChannel)
     }
 
     private fun openAppPendingIntent(): android.app.PendingIntent =
@@ -1909,3 +2065,7 @@ class AirbridgeService : Service() {
 }
 
 enum class HandoffPhase { IDLE, IN_PROGRESS, FAILED }
+
+/** Who asked for a headphone takeover — drives cooldown bookkeeping and
+ *  whether a post-success notification is shown. */
+enum class HandoffTrigger { MANUAL, AUTO, MOVE_BACK }
