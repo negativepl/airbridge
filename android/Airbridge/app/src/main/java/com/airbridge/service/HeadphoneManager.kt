@@ -75,6 +75,11 @@ class HeadphoneManager(private val context: Context) {
                 BluetoothProfile.A2DP -> a2dp = proxy
                 BluetoothProfile.HEADSET -> headset = proxy
             }
+            // Profile proxies bind asynchronously after start(); a caller that
+            // queries isConnected() right after start() can observe a false
+            // "disconnected" even though the headphones are already linked.
+            // Catch up here once this proxy's connected-device list is available.
+            reportIfAlreadyConnected(proxy)
         }
 
         override fun onServiceDisconnected(profile: Int) {
@@ -83,6 +88,27 @@ class HeadphoneManager(private val context: Context) {
                 BluetoothProfile.HEADSET -> headset = null
             }
         }
+    }
+
+    /** Fires onStateChanged(true, ...) if the selected headphones are already
+     *  connected on this newly-bound proxy — closes the race between start()
+     *  and asynchronous profile-proxy binding. Only fires when found in THIS
+     *  proxy's list, so it fires at most once per bind (A2DP or HEADSET). */
+    private fun reportIfAlreadyConnected(proxy: BluetoothProfile) {
+        val address = selectedAddress ?: return
+        if (!hasPermission()) return
+        val device = try {
+            proxy.connectedDevices.orEmpty().firstOrNull { it.address == address }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "reportIfAlreadyConnected: $e")
+            null
+        } ?: return
+        val name = try {
+            device.name ?: address
+        } catch (e: SecurityException) {
+            address
+        }
+        onStateChanged?.invoke(true, address, name)
     }
 
     private val aclReceiver = object : BroadcastReceiver() {
