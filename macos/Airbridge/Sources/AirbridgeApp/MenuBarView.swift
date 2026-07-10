@@ -89,20 +89,25 @@ struct MenuBarView: View {
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 } else if bluetoothAudio.enabled, bluetoothAudio.selectedConnected {
-                    // Headphones already on this Mac: passive status row (styled
-                    // like the battery row, not clickable) so the menu says where
-                    // they are instead of showing nothing.
+                    // Headphones already on this Mac: passive status row. Shares
+                    // MenuRow's exact geometry (spacing/font/padding/minHeight) so
+                    // the morph from the actionable row is in-place — only the
+                    // label text and tone change, no horizontal jump or resize.
                     HStack(spacing: 8) {
                         Image(systemName: "headphones")
                             .font(.ab(.subheadline))
                             .frame(width: 18, alignment: .center)
+                            .foregroundStyle(.secondary)
                         Text(L10n.isPL ? "Słuchawki połączone z Makiem" : "Headphones connected to Mac")
                             .font(.ab(.subheadline))
+                            .foregroundStyle(.primary.opacity(0.75))
                             .lineLimit(1)
+                        Spacer(minLength: 0)
                     }
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 8)
                     .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                    .padding(.horizontal, 6)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
