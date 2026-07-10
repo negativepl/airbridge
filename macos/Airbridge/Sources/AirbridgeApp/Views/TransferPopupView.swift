@@ -622,15 +622,14 @@ private struct TransferStateEffects: View {
             let tp = animTP
             let twoPi = 2.0 * .pi
 
-            // ── Energy parameters (all lerp from idle → transfer) ──
-            let speed = 1.0 + tp * 1.2              // drift speed: 1× → 2.2×
-            let st = t * speed                       // scaled time
-            let yAmp = 1.0 + tp * 0.6               // vertical sweep: 1× → 1.6×
-            let pulseHz = 2.0 + tp * 4.0             // breathing: 2 Hz → 6 Hz
-            let pulseAmp = tp * 0.3                  // pulse depth: 0% → 30%
-            let breathe = 1.0 + sin(t * twoPi * pulseHz) * pulseAmp
+            // ── Ambient energy: constant and calm. Progress does NOT speed
+            // the drift up (fast wobble + high-rate pulsing read as flicker);
+            // instead progress drives a soft left-to-right light fill below.
+            let st = t * 0.55                        // slow, constant drift
+            let yAmp = 1.0
+            let breathe = 1.0 + sin(t * twoPi * 0.35) * 0.08   // gentle 0.35 Hz
             let glow = animIntensity * breathe
-            let blurR = 20.0 - tp * 7.0              // blur: 20 → 13 (sharper)
+            let blurR = 22.0
 
             GeometryReader { geo in
                 let w = geo.size.width
@@ -638,30 +637,40 @@ private struct TransferStateEffects: View {
                 let topMaskCutoff = max(0.04, (notchInset + 12) / h)
 
                 ZStack {
+                    // Three wide, slow glows anchored at the bottom — ambient
+                    // light, not visible moving shapes.
                     blob(color: animPrimary, opacity: glow,
-                         cx: 0.20 + sin(st * twoPi / 3.0) * 0.38,
-                         cy: 0.95 + cos(st * twoPi / 2.6) * 0.20 * yAmp,
-                         radius: w * 0.28)
+                         cx: 0.25 + sin(st * twoPi / 9.0) * 0.10,
+                         cy: 0.98 + cos(st * twoPi / 11.0) * 0.06 * yAmp,
+                         radius: w * 0.34)
 
                     blob(color: animSecondary, opacity: glow,
-                         cx: 0.80 + cos(st * twoPi / 4.0) * 0.38,
-                         cy: 1.0 + sin(st * twoPi / 3.5) * 0.18 * yAmp,
+                         cx: 0.75 + cos(st * twoPi / 12.0) * 0.10,
+                         cy: 1.02 + sin(st * twoPi / 10.0) * 0.05 * yAmp,
+                         radius: w * 0.36)
+
+                    blob(color: animTertiary, opacity: glow * 0.85,
+                         cx: 0.50 + sin(st * twoPi / 14.0) * 0.12,
+                         cy: 0.95 + cos(st * twoPi / 9.5) * 0.07 * yAmp,
                          radius: w * 0.30)
 
-                    blob(color: animTertiary, opacity: glow * 0.9,
-                         cx: 0.50 + sin(st * twoPi / 5.0) * 0.40,
-                         cy: 0.88 + cos(st * twoPi / 3.0) * 0.25 * yAmp,
-                         radius: w * 0.26)
-
-                    blob(color: animPrimary, opacity: glow * 0.85,
-                         cx: 0.65 + cos(st * twoPi / 6.0) * 0.34,
-                         cy: 1.0 + sin(st * twoPi / 4.0) * 0.15 * yAmp,
-                         radius: w * 0.24)
-
-                    blob(color: animSecondary, opacity: glow * 0.85,
-                         cx: 0.35 + sin(st * twoPi / 7.0) * 0.34,
-                         cy: 0.92 + cos(st * twoPi / 3.4) * 0.22 * yAmp,
-                         radius: w * 0.25)
+                    // Progress as light: a soft fill that grows left→right with
+                    // the transfer, so "how far along" is legible at a glance.
+                    if tp > 0.005 {
+                        RoundedRectangle(cornerRadius: h * 0.5, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: animPrimary.opacity(glow * 0.85), location: 0),
+                                        .init(color: animPrimary.opacity(glow * 0.55), location: 0.8),
+                                        .init(color: .clear, location: 1.0),
+                                    ],
+                                    startPoint: .leading, endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(w * 0.12, w * tp), height: h * 0.5)
+                            .position(x: max(w * 0.12, w * tp) / 2, y: h * 0.95)
+                    }
                 }
                 .compositingGroup()
                 .blur(radius: blurR)
