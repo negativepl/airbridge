@@ -318,7 +318,11 @@ class AirbridgeService : Service() {
     }
     private val audioPlaybackCallback = object : android.media.AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: MutableList<android.media.AudioPlaybackConfiguration>?) {
-            val nowActive = audioManager.activePlaybackConfigurations.isNotEmpty()
+            // Gate on isMusicActive too — activePlaybackConfigurations alone
+            // fires for system sounds (e.g. a notification ding), which would
+            // otherwise trigger an unwanted auto-steal of the headphones. This
+            // is about actual media playback, not incidental system audio.
+            val nowActive = audioManager.activePlaybackConfigurations.isNotEmpty() && audioManager.isMusicActive
             if (nowActive == localAudioActive) return
             val wasActive = localAudioActive
             localAudioActive = nowActive
@@ -442,6 +446,10 @@ class AirbridgeService : Service() {
         if (headphoneHandoffPhase.value != HandoffPhase.IDLE) {
             headphoneHandoffPhase.value = HandoffPhase.IDLE
         }
+        // The Move-back notification (if any) refers to a handoff on this
+        // connection — stale once it's gone.
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .cancel(AUTO_SWITCH_NOTIFICATION_ID)
     }
 
     /** Zlicza czas trwającej sesji do statystyk i czyści znacznik startu. Idempotentne. */
@@ -586,20 +594,25 @@ class AirbridgeService : Service() {
                 }
             }
             ACTION_CANCEL_TRANSFER -> {
-                val transferId = pendingOfferTransferId
-                if (transferId != null) {
-                    Log.d(TAG, "Cancelling outgoing transfer $transferId")
-                    // Abort the OkHttp call first (thread-safe, aborts a
-                    // blocking execute() from any thread); cancelling the Job
-                    // only interrupts the coroutine while it's suspended
-                    // (i.e. still waiting for accept/reject).
-                    activeUploadCall?.cancel()
-                    activeUploadCall = null
-                    outgoingTransferJob?.cancel()
-                    outgoingTransferJob = null
-                    pendingOutgoingOffers.remove(transferId)
-                    pendingOfferTransferId = null
-                    webSocketClient.send(Message.FileTransferCancel(transferId))
+                // No per-file UI exists for outgoing sends — the transfer card
+                // is global — so a cancel tap aborts every in-flight outgoing
+                // transfer (relevant when ACTION_SEND_MULTIPLE started several
+                // at once), not just one.
+                if (outgoingTransfers.isEmpty()) {
+                    Log.d(TAG, "ACTION_CANCEL_TRANSFER: no pending outgoing transfer")
+                } else {
+                    Log.d(TAG, "Cancelling ${outgoingTransfers.size} outgoing transfer(s)")
+                    outgoingTransfers.forEach { (id, entry) ->
+                        entry.cancelled = true
+                        // Abort the OkHttp call first (thread-safe, aborts a
+                        // blocking execute() from any thread); cancelling the
+                        // Job only interrupts the coroutine while it's
+                        // suspended (i.e. still waiting for accept/reject).
+                        entry.call?.cancel()
+                        entry.job?.cancel()
+                        pendingOutgoingOffers.remove(id)
+                        webSocketClient.send(Message.FileTransferCancel(id))
+                    }
                     transferIsSending.value = false
                     transferProgress.value = null
                     transferFileName.value = null
@@ -607,8 +620,6 @@ class AirbridgeService : Service() {
                     transferEtaSeconds.value = 0
                     (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                         .cancel(TRANSFER_NOTIFICATION_ID)
-                } else {
-                    Log.d(TAG, "ACTION_CANCEL_TRANSFER: no pending outgoing transfer")
                 }
             }
             ACTION_DISCONNECT -> {
@@ -631,9 +642,12 @@ class AirbridgeService : Service() {
                 (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                     .cancel(AUTO_SWITCH_NOTIFICATION_ID)
                 webSocketClient.send(Message.HeadphoneTakeoverRequest)
-                // Re-arm the cooldown so the local auto-switch engine doesn't
-                // immediately try to grab the headphones back.
-                lastHandoffAtMs = android.os.SystemClock.elapsedRealtime()
+                // Re-arm BOTH cooldowns so the local auto-switch engine
+                // doesn't immediately try to grab the headphones back — this
+                // is a manual action just as much as the takeover button is.
+                val now = android.os.SystemClock.elapsedRealtime()
+                lastHandoffAtMs = now
+                lastManualHandoffAtMs = now
             }
         }
         return START_STICKY
@@ -682,6 +696,10 @@ class AirbridgeService : Service() {
         if (shouldRegister && !playbackCallbackRegistered) {
             audioManager.registerAudioPlaybackCallback(audioPlaybackCallback, mainHandler)
             playbackCallbackRegistered = true
+            // Seed from the current state — without this, a service restart
+            // that happens mid-playback would report false (no activity)
+            // until the next onPlaybackConfigChanged callback fires.
+            localAudioActive = audioManager.activePlaybackConfigurations.isNotEmpty() && audioManager.isMusicActive
         } else if (!shouldRegister && playbackCallbackRegistered) {
             audioManager.unregisterAudioPlaybackCallback(audioPlaybackCallback)
             playbackCallbackRegistered = false
@@ -851,20 +869,31 @@ class AirbridgeService : Service() {
     private val pendingOutgoingOffers = ConcurrentHashMap<String, kotlinx.coroutines.CompletableDeferred<Boolean>>()
     private var lastProgressNotifUpdate = 0L
 
-    // Outgoing transfer cancellation (offer wait + upload). Set when an offer
-    // is sent, cleared once the transfer finishes/fails/times out/is cancelled.
-    @Volatile private var pendingOfferTransferId: String? = null
+    /**
+     * Per-transfer bookkeeping for an outgoing send. ACTION_SEND_MULTIPLE fires
+     * one ACTION_SEND_FILE per URI, so [handleSendFile] can run several times
+     * concurrently — a single set of scalars would have each new transfer
+     * overwrite the previous one's job/call, breaking cancel and making every
+     * transfer but the last look "cancelled" once its upload finished.
+     */
+    private class OutgoingTransfer {
+        // The coroutine driving this outgoing transfer (offer wait + upload).
+        // Cancelling it interrupts the offer wait immediately; it does NOT
+        // abort an in-flight OkHttp call (see [call]).
+        @Volatile var job: kotlinx.coroutines.Job? = null
 
-    // The coroutine driving the current outgoing transfer (offer wait +
-    // upload). Cancelling it interrupts the offer wait immediately; it does
-    // NOT abort an in-flight OkHttp call (see activeUploadCall).
-    @Volatile private var outgoingTransferJob: kotlinx.coroutines.Job? = null
+        // OkHttp cancels are thread-safe and abort a blocking execute() from
+        // any thread with an IOException — this is what actually stops bytes
+        // going out mid-upload (coroutine cancellation alone can't interrupt
+        // a blocking synchronous call with no suspension points).
+        @Volatile var call: okhttp3.Call? = null
 
-    // OkHttp cancels are thread-safe and abort a blocking execute() from any
-    // thread with an IOException — this is what actually stops bytes going
-    // out mid-upload (coroutine cancellation alone can't interrupt a blocking
-    // synchronous call with no suspension points).
-    @Volatile private var activeUploadCall: okhttp3.Call? = null
+        @Volatile var cancelled: Boolean = false
+    }
+
+    // transferId -> its OutgoingTransfer. Entries are removed once the
+    // transfer finishes/fails/times out/is cancelled.
+    private val outgoingTransfers = java.util.concurrent.ConcurrentHashMap<String, OutgoingTransfer>()
 
     private fun setupHttpFileServer() {
         // Deliberately NOT started: the Mac cannot initiate outbound TCP to
@@ -1536,7 +1565,14 @@ class AirbridgeService : Service() {
                         // The Mac just took the headphones — that's a handoff
                         // too, so the general cooldown applies here as well
                         // (not the manual one: this phone didn't trigger it).
-                        if (ok) lastHandoffAtMs = android.os.SystemClock.elapsedRealtime()
+                        if (ok) {
+                            lastHandoffAtMs = android.os.SystemClock.elapsedRealtime()
+                            // The Mac now holds the headphones — any stale
+                            // "Move-back" notification from a previous local
+                            // auto-switch no longer applies.
+                            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                                .cancel(AUTO_SWITCH_NOTIFICATION_ID)
+                        }
                         webSocketClient.send(
                             Message.HeadphoneReleaseResponse(ok, if (ok) null else "release_failed")
                         )
@@ -1721,9 +1757,11 @@ class AirbridgeService : Service() {
         updateTransferNotification(0, "")
 
         val transferId = java.util.UUID.randomUUID().toString()
-        pendingOfferTransferId = transferId
+        val transferEntry = OutgoingTransfer()
+        outgoingTransfers[transferId] = transferEntry
 
-        outgoingTransferJob = serviceScope.launch {
+        transferEntry.job = serviceScope.launch {
+          try {
             // 1. Send offer and wait for accept/reject
             val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
             pendingOutgoingOffers[transferId] = deferred
@@ -1742,7 +1780,6 @@ class AirbridgeService : Service() {
 
             if (!accepted) {
                 pendingOutgoingOffers.remove(transferId)
-                pendingOfferTransferId = null
                 Log.d(TAG, "Offer rejected or timed out for $filename (timedOut=$timedOut)")
                 transferIsSending.value = false
                 transferProgress.value = null
@@ -1783,7 +1820,7 @@ class AirbridgeService : Service() {
                 uri = uri,
                 contentResolver = applicationContext.contentResolver,
                 destinationDir = destinationDir,
-                onCallCreated = { activeUploadCall = it }
+                onCallCreated = { transferEntry.call = it }
             ) { bytesSent, totalBytes ->
                 lastFileSize = totalBytes
                 val elapsed = System.currentTimeMillis() - startTime
@@ -1819,13 +1856,15 @@ class AirbridgeService : Service() {
             }
 
             val elapsed = System.currentTimeMillis() - startTime
-            // ACTION_CANCEL_TRANSFER clears pendingOfferTransferId as soon as
-            // it fires (it can't reliably preempt an in-flight synchronous
-            // upload() call — see the cancel handler). If it already cleared
-            // this transfer, upload() failing here is the expected result of
-            // that cancel, not a real error — the cancel handler already sent
-            // FileTransferCancel and updated the UI, so skip these notifications.
-            val wasCancelled = pendingOfferTransferId != transferId
+            // ACTION_CANCEL_TRANSFER marks the entry cancelled as soon as it
+            // fires (it can't reliably preempt an in-flight synchronous
+            // upload() call — see the cancel handler). If it already did,
+            // upload() failing here is the expected result of that cancel,
+            // not a real error — the cancel handler already sent
+            // FileTransferCancel and updated the UI, so skip these
+            // notifications (and don't let a stray progress re-post strand
+            // the sending notification the cancel handler already cleared).
+            val wasCancelled = transferEntry.cancelled
             if (!wasCancelled) {
                 if (success) {
                     val speedMBs = if (elapsed > 0) lastFileSize / 1024.0 / 1024.0 / (elapsed / 1000.0) else 0.0
@@ -1854,14 +1893,17 @@ class AirbridgeService : Service() {
                         .build()
                     manager.notify(transferNotifId, failNotif)
                 }
-                pendingOfferTransferId = null
+            } else {
+                manager.cancel(transferNotifId)
             }
-            activeUploadCall = null
 
             transferProgress.value = null
             transferFileName.value = null
             transferSpeedBps.value = 0
             transferEtaSeconds.value = 0
+          } finally {
+              outgoingTransfers.remove(transferId)
+          }
         }
     }
 
@@ -1942,7 +1984,7 @@ class AirbridgeService : Service() {
                 val now = android.os.SystemClock.elapsedRealtime()
                 lastHandoffAtMs = now
                 if (trigger == HandoffTrigger.MANUAL) lastManualHandoffAtMs = now
-                if (trigger == HandoffTrigger.AUTO) postAutoSwitchNotification(address)
+                if (trigger == HandoffTrigger.AUTO) postAutoSwitchNotification()
             } else {
                 Log.w(TAG, "Headphone takeover failed (releaseOk=${response?.ok}, error=${response?.error})")
             }
@@ -1951,7 +1993,7 @@ class AirbridgeService : Service() {
 
     /** Posted after the auto-switch engine successfully pulls the headphones
      *  onto this phone, offering a one-tap way back to the Mac. */
-    private fun postAutoSwitchNotification(address: String) {
+    private fun postAutoSwitchNotification() {
         val title = headphonePrefs().getString("headphone_name", null)
             ?.takeIf { it.isNotBlank() } ?: getString(com.airbridge.R.string.app_name)
         val moveBackIntent = android.app.PendingIntent.getService(
@@ -2107,10 +2149,14 @@ class AirbridgeService : Service() {
         ).apply {
             description = getString(com.airbridge.R.string.channel_files_desc)
         }
+        // IMPORTANCE_DEFAULT, not _HIGH: a heads-up banner isn't needed (the
+        // user is holding the phone that just took the audio) but the
+        // Move-back action must still be noticeable — DEFAULT shows in the
+        // shade/status bar without the intrusive heads-up popup.
         val headphoneChannel = NotificationChannel(
             CHANNEL_HEADPHONE_ID,
             getString(com.airbridge.R.string.channel_headphone_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = getString(com.airbridge.R.string.channel_headphone_desc)
         }
