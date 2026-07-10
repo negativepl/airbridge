@@ -667,13 +667,33 @@ sealed class Message {
     data class HeadphoneState(
         val connected: Boolean,
         val address: String,
-        val name: String
+        val name: String,
+        val audioActive: Boolean? = null
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "headphone_state")
             put("connected", connected)
             put("address", address)
             put("name", name)
+            if (audioActive != null) put("audio_active", audioActive)
+        }.toString()
+    }
+
+    /** Either direction: "take the headphones back", used for the Move-back action
+     *  from an auto-switch notification, bypassing cooldowns. */
+    data object HeadphoneTakeoverRequest : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "headphone_takeover_request")
+        }.toString()
+    }
+
+    /** Either direction: cancel an in-flight or pending file transfer. */
+    data class FileTransferCancel(
+        val transferId: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "file_transfer_cancel")
+            put("transfer_id", transferId)
         }.toString()
     }
 
@@ -1091,7 +1111,12 @@ sealed class Message {
                 "headphone_state" -> HeadphoneState(
                     connected = obj.getBoolean("connected"),
                     address = obj.getString("address"),
-                    name = obj.getString("name")
+                    name = obj.getString("name"),
+                    audioActive = if (obj.has("audio_active")) obj.getBoolean("audio_active") else null
+                )
+                "headphone_takeover_request" -> HeadphoneTakeoverRequest
+                "file_transfer_cancel" -> FileTransferCancel(
+                    transferId = obj.getString("transfer_id")
                 )
                 "headphone_release_request" -> HeadphoneReleaseRequest(
                     address = obj.getString("address")

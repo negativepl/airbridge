@@ -130,6 +130,48 @@ class MessageTest {
         assertEquals(failed, Message.fromJson(failed.toJson()))
     }
 
+    @Test
+    fun `HeadphoneState without audioActive omits key and decodes to null`() {
+        val msg = Message.HeadphoneState(connected = true, address = "AA:BB:CC:DD:EE:FF", name = "Galaxy Buds3 Pro")
+        val obj = JSONObject(msg.toJson())
+        assertFalse(obj.has("audio_active"))
+        val decoded = Message.fromJson(msg.toJson()) as Message.HeadphoneState
+        assertNull(decoded.audioActive)
+        assertEquals(msg, decoded)
+    }
+
+    @Test
+    fun `HeadphoneState with audioActive true round-trips`() {
+        val msg = Message.HeadphoneState(
+            connected = true,
+            address = "AA:BB:CC:DD:EE:FF",
+            name = "Galaxy Buds3 Pro",
+            audioActive = true
+        )
+        val obj = JSONObject(msg.toJson())
+        assertTrue(obj.getBoolean("audio_active"))
+        val decoded = Message.fromJson(msg.toJson()) as Message.HeadphoneState
+        assertEquals(true, decoded.audioActive)
+        assertEquals(msg, decoded)
+    }
+
+    @Test
+    fun `HeadphoneTakeoverRequest JSON round-trip`() {
+        val msg = Message.HeadphoneTakeoverRequest
+        val obj = JSONObject(msg.toJson())
+        assertEquals("headphone_takeover_request", obj.getString("type"))
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
+    @Test
+    fun `FileTransferCancel JSON round-trip`() {
+        val msg = Message.FileTransferCancel(transferId = "tr-42")
+        val obj = JSONObject(msg.toJson())
+        assertEquals("file_transfer_cancel", obj.getString("type"))
+        assertEquals("tr-42", obj.getString("transfer_id"))
+        assertEquals(msg, Message.fromJson(msg.toJson()))
+    }
+
     @Test fun deviceInfoResponseIncludesChargingFields() {
         val info = DeviceInfo(
             name = "Galaxy", model = "SM", manufacturer = "Samsung",
