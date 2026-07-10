@@ -130,14 +130,20 @@ final class BluetoothAudioService {
             }
             return (connected, false, audioActive)
         }.value
-        guard let result, !result.closed else { return }
-        if result.connected != selectedConnected {
-            selectedConnected = result.connected
-            onStateChanged?(result.connected, address, selectedName ?? address)
-        }
+        guard let result else { return }
+        // Apply the audioActive transition BEFORE the guard-window `closed`
+        // early return below — audio activity is independent of the
+        // just-performed release, and gating it on `closed` would silently
+        // drop an activity change that happened to land in the same poll as
+        // a guard-window re-release.
         if result.audioActive != systemAudioActive {
             systemAudioActive = result.audioActive
             onAudioActivityChanged?(result.audioActive)
+        }
+        guard !result.closed else { return }
+        if result.connected != selectedConnected {
+            selectedConnected = result.connected
+            onStateChanged?(result.connected, address, selectedName ?? address)
         }
     }
 

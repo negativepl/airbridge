@@ -14,6 +14,9 @@ final class HandoffNotifier {
 
     static let categoryId = "HEADPHONE_HANDOFF"
     static let moveBackActionId = "MOVE_BACK"
+    /// Fixed identifier for the "switched to Mac" notification, so
+    /// `clearDelivered()` can target it specifically.
+    static let notificationId = "headphone-handoff"
 
     private var moveBackHandler: (() -> Void)?
 
@@ -63,8 +66,16 @@ final class HandoffNotifier {
         content.sound = .default
         content.categoryIdentifier = Self.categoryId
 
-        let request = UNNotificationRequest(identifier: "headphone-handoff", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: Self.notificationId, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+    }
+
+    /// Removes the delivered "switched to Mac" notification, if any — used
+    /// once the phone takes the headphones back, so a stale "Move back"
+    /// action doesn't linger in Notification Center for a handoff that's
+    /// already been reversed.
+    func clearDelivered() {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.notificationId])
     }
 
     /// Called by `NotificationService`'s delegate callback for any action on

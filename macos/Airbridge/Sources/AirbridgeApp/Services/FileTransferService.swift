@@ -30,6 +30,10 @@ final class FileTransferService: MessageHandler {
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
     @ObservationIgnored private var isSendingFromQueue = false
     @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
+    /// transferId of the outgoing offer currently awaiting accept/reject, so
+    /// `cancelPendingTransfer()` can tell the phone to drop its incoming-offer
+    /// notification instead of leaving it to time out on its own.
+    @ObservationIgnored private var pendingOutgoingTransferId: String? = nil
     /// All incoming offers awaiting one accept/reject (the phone can share many
     /// files at once — accept/reject must cover every offer, not just the last).
     /// Each offer remembers its originating connection so the accept/reject
@@ -41,6 +45,12 @@ final class FileTransferService: MessageHandler {
     /// fields — the other transfer still lands on disk, just without fighting
     /// over the progress UI.
     @ObservationIgnored private var receivingOwnerKey: String? = nil
+    /// transferIds we've already sent `.fileTransferAccept` for. `HttpUploadServer`
+    /// has no per-transferId failure callback, so if the phone cancels AFTER
+    /// acceptance (button, or a 60s-timeout race), `handleIncomingOfferCancelled`
+    /// needs this set to know to reset the receive machine instead of treating
+    /// the id as unknown (it's already been removed from `pendingOffers`).
+    @ObservationIgnored private var acceptedIncomingTransferIds = Set<String>()
     /// Gdy ustawione, najbliższy przychodzący plik o tej nazwie idzie do cache
     /// podglądu (a nie do Downloads) i wywołuje completion z URL-em. Korelacja po
     /// nazwie wystarcza, bo apka prowadzi jeden transfer naraz.
@@ -111,6 +121,7 @@ final class FileTransferService: MessageHandler {
             TransferPopup.shared.hide(delay: 0)
             return
         }
+        for offer in offers { acceptedIncomingTransferIds.insert(offer.transferId) }
         let connectionService = self.connectionService
         Task {
             for offer in offers {
@@ -157,6 +168,7 @@ final class FileTransferService: MessageHandler {
     /// appeared to do nothing after the connection died).
     func connectionLost() {
         receivingOwnerKey = nil
+        acceptedIncomingTransferIds.removeAll()
         guard hasIncomingOffer else { return }
         pendingOffers = []
         pendingOffersTotalSize = 0
@@ -191,6 +203,23 @@ final class FileTransferService: MessageHandler {
     /// waiting. Drop just that offer and, if none remain, dismiss the popup.
     /// Mirrors deviceDisconnected's partial-removal logic below.
     private func handleIncomingOfferCancelled(transferId: String) {
+        if acceptedIncomingTransferIds.remove(transferId) != nil {
+            // The phone cancelled after we already accepted — either the
+            // Cancel button or the 60s-timeout race on its side. The offer is
+            // no longer in `pendingOffers` (accept clears it), and
+            // `HttpUploadServer` has no per-transferId failure callback, so
+            // reset the receive machine directly instead of leaving the
+            // popup stranded mid-progress.
+            receivingOwnerKey = nil
+            isReceivingFile = false
+            transferStartTime = nil
+            transferSpeed = 0
+            transferEta = 0
+            fileTransferProgress = 0
+            fileTransferFileName = ""
+            TransferPopup.shared.hide(delay: 0)
+            return
+        }
         let remaining = pendingOffers.filter { $0.transferId != transferId }
         guard remaining.count != pendingOffers.count else { return } // unknown id — ignore
         pendingOffers = remaining
@@ -217,6 +246,12 @@ final class FileTransferService: MessageHandler {
     /// Triggers the same path as a rejection.
     func cancelPendingTransfer() {
         guard isWaitingForAccept else { return }
+        if let transferId = pendingOutgoingTransferId {
+            // Tell the phone to drop its incoming-offer notification instead
+            // of leaving it to sit there until its own 60s timeout.
+            let connectionService = self.connectionService
+            Task { try? await connectionService?.sendToActive(Message.fileTransferCancel(transferId: transferId)) }
+        }
         offerResponseStream?.yield(false)
         offerResponseStream?.finish()
         offerResponseStream = nil
@@ -248,6 +283,7 @@ final class FileTransferService: MessageHandler {
         self.isWaitingForAccept = true
         self.isRejected = false
         self.isReceivingFile = false
+        self.pendingOutgoingTransferId = transferId
 
         // Show the popup immediately in waiting state (idempotent — if the
         // user already opened it via Quick Drop, no new window is created)
@@ -322,6 +358,7 @@ final class FileTransferService: MessageHandler {
 
                 // Rejected — let view-side animation handle the morph
                 self.isWaitingForAccept = false
+                self.pendingOutgoingTransferId = nil
                 self.isRejected = true
                 // Show rejection for 2s then slide up. Hide animation is
                 // 0.5s — total popup-visible time is 2.5s.
@@ -352,6 +389,7 @@ final class FileTransferService: MessageHandler {
             self.transferSpeed = 0
             self.transferEta = 0
             self.isWaitingForAccept = false
+            self.pendingOutgoingTransferId = nil
 
             // 6. Wait for phone's GET to finish streaming. Mac's
             //    HttpUploadServer fires onComplete via httpContinuation
@@ -463,6 +501,12 @@ final class FileTransferService: MessageHandler {
 
                 guard ownsPopup else { return }
                 self.receivingOwnerKey = nil
+                // Best-effort: this callback isn't keyed by transferId, so a
+                // completed receive clears the whole accepted-set rather than
+                // just its own entry — a stray late cancel for an id from an
+                // already-finished multi-file batch is harmless (fresh UUID
+                // per offer, so it can never collide with a live transfer).
+                self.acceptedIncomingTransferIds.removeAll()
                 TransferPopup.shared.hide()
 
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -524,6 +568,27 @@ final class FileTransferService: MessageHandler {
         }
 
         await connectionService.httpServer.setCallbacks(onFileReceived: onFileReceived, onProgress: onProgress)
+
+        // The phone's HTTP upload was torn down mid-stream (connection error,
+        // or the peer closing early) — HttpUploadServer has no transferId to
+        // give us here, so correlate by the same "host|filename" owner key
+        // the progress/completion callbacks use, and only reset state if this
+        // upload actually owns the popup.
+        connectionService.httpServer.onUploadAborted = { [weak self] filename, senderHost in
+            Task { @MainActor in
+                guard let self else { return }
+                let ownerKey = "\(senderHost)|\(filename)"
+                guard self.receivingOwnerKey == ownerKey else { return }
+                self.receivingOwnerKey = nil
+                self.isReceivingFile = false
+                self.transferStartTime = nil
+                self.transferSpeed = 0
+                self.transferEta = 0
+                self.fileTransferProgress = 0
+                self.fileTransferFileName = ""
+                TransferPopup.shared.hide(delay: 0)
+            }
+        }
     }
 
     // MARK: - Preview

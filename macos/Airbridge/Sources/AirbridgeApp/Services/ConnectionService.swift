@@ -413,6 +413,9 @@ final class ConnectionService {
             // handoff in the other direction, so it still arms the cooldown.
             if ok {
                 self.lastHandoffAt = Date()
+                // Stale "switched to Mac" notification (if any) no longer
+                // applies — the phone just took them back.
+                self.handoffNotifier?.clearDelivered()
             }
         }
     }
@@ -479,7 +482,9 @@ final class ConnectionService {
                     }
                 }
             case .moveBack:
-                break
+                // Move-back is a manual action too — re-arm both cooldowns so
+                // the auto-switch engine doesn't immediately fight it.
+                self.lastManualHandoffAt = Date()
             }
         }
     }

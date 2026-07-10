@@ -34,6 +34,15 @@ public actor HttpUploadServer {
     /// without hopping to the actor (which causes blocking).
     public nonisolated(unsafe) var onProgress: (@Sendable (String, Int, Int, String) -> Void)?
 
+    /// Called when an in-progress incoming upload (bytes already written to
+    /// the sink) is torn down before `finalizeUpload` runs — a connection
+    /// error mid-stream, or the peer closing early. Arguments: (filename,
+    /// senderHost), matching the `"\(senderHost)|\(filename)"` owner key used
+    /// elsewhere so the consumer can reset any UI state it drives for that
+    /// upload instead of leaving it stranded. Not called when zero bytes have
+    /// been written yet (nothing was ever "in progress").
+    public nonisolated(unsafe) var onUploadAborted: (@Sendable (String, String) -> Void)?
+
     /// Sets both callbacks at once.
     public func setCallbacks(
         onFileReceived: (@Sendable (String, String, String, URL, String?, String) -> Void)?,
@@ -533,7 +542,9 @@ public actor HttpUploadServer {
             }
 
             if let error {
+                let hadBytes = sink.bytesWritten > 0
                 sink.discard()
+                if hadBytes { self.onUploadAborted?(filename, senderHost) }
                 self.sendErrorResponse(on: connection, status: 500, message: "Receive error: \(error)")
                 return
             }
@@ -549,7 +560,9 @@ public actor HttpUploadServer {
             }
 
             if isComplete && sink.bytesWritten < contentLength {
+                let hadBytes = sink.bytesWritten > 0
                 sink.discard()
+                if hadBytes { self.onUploadAborted?(filename, senderHost) }
                 self.sendErrorResponse(on: connection, status: 400, message: "Connection closed before full body received")
                 return
             }
