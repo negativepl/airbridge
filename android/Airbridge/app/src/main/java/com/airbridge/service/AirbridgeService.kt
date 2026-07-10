@@ -1725,9 +1725,16 @@ class AirbridgeService : Service() {
         pendingRelease = pending
         webSocketClient.send(Message.HeadphoneReleaseRequest(address))
         serviceScope.launch {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
             val response = withTimeoutOrNull(10_000L) { pending.await() }
             pendingRelease = null
             val connected = response?.ok == true && headphoneManager.takeover(address)
+            // The release+connect round-trip can finish in ~100 ms; a conflated
+            // StateFlow would then skip IN_PROGRESS in the UI entirely and the
+            // button would never visibly enter the transfer state. Hold the
+            // phase for a beat so the loader and success choreography can play.
+            val elapsedMs = android.os.SystemClock.elapsedRealtime() - startedAt
+            if (elapsedMs < 900L) kotlinx.coroutines.delay(900L - elapsedMs)
             headphoneHandoffPhase.value = if (connected) HandoffPhase.IDLE else HandoffPhase.FAILED
             if (!connected) {
                 Log.w(TAG, "Headphone takeover failed (releaseOk=${response?.ok}, error=${response?.error})")
