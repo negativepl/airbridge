@@ -149,14 +149,17 @@
     <string name="settings_headphone_device">Słuchawki</string>
     <string name="settings_headphone_device_none">Nie wybrano</string>
     <string name="settings_headphone_permission">Do zarządzania słuchawkami wymagane jest uprawnienie Bluetooth</string>
-    <string name="settings_headphone_auto">Przełączaj automatycznie</string>
-    <string name="settings_headphone_auto_desc">Przenoś słuchawki na urządzenie, które zaczyna odtwarzać</string>
+    <string name="settings_headphone_auto">Proponuj przełączanie</string>
+    <string name="settings_headphone_auto_desc">Pytaj przed przeniesieniem słuchawek na urządzenie, które zaczyna odtwarzać</string>
     <string name="headphone_takeover">Przenieś słuchawki na telefon</string>
     <string name="headphone_takeover_in_progress">Przenoszenie słuchawek…</string>
     <string name="headphone_takeover_failed">Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami.</string>
     <string name="headphone_takeover_done">Słuchawki przeniesione na telefon</string>
     <string name="headphone_auto_switched_phone">Słuchawki przełączone na telefon</string>
     <string name="headphone_move_back">Przenieś z powrotem</string>
+    <string name="headphone_prompt_title">Słuchawki</string>
+    <string name="headphone_prompt_text_phone">Przełączyć słuchawki na ten telefon?</string>
+    <string name="headphone_prompt_action">Przełącz</string>
 
     <string name="settings_notifications">Powiadomienia</string>
     <string name="settings_vibrate">Wibracja przy synchronizacji</string>
