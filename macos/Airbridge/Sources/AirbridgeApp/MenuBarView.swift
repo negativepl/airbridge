@@ -74,10 +74,15 @@ struct MenuBarView: View {
                    connectionService.phoneHeadphoneState?.connected == true {
                     MenuRow(title: connectionService.headphoneHandoffPhase == .inProgress
                                 ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
-                                : (L10n.isPL ? "Słuchawki na telefonie — przenieś na Maca" : "Headphones on phone — move to Mac"),
-                            systemImage: "headphones") {
+                                : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac"),
+                            systemImage: "headphones",
+                            trailing: connectionService.headphoneHandoffPhase == .inProgress
+                                ? { AnyView(ProgressView().controlSize(.small)) }
+                                : { AnyView(EmptyView()) }) {
+                        guard connectionService.headphoneHandoffPhase != .inProgress else { return }
                         connectionService.takeoverHeadphones()
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 Divider()
@@ -116,6 +121,8 @@ struct MenuBarView: View {
         // a fixed width, clamped so it is never cramped nor absurdly wide.
         .fixedSize(horizontal: true, vertical: false)
         .frame(minWidth: 240, maxWidth: 420)
+        .animation(.airbridgeQuick, value: connectionService.phoneHeadphoneState)
+        .animation(.airbridgeQuick, value: connectionService.headphoneHandoffPhase)
     }
 
     private var connectionHeadline: String {
