@@ -68,6 +68,9 @@ struct TransferPopupView: View {
 
     @State private var showComplete = false
     @State private var isTargeted = false
+    /// Set the instant "Accept" is tapped, cleared once real progress (or
+    /// any other terminal state) takes over. See `TransferPopupState.accepting`.
+    @State private var isAcceptPending = false
 
     private var state: TransferPopupState {
         if fileTransferService.hasIncomingOffer {
@@ -100,6 +103,11 @@ struct TransferPopupView: View {
                 isReceiving: fileTransferService.isReceivingFile
             )
         }
+        // Accept was tapped but the first progress tick hasn't arrived yet —
+        // bridge here instead of falling through to idle.
+        if isAcceptPending {
+            return .accepting(filename: fileTransferService.fileTransferFileName)
+        }
         // Nothing active → idle drop zone
         return .idle(connected: connectionService.isConnected)
     }
@@ -107,7 +115,7 @@ struct TransferPopupView: View {
     private func tint(for state: TransferPopupState) -> Color {
         switch state {
         case .idle: return .accentColor
-        case .incoming, .waiting, .transferring: return .accentColor
+        case .incoming, .waiting, .accepting, .transferring: return .accentColor
         case .complete: return .green
         case .rejected: return .red
         }
@@ -118,7 +126,7 @@ struct TransferPopupView: View {
     /// changes, so transitions blend the three colors smoothly.
     private func palette(for state: TransferPopupState) -> GradientPalette {
         switch state {
-        case .idle, .incoming, .waiting, .transferring:
+        case .idle, .incoming, .waiting, .accepting, .transferring:
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
         case .complete:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
@@ -132,6 +140,7 @@ struct TransferPopupView: View {
         case .idle(let connected): return connected ? (isTargeted ? 1.0 : 0.7) : 0.0
         case .incoming: return 0.9
         case .waiting: return 0.75
+        case .accepting: return 0.85
         case .transferring: return 1.0
         case .complete: return 0.95
         case .rejected: return 0.85
@@ -174,6 +183,7 @@ struct TransferPopupView: View {
         case .transferring: return 3
         case .complete: return 4
         case .rejected: return 5
+        case .accepting: return 6
         }
     }
 
@@ -190,6 +200,8 @@ struct TransferPopupView: View {
             incomingView(name: name, size: size)
         case .waiting(let name):
             waitingView(name: name)
+        case .accepting(let name):
+            acceptingView(name: name)
         case .transferring(let name, let progress, let receiving):
             transferringView(name: name, progress: progress, isReceiving: receiving)
         case .complete(_, let receiving):
@@ -289,7 +301,14 @@ struct TransferPopupView: View {
         }
         // Animate only between state KINDS — progress ticks keep the same
         // stateKind, so they don't re-trigger the cross-fade or re-mount.
-        .animation(.easeInOut(duration: 0.28), value: stateKind)
+        // A spring with a touch of bounce (rather than plain easeInOut) is
+        // what gives state morphs (accept → progress, progress → complete)
+        // the "alive" Dynamic-Island feel instead of a flat cross-dissolve.
+        // Safe here because it only drives the CONTENT transition inside the
+        // clipped glass pill (see `stateTransition`) — the outer island
+        // shell frame is untouched, so there's no risk of the shell overshoot
+        // that used to flash desktop above the notch.
+        .animation(Self.stateSpring, value: stateKind)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
@@ -306,6 +325,13 @@ struct TransferPopupView: View {
             }
         }
         .onChange(of: state) { _, newState in
+            // Clear the accept bridge once a "real" state takes over
+            // (progress started, rejected, a fresh offer, back to idle, …).
+            // While the bridge itself IS the current state (.accepting) this
+            // is a no-op — isAcceptPending stays true until superseded.
+            if case .accepting = newState {} else {
+                isAcceptPending = false
+            }
             // Any activity (incoming offer, waiting, transferring, etc.)
             // cancels the idle auto-hide. Returning to idle restarts it.
             if case .idle = newState {
@@ -347,6 +373,12 @@ struct TransferPopupView: View {
     }
 
     static let windowPadding: CGFloat = 40
+
+    /// Springy morph used between popup states — a touch of bounce
+    /// (dampingFraction 0.72) so state changes feel alive rather than a
+    /// flat cross-dissolve, echoing Dynamic Island's content morphs. Kept
+    /// tame enough (response 0.42) that it never reads as a "wobble".
+    static let stateSpring = Animation.spring(response: 0.42, dampingFraction: 0.72)
 
     /// Transition used between all popup state views. Opacity + blur only —
     /// NO scale. A center scale (even subtle) combined with the bouncy
@@ -424,6 +456,13 @@ struct TransferPopupView: View {
                 .controlSize(.large)
 
                 Button(L10n.isPL ? "Akceptuj" : "Accept") {
+                    // Drive the bridge state with an explicit spring so the
+                    // button row's scale+fade-out is acknowledged the instant
+                    // it's tapped, rather than waiting on the implicit
+                    // stateKind animation to pick up the service's change.
+                    withAnimation(Self.stateSpring) {
+                        isAcceptPending = true
+                    }
                     fileTransferService.acceptIncomingOffer()
                 }
                 .buttonStyle(.borderedProminent)
@@ -457,12 +496,45 @@ struct TransferPopupView: View {
         }
     }
 
+    /// Shown for the instant between tapping "Accept" and the first real
+    /// progress tick. Mirrors `transferringView`'s layout (icon + label +
+    /// bar) as closely as possible so the morph from "buttons row" through
+    /// this into the real progress bar reads as one continuous motion
+    /// instead of two separate swaps.
+    private func acceptingView(name: String) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.variableColor, options: .repeating)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L10n.isPL ? "Rozpoczynam odbiór…" : "Starting receive…")
+                    .font(.ab(.footnote, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
+
+                Text(name)
+                    .font(.ab(.callout, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+            }
+            Spacer()
+        }
+    }
+
     private func transferringView(name: String, progress: Double, isReceiving: Bool) -> some View {
         HStack(spacing: 16) {
             Image(systemName: isReceiving ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                 .font(.system(size: 26, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.variableColor, options: .repeating)
+                .contentTransition(.symbolEffect(.replace))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(isReceiving
@@ -470,6 +542,7 @@ struct TransferPopupView: View {
                     : (L10n.isPL ? "Wysyłam" : "Sending"))
                     .font(.ab(.footnote, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .contentTransition(.opacity)
 
                 Text(name)
                     .font(.ab(.callout, weight: .semibold))
@@ -512,12 +585,17 @@ struct TransferPopupView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: isReceiving)
+                // Triggered on `stateKind` (not `isReceiving`) so the bounce
+                // fires every time the island morphs INTO .complete — using
+                // `isReceiving` alone would silently skip the bounce for two
+                // same-direction transfers in a row (no value change).
+                .symbolEffect(.bounce, value: stateKind)
             Text(isReceiving
                 ? (L10n.isPL ? "Plik odebrany!" : "File received!")
                 : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
                 .font(.ab(.title3, weight: .bold))
                 .foregroundStyle(.primary)
+                .contentTransition(.opacity)
             Spacer()
         }
     }
@@ -528,7 +606,9 @@ struct TransferPopupView: View {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 32, weight: .medium))
                 .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: name)
+                // See completeView — trigger on stateKind so consecutive
+                // rejections of a same-named file still bounce.
+                .symbolEffect(.bounce, value: stateKind)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
                     .font(.ab(.headline, weight: .semibold))
