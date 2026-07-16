@@ -125,6 +125,7 @@
     <string name="mac_files_permission_needed">Grant file access on your Mac</string>
     <string name="mac_files_root">Mac</string>
     <string name="mac_files_empty_folder">This folder is empty</string>
+    <string name="mac_files_download_failed">Download failed. Tap to retry.</string>
     <string name="nav_screen_sharing">Screen</string>
     <string name="nav_send">Send</string>
     <string name="nav_settings">Settings</string>

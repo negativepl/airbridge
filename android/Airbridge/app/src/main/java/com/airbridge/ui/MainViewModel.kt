@@ -37,6 +37,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val macFolderStats = AirbridgeService.macFolderStats
     val macDownloadedNames = AirbridgeService.macDownloadedNames
     val macDownloadProgress = AirbridgeService.macDownloadProgress
+    val macDownloadFailedNames = AirbridgeService.macDownloadFailedNames
 
     // Headphone handoff
     val macHeadphoneState = AirbridgeService.macHeadphoneState

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -90,6 +91,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
     // Per-file download progress (filename -> 0..1). A row shows a small progress
     // ring while its name is present here (queued files sit at 0 until their turn).
     val downloadProgress by viewModel.macDownloadProgress.collectAsState()
+    // Files whose last download attempt failed (Mac never confirmed the transfer,
+    // or the stream broke) — the row shows an error badge; tapping it retries.
+    val failedNames by viewModel.macDownloadFailedNames.collectAsState()
 
     // Load the root listing the first time the tab is shown and we are connected.
     // Guard on path and entries being empty so a reconnect while browsing a subfolder
@@ -231,6 +235,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                     itemsIndexed(paneEntries, key = { _, it -> it.relativePath }) { index, entry ->
                         val thumb = thumbs[entry.relativePath]
                         val downloading = !entry.isDirectory && entry.name in downloadProgress
+                        val failed = !entry.isDirectory && entry.name in failedNames
                         // Grouped-list shape: the first/last rows round their outer edges
                         // strongly, rows between are gently rounded. With a small gap the list
                         // reads as one rounded group (M3 Expressive style).
@@ -282,15 +287,21 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                                 }
                             },
                             // A small progress ring appears while the file transfers, then
-                            // pops into a check for a moment on completion; otherwise the row
-                            // has no trailing control — tapping the row is the download action.
-                            trailingContent = if (downloading || entry.name in justDone) {
+                            // pops into a check for a moment on completion; a failed download
+                            // leaves an error badge until the row is tapped again (retry).
+                            // Otherwise the row has no trailing control — tapping the row is
+                            // the download action.
+                            trailingContent = if (downloading || failed || entry.name in justDone) {
                                 {
                                     AnimatedContent(
-                                        targetState = downloading,
+                                        targetState = when {
+                                            downloading -> DownloadBadge.Progress
+                                            failed -> DownloadBadge.Failed
+                                            else -> DownloadBadge.Done
+                                        },
                                         contentAlignment = Alignment.Center,
                                         transitionSpec = {
-                                            // The check springs in; the ring just fades out.
+                                            // The badge springs in; the ring just fades out.
                                             (fadeIn(tween(150)) + scaleIn(
                                                 initialScale = 0.5f,
                                                 animationSpec = spring(
@@ -300,18 +311,23 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
                                             )) togetherWith fadeOut(tween(120)) using null
                                         },
                                         label = "downloadTrailing"
-                                    ) { isDownloading ->
-                                        if (isDownloading) {
-                                            CircularProgressIndicator(
+                                    ) { badge ->
+                                        when (badge) {
+                                            DownloadBadge.Progress -> CircularProgressIndicator(
                                                 progress = { (downloadProgress[entry.name] ?: 0f).coerceIn(0f, 1f) },
                                                 modifier = Modifier.size(22.dp),
                                                 strokeWidth = 2.dp
                                             )
-                                        } else {
-                                            Icon(
+                                            DownloadBadge.Done -> Icon(
                                                 imageVector = Icons.Rounded.CheckCircle,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            DownloadBadge.Failed -> Icon(
+                                                imageVector = Icons.Rounded.ErrorOutline,
+                                                contentDescription = stringResource(R.string.mac_files_download_failed),
+                                                tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(24.dp)
                                             )
                                         }
@@ -429,6 +445,9 @@ private fun ThumbImage(base64: String) {
         )
     }
 }
+
+/** Trailing badge of a file row: transfer in progress, done, or failed. */
+private enum class DownloadBadge { Progress, Done, Failed }
 
 private fun formatFileSize(bytes: Long): String = when {
     bytes < 1024L -> "$bytes B"

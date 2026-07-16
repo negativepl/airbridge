@@ -67,6 +67,9 @@ class AirbridgeService : Service() {
         const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
         private const val RING_NOTIFICATION_ID = 7
         private const val TRANSFER_NOTIFICATION_ID = 2
+        // How long a Files-browser download waits for the Mac's
+        // MacFileDownloadReady before the row is marked as failed.
+        private const val MAC_DOWNLOAD_READY_TIMEOUT_MS = 30_000L
 
         /** SharedPreferences key for the auto-switch toggle (default OFF). */
         const val AUTO_SWITCH_PREF = "headphone_auto_switch"
@@ -149,6 +152,10 @@ class AirbridgeService : Service() {
         // their own progress at once — the single transferProgress can't represent
         // concurrent Mac-file downloads.
         val macDownloadProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+        // Files whose last download attempt failed (Mac never confirmed the
+        // transfer, or the stream broke). The row shows an error badge until
+        // the user retries by tapping it again.
+        val macDownloadFailedNames = MutableStateFlow<Set<String>>(emptySet())
         private val pendingMacDownloads = java.util.concurrent.ConcurrentHashMap<String, String>() // transferId -> filename
 
         fun addActivity(context: Context, item: ActivityItem) {
@@ -265,9 +272,7 @@ class AirbridgeService : Service() {
         }
 
         fun downloadMacFile(path: String) {
-            val transferId = java.util.UUID.randomUUID().toString()
-            pendingMacDownloads[transferId] = path.substringAfterLast('/')
-            instance?.webSocketClient?.send(Message.MacFileDownloadRequest(transferId, path))
+            instance?.startMacFileDownload(path)
         }
     }
 
@@ -959,6 +964,35 @@ class AirbridgeService : Service() {
     // The accepted Mac→phone transfer currently downloading (the transfer
     // card is single-slot, so at most one). Cleared when the download ends.
     @Volatile private var incomingDownload: IncomingDownload? = null
+
+    /**
+     * Starts a Files-browser download: registers the pending transfer, asks
+     * the Mac to stage the file, and arms a timeout for the
+     * MacFileDownloadReady confirmation. Without the timeout, a WebSocket
+     * that died right after the request left the row without any feedback —
+     * a silent failure.
+     */
+    private fun startMacFileDownload(path: String) {
+        val transferId = java.util.UUID.randomUUID().toString()
+        val name = path.substringAfterLast('/')
+        macDownloadFailedNames.update { it - name }
+        // Show the row's progress ring immediately — between the request and
+        // the Mac's MacFileDownloadReady there is otherwise no visible state.
+        macDownloadProgress.update { it + (name to 0f) }
+        pendingMacDownloads[transferId] = name
+        webSocketClient.send(Message.MacFileDownloadRequest(transferId, path))
+        serviceScope.launch {
+            kotlinx.coroutines.delay(MAC_DOWNLOAD_READY_TIMEOUT_MS)
+            // Removing the entry is the claim: whoever removes it first —
+            // this timeout or the MacFileDownloadReady handler — owns the
+            // transfer. A late Ready then finds nothing and is ignored.
+            if (pendingMacDownloads.remove(transferId) != null) {
+                Log.w(TAG, "MacFileDownloadReady timeout for $name ($transferId)")
+                macDownloadProgress.update { it - name }
+                macDownloadFailedNames.update { it + name }
+            }
+        }
+    }
 
     private fun setupHttpFileServer() {
         // Deliberately NOT started: the Mac cannot initiate outbound TCP to
@@ -1716,9 +1750,17 @@ class AirbridgeService : Service() {
                     (message.path to Triple(message.dirCount, message.fileCount, message.totalSize))
             }
             is Message.MacFileDownloadReady -> {
-                val name = pendingMacDownloads.remove(message.transferId) ?: message.filename
+                // Removing the pending entry claims the transfer; if it is
+                // already gone, the ready-wait timeout has failed this row —
+                // a late Ready must not resurrect the download.
+                val name = pendingMacDownloads.remove(message.transferId) ?: run {
+                    Log.w(TAG, "MacFileDownloadReady for unknown/timed-out transfer ${message.transferId}")
+                    return
+                }
                 val host = connectedHost.value ?: run {
                     Log.w(TAG, "MacFileDownloadReady: no host, cannot download ${message.transferId}")
+                    macDownloadProgress.update { it - name }
+                    macDownloadFailedNames.update { it + name }
                     return
                 }
                 serviceScope.launch {
@@ -1749,6 +1791,7 @@ class AirbridgeService : Service() {
                             macDownloadedNames.update { it + name }
                         } else {
                             Log.e(TAG, "MacFileDownloadReady: download failed for $name")
+                            macDownloadFailedNames.update { it + name }
                         }
                         macDownloadProgress.update { it - name }
                     }

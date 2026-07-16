@@ -129,6 +129,7 @@
     <string name="mac_files_permission_needed">Przyznaj dostęp do plików na Maku</string>
     <string name="mac_files_root">Mac</string>
     <string name="mac_files_empty_folder">Ten folder jest pusty</string>
+    <string name="mac_files_download_failed">Pobieranie nie powiodło się. Dotknij, aby ponowić.</string>
     <string name="nav_screen_sharing">Ekran</string>
     <string name="nav_send">Wyślij</string>
     <string name="nav_settings">Ustawienia</string>
