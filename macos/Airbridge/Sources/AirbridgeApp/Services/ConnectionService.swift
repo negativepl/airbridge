@@ -610,12 +610,33 @@ final class ConnectionService {
             connectedDevices[idx].name = name
             if let clientIP { connectedDevices[idx].clientIP = clientIP }
         } else {
+            // A device is identified by its pairing public key, not by the
+            // socket: a quick reconnect authenticates on a new connection
+            // while the stale one may still be tracked, and the same phone
+            // would show up twice in the device switcher. Drop stale entries,
+            // close their sockets, and carry over deviceInfo/wallpaper so the
+            // label does not degrade to the pairing name until the next poll.
+            let stale = connectedDevices.filter { $0.publicKey == publicKey }
+            connectedDevices.removeAll { $0.publicKey == publicKey }
+            for entry in stale {
+                let staleId = entry.connectionId
+                Diag.log("Connection", "dropping stale connection \(staleId) — device re-authenticated as \(connectionId)")
+                Task { await server.disconnectClient(staleId) }
+            }
             connectedDevices.append(ConnectedDevice(
                 connectionId: connectionId, publicKey: publicKey,
-                name: name, clientIP: clientIP, deviceInfo: nil, wallpaper: nil))
+                name: name, clientIP: clientIP,
+                deviceInfo: stale.last?.deviceInfo, wallpaper: stale.last?.wallpaper))
         }
         refreshAllowedUploadHosts()
         ensureActiveDeviceValid()
+    }
+
+    /// Attach the phone-reported device info to its connection entry.
+    func setDeviceInfo(_ info: DeviceInfo, for connectionId: String) {
+        if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
+            connectedDevices[idx].deviceInfo = info
+        }
     }
 
     /// Syncs the set of IPs allowed to upload to the currently connected devices.
@@ -780,9 +801,7 @@ final class ConnectionService {
         case .notificationPosted:
             notificationHandler?.handleMessage(message)
         case .deviceInfoResponse(let info):
-            if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
-                connectedDevices[idx].deviceInfo = info
-            }
+            setDeviceInfo(info, for: connectionId)
         case .wallpaperResponse(let imageBase64):
             if let idx = connectedDevices.firstIndex(where: { $0.connectionId == connectionId }) {
                 connectedDevices[idx].wallpaper = imageBase64.isEmpty ? nil : Data(base64Encoded: imageBase64)
