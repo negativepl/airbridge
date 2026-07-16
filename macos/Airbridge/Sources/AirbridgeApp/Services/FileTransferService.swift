@@ -47,6 +47,13 @@ final class FileTransferService: MessageHandler {
     /// Wait-for-accept timeout for outgoing offers — mirrors the phone's own
     /// 60 s offer timeout. Internal so tests can shorten it.
     @ObservationIgnored var offerAcceptTimeout: TimeInterval = 60
+    /// An accepted outgoing upload is considered dead after this long without
+    /// a progress callback (the phone vanished between accepting and its GET,
+    /// or mid-download). Internal so tests can shorten it.
+    @ObservationIgnored var uploadStallTimeout: TimeInterval = 30
+    /// Timestamp of the last outgoing-upload progress callback, watched by
+    /// the stall watchdog in `sendSingleFile`.
+    @ObservationIgnored private var lastOutgoingActivity = Date()
     /// All incoming offers awaiting one accept/reject (the phone can share many
     /// files at once — accept/reject must cover every offer, not just the last).
     /// Each offer remembers its originating connection so the accept/reject
@@ -343,6 +350,7 @@ final class FileTransferService: MessageHandler {
             let onProgress: @Sendable (Int64, Int64) -> Void = { [weak self] sent, total in
                 Task { @MainActor in
                     guard let self else { return }
+                    self.lastOutgoingActivity = Date()
                     let progress = total > 0 ? Double(sent) / Double(total) : 0
                     // Clamp away from 0 so the view state computation
                     // doesn't briefly return .idle between "waiting for
@@ -448,22 +456,48 @@ final class FileTransferService: MessageHandler {
             // 6. Wait for phone's GET to finish streaming. Mac's
             //    HttpUploadServer fires onComplete via httpContinuation
             //    when the last chunk lands (or on any transport error).
+            //    HttpUploadServer has no failure signal for a GET that never
+            //    arrives (phone died right after accepting) — a stall
+            //    watchdog fails the wait when progress stops for too long.
+            self.lastOutgoingActivity = Date()
+            let stallTimeout = self.uploadStallTimeout
+            let watchdog = Task { @MainActor [weak self] in
+                let interval = max(0.05, min(5, stallTimeout / 3))
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    guard !Task.isCancelled, let self else { return }
+                    if Date().timeIntervalSince(self.lastOutgoingActivity) > stallTimeout {
+                        httpContinuation.yield(false)
+                        httpContinuation.finish()
+                        return
+                    }
+                }
+            }
             var success = false
             for await result in httpStream {
                 success = result
                 break
             }
+            watchdog.cancel()
 
             if success {
                 self.fileTransferProgress = 1.0
                 self.playReceiveSound()
                 TransferPopup.shared.hide()
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             } else {
+                // Transport error or stall — drop the registration so a late
+                // GET can't fetch a transfer the UI already reported as
+                // failed, then show the transient failure state.
+                await connectionService.httpServer.unregisterOutgoingFile(transferId: transferId)
                 self.fileTransferProgress = 0
-                TransferPopup.shared.hide()
+                self.isFailed = true
+                TransferPopup.shared.hide(delay: 2.0)
+                // Same reset choreography as the rejected/failed offer branch.
+                try? await Task.sleep(nanoseconds: 2_800_000_000)
+                self.isFailed = false
             }
 
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
             self.fileTransferProgress = 0
             self.fileTransferFileName = ""
             self.isSendingFromQueue = false

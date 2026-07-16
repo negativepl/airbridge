@@ -84,6 +84,25 @@ final class FileTransferServiceStabilityTests: XCTestCase {
         XCTAssertFalse(service.isFailed)
     }
 
+    // MARK: - Finding 2: upload completion wait must not hang forever
+
+    /// After the phone accepts, no upload progress within the stall timeout
+    /// must fail the transfer instead of leaving the island on "Sending"
+    /// with no way out.
+    func testUploadStallTimeoutFailsTransfer() async {
+        service.uploadStallTimeout = 0.3
+        service.sendFile(url: tempFile)
+        let waiting = await waitUntil { self.service.isWaitingForAccept }
+        XCTAssertTrue(waiting)
+
+        // Phone accepts, then vanishes — its GET never arrives.
+        service.handleMessage(.fileTransferAccept(transferId: "any"))
+
+        let failed = await waitUntil { self.service.isFailed }
+        XCTAssertTrue(failed, "a stalled upload must fail instead of hanging in transferring state")
+        XCTAssertFalse(service.isWaitingForAccept)
+    }
+
     /// No accept/reject within the timeout must fail the wait (mirrors the
     /// phone's own 60 s offer timeout).
     func testOfferAcceptTimeoutFailsWait() async {
