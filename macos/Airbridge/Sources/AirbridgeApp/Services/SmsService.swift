@@ -99,6 +99,14 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         isLoadingMessages = false
         conversationsLoadFailed = false
         messagesLoadFailed = false
+        // Conversations and messages belong to the previous phone — clear
+        // them so they are never shown as the new device's data.
+        conversations = []
+        currentMessages = []
+        currentThreadId = nil
+        totalConversations = 0
+        totalMessages = 0
+        sendResult = nil
     }
 
     func handleMessage(_ message: Message) {

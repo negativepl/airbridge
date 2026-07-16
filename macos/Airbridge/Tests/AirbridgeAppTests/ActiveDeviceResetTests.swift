@@ -87,6 +87,56 @@ final class ActiveDeviceResetTests: XCTestCase {
         XCTAssertFalse(files.isLoading)
     }
 
+    // MARK: - Finding P2-2: silent re-target on active-device drop
+
+    /// When the active phone drops while another stays connected,
+    /// `activeDeviceId` silently re-targets. The previous device's data and
+    /// loading state must be cleared at that moment — no zombie spinner and
+    /// never data from two phones at once.
+    func testActiveDeviceDropClearsPreviousDeviceData() {
+        connection.upsertDevice(connectionId: "1.1.1.1:5", publicKey: "kA", name: "Phone A")
+        connection.upsertDevice(connectionId: "1.1.1.2:5", publicKey: "kB", name: "Phone B")
+        XCTAssertEqual(connection.activeDevice?.connectionId, "1.1.1.1:5")
+
+        // Device A's data is on screen; a messages load is in flight.
+        gallery.handleMessage(.galleryResponse(
+            photos: [GalleryPhotoMeta(id: "p1", filename: "a.jpg", dateTaken: 0, width: 1, height: 1, size: 1, mimeType: "image/jpeg")],
+            totalCount: 1, page: 0))
+        sms.handleMessage(.smsConversationsResponse(
+            conversations: [SmsConversationMeta(threadId: "t1", address: "1", displayName: "A", snippet: "", date: 0, messageCount: 1, unreadCount: 0)],
+            totalCount: 1, page: 0))
+        sms.loadMessages(threadId: "t1")
+        files.handleMessage(.filesListResponse(
+            path: "",
+            entries: [FileEntry(name: "a.txt", relativePath: "a.txt", isDirectory: false, size: 1, modified: 0, mimeType: "text/plain")],
+            totalCount: 1, page: 0, needsPermission: false))
+
+        // Active phone A drops; B remains — silent re-target.
+        connection.handleClientDisconnected("1.1.1.1:5")
+
+        XCTAssertEqual(connection.activeDevice?.connectionId, "1.1.1.2:5")
+        XCTAssertTrue(gallery.photos.isEmpty, "phone A's photos must not be shown as phone B's")
+        XCTAssertTrue(sms.conversations.isEmpty)
+        XCTAssertTrue(sms.currentMessages.isEmpty)
+        XCTAssertNil(sms.currentThreadId)
+        XCTAssertTrue(files.entries.isEmpty)
+        XCTAssertFalse(sms.isLoadingMessages, "no zombie spinner for the dropped device's request")
+    }
+
+    /// A non-active device dropping must not disturb the active device's data.
+    func testNonActiveDeviceDropKeepsActiveDeviceData() {
+        connection.upsertDevice(connectionId: "1.1.1.1:5", publicKey: "kA", name: "Phone A")
+        connection.upsertDevice(connectionId: "1.1.1.2:5", publicKey: "kB", name: "Phone B")
+        gallery.handleMessage(.galleryResponse(
+            photos: [GalleryPhotoMeta(id: "p1", filename: "a.jpg", dateTaken: 0, width: 1, height: 1, size: 1, mimeType: "image/jpeg")],
+            totalCount: 1, page: 0))
+
+        connection.handleClientDisconnected("1.1.1.2:5")
+
+        XCTAssertEqual(connection.activeDevice?.connectionId, "1.1.1.1:5")
+        XCTAssertEqual(gallery.photos.count, 1, "the active device's data must survive another phone's drop")
+    }
+
     /// A stale timeout-failure flag from the previous device must not survive
     /// a device change either.
     func testFailureFlagsResetOnDeviceChange() async {

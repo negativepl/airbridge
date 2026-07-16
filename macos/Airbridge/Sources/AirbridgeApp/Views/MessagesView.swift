@@ -44,8 +44,10 @@ struct MessagesView: View {
             }
         }
         .onChange(of: connectionService.activeDeviceId) { _, _ in
-            // Switched phones — reload conversations from the new device (page 0
-            // resets the list).
+            // Switched phones — the selected conversation belonged to the
+            // previous device; drop it and reload conversations from the new
+            // one (page 0 resets the list).
+            selectedConversation = nil
             if connectionService.isConnected { smsService.loadConversations() }
         }
         .navigationTitle(navTitle)

@@ -351,6 +351,19 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
         statsWatchdogTask?.cancel()
         isLoading = false
         loadFailed = false
+        // The listing belongs to the previous phone (paths differ per device)
+        // — clear it so it is never shown as the new device's contents.
+        entries = []
+        thumbnails = [:]
+        folderStats = [:]
+        requestedThumbnails = []
+        requestedFolderStats = []
+        failedFolderStats = []
+        totalCount = 0
+        currentPage = 0
+        currentPath = ""
+        needsPermission = false
+        hasLoadedOnce = false
     }
 
     // MARK: - MessageHandler

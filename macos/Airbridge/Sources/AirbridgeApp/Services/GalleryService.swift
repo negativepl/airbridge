@@ -118,13 +118,20 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
     // MARK: - ActiveDeviceObserver
 
     /// The device our requests target changed (switch, drop, or disconnect):
-    /// any in-flight listing belongs to the previous phone — drop its
-    /// loading/failure state so the next load is neither blocked nor
-    /// mislabeled as failed.
+    /// any in-flight listing and all cached data belong to the previous phone
+    /// — drop them so the next load is neither blocked nor mislabeled as
+    /// failed, and the old phone's photos are never shown as the new one's.
     func activeDeviceChanged() {
         loadWatchdogTask?.cancel()
         isLoading = false
         loadFailed = false
+        photos = []
+        thumbnailImages = [:]
+        previewImages = [:]
+        requestedThumbnails = []
+        requestedPreviews = []
+        totalCount = 0
+        currentPage = 0
     }
 
     // MARK: - MessageHandler

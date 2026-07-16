@@ -784,6 +784,33 @@ final class ConnectionService {
         }
     }
 
+    /// One client dropped (server callback; internal so tests can drive it).
+    /// `endpoint` is the connectionId ("host:port") — removes just that device,
+    /// leaving any other connected phones intact, and cleans every piece of
+    /// state that referenced it.
+    func handleClientDisconnected(_ endpoint: String) {
+        connectedDevices.removeAll { $0.connectionId == endpoint }
+        refreshAllowedUploadHosts()
+        ensureActiveDeviceValid()
+        // Drop only this device's pending offers — other phones' offers
+        // (and their in-flight uploads) stay untouched.
+        fileTransferService?.deviceDisconnected(connectionId: endpoint)
+        Diag.log("Connection", "client disconnected: \(endpoint) — remaining=\(connectedDevices.count)")
+        if connectedDevices.isEmpty {
+            // Dismiss any incoming-file popup orphaned by the dropped link.
+            fileTransferService?.connectionLost()
+            // Stale headphone/handoff state belonged to the phone that just
+            // dropped — clear it rather than showing it against nothing.
+            phoneHeadphoneState = nil
+            handoffTimeoutTask?.cancel()
+            headphoneHandoffPhase = .idle
+            if !manuallyDisconnected {
+                statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
+                phase = .listening
+            }
+        }
+    }
+
     // MARK: - Server Callbacks
 
     private func configureServerCallbacks() async {
@@ -795,29 +822,7 @@ final class ConnectionService {
         let onConnect: @Sendable (String) -> Void = { _ in }
         let onDisconnect: @Sendable (String) -> Void = { [weak self] endpoint in
             Task { @MainActor in
-                guard let self else { return }
-                // `endpoint` is the connectionId ("host:port") — drop just that device,
-                // leaving any other connected phones intact.
-                self.connectedDevices.removeAll { $0.connectionId == endpoint }
-                self.refreshAllowedUploadHosts()
-                self.ensureActiveDeviceValid()
-                // Drop only this device's pending offers — other phones' offers
-                // (and their in-flight uploads) stay untouched.
-                self.fileTransferService?.deviceDisconnected(connectionId: endpoint)
-                Diag.log("Connection", "client disconnected: \(endpoint) — remaining=\(self.connectedDevices.count)")
-                if self.connectedDevices.isEmpty {
-                    // Dismiss any incoming-file popup orphaned by the dropped link.
-                    self.fileTransferService?.connectionLost()
-                    // Stale headphone/handoff state belonged to the phone that just
-                    // dropped — clear it rather than showing it against nothing.
-                    self.phoneHeadphoneState = nil
-                    self.handoffTimeoutTask?.cancel()
-                    self.headphoneHandoffPhase = .idle
-                    if !self.manuallyDisconnected {
-                        self.statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
-                        self.phase = .listening
-                    }
-                }
+                self?.handleClientDisconnected(endpoint)
             }
         }
         await server.setCallbacks(
