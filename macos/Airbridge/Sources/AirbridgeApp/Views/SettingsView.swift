@@ -48,6 +48,7 @@ struct SettingsView: View {
             quickDropSection
             fileTransferSection
             updateSection
+            diagnosticsSection
         }
         .onAppear {
             pairingService.refreshPairedDevices()
@@ -486,6 +487,35 @@ struct SettingsView: View {
                 }
             }
         }
+
+    private var diagnosticsSection: some View {
+        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Diagnostyka" : "Diagnostics"),
+                     systemImage: "doc.text.magnifyingglass") {
+            HStack {
+                Text(L10n.isPL
+                     ? "Zapisz plik tekstowy z wersją aplikacji, stanem połączenia i ostatnimi wpisami dziennika. Plik pozostaje na tym Macu — nic nie jest wysyłane."
+                     : "Save a text file with the app version, connection state, and recent log entries. The file stays on this Mac — nothing is uploaded.")
+                    .font(.ab(.body))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(L10n.isPL ? "Zapisz raport diagnostyczny" : "Save diagnostic report") {
+                    saveDiagnosticReport()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.extraLarge)
+            }
+        }
+    }
+
+    private func saveDiagnosticReport() {
+        let report = DiagnosticReportService.makeReport(connectionService: connectionService)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = DiagnosticReport.suggestedFileName()
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            try? report.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
 
     private var checkButton: some View {
         Button(L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates") {
