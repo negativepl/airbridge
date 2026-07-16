@@ -88,19 +88,19 @@ public final class MirrorService {
     }
     public func setQuality(_ slot: MirrorSlot, _ q: MirrorQuality) {
         quality[slot.rawValue] = q
-        Self.persist(slot, q)
+        Self.persist(slot, q, in: defaults)
     }
 
-    private static func persist(_ slot: MirrorSlot, _ q: MirrorQuality) {
-        let d = UserDefaults.standard, p = "mirrorQ.\(slot.rawValue)."
+    private static func persist(_ slot: MirrorSlot, _ q: MirrorQuality, in d: UserDefaults) {
+        let p = "mirrorQ.\(slot.rawValue)."
         d.set(q.fps, forKey: p + "fps")
         d.set(q.bitrateBps, forKey: p + "bitrate")
         d.set(q.bitrateAuto, forKey: p + "auto")
         d.set(q.resolutionScale, forKey: p + "scale")
         d.set(q.useHEVC, forKey: p + "hevc")
     }
-    private static func load(_ slot: MirrorSlot) -> MirrorQuality? {
-        let d = UserDefaults.standard, p = "mirrorQ.\(slot.rawValue)."
+    private static func load(_ slot: MirrorSlot, from d: UserDefaults) -> MirrorQuality? {
+        let p = "mirrorQ.\(slot.rawValue)."
         guard d.object(forKey: p + "fps") != nil else { return nil }
         return MirrorQuality(
             fps: d.integer(forKey: p + "fps"),
@@ -167,6 +167,9 @@ public final class MirrorService {
     /// public-key prefix). Checks ALL paired devices, so any connected phone —
     /// not just the first — can open the mirror.
     private var mirrorTokenValidator: (Data) -> Bool
+    /// Backing store for per-mode quality — injected so tests can isolate
+    /// state in a throwaway suite instead of leaking through `.standard`.
+    private let defaults: UserDefaults
     private var decoder: VideoDecoder?
     // Reverse mirror (Mac -> phone)
     private var reversePipeline: ReverseMirrorPipeline?
@@ -179,14 +182,17 @@ public final class MirrorService {
     private var fpsWindowStartedAt = Date()
     private var fpsFrameCount = 0
 
-    public init(port: UInt16 = 8767, mirrorTokenValidator: @escaping (Data) -> Bool = { _ in false }) {
+    public init(port: UInt16 = 8767,
+                mirrorTokenValidator: @escaping (Data) -> Bool = { _ in false },
+                defaults: UserDefaults = .standard) {
         self.mirrorTokenValidator = mirrorTokenValidator
         self.server = WebSocketServer(port: port)
+        self.defaults = defaults
 
         // Load per-mode quality, migrating legacy single-setting keys into the
         // forward slot on first run. Built into a local first (self isn't fully
         // initialized until the streams below are set).
-        let d = UserDefaults.standard
+        let d = defaults
         let legacyForward = MirrorQuality(
             fps: (d.object(forKey: Self.fpsKey) as? Int) ?? Self.defaultQuality.fps,
             bitrateBps: (d.object(forKey: Self.bitrateKey) as? Int) ?? Self.defaultQuality.bitrateBps,
@@ -196,7 +202,7 @@ public final class MirrorService {
         var loadedQuality: [Int: MirrorQuality] = [:]
         for slot in MirrorSlot.allCases {
             let fallback = (slot == .forward) ? legacyForward : Self.defaultQuality
-            loadedQuality[slot.rawValue] = Self.load(slot) ?? fallback
+            loadedQuality[slot.rawValue] = Self.load(slot, from: d) ?? fallback
         }
         self.quality = loadedQuality
     }
@@ -229,7 +235,12 @@ public final class MirrorService {
     }
 
     public func stop() async {
-        await server.disconnectAllClients()
+        // Fully stop the server (cancels connections AND the NWListener,
+        // suspending until the listener reports .cancelled). Merely kicking
+        // clients used to leave the listener alive: its handlers kept firing
+        // during test teardown (sporadic signal 11) and the port stayed bound,
+        // so a later start() on the fixed port failed with "address in use".
+        await server.stop()
         authenticatedMirrorConnections.removeAll()
         stopReverseMirror()
         actualPort = nil

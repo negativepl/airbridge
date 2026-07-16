@@ -12,11 +12,23 @@ import Foundation
 @MainActor
 struct MirrorIntegrationTests {
 
+    /// Quality settings live in UserDefaults; a throwaway suite keeps each
+    /// test run at the documented defaults instead of whatever a previous run
+    /// (or the host app) persisted under `.standard`.
+    private static func freshDefaults() -> UserDefaults {
+        let name = "MirrorIntegrationTests"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
     /// Verify HELLO with the correct token receives a HELLO_ACK reply.
     @Test("Server replies HELLO_ACK to HELLO with valid token")
     func handshakeAcceptsValidToken() async throws {
         let token = Data(repeating: 0xAB, count: 16)
-        let service = MirrorService(port: 0, mirrorTokenValidator: { $0 == token })
+        let service = MirrorService(port: 0,
+                                    mirrorTokenValidator: { $0 == token },
+                                    defaults: Self.freshDefaults())
         service.tlsIdentity = TLSTestSupport.identity
         try await service.start()
         guard let port = service.actualPort else {
@@ -46,15 +58,19 @@ struct MirrorIntegrationTests {
             Issue.record("Expected HELLO_ACK, got \(decoded)")
             return
         }
-        // The exact numbers depend on persisted per-mode quality settings
-        // (UserDefaults leaks between runs) — assert shape, not values.
-        #expect(bitrate > 0)
-        #expect(fps > 0)
-        #expect(kf > 0)
-        #expect(w > 0)
-        #expect(h > 0)
+        // Defaults are isolated per test (fresh suite), so the ACK is fully
+        // deterministic: default quality (60 fps, auto bitrate, scale 1.0)
+        // against the 1080x2376 screen advertised in HELLO.
+        #expect(fps == 60)
+        #expect(kf == 5)
+        #expect(w == 1080)
+        #expect(h == 2376)
+        // Auto bitrate: 1080 * 2376 * 60 fps * 0.07 bits/pixel/frame,
+        // clamped to [6 Mbps, 35 Mbps].
+        #expect(bitrate == 10_777_536)
 
         task.cancel(with: .normalClosure, reason: nil)
+        session.invalidateAndCancel()
         await service.stop()
     }
 
@@ -63,7 +79,9 @@ struct MirrorIntegrationTests {
     func handshakeRejectsBadToken() async throws {
         let validToken = Data(repeating: 0xAB, count: 16)
         let badToken = Data(repeating: 0xCD, count: 16)
-        let service = MirrorService(port: 0, mirrorTokenValidator: { $0 == validToken })
+        let service = MirrorService(port: 0,
+                                    mirrorTokenValidator: { $0 == validToken },
+                                    defaults: Self.freshDefaults())
         service.tlsIdentity = TLSTestSupport.identity
         try await service.start()
         guard let port = service.actualPort else {
@@ -93,6 +111,7 @@ struct MirrorIntegrationTests {
         }
 
         task.cancel(with: .normalClosure, reason: nil)
+        session.invalidateAndCancel()
         await service.stop()
     }
 }
