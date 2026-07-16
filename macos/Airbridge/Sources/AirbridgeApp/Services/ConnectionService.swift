@@ -26,6 +26,16 @@ extension MessageHandler {
     }
 }
 
+/// Implemented by handlers whose in-flight request state is keyed to the
+/// active device (Gallery, SMS, Files). Called whenever `activeDeviceId`
+/// changes — a manual switch, the active device dropping (silent re-target
+/// to another phone), or a full disconnect — so stale loading state from the
+/// previous device never blocks or mislabels the next one.
+@MainActor
+protocol ActiveDeviceObserver: AnyObject {
+    func activeDeviceChanged()
+}
+
 /// Manages WebSocket + HTTP server lifecycle, Bonjour advertisement,
 /// authentication, and message routing to registered handlers.
 /// Machine-readable connection state. Views must branch on this instead of
@@ -89,7 +99,18 @@ final class ConnectionService {
 
     func setActiveDevice(_ connectionId: String) {
         guard connectedDevices.contains(where: { $0.connectionId == connectionId }) else { return }
-        activeDeviceId = connectionId
+        updateActiveDeviceId(connectionId)
+    }
+
+    /// Single funnel for `activeDeviceId` mutations — notifies device-scoped
+    /// handlers when the value actually changes so they can drop in-flight
+    /// state that belonged to the previous device.
+    private func updateActiveDeviceId(_ newId: String?) {
+        guard newId != activeDeviceId else { return }
+        activeDeviceId = newId
+        for handler in [galleryHandler, smsHandler, filesHandler] {
+            (handler as? ActiveDeviceObserver)?.activeDeviceChanged()
+        }
     }
 
     /// Send a message only to the active device. No-op when none is connected.
@@ -575,7 +596,7 @@ final class ConnectionService {
     /// recent connection when unset, and re-targets when the active one drops.
     private func ensureActiveDeviceValid() {
         if let id = activeDeviceId, connectedDevices.contains(where: { $0.connectionId == id }) { return }
-        activeDeviceId = connectedDevices.last?.connectionId
+        updateActiveDeviceId(connectedDevices.last?.connectionId)
     }
 
     /// Bumped on every successful pairing so the pairing UI can advance to the

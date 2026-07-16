@@ -19,7 +19,7 @@ struct FolderStats: Equatable {
 
 @Observable
 @MainActor
-final class FilesBrowserService: MessageHandler {
+final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
 
     private(set) var currentPath: String = ""
     private(set) var entries: [FileEntry] = []
@@ -338,6 +338,19 @@ final class FilesBrowserService: MessageHandler {
         for url in urls {
             fileTransferService.sendFile(url: url, destinationDir: currentPath)
         }
+    }
+
+    // MARK: - ActiveDeviceObserver
+
+    /// The device our requests target changed (switch, drop, or disconnect):
+    /// any in-flight listing/stats request belongs to the previous phone —
+    /// drop its loading/failure state so the next load is neither blocked
+    /// nor mislabeled as failed.
+    func activeDeviceChanged() {
+        listWatchdogTask?.cancel()
+        statsWatchdogTask?.cancel()
+        isLoading = false
+        loadFailed = false
     }
 
     // MARK: - MessageHandler

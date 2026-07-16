@@ -4,7 +4,7 @@ import Protocol
 
 @Observable
 @MainActor
-final class GalleryService: MessageHandler {
+final class GalleryService: MessageHandler, ActiveDeviceObserver {
 
     private(set) var photos: [GalleryPhotoMeta] = []
     private(set) var thumbnailImages: [String: NSImage] = [:]  // photoId -> cached small thumb
@@ -113,6 +113,18 @@ final class GalleryService: MessageHandler {
         Task {
             try? await connectionService.sendToActive(message)
         }
+    }
+
+    // MARK: - ActiveDeviceObserver
+
+    /// The device our requests target changed (switch, drop, or disconnect):
+    /// any in-flight listing belongs to the previous phone — drop its
+    /// loading/failure state so the next load is neither blocked nor
+    /// mislabeled as failed.
+    func activeDeviceChanged() {
+        loadWatchdogTask?.cancel()
+        isLoading = false
+        loadFailed = false
     }
 
     // MARK: - MessageHandler

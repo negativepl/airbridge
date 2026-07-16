@@ -4,7 +4,7 @@ import Protocol
 
 @Observable
 @MainActor
-final class SmsService: MessageHandler {
+final class SmsService: MessageHandler, ActiveDeviceObserver {
 
     private(set) var conversations: [SmsConversationMeta] = []
     private(set) var currentMessages: [SmsMessageMeta] = []
@@ -86,6 +86,19 @@ final class SmsService: MessageHandler {
         Task {
             try? await connectionService.sendToActive(Message.smsSendRequest(address: address, body: body))
         }
+    }
+
+    /// The device our requests target changed (switch, drop, or disconnect):
+    /// any in-flight load belongs to the previous phone — drop its
+    /// loading/failure state so the stale `isLoading*` guards cannot reject
+    /// the reload for the new device (the "empty list forever" bug).
+    func activeDeviceChanged() {
+        conversationsWatchdogTask?.cancel()
+        messagesWatchdogTask?.cancel()
+        isLoadingConversations = false
+        isLoadingMessages = false
+        conversationsLoadFailed = false
+        messagesLoadFailed = false
     }
 
     func handleMessage(_ message: Message) {
