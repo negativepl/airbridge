@@ -94,6 +94,10 @@ Move your Bluetooth headphones between the phone and the Mac with one click — 
 
 > This feature is in **beta**: manual transfer is solid; switching suggestions may occasionally not appear depending on how apps hold the audio device.
 
+**Known limitations**
+
+- **LE Audio devices** (e.g. Galaxy Buds4 Pro) may not release cleanly when handing off away from the Mac: macOS exposes only the classic BR/EDR link to applications, so the release tears down that link while the LE Audio stream can remain active. If the headphones do not switch, toggle them off and on or reconnect them manually on the target device.
+
 ### Clipboard Sync
 Copy text on your phone, paste on your Mac — and vice versa. Works automatically in the background. Supports plain text and HTML.
 
