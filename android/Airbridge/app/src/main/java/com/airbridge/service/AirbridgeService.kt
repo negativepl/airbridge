@@ -549,15 +549,19 @@ class AirbridgeService : Service() {
                                 transferFileName.value = offer.filename
                                 transferIsSending.value = false
                                 transferProgress.value = 0f
+                                val entry = IncomingDownload(transferId, offer.filename)
+                                incomingDownload = entry
                                 val tempFile = httpFileDownloader.download(
                                     host = host,
                                     port = port,
                                     certFingerprint = webSocketClient.certFingerprintInUse,
                                     transferId = transferId,
-                                    filenameHint = offer.filename
+                                    filenameHint = offer.filename,
+                                    onCallCreated = { entry.call = it }
                                 ) { bytesReceived, totalBytes ->
                                     updateTransferProgress(offer.filename, bytesReceived, totalBytes)
                                 }
+                                incomingDownload = null
                                 if (tempFile != null) {
                                     val destDir = offer.destinationDir
                                     if (destDir != null) {
@@ -566,10 +570,25 @@ class AirbridgeService : Service() {
                                         finalizeReceivedFile(offer.filename, tempFile)
                                     }
                                 } else {
-                                    Log.e(TAG, "Download failed for ${offer.filename}")
+                                    Log.e(TAG, "Download failed for ${offer.filename} (cancelled=${entry.cancelled})")
                                     transferProgress.value = null
                                     transferFileName.value = null
-                                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(4)
+                                    val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                                    manager.cancel(4)
+                                    // A user-initiated cancel is not an error — the
+                                    // cancel handler already cleaned up the UI. Only a
+                                    // real failure (stall timeout, connection loss)
+                                    // gets the error notification.
+                                    if (!entry.cancelled) {
+                                        val notif = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                                            .setContentTitle(getString(com.airbridge.R.string.notification_title_receive_error))
+                                            .setContentText(offer.filename)
+                                            .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                                            .setContentIntent(openAppPendingIntent())
+                                            .setAutoCancel(true)
+                                            .build()
+                                        manager.notify(3, notif)
+                                    }
                                 }
                             }
                         } else {
@@ -600,12 +619,27 @@ class AirbridgeService : Service() {
                 }
             }
             ACTION_CANCEL_TRANSFER -> {
+                // Incoming (Mac→phone) download: abort the blocking GET —
+                // the download coroutine sees the failed call, and because
+                // `cancelled` is set it cleans up silently instead of posting
+                // the receive-error notification.
+                val incoming = incomingDownload
+                if (incoming != null) {
+                    Log.d(TAG, "Cancelling incoming download ${incoming.filename}")
+                    incoming.cancelled = true
+                    incoming.call?.cancel()
+                    // Tell the Mac to drop its /send registration for this
+                    // transfer instead of waiting for the socket to die.
+                    webSocketClient.send(Message.FileTransferCancel(incoming.transferId))
+                }
                 // No per-file UI exists for outgoing sends — the transfer card
                 // is global — so a cancel tap aborts every in-flight outgoing
                 // transfer (relevant when ACTION_SEND_MULTIPLE started several
                 // at once), not just one.
                 if (outgoingTransfers.isEmpty()) {
-                    Log.d(TAG, "ACTION_CANCEL_TRANSFER: no pending outgoing transfer")
+                    if (incoming == null) {
+                        Log.d(TAG, "ACTION_CANCEL_TRANSFER: no transfer in flight")
+                    }
                 } else {
                     Log.d(TAG, "Cancelling ${outgoingTransfers.size} outgoing transfer(s)")
                     outgoingTransfers.forEach { (id, entry) ->
@@ -913,6 +947,18 @@ class AirbridgeService : Service() {
     // transferId -> its OutgoingTransfer. Entries are removed once the
     // transfer finishes/fails/times out/is cancelled.
     private val outgoingTransfers = java.util.concurrent.ConcurrentHashMap<String, OutgoingTransfer>()
+
+    private class IncomingDownload(val transferId: String, val filename: String) {
+        // Same cancellation contract as OutgoingTransfer.call: OkHttp cancels
+        // are thread-safe and abort the blocking download from any thread.
+        @Volatile var call: okhttp3.Call? = null
+
+        @Volatile var cancelled: Boolean = false
+    }
+
+    // The accepted Mac→phone transfer currently downloading (the transfer
+    // card is single-slot, so at most one). Cleared when the download ends.
+    @Volatile private var incomingDownload: IncomingDownload? = null
 
     private fun setupHttpFileServer() {
         // Deliberately NOT started: the Mac cannot initiate outbound TCP to

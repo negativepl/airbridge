@@ -81,11 +81,13 @@
     <string name="notification_running_background">Running in background</string>
     <string name="notification_title_file_sent">File sent</string>
     <string name="notification_title_file_error">Send failed</string>
+    <string name="notification_title_receive_error">Receive failed</string>
     <string name="notification_title_file_received">File received</string>
     <string name="notification_title_file_rejected">File rejected</string>
     <string name="notification_title_receiving">Receiving file from %s</string>
     <string name="notification_title_sending">Sending to %s</string>
     <string name="transfer_sending">Sending…</string>
+    <string name="transfer_receiving">Receiving…</string>
     <string name="notification_accept_file">%s wants to send you a file</string>
     <string name="notification_accept_file_detail">%1$s (%2$s)</string>
     <string name="notification_accept">Accept</string>

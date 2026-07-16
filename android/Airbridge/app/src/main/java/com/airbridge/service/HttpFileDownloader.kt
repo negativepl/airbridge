@@ -19,17 +19,28 @@ import java.util.concurrent.TimeUnit
  * server roles for Mac→phone transfers. Android initiates outbound — phone
  * has no LNP restriction — Mac only accepts incoming, which always works.
  */
-class HttpFileDownloader {
+class HttpFileDownloader(
+    // Injectable so unit tests can exercise the stall path without waiting
+    // out the production timeout.
+    private val readTimeoutMs: Long = DEFAULT_READ_TIMEOUT_MS
+) {
 
     companion object {
         private const val TAG = "HttpFileDownloader"
         private const val BUFFER_SIZE = 256 * 1024 // 256 KB read buffer
+        // OkHttp's read timeout is per read operation, so any byte arriving
+        // resets it — 30 s therefore means "no data at all for 30 s", i.e. a
+        // stalled sender, not a slow link. The previous 5-minute value froze
+        // the transfer UI for the full duration when the Mac stalled.
+        const val DEFAULT_READ_TIMEOUT_MS = 30_000L
     }
 
     /**
      * Download a file from the given host/port for the given transferId.
      * On success returns the temp file. On failure returns null.
-     * `onProgress` fires as bytes arrive with (bytesReceived, totalBytes).
+     * `onCallCreated` hands out the OkHttp Call so the caller can cancel the
+     * transfer from another thread; `onProgress` fires as bytes arrive with
+     * (bytesReceived, totalBytes).
      */
     fun download(
         host: String,
@@ -37,6 +48,7 @@ class HttpFileDownloader {
         certFingerprint: String,
         transferId: String,
         filenameHint: String,
+        onCallCreated: (okhttp3.Call) -> Unit = {},
         onProgress: (bytesReceived: Long, totalBytes: Long) -> Unit
     ): File? {
         // Built per call: the TLS pin is per-host, so the client cannot be a
@@ -44,7 +56,7 @@ class HttpFileDownloader {
         val client = PinnedTls.apply(
             OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.MINUTES),
+                .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS),
             certFingerprint
         ).build()
         val url = "https://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/send/$transferId"
@@ -52,8 +64,11 @@ class HttpFileDownloader {
 
         val request = Request.Builder().url(url).get().build()
 
+        var tempFile: File? = null
         return try {
-            val response = client.newCall(request).execute()
+            val call = client.newCall(request)
+            onCallCreated(call)
+            val response = call.execute()
             if (!response.isSuccessful) {
                 Log.e(TAG, "Download failed: HTTP ${response.code}")
                 response.close()
@@ -65,10 +80,11 @@ class HttpFileDownloader {
             // URL-encoded in X-Filename; we already have `filenameHint` from
             // the offer message, so just strip path separators from it).
             val safeName = filenameHint.replace('/', '_').replace('\\', '_')
-            val tempFile = File.createTempFile("airbridge_", "_$safeName")
+            val outFile = File.createTempFile("airbridge_", "_$safeName")
+            tempFile = outFile
             val digest = MessageDigest.getInstance("SHA-256")
             response.body.byteStream().use { input ->
-                FileOutputStream(tempFile).use { out ->
+                FileOutputStream(outFile).use { out ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var totalRead = 0L
                     var read: Int
@@ -89,14 +105,17 @@ class HttpFileDownloader {
                 val actual = digest.digest().joinToString("") { "%02x".format(it) }
                 if (!actual.equals(expectedChecksum, ignoreCase = true)) {
                     Log.e(TAG, "Checksum mismatch: expected $expectedChecksum, got $actual")
-                    tempFile.delete()
+                    outFile.delete()
                     return null
                 }
             }
-            Log.d(TAG, "Download complete: ${tempFile.absolutePath}")
-            tempFile
+            Log.d(TAG, "Download complete: ${outFile.absolutePath}")
+            outFile
         } catch (e: Exception) {
             Log.e(TAG, "Download exception", e)
+            // A stall/cancel mid-stream leaves a partial temp file behind —
+            // remove it, nothing will consume it.
+            tempFile?.delete()
             null
         } finally {
             // The per-call client would otherwise leave a live Dispatcher and

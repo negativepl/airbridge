@@ -81,11 +81,13 @@
     <string name="notification_running_background">Działa w tle</string>
     <string name="notification_title_file_sent">Plik wysłany</string>
     <string name="notification_title_file_error">Błąd wysyłania</string>
+    <string name="notification_title_receive_error">Błąd odbierania</string>
     <string name="notification_title_file_received">Plik odebrany</string>
     <string name="notification_title_file_rejected">Plik odrzucony</string>
     <string name="notification_title_receiving">Odbieram plik od %s</string>
     <string name="notification_title_sending">Wysyłam do %s</string>
     <string name="transfer_sending">Wysyłanie…</string>
+    <string name="transfer_receiving">Odbieranie…</string>
     <string name="notification_accept_file">%s chce wysłać Ci plik</string>
     <string name="notification_accept_file_detail">%1$s (%2$s)</string>
     <string name="notification_accept">Akceptuj</string>

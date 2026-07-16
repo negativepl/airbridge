@@ -387,9 +387,13 @@ fun MainScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val transferIsSending by viewModel.transferIsSending.collectAsState()
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = stringResource(R.string.transfer_sending),
+                                text = stringResource(
+                                    if (transferIsSending) R.string.transfer_sending
+                                    else R.string.transfer_receiving
+                                ),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -408,19 +412,15 @@ fun MainScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        // Cancel applies only to OUTGOING transfers (offer wait +
-                        // upload); the service has no handle on an incoming
-                        // download, so hide the button there instead of showing
-                        // a dead control.
-                        val transferIsSending by viewModel.transferIsSending.collectAsState()
-                        if (transferIsSending) {
-                            IconButton(onClick = { viewModel.cancelTransfer() }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = stringResource(R.string.transfer_cancel),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
+                        // Cancel covers both directions: outgoing (offer wait +
+                        // upload) and incoming (the service aborts the blocking
+                        // GET via the tracked OkHttp call).
+                        IconButton(onClick = { viewModel.cancelTransfer() }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.transfer_cancel),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
 
