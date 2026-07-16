@@ -158,8 +158,6 @@
     <string name="headphone_takeover_in_progress">Przenoszenie słuchawek…</string>
     <string name="headphone_takeover_failed">Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami.</string>
     <string name="headphone_takeover_done">Słuchawki przeniesione na telefon</string>
-    <string name="headphone_auto_switched_phone">Słuchawki przełączone na telefon</string>
-    <string name="headphone_move_back">Przenieś z powrotem</string>
     <string name="headphone_prompt_title">Słuchawki</string>
     <string name="headphone_prompt_text_phone">Przełączyć słuchawki na ten telefon?</string>
     <string name="headphone_prompt_action">Przełącz</string>
@@ -220,7 +218,6 @@
     <string name="screen_sharing_second_display">Telefon jako drugi monitor</string>
     <string name="screen_sharing_second_display_desc">Dodatkowy pulpit dopasowany do ekranu telefonu.</string>
     <string name="screen_sharing_connect_first">Połącz się z Makiem, aby udostępniać ekran.</string>
-    <string name="power_charging">Ładowanie</string>
     <string name="update_version_mismatch">Mac ma wersję AirBridge %1$s. Zaktualizuj obie aplikacje, aby zachować zgodność.</string>
     <string name="home_status_connected">Połączono</string>
     <string name="home_disconnect_confirm">Rozłączyć z %1$s?</string>

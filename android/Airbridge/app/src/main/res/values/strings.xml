@@ -154,8 +154,6 @@
     <string name="headphone_takeover_in_progress">Moving headphones…</string>
     <string name="headphone_takeover_failed">Headphone handoff failed. Make sure the headphones are on and paired with both devices.</string>
     <string name="headphone_takeover_done">Headphones moved to this phone</string>
-    <string name="headphone_auto_switched_phone">Headphones switched to this phone</string>
-    <string name="headphone_move_back">Move back</string>
     <string name="headphone_prompt_title">Headphones</string>
     <string name="headphone_prompt_text_phone">Switch the headphones to this phone?</string>
     <string name="headphone_prompt_action">Switch</string>
@@ -215,7 +213,6 @@
     <string name="screen_sharing_second_display">Phone as second display</string>
     <string name="screen_sharing_second_display_desc">An extra desktop shaped to your phone.</string>
     <string name="screen_sharing_connect_first">Connect to your Mac to share its screen.</string>
-    <string name="power_charging">Charging</string>
     <string name="update_version_mismatch">Your Mac runs AirBridge %1$s. Update both apps to keep them in sync.</string>
     <string name="home_status_connected">Connected</string>
     <string name="home_disconnect_confirm">Disconnect from %1$s?</string>
