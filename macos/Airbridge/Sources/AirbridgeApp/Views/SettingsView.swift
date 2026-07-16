@@ -122,13 +122,15 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        // Adding a device now lives in the window toolbar (next to
-                        // the device switcher), so the row stays a clean list item.
                         Button(L10n.isPL ? "Usuń" : "Remove", role: .destructive) {
                             vm.unpairDevice(publicKey: device.publicKeyBase64)
                         }
                         .controlSize(.extraLarge)
                     }
+                }
+                HStack {
+                    Spacer()
+                    addDeviceButton
                 }
             }
         }
