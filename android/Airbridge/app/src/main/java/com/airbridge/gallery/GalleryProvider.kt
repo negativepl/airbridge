@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import androidx.core.graphics.scale
 import android.util.Base64
 import android.util.Log
 import com.airbridge.protocol.PhotoMeta
@@ -127,7 +128,7 @@ class GalleryProvider(private val contentResolver: ContentResolver) {
                 val scale = targetSize.toFloat() / maxOf(bitmap.width, bitmap.height)
                 val newW = (bitmap.width * scale).toInt()
                 val newH = (bitmap.height * scale).toInt()
-                val scaled = Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+                val scaled = bitmap.scale(newW, newH)
                 if (scaled !== bitmap) bitmap.recycle()
                 scaled
             } else {

@@ -8,6 +8,8 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Base64
 import android.util.Log
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
 
 /**
@@ -44,7 +46,7 @@ object WallpaperProvider {
         if (drawable is BitmapDrawable && drawable.bitmap != null) return drawable.bitmap
         val w = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1080
         val h = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1920
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val bmp = createBitmap(w, h)
         val canvas = Canvas(bmp)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
@@ -57,6 +59,6 @@ object WallpaperProvider {
         val scale = maxDim.toFloat() / longEdge
         val w = (src.width * scale).toInt().coerceAtLeast(1)
         val h = (src.height * scale).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(src, w, h, true)
+        return src.scale(w, h)
     }
 }

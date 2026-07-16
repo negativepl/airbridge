@@ -2,6 +2,7 @@ package com.airbridge.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,7 +79,7 @@ class PairedDeviceStore(context: Context) {
     private fun save(devices: List<PairedDevice>) {
         val arr = JSONArray()
         devices.forEach { d -> arr.put(d.toJson()) }
-        prefs.edit().putString("devices", arr.toString()).apply()
+        prefs.edit { putString("devices", arr.toString()) }
         _revision.update { it + 1 }
     }
 }

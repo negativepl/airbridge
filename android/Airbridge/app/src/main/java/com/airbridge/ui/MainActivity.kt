@@ -1,6 +1,7 @@
 package com.airbridge.ui
 
 import android.content.ClipboardManager
+import androidx.core.content.edit
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
@@ -139,7 +140,7 @@ class MainActivity : ComponentActivity() {
                             pairedMacName = "Mac"
                             showPairingSuccess = true
                             viewModel.handlePairingPayload(payload)
-                            prefs.edit().putBoolean("onboarding_completed", true).apply()
+                            prefs.edit { putBoolean("onboarding_completed", true) }
                         },
                         onDismiss = {
                             showQrScanner = false
@@ -486,14 +487,14 @@ class MainActivity : ComponentActivity() {
                 } else {
                     OnboardingScreen(
                         onFinished = {
-                            prefs.edit().putBoolean("onboarding_completed", true).apply()
+                            prefs.edit { putBoolean("onboarding_completed", true) }
                             onboardingCompleted = true
                         },
                         onScanQr = {
                             showQrScanner = true
                         },
                         onSkipPairing = {
-                            prefs.edit().putBoolean("onboarding_completed", true).apply()
+                            prefs.edit { putBoolean("onboarding_completed", true) }
                             onboardingCompleted = true
                         }
                     )

@@ -2,6 +2,7 @@ package com.airbridge.stats
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,11 +76,11 @@ class StatsStore(context: Context) {
         val today = todayEpochDay(System.currentTimeMillis())
         val newDay = prefs.contains("stat_day") && prefs.getLong("stat_day", today) != today
         val next = applyDelta(_stats.value, newDay, delta)
-        val e = prefs.edit()
-        write(e, "today_", next.today)
-        write(e, "total_", next.total)
-        e.putLong("stat_day", today)
-        e.apply()
+        prefs.edit {
+            write(this, "today_", next.today)
+            write(this, "total_", next.total)
+            putLong("stat_day", today)
+        }
         _stats.value = next
     }
 

@@ -1,7 +1,7 @@
 package com.airbridge.ui
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -179,7 +179,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/negativepl"))
+                            Intent(Intent.ACTION_VIEW, "https://github.com/negativepl".toUri())
                         )
                     }
                 )
@@ -271,7 +271,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/negativepl/airbridge"))
+                            Intent(Intent.ACTION_VIEW, "https://github.com/negativepl/airbridge".toUri())
                         )
                     }
                 )
@@ -298,7 +298,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/negativepl/airbridge/issues"))
+                            Intent(Intent.ACTION_VIEW, "https://github.com/negativepl/airbridge/issues".toUri())
                         )
                     }
                 )

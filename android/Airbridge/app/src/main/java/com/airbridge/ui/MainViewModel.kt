@@ -3,6 +3,7 @@ package com.airbridge.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import com.airbridge.protocol.ContentType
 import com.airbridge.service.ActivityItem
@@ -179,7 +180,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Persist the mirror/pairing token so the phone can initiate screen
         // sharing (reverse mirror) on its own later.
         context.getSharedPreferences("airbridge_prefs", android.content.Context.MODE_PRIVATE)
-            .edit().putString("mirror_token", payload.pairingToken).apply()
+            .edit { putString("mirror_token", payload.pairingToken) }
 
         // Set pending pair request for when WebSocket connects. The Mac's key
         // from the QR is carried along so the service can verify that the

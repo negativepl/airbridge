@@ -13,6 +13,8 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import android.util.Log
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import com.airbridge.service.AirbridgeService
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -105,9 +107,9 @@ class NotificationRelayService : NotificationListenerService() {
     private fun encodeAppIcon(drawable: Drawable): String {
         val size = 96
         val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
-            Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+            drawable.bitmap.scale(size, size)
         } else {
-            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val bmp = createBitmap(size, size)
             val canvas = Canvas(bmp)
             drawable.setBounds(0, 0, size, size)
             drawable.draw(canvas)

@@ -251,7 +251,7 @@ private fun SettingsContent(
                                 checked = themeMode == value,
                                 onCheckedChange = {
                                     themeMode = value
-                                    prefs.edit().putString("theme_mode", value).apply()
+                                    prefs.edit { putString("theme_mode", value) }
                                     onThemeChanged(value)
                                 },
                                 modifier = Modifier
@@ -288,7 +288,7 @@ private fun SettingsContent(
                     if (uri != null) {
                         val path = uri.path?.replace("/tree/primary:", "/storage/emulated/0/") ?: return@rememberLauncherForActivityResult
                         downloadFolder = path
-                        prefs.edit().putString("download_folder", path).apply()
+                        prefs.edit { putString("download_folder", path) }
                     }
                 }
                 Card(
@@ -381,7 +381,7 @@ private fun SettingsContent(
                         role = Role.Switch,
                         onValueChange = {
                             vibrateOnSync = it
-                            prefs.edit().putBoolean("vibrate_on_sync", it).apply()
+                            prefs.edit { putBoolean("vibrate_on_sync", it) }
                         }
                     )
                 )
@@ -411,7 +411,7 @@ private fun SettingsContent(
                         role = Role.Switch,
                         onValueChange = {
                             autoConnect = it
-                            prefs.edit().putBoolean("auto_connect", it).apply()
+                            prefs.edit { putBoolean("auto_connect", it) }
                         }
                     )
                 )

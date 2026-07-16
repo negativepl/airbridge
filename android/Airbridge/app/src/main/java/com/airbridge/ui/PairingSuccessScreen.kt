@@ -29,7 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,7 +52,7 @@ fun PairingSuccessScreen(
     val connectedName by AirbridgeService.connectedDeviceName.collectAsState()
     val displayName = connectedName ?: deviceName
 
-    var phase by remember { mutableStateOf(0) } // 0 = pairing, 1 = success
+    var phase by remember { mutableIntStateOf(0) } // 0 = pairing, 1 = success
 
     val checkScale by animateFloatAsState(
         targetValue = if (phase == 1) 1f else 0f,

@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import androidx.core.content.IntentCompat
+import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -174,7 +176,7 @@ class AirbridgeService : Service() {
                 )
             }
             context.getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE)
-                .edit().putString(ACTIVITY_LOG_KEY, arr.toString()).apply()
+                .edit { putString(ACTIVITY_LOG_KEY, arr.toString()) }
         }
 
         fun loadActivityLog(context: Context) {
@@ -1069,8 +1071,8 @@ class AirbridgeService : Service() {
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                val accentColor = android.graphics.Color.parseColor("#4285F4")
-                val grayColor = android.graphics.Color.parseColor("#444444")
+                val accentColor = "#4285F4".toColorInt()
+                val grayColor = "#444444".toColorInt()
                 notifBuilder.style = Notification.ProgressStyle().apply {
                     this.progress = progressPercent
                     this.progressSegments = listOf(
@@ -1616,7 +1618,7 @@ class AirbridgeService : Service() {
                     Log.w(TAG, "MirrorStartRequest received but host=$host mirrorPort=$mirrorPort — ignoring")
                     return
                 }
-                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit().putString("mirror_token", message.token).apply()
+                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit { putString("mirror_token", message.token) }
                 val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
                 val intent = Intent(this, com.airbridge.mirror.MirrorActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1635,7 +1637,7 @@ class AirbridgeService : Service() {
                     Log.w(TAG, "ReverseMirrorStart received but host=$host mirrorPort=$mirrorPort — ignoring")
                     return
                 }
-                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit().putString("mirror_token", message.token).apply()
+                getSharedPreferences("airbridge_prefs", MODE_PRIVATE).edit { putString("mirror_token", message.token) }
                 val tokenBytes = android.util.Base64.decode(message.token, android.util.Base64.NO_WRAP)
                 val intent = Intent(this, com.airbridge.mirror.ReverseMirrorActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1868,8 +1870,8 @@ class AirbridgeService : Service() {
                 .setOnlyAlertOnce(true)
                 .setContentIntent(openIntent)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                val accentColor = android.graphics.Color.parseColor("#4285F4")
-                val grayColor = android.graphics.Color.parseColor("#444444")
+                val accentColor = "#4285F4".toColorInt()
+                val grayColor = "#444444".toColorInt()
                 notifBuilder.style = Notification.ProgressStyle().apply {
                     this.progress = progress
                     this.progressSegments = listOf(

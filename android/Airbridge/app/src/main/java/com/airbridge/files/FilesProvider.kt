@@ -10,6 +10,7 @@ import android.os.Environment
 import android.util.Base64
 import android.util.Log
 import android.webkit.MimeTypeMap
+import androidx.core.graphics.scale
 import com.airbridge.protocol.FileEntry
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -189,7 +190,7 @@ class FilesProvider(
         return try {
             val scale = 400f / maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
             val scaled = if (scale < 1f)
-                Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                bitmap.scale((bitmap.width * scale).toInt(), (bitmap.height * scale).toInt())
             else bitmap
             val out = ByteArrayOutputStream()
             scaled.compress(Bitmap.CompressFormat.JPEG, 75, out)

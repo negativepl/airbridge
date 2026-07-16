@@ -357,6 +357,11 @@ private fun HowItWorksPage() {
     }
 }
 
+// InlinedApi: POST_NOTIFICATIONS/READ_MEDIA_IMAGES (API 33) and
+// ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION (API 30) are compile-time inlined
+// string constants, safe to reference on minSdk 29; runtime use is guarded by the
+// SDK_INT >= TIRAMISU check in checkPerm()/the launchers below.
+@android.annotation.SuppressLint("InlinedApi")
 @Composable
 private fun PermissionsPage() {
     val context = LocalContext.current

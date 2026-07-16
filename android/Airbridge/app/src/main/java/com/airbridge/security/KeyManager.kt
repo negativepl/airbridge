@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.core.content.edit
 import java.security.KeyPairGenerator
 import java.security.KeyFactory
 import java.security.KeyStore
@@ -37,7 +38,7 @@ class KeyManager(context: Context) {
         val existing = prefs.getString("device_id", null)
         if (existing != null) return existing
         val newId = UUID.randomUUID().toString()
-        prefs.edit().putString("device_id", newId).apply()
+        prefs.edit { putString("device_id", newId) }
         return newId
     }
 
@@ -108,10 +109,10 @@ class KeyManager(context: Context) {
     private fun migratePrivateKeyIfNeeded(masterKey: SecretKey) {
         val plaintext = prefs.getString(PREF_PLAINTEXT, null) ?: return
         val blob = KeyCrypto.encrypt(masterKey, Base64.decode(plaintext, Base64.NO_WRAP))
-        prefs.edit()
-            .putString(PREF_ENC, Base64.encodeToString(blob, Base64.NO_WRAP))
-            .remove(PREF_PLAINTEXT)
-            .apply()
+        prefs.edit {
+            putString(PREF_ENC, Base64.encodeToString(blob, Base64.NO_WRAP))
+            remove(PREF_PLAINTEXT)
+        }
     }
 
     private fun loadPrivateKeyBytes(): ByteArray {
@@ -130,9 +131,9 @@ class KeyManager(context: Context) {
         val keyPair = kpg.generateKeyPair()
         val pubBase64 = Base64.encodeToString(keyPair.public.encoded, Base64.NO_WRAP)
         val privBlob = KeyCrypto.encrypt(masterKey(), keyPair.private.encoded)
-        prefs.edit()
-            .putString("public_key_base64", pubBase64)
-            .putString(PREF_ENC, Base64.encodeToString(privBlob, Base64.NO_WRAP))
-            .apply()
+        prefs.edit {
+            putString("public_key_base64", pubBase64)
+            putString(PREF_ENC, Base64.encodeToString(privBlob, Base64.NO_WRAP))
+        }
     }
 }
