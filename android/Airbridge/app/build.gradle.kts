@@ -10,8 +10,8 @@ android {
         applicationId = "com.airbridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20900
-        versionName = "2.9.0-beta"
+        versionCode = 30000
+        versionName = "3.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
