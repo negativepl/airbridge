@@ -152,6 +152,33 @@ final class FileTransferServiceStabilityTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    // MARK: - Finding 5: abort before the popup is claimed must reset receive state
+
+    /// An accepted incoming offer flips `isReceivingFile` on before any byte
+    /// arrives. If the upload then aborts before the first progress callback
+    /// claims the popup (receivingOwnerKey still nil), the receive state must
+    /// be reset anyway — not left stuck behind the owner-key guard.
+    func testAbortBeforeOwnerClaimResetsReceiveState() async {
+        let installed = await waitUntil { self.connection.httpServer.onUploadAborted != nil }
+        XCTAssertTrue(installed)
+
+        service.handleMessage(
+            .fileTransferOffer(transferId: "t1", filename: "a.bin",
+                               mimeType: "application/octet-stream",
+                               fileSize: 10, destinationDir: nil),
+            from: "1.1.1.1:5"
+        )
+        XCTAssertTrue(service.isReceivingFile)
+        service.acceptIncomingOffer()
+        XCTAssertTrue(service.isReceivingFile)
+
+        // Upload dies before any progress callback claimed the popup.
+        connection.httpServer.onUploadAborted?("a.bin", "1.1.1.1")
+
+        let reset = await waitUntil { !self.service.isReceivingFile }
+        XCTAssertTrue(reset, "abort before the first byte must reset the receive state")
+    }
+
     /// No accept/reject within the timeout must fail the wait (mirrors the
     /// phone's own 60 s offer timeout).
     func testOfferAcceptTimeoutFailsWait() async {

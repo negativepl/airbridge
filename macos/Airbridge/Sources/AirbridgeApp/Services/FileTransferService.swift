@@ -689,7 +689,13 @@ final class FileTransferService: MessageHandler {
                     return
                 }
                 let ownerKey = "\(senderHost)|\(filename)"
-                guard self.receivingOwnerKey == ownerKey else { return }
+                // nil owner + isReceivingFile covers aborts that land before
+                // the first progress callback claimed the popup — the accept
+                // flow already flipped isReceivingFile on, and it must not
+                // stay stuck behind an owner key nobody ever set.
+                let ownsPopup = self.receivingOwnerKey == ownerKey
+                    || (self.receivingOwnerKey == nil && self.isReceivingFile)
+                guard ownsPopup else { return }
                 self.receivingOwnerKey = nil
                 self.isReceivingFile = false
                 self.transferStartTime = nil
