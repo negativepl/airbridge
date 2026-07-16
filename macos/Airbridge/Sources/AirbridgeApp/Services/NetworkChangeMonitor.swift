@@ -24,8 +24,7 @@ final class NetworkChangeMonitor: @unchecked Sendable {
     private let onChange: @Sendable () -> Void
     private let log = Logger(subsystem: "com.airbridge.macos", category: "NetworkChange")
 
-    private var baselineKey: String?
-    private var sawUnsatisfied = false
+    private var detector = NetworkChangeDetector()
     private var debounce: DispatchWorkItem?
     private var started = false
 
@@ -51,21 +50,16 @@ final class NetworkChangeMonitor: @unchecked Sendable {
 
     private func handle(_ path: NWPath) {
         guard path.status == .satisfied else {
-            sawUnsatisfied = true
+            _ = detector.register(satisfied: false, key: "")
             log.notice("path unsatisfied (status=\(String(describing: path.status), privacy: .public))")
             Diag.log("NetworkChange", "path unsatisfied (status=\(path.status))")
             return
         }
 
         let key = networkKey(path)
-        let isBaseline = baselineKey == nil
-        let changed = !isBaseline && (sawUnsatisfied || key != baselineKey)
-        sawUnsatisfied = false
-        baselineKey = key
-
         // Only log a real transition — the per-callback "satisfied" path updates
         // fire every few seconds and would otherwise flood the log.
-        guard changed else { return }
+        guard detector.register(satisfied: true, key: key) else { return }
         log.notice("network changed -> \(key, privacy: .public)")
         Diag.log("NetworkChange", "network changed -> \(key); re-advertising")
 
