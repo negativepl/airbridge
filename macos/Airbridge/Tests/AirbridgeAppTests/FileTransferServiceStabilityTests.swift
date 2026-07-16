@@ -103,6 +103,55 @@ final class FileTransferServiceStabilityTests: XCTestCase {
         XCTAssertFalse(service.isWaitingForAccept)
     }
 
+    // MARK: - Finding 3: aborted/stalled preview downloads must complete with nil
+
+    /// A preview download torn down mid-stream must call the preview's
+    /// completion with nil (surfacing the error in FilesBrowserView) instead
+    /// of leaving the spinner forever.
+    func testAbortedPreviewCompletesWithNil() async {
+        let installed = await waitUntil { self.connection.httpServer.onUploadAborted != nil }
+        XCTAssertTrue(installed, "configure() must install the abort callback")
+
+        var completed = false
+        var result: URL? = URL(fileURLWithPath: "/sentinel")
+        service.requestPreview(
+            filename: "photo.jpg",
+            saveTo: FileManager.default.temporaryDirectory.appendingPathComponent("preview-\(UUID().uuidString).jpg"),
+            onProgress: { _ in },
+            completion: { url in
+                completed = true
+                result = url
+            }
+        )
+
+        connection.httpServer.onUploadAborted?("photo.jpg", "1.2.3.4")
+
+        let done = await waitUntil { completed }
+        XCTAssertTrue(done, "aborted preview must invoke its completion")
+        XCTAssertNil(result)
+    }
+
+    /// A preview download that never makes progress must time out with nil.
+    func testPreviewStallTimeoutCompletesWithNil() async {
+        service.previewStallTimeout = 0.2
+
+        var completed = false
+        var result: URL? = URL(fileURLWithPath: "/sentinel")
+        service.requestPreview(
+            filename: "clip.mp4",
+            saveTo: FileManager.default.temporaryDirectory.appendingPathComponent("preview-\(UUID().uuidString).mp4"),
+            onProgress: { _ in },
+            completion: { url in
+                completed = true
+                result = url
+            }
+        )
+
+        let done = await waitUntil { completed }
+        XCTAssertTrue(done, "stalled preview must time out and invoke its completion")
+        XCTAssertNil(result)
+    }
+
     /// No accept/reject within the timeout must fail the wait (mirrors the
     /// phone's own 60 s offer timeout).
     func testOfferAcceptTimeoutFailsWait() async {

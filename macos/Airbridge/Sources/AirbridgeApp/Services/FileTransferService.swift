@@ -75,6 +75,15 @@ final class FileTransferService: MessageHandler {
     /// podglądu (a nie do Downloads) i wywołuje completion z URL-em. Korelacja po
     /// nazwie wystarcza, bo apka prowadzi jeden transfer naraz.
     @ObservationIgnored private var pendingPreview: (filename: String, cacheURL: URL, onProgress: (Double) -> Void, completion: (URL?) -> Void)?
+    /// A pending preview download is abandoned (completion(nil)) after this
+    /// long without progress. Internal so tests can shorten it.
+    @ObservationIgnored var previewStallTimeout: TimeInterval = 30
+    /// Timestamp of the last preview progress callback, watched by the
+    /// preview stall watchdog.
+    @ObservationIgnored private var lastPreviewActivity = Date()
+    /// Stall watchdog for the pending preview download. Cancelled whenever
+    /// the preview resolves (file arrived, abort, explicit cancel).
+    @ObservationIgnored private var previewWatchdogTask: Task<Void, Never>?
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
@@ -536,6 +545,8 @@ final class FileTransferService: MessageHandler {
 
                 if let preview = self.pendingPreview, preview.filename == filename {
                     self.pendingPreview = nil
+                    self.previewWatchdogTask?.cancel()
+                    self.previewWatchdogTask = nil
                     do {
                         try FileManager.default.createDirectory(
                             at: preview.cacheURL.deletingLastPathComponent(),
@@ -615,6 +626,7 @@ final class FileTransferService: MessageHandler {
 
                 // Transfer-podgląd: postęp ląduje w oknie podglądu, BEZ globalnego popovera.
                 if let preview = self.pendingPreview, preview.filename == filename {
+                    self.lastPreviewActivity = Date()
                     preview.onProgress(progress)
                     return
                 }
@@ -665,6 +677,17 @@ final class FileTransferService: MessageHandler {
         connectionService.httpServer.onUploadAborted = { [weak self] filename, senderHost in
             Task { @MainActor in
                 guard let self else { return }
+                // A preview download never claims the popup (its progress is
+                // routed to the preview window, see onProgress above), so its
+                // abort is handled separately — otherwise the owner-key guard
+                // below skips it and the preview spinner waits forever.
+                if let preview = self.pendingPreview, preview.filename == filename {
+                    self.pendingPreview = nil
+                    self.previewWatchdogTask?.cancel()
+                    self.previewWatchdogTask = nil
+                    preview.completion(nil)
+                    return
+                }
                 let ownerKey = "\(senderHost)|\(filename)"
                 guard self.receivingOwnerKey == ownerKey else { return }
                 self.receivingOwnerKey = nil
@@ -686,12 +709,35 @@ final class FileTransferService: MessageHandler {
     func requestPreview(filename: String, saveTo cacheURL: URL,
                         onProgress: @escaping (Double) -> Void,
                         completion: @escaping (URL?) -> Void) {
+        previewWatchdogTask?.cancel()
         pendingPreview = (filename, cacheURL, onProgress, completion)
+        // The phone may never start the upload (dropped mid-request) and
+        // HttpUploadServer only reports aborts of uploads that already
+        // delivered bytes — a stall watchdog covers the silent cases so the
+        // preview spinner cannot wait forever.
+        lastPreviewActivity = Date()
+        let stallTimeout = previewStallTimeout
+        previewWatchdogTask = Task { @MainActor [weak self] in
+            let interval = max(0.05, min(5, stallTimeout / 3))
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled, let self else { return }
+                guard let preview = self.pendingPreview, preview.filename == filename else { return }
+                if Date().timeIntervalSince(self.lastPreviewActivity) > stallTimeout {
+                    self.pendingPreview = nil
+                    self.previewWatchdogTask = nil
+                    preview.completion(nil)
+                    return
+                }
+            }
+        }
     }
 
     /// Anuluje oczekujący podgląd (np. gdy użytkownik zamknie okno przed pobraniem).
     func cancelPendingPreview() {
         pendingPreview = nil
+        previewWatchdogTask?.cancel()
+        previewWatchdogTask = nil
     }
 
     /// Kopiuje już pobrany plik (np. z cache podglądu) do Downloads — bez ponownego transferu.
