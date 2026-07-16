@@ -26,6 +26,9 @@ final class FilesBrowserService: MessageHandler {
     private(set) var totalCount: Int = 0
     private(set) var currentPage: Int = 0
     private(set) var isLoading: Bool = false
+    /// The last listing request received no response within `requestTimeout`.
+    /// Views show a retryable failure state instead of spinning forever.
+    private(set) var loadFailed: Bool = false
     private(set) var needsPermission: Bool = false
     private(set) var hasLoadedOnce: Bool = false
     private(set) var thumbnails: [String: NSImage] = [:]   // relativePath -> thumb
@@ -57,7 +60,16 @@ final class FilesBrowserService: MessageHandler {
     private var isLoadingSortPrefs = false
     private var requestedThumbnails: Set<String> = []
     private var requestedFolderStats: Set<String> = []
+    /// Folders whose stats request timed out — revealed without stats so the
+    /// top-down row reveal is not blocked forever by one unanswered request.
+    private var failedFolderStats: Set<String> = []
     private let pageSize = 200
+    /// How long a listing / folder-stats request may wait for the phone's
+    /// response before it counts as lost (frozen phone app, reply dropped on
+    /// a live socket). Internal so tests can shorten it.
+    @ObservationIgnored var requestTimeout: TimeInterval = 20
+    @ObservationIgnored private var listWatchdogTask: Task<Void, Never>?
+    @ObservationIgnored private var statsWatchdogTask: Task<Void, Never>?
     private weak var connectionService: ConnectionService?
     private weak var fileTransferService: FileTransferService?
 
@@ -104,6 +116,7 @@ final class FilesBrowserService: MessageHandler {
     func open(path: String, page: Int = 0) {
         guard let connectionService, connectionService.isConnected else { return }
         isLoading = true
+        loadFailed = false
         if page == 0 {
             currentPath = path
             entries = []
@@ -111,6 +124,7 @@ final class FilesBrowserService: MessageHandler {
             requestedThumbnails = []
             folderStats = [:]
             requestedFolderStats = []
+            failedFolderStats = []
         }
         let message = Message.filesListRequest(
             path: path, page: page, pageSize: pageSize,
@@ -120,6 +134,21 @@ final class FilesBrowserService: MessageHandler {
             query: searchQuery
         )
         Task { try? await connectionService.sendToActive(message) }
+        startListWatchdog()
+    }
+
+    /// Fails the in-flight listing request when no response arrives within
+    /// `requestTimeout` — the WebSocket itself still looks healthy in that
+    /// case, so without this the view would spin forever.
+    private func startListWatchdog() {
+        listWatchdogTask?.cancel()
+        listWatchdogTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.requestTimeout * 1_000_000_000))
+            guard !Task.isCancelled, self.isLoading else { return }
+            self.isLoading = false
+            self.loadFailed = true
+        }
     }
 
     func reload() { open(path: currentPath) }
@@ -246,7 +275,9 @@ final class FilesBrowserService: MessageHandler {
         if isSearching { return entries }
         var result: [FileEntry] = []
         for e in entries {
-            let ready = e.isDirectory ? folderStats[e.relativePath] != nil : true
+            let ready = e.isDirectory
+                ? folderStats[e.relativePath] != nil || failedFolderStats.contains(e.relativePath)
+                : true
             if ready { result.append(e) } else { break }
         }
         return result
@@ -261,10 +292,32 @@ final class FilesBrowserService: MessageHandler {
         guard let connectionService else { return }
         // Only one in flight: if the first unresolved folder is already
         // requested, we're waiting on it.
-        guard let next = entries.first(where: { $0.isDirectory && folderStats[$0.relativePath] == nil }) else { return }
-        guard !requestedFolderStats.contains(next.relativePath) else { return }
+        guard let next = entries.first(where: {
+            $0.isDirectory && folderStats[$0.relativePath] == nil && !failedFolderStats.contains($0.relativePath)
+        }) else { return }
+        guard !requestedFolderStats.contains(next.relativePath) else {
+            // Already in flight — re-arm its watchdog in case a stray response
+            // for a different folder cancelled it.
+            startStatsWatchdog(for: next.relativePath)
+            return
+        }
         requestedFolderStats.insert(next.relativePath)
         Task { try? await connectionService.sendToActive(.folderStatsRequest(path: next.relativePath)) }
+        startStatsWatchdog(for: next.relativePath)
+    }
+
+    /// A folder-stats request that never gets an answer would block the
+    /// top-down row reveal (and the loading spinner) forever — give up on
+    /// that folder after `requestTimeout` and move on to the next one.
+    private func startStatsWatchdog(for path: String) {
+        statsWatchdogTask?.cancel()
+        statsWatchdogTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.requestTimeout * 1_000_000_000))
+            guard !Task.isCancelled, self.folderStats[path] == nil else { return }
+            self.failedFolderStats.insert(path)
+            self.requestNextFolderStats()
+        }
     }
 
     // MARK: - Transfer
@@ -293,6 +346,8 @@ final class FilesBrowserService: MessageHandler {
         switch message {
         case .filesListResponse(let path, let newEntries, let total, let page, let needsPerm):
             guard path == currentPath else { return }
+            listWatchdogTask?.cancel()
+            loadFailed = false
             needsPermission = needsPerm
             if page == 0 {
                 entries = newEntries
@@ -312,6 +367,7 @@ final class FilesBrowserService: MessageHandler {
             }
 
         case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
+            statsWatchdogTask?.cancel()
             folderStats[path] = FolderStats(dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
             requestNextFolderStats()
 

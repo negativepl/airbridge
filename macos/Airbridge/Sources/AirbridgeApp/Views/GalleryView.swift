@@ -21,6 +21,8 @@ struct GalleryView: View {
                 notConnectedView
             } else if galleryService.photos.isEmpty && galleryService.isLoading {
                 initialLoadingView
+            } else if galleryService.photos.isEmpty && galleryService.loadFailed {
+                loadFailedView
             } else if galleryService.photos.isEmpty {
                 emptyView
             } else {
@@ -67,6 +69,24 @@ struct GalleryView: View {
                 Text(L10n.isPL ? "Ładowanie galerii…" : "Loading gallery…")
                     .font(.ab(.subheadline))
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var loadFailedView: some View {
+        EmptyStateContainer {
+            EmptyStateView(
+                systemImage: "exclamationmark.triangle",
+                title: L10n.isPL ? "Nie udało się załadować galerii" : "Could Not Load Gallery",
+                subtitle: L10n.isPL
+                    ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
+                    : "The phone did not respond to the request. Please try again."
+            ) {
+                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") {
+                    galleryService.clearAndReload()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
         }
     }

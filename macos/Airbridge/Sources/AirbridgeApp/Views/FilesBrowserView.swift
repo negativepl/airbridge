@@ -161,6 +161,8 @@ struct FilesBrowserView: View {
             ProgressView()
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if filesBrowserService.loadFailed && filesBrowserService.displayedEntries.isEmpty {
+            loadFailedState
         } else if viewMode == .grid {
             gridView
         } else {
@@ -294,6 +296,22 @@ struct FilesBrowserView: View {
         if cal.isDateInToday(day) { return L10n.isPL ? "Dziś" : "Today" }
         if cal.isDateInYesterday(day) { return L10n.isPL ? "Wczoraj" : "Yesterday" }
         return sectionDateFormatter.string(from: day)
+    }
+
+    private var loadFailedState: some View {
+        EmptyStateContainer {
+            EmptyStateView(
+                systemImage: "exclamationmark.triangle",
+                title: L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
+                subtitle: L10n.isPL
+                    ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
+                    : "The phone did not respond to the request. Please try again."
+            ) {
+                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { filesBrowserService.reload() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+            }
+        }
     }
 
     private var permissionEmptyState: some View {

@@ -12,11 +12,19 @@ final class GalleryService: MessageHandler {
     private(set) var totalCount: Int = 0
     private(set) var currentPage: Int = 0
     private(set) var isLoading: Bool = false
+    /// The last listing request received no response within `requestTimeout`.
+    /// Views show a retryable failure state instead of spinning forever.
+    private(set) var loadFailed: Bool = false
 
     private var requestedThumbnails: Set<String> = []
     private var requestedPreviews: Set<String> = []
     private let pageSize = 50
     private weak var connectionService: ConnectionService?
+    /// How long a listing request may wait for the phone's response before it
+    /// counts as lost (frozen phone app, reply dropped on a live socket).
+    /// Internal so tests can shorten it.
+    @ObservationIgnored var requestTimeout: TimeInterval = 20
+    @ObservationIgnored private var loadWatchdogTask: Task<Void, Never>?
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
@@ -27,6 +35,7 @@ final class GalleryService: MessageHandler {
     func loadPhotos(page: Int = 0) {
         guard let connectionService, connectionService.isConnected, !isLoading else { return }
         isLoading = true
+        loadFailed = false
         if page == 0 {
             photos = []
             thumbnailImages = [:]
@@ -36,15 +45,32 @@ final class GalleryService: MessageHandler {
         Task {
             try? await connectionService.sendToActive(message)
         }
+        startLoadWatchdog()
+    }
+
+    /// Fails the in-flight listing request when no response arrives in time —
+    /// the WebSocket itself still looks healthy in that case, so without this
+    /// the view would spin forever.
+    private func startLoadWatchdog() {
+        loadWatchdogTask?.cancel()
+        loadWatchdogTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.requestTimeout * 1_000_000_000))
+            guard !Task.isCancelled, self.isLoading else { return }
+            self.isLoading = false
+            self.loadFailed = true
+        }
     }
 
     func clearAndReload() {
+        loadWatchdogTask?.cancel()
         photos = []
         thumbnailImages = [:]
         previewImages = [:]
         requestedThumbnails = []
         requestedPreviews = []
         isLoading = false
+        loadFailed = false
         currentPage = 0
         totalCount = 0
         loadPhotos()
@@ -94,6 +120,8 @@ final class GalleryService: MessageHandler {
     func handleMessage(_ message: Message) {
         switch message {
         case .galleryResponse(let newPhotos, let total, let page):
+            loadWatchdogTask?.cancel()
+            loadFailed = false
             if page == 0 {
                 photos = newPhotos
             } else {

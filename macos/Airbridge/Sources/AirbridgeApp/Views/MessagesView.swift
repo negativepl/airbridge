@@ -81,6 +81,20 @@ struct MessagesView: View {
             if smsService.isLoadingConversations && smsService.conversations.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if smsService.conversationsLoadFailed && smsService.conversations.isEmpty {
+                EmptyStateView(
+                    systemImage: "exclamationmark.triangle",
+                    title: L10n.isPL ? "Nie udało się załadować" : "Could Not Load",
+                    subtitle: L10n.isPL
+                        ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
+                        : "The phone did not respond to the request. Please try again."
+                ) {
+                    Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") {
+                        smsService.loadConversations()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -168,6 +182,20 @@ struct MessagesView: View {
                     if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 300)
+                    } else if smsService.messagesLoadFailed && smsService.currentMessages.isEmpty {
+                        EmptyStateView(
+                            systemImage: "exclamationmark.triangle",
+                            title: L10n.isPL ? "Nie udało się załadować wiadomości" : "Could Not Load Messages",
+                            subtitle: L10n.isPL
+                                ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
+                                : "The phone did not respond to the request. Please try again."
+                        ) {
+                            Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") {
+                                smsService.loadMessages(threadId: convo.threadId)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 300)
                     } else {
                         ForEach(smsService.currentMessages.reversed()) { msg in
                             messageBubble(msg)
