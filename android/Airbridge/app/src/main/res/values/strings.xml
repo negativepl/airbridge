@@ -250,4 +250,10 @@
     <string name="update_download_install">Download and install</string>
     <string name="update_downloading">Downloading… %1$d%%</string>
     <string name="update_verify_failed">Downloaded file failed verification</string>
+
+    <!-- Diagnostics -->
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_export_diagnostics">Export diagnostic report</string>
+    <string name="settings_export_diagnostics_desc">Creates a text file with the app version, device information, connection state and recent logs. Nothing is sent without your action.</string>
+    <string name="settings_export_diagnostics_failed">Could not create the diagnostic report</string>
 </resources>

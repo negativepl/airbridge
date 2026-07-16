@@ -9,4 +9,5 @@
 <paths>
     <external-path name="external_files" path="." />
     <cache-path name="updates" path="updates/" />
+    <cache-path name="diagnostics" path="diagnostics/" />
 </paths>

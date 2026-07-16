@@ -257,4 +257,10 @@
     <string name="update_download_install">Pobierz i zainstaluj</string>
     <string name="update_downloading">Pobieranie… %1$d%%</string>
     <string name="update_verify_failed">Pobrany plik nie przeszedł weryfikacji</string>
+
+    <!-- Diagnostics -->
+    <string name="settings_diagnostics">Diagnostyka</string>
+    <string name="settings_export_diagnostics">Eksportuj raport diagnostyczny</string>
+    <string name="settings_export_diagnostics_desc">Tworzy plik tekstowy z wersją aplikacji, informacjami o urządzeniu, stanem połączenia i ostatnimi logami. Nic nie jest wysyłane bez Twojego działania.</string>
+    <string name="settings_export_diagnostics_failed">Nie udało się utworzyć raportu diagnostycznego</string>
 </resources>

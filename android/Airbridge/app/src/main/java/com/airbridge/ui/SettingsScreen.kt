@@ -55,7 +55,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.SystemUpdate
+import android.widget.Toast
+import com.airbridge.diagnostics.DiagnosticReportExporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -563,6 +570,58 @@ private fun SettingsContent(
                 trigger = checkUpdateTrigger,
                 onDone = { checkUpdateTrigger = false }
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Diagnostics section — builds the report off the main thread and
+            // hands the file to the system share sheet; nothing is uploaded.
+            SectionHeader(text = stringResource(R.string.settings_diagnostics))
+            Spacer(modifier = Modifier.height(8.dp))
+            val exportScope = rememberCoroutineScope()
+            val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        exportScope.launch {
+                            val intent = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val file = DiagnosticReportExporter.export(context)
+                                    DiagnosticReportExporter.shareIntent(context, file)
+                                }.getOrNull()
+                            }
+                            if (intent != null) {
+                                context.startActivity(intent)
+                            } else {
+                                Toast.makeText(context, exportFailedMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) {
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            Icons.Rounded.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    headlineContent = { Text(stringResource(R.string.settings_export_diagnostics)) },
+                    supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
 
         Spacer(modifier = Modifier.height(32.dp))
     }
