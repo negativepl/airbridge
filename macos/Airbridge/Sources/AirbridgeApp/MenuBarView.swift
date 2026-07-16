@@ -74,14 +74,22 @@ struct MenuBarView: View {
 
                 if bluetoothAudio.enabled,
                    connectionService.phoneHeadphoneState?.connected == true
-                        || connectionService.headphoneHandoffPhase == .inProgress
+                        || connectionService.headphoneHandoffPhase != .idle
                         || showHandoffSuccess {
+                    // Failed state replaces the row text for a few seconds
+                    // (the phase auto-returns to idle) — same in-place pattern
+                    // as the success beat; clicking it retries the takeover.
                     MenuRow(title: showHandoffSuccess
                                 ? (L10n.isPL ? "Słuchawki połączone z Makiem" : "Headphones connected to Mac")
                                 : (connectionService.headphoneHandoffPhase == .inProgress
                                     ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
-                                    : (L10n.isPL ? "Przenieś słuchawki na Maka" : "Move headphones to Mac")),
-                            systemImage: showHandoffSuccess ? "checkmark.circle" : "headphones",
+                                    : (connectionService.headphoneHandoffPhase == .failed
+                                        ? (L10n.isPL ? "Nie udało się przenieść słuchawek" : "Headphone handoff failed")
+                                        : (L10n.isPL ? "Przenieś słuchawki na Maka" : "Move headphones to Mac"))),
+                            systemImage: showHandoffSuccess
+                                ? "checkmark.circle"
+                                : (connectionService.headphoneHandoffPhase == .failed
+                                    ? "exclamationmark.triangle" : "headphones"),
                             loading: !showHandoffSuccess && connectionService.headphoneHandoffPhase == .inProgress) {
                         guard !showHandoffSuccess, connectionService.headphoneHandoffPhase != .inProgress else { return }
                         connectionService.takeoverHeadphones()

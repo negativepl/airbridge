@@ -166,6 +166,11 @@ final class ConnectionService {
     /// Observed by `TransferPopupView`; set/cleared only from this file.
     var headphonePromptVisible = false
     @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
+    /// Auto-clears a `.failed` handoff back to `.idle` (see `markHandoffFailed`).
+    @ObservationIgnored private var handoffFailedResetTask: Task<Void, Never>?
+    /// How long the `.failed` phase stays visible before returning to `.idle`.
+    /// Internal so tests can shrink it.
+    @ObservationIgnored var handoffFailedResetNanos: UInt64 = 5_000_000_000
     @ObservationIgnored private var pendingHandoffTrigger: HandoffTrigger = .manual
     @ObservationIgnored private var headphonePromptAutoHideTask: Task<Void, Never>?
     /// Cooldowns so auto-switch doesn't fight a handoff that just happened —
@@ -459,8 +464,14 @@ final class ConnectionService {
     /// `autoSwitchIfAppropriate`, not here, so `.moveBack` callers bypass them
     /// simply by calling this directly.
     func takeoverHeadphones(trigger: HandoffTrigger = .manual) {
-        guard let ba = bluetoothAudio, ba.enabled, let address = ba.selectedAddress,
-              headphoneHandoffPhase != .inProgress else { return }
+        guard headphoneHandoffPhase != .inProgress else { return }
+        guard let ba = bluetoothAudio, ba.enabled, let address = ba.selectedAddress else {
+            // The button can outlive the configuration (stale UI state) —
+            // surface a failure instead of silently ignoring the click.
+            Diag.log("Headphone", "takeover requested but handoff is not configured")
+            markHandoffFailed()
+            return
+        }
         headphoneHandoffPhase = .inProgress
         pendingHandoffTrigger = trigger
         Task { try? await sendToActive(.headphoneReleaseRequest(address: address)) }
@@ -469,8 +480,23 @@ final class ConnectionService {
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             guard let self, !Task.isCancelled else { return }
             if self.headphoneHandoffPhase == .inProgress {
-                self.headphoneHandoffPhase = .failed
+                Diag.log("Headphone", "takeover timed out waiting for the phone's release response")
+                self.markHandoffFailed()
             }
+        }
+    }
+
+    /// Transition to `.failed` and auto-return to `.idle` after a short beat:
+    /// the failure stays visible (Home error text, menu bar row) but never
+    /// lingers as stale state. Internal so tests can drive it directly.
+    func markHandoffFailed() {
+        headphoneHandoffPhase = .failed
+        handoffFailedResetTask?.cancel()
+        handoffFailedResetTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: self.handoffFailedResetNanos)
+            guard !Task.isCancelled, self.headphoneHandoffPhase == .failed else { return }
+            self.headphoneHandoffPhase = .idle
         }
     }
 
@@ -552,12 +578,17 @@ final class ConnectionService {
         let trigger = pendingHandoffTrigger
         guard ok, let ba = bluetoothAudio else {
             Diag.log("Headphone", "release refused by phone: \(error ?? "unknown")")
-            headphoneHandoffPhase = .failed
+            markHandoffFailed()
             return
         }
         Task {
             let connected = await ba.takeover()
-            self.headphoneHandoffPhase = connected ? .idle : .failed
+            if connected {
+                self.headphoneHandoffPhase = .idle
+            } else {
+                Diag.log("Headphone", "local takeover failed after the phone released")
+                self.markHandoffFailed()
+            }
             guard connected else { return }
             self.lastHandoffAt = Date()
             switch trigger {
@@ -803,7 +834,11 @@ final class ConnectionService {
             // dropped — clear it rather than showing it against nothing.
             phoneHeadphoneState = nil
             handoffTimeoutTask?.cancel()
+            handoffFailedResetTask?.cancel()
             headphoneHandoffPhase = .idle
+            // A visible ask-first prompt refers to a takeover from the phone
+            // that just dropped — dismiss it rather than leaving it dangling.
+            dismissHeadphonePrompt()
             if !manuallyDisconnected {
                 statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                 phase = .listening
