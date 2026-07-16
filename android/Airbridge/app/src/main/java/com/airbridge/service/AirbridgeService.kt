@@ -312,6 +312,17 @@ class AirbridgeService : Service() {
     @Volatile
     private var pendingRelease: CompletableDeferred<Message.HeadphoneReleaseResponse>? = null
 
+    /** Auto-clears a FAILED handoff phase back to IDLE (see [failHandoff]). */
+    private var handoffFailResetJob: kotlinx.coroutines.Job? = null
+
+    /** Enter the FAILED handoff phase and schedule its return to IDLE, so the
+     *  error text on Home is visible for a beat but never sticks around. */
+    private fun failHandoff() {
+        headphoneHandoffPhase.value = HandoffPhase.FAILED
+        handoffFailResetJob?.cancel()
+        handoffFailResetJob = serviceScope.launch { autoClearFailedHandoff(headphoneHandoffPhase) }
+    }
+
     // Playback-driven auto-switch: whether THIS phone currently has any active
     // audio playback (music, video, etc.), independent of headphone routing.
     @Volatile
@@ -454,6 +465,7 @@ class AirbridgeService : Service() {
      */
     private fun clearHeadphoneHandoffState() {
         macHeadphoneState.value = null
+        handoffFailResetJob?.cancel()
         if (headphoneHandoffPhase.value != HandoffPhase.IDLE) {
             headphoneHandoffPhase.value = HandoffPhase.IDLE
         }
@@ -2073,10 +2085,15 @@ class AirbridgeService : Service() {
             // local config no longer supports a takeover — surface that via
             // the existing FAILED-phase error text instead of a silent no-op.
             Log.w(TAG, "Headphone takeover requested but not configured (address=$address, enabled=${headphoneHandoffEnabled()})")
-            headphoneHandoffPhase.value = HandoffPhase.FAILED
+            failHandoff()
             return
         }
-        if (!isConnected.value) return
+        if (!isConnected.value) {
+            // The handoff UI is gone once disconnected — nothing to show, but
+            // leave a trace (a stale notification action can still land here).
+            Log.w(TAG, "Headphone takeover requested while disconnected — ignored")
+            return
+        }
         if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) return
         headphoneHandoffPhase.value = HandoffPhase.IN_PROGRESS
         val pending = CompletableDeferred<Message.HeadphoneReleaseResponse>()
@@ -2093,13 +2110,14 @@ class AirbridgeService : Service() {
             // phase for a beat so the loader and success choreography can play.
             val elapsedMs = android.os.SystemClock.elapsedRealtime() - startedAt
             if (elapsedMs < 900L) kotlinx.coroutines.delay(900L - elapsedMs)
-            headphoneHandoffPhase.value = if (connected) HandoffPhase.IDLE else HandoffPhase.FAILED
             if (connected) {
+                headphoneHandoffPhase.value = HandoffPhase.IDLE
                 val now = android.os.SystemClock.elapsedRealtime()
                 lastHandoffAtMs = now
                 if (trigger == HandoffTrigger.MANUAL) lastManualHandoffAtMs = now
             } else {
                 Log.w(TAG, "Headphone takeover failed (releaseOk=${response?.ok}, error=${response?.error})")
+                failHandoff()
             }
         }
     }
