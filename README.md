@@ -119,6 +119,8 @@ You can also send selected text directly from any Android app:
 - **Cancellable and self-recovering**: Outgoing transfers from the phone can be cancelled at any point — while waiting for acceptance or mid-upload — and both sides clean up. An offer that is never answered times out after 60 seconds instead of hanging.
 - **Speed**: Direct HTTP transfer over your local network. No chunking, no base64, no cloud relay. Limited only by your Wi-Fi speed.
 
+**Known limitation**: concurrent sends from the phone share a single progress card — when several files are sent at once, the card shows the progress of whichever transfer reported last. The files themselves transfer correctly.
+
 ### Photo Gallery
 Browse your phone's entire photo library from your Mac. Thumbnails load on scroll in a horizontal strip. Tap any photo to open a full-screen viewer with pinch-to-zoom, pan, and rotation controls. Download originals in full resolution with one click. Thumbnails and previews stream over the control WebSocket; full-resolution downloads come over the same HTTP transfer path as files.
 
