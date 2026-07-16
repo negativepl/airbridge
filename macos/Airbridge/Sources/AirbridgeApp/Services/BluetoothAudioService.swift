@@ -38,22 +38,51 @@ final class BluetoothAudioService {
     @ObservationIgnored private var guardUntil = Date.distantPast
     @ObservationIgnored private var monitorTask: Task<Void, Never>?
 
+    // Settings are stored properties (tracked by @Observable) mirrored to
+    // UserDefaults on write — computed properties reading UserDefaults leave
+    // no observation trail, so SwiftUI never re-rendered after a toggle.
+    @ObservationIgnored private let defaults: UserDefaults
+    private var enabledStorage: Bool
+    private var selectedAddressStorage: String?
+    private var selectedNameStorage: String?
+    private var autoSwitchStorage: Bool
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        enabledStorage = defaults.bool(forKey: "headphoneHandoff")
+        selectedAddressStorage = defaults.string(forKey: "headphoneAddress").map(Self.canonicalAddress)
+        selectedNameStorage = defaults.string(forKey: "headphoneName")
+        autoSwitchStorage = defaults.bool(forKey: "headphoneAutoSwitch")
+    }
+
     var enabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "headphoneHandoff") }
-        set { UserDefaults.standard.set(newValue, forKey: "headphoneHandoff") }
+        get { enabledStorage }
+        set {
+            enabledStorage = newValue
+            defaults.set(newValue, forKey: "headphoneHandoff")
+        }
     }
     var selectedAddress: String? {
-        get { UserDefaults.standard.string(forKey: "headphoneAddress").map(Self.canonicalAddress) }
-        set { UserDefaults.standard.set(newValue, forKey: "headphoneAddress") }
+        get { selectedAddressStorage }
+        set {
+            selectedAddressStorage = newValue.map(Self.canonicalAddress)
+            defaults.set(selectedAddressStorage, forKey: "headphoneAddress")
+        }
     }
     var selectedName: String? {
-        get { UserDefaults.standard.string(forKey: "headphoneName") }
-        set { UserDefaults.standard.set(newValue, forKey: "headphoneName") }
+        get { selectedNameStorage }
+        set {
+            selectedNameStorage = newValue
+            defaults.set(newValue, forKey: "headphoneName")
+        }
     }
     /// AirPods-style automatic switching on playback start; off by default.
     var autoSwitchEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "headphoneAutoSwitch") }
-        set { UserDefaults.standard.set(newValue, forKey: "headphoneAutoSwitch") }
+        get { autoSwitchStorage }
+        set {
+            autoSwitchStorage = newValue
+            defaults.set(newValue, forKey: "headphoneAutoSwitch")
+        }
     }
 
     /// IOBluetooth enumeration is blocking IPC; run it off the main actor so the
@@ -72,11 +101,6 @@ final class BluetoothAudioService {
             }
             return result
         }.value
-    }
-
-    private func selectedDevice() -> IOBluetoothDevice? {
-        guard let address = selectedAddress else { return nil }
-        return IOBluetoothDevice(addressString: address)
     }
 
     // MARK: - State monitoring
@@ -151,13 +175,15 @@ final class BluetoothAudioService {
 
     /// Disconnect the headphones so the phone can take them.
     func release() async -> Bool {
-        guard let device = selectedDevice(), let address = selectedAddress else { return false }
+        guard let address = selectedAddress else { return false }
         guardUntil = Date().addingTimeInterval(Self.guardInterval)
-        if !device.isConnected() { return true }
-        // IOBluetoothDevice isn't Sendable; re-resolve it by address inside the
-        // detached task instead of capturing the main-actor-isolated instance.
+        // IOBluetoothDevice isn't Sendable and both isConnected() and
+        // closeConnection() are blocking IPC; resolve and query the device
+        // entirely inside the detached task so the main actor never stalls.
         let status = await Task.detached {
-            IOBluetoothDevice(addressString: address)?.closeConnection() ?? kIOReturnError
+            guard let device = IOBluetoothDevice(addressString: address) else { return kIOReturnError }
+            if !device.isConnected() { return kIOReturnSuccess }
+            return device.closeConnection()
         }.value
         return status == kIOReturnSuccess
     }
