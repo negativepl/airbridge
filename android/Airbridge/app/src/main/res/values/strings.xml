@@ -242,6 +242,7 @@
     <string name="update_check">Check for updates</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You are on the latest version</string>
+    <string name="update_installed_version">Installed version: %1$s</string>
     <string name="update_failed">Could not check for updates</string>
     <string name="update_available_title">Update available: %1$s</string>
     <string name="update_published">Released %1$s</string>

@@ -8,9 +8,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -48,6 +52,7 @@ private sealed class FlowState {
     object Idle : FlowState()
     object Checking : FlowState()
     data class Available(val manifest: UpdateManifest) : FlowState()
+    data class UpToDate(val installedVersion: String) : FlowState()
 }
 
 private sealed class DownloadState {
@@ -61,7 +66,6 @@ private sealed class DownloadState {
 @Composable
 fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
     val context = LocalContext.current
-    val upToDateMsg = stringResource(R.string.update_up_to_date)
     val failedMsg = stringResource(R.string.update_failed)
 
     var state by remember { mutableStateOf<FlowState>(FlowState.Idle) }
@@ -69,16 +73,14 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
     LaunchedEffect(trigger) {
         if (!trigger) return@LaunchedEffect
         state = FlowState.Checking
-        val installedVersionCode = context.packageManager
-            .getPackageInfo(context.packageName, 0).longVersionCode.toInt()
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        val installedVersionCode = packageInfo.longVersionCode.toInt()
         when (val result = UpdateChecker().check(installedVersionCode)) {
             is UpdateChecker.CheckResult.UpdateAvailable -> {
                 state = FlowState.Available(result.manifest)
             }
             UpdateChecker.CheckResult.UpToDate -> {
-                Toast.makeText(context, upToDateMsg, Toast.LENGTH_SHORT).show()
-                state = FlowState.Idle
-                onDone()
+                state = FlowState.UpToDate(packageInfo.versionName ?: "")
             }
             is UpdateChecker.CheckResult.Failed -> {
                 Log.w("UpdateFlow", result.reason)
@@ -90,11 +92,11 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
     }
 
     // The sheet appears as soon as the check starts (Checking), then morphs
-    // its content into the changelog once an update is found (Available).
-    // UpToDate/Failed never reach here — they resolve straight back to Idle
-    // above, after their toast, so the sheet simply isn't shown for them.
+    // its content into the changelog (Available) or the up-to-date
+    // confirmation (UpToDate). Only Failed resolves straight back to Idle
+    // above, after its toast, so the sheet isn't shown for it.
     val currentState = state
-    if (currentState is FlowState.Checking || currentState is FlowState.Available) {
+    if (currentState !is FlowState.Idle) {
         @Suppress("DEPRECATION")
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
@@ -112,6 +114,9 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
                         state = FlowState.Idle
                         onDone()
                     }
+                )
+                is FlowState.UpToDate -> UpdateUpToDateSheet(
+                    installedVersion = currentState.installedVersion
                 )
                 FlowState.Idle -> {}
             }
@@ -135,6 +140,39 @@ private fun UpdateCheckingSheet() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun UpdateUpToDateSheet(installedVersion: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.update_up_to_date),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (installedVersion.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.update_installed_version, installedVersion),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

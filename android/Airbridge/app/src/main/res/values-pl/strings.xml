@@ -249,6 +249,7 @@
     <string name="update_check">Sprawdź aktualizacje</string>
     <string name="update_checking">Sprawdzanie…</string>
     <string name="update_up_to_date">Masz najnowszą wersję</string>
+    <string name="update_installed_version">Zainstalowana wersja: %1$s</string>
     <string name="update_failed">Nie udało się sprawdzić aktualizacji</string>
     <string name="update_available_title">Dostępna aktualizacja: %1$s</string>
     <string name="update_published">Wydano %1$s</string>
