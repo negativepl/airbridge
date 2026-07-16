@@ -79,6 +79,9 @@ struct TransferPopupView: View {
         if fileTransferService.isRejected {
             return .rejected(filename: fileTransferService.fileTransferFileName)
         }
+        if fileTransferService.isFailed {
+            return .failed(filename: fileTransferService.fileTransferFileName)
+        }
         if fileTransferService.isWaitingForAccept {
             return .waiting(filename: fileTransferService.fileTransferFileName)
         }
@@ -114,7 +117,7 @@ struct TransferPopupView: View {
         case .idle: return .accentColor
         case .incoming, .waiting, .transferring, .headphonePrompt: return .accentColor
         case .complete: return .green
-        case .rejected: return .red
+        case .rejected, .failed: return .red
         }
     }
 
@@ -127,7 +130,7 @@ struct TransferPopupView: View {
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
         case .complete:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
-        case .rejected:
+        case .rejected, .failed:
             return GradientPalette(primary: .red, secondary: .orange, tertiary: .pink)
         }
     }
@@ -140,6 +143,7 @@ struct TransferPopupView: View {
         case .transferring: return 1.0
         case .complete: return 0.95
         case .rejected: return 0.85
+        case .failed: return 0.85
         case .headphonePrompt: return 0.9
         }
     }
@@ -181,6 +185,7 @@ struct TransferPopupView: View {
         case .complete: return 4
         case .rejected: return 5
         case .headphonePrompt: return 6
+        case .failed: return 7
         }
     }
 
@@ -203,6 +208,8 @@ struct TransferPopupView: View {
             completeView(isReceiving: receiving)
         case .rejected(let name):
             rejectedView(name: name)
+        case .failed(let name):
+            failedView(name: name)
         case .headphonePrompt:
             headphonePromptView()
         }
@@ -540,6 +547,27 @@ struct TransferPopupView: View {
                 .symbolEffect(.bounce, value: name)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
+                    .font(.ab(.headline, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(name)
+                    .font(.ab(.subheadline))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+        }
+    }
+
+    private func failedView(name: String) -> some View {
+        HStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 32, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: name)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.isPL ? "Przesyłanie nie powiodło się" : "Transfer failed")
                     .font(.ab(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
                 Text(name)

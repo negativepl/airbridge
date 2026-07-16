@@ -19,6 +19,9 @@ final class FileTransferService: MessageHandler {
     private(set) var transferEta: Int = 0
     private(set) var isWaitingForAccept: Bool = false
     private(set) var isRejected: Bool = false
+    /// A transfer ended abnormally (peer disconnected, timed out, or the
+    /// upload stalled) — drives the island's transient failure state.
+    private(set) var isFailed: Bool = false
     private(set) var incomingOfferTransferId: String? = nil
     private(set) var incomingOfferFileSize: Int64 = 0
     var hasIncomingOffer: Bool { !pendingOffers.isEmpty }
@@ -29,11 +32,21 @@ final class FileTransferService: MessageHandler {
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
     @ObservationIgnored private var isSendingFromQueue = false
-    @ObservationIgnored private var offerResponseStream: AsyncStream<Bool>.Continuation?
+    /// How the wait for an outgoing offer's answer ended. `.failed` covers
+    /// everything that is not an explicit answer from the phone: the sender
+    /// disconnecting, the last connection dropping, or the wait timing out.
+    private enum OutgoingOfferResponse { case accepted, rejected, failed }
+    @ObservationIgnored private var offerResponseStream: AsyncStream<OutgoingOfferResponse>.Continuation?
     /// transferId of the outgoing offer currently awaiting accept/reject, so
     /// `cancelPendingTransfer()` can tell the phone to drop its incoming-offer
     /// notification instead of leaving it to time out on its own.
     @ObservationIgnored private var pendingOutgoingTransferId: String? = nil
+    /// connectionId of the device the pending outgoing offer targets, so a
+    /// disconnect of THAT device (not any other phone) fails the wait.
+    @ObservationIgnored private var pendingOutgoingConnectionId: String? = nil
+    /// Wait-for-accept timeout for outgoing offers — mirrors the phone's own
+    /// 60 s offer timeout. Internal so tests can shorten it.
+    @ObservationIgnored var offerAcceptTimeout: TimeInterval = 60
     /// All incoming offers awaiting one accept/reject (the phone can share many
     /// files at once — accept/reject must cover every offer, not just the last).
     /// Each offer remembers its originating connection so the accept/reject
@@ -74,11 +87,11 @@ final class FileTransferService: MessageHandler {
         case .fileTransferOffer(let transferId, let filename, _, let fileSize, _):
             handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize, connectionId: connectionId)
         case .fileTransferAccept:
-            offerResponseStream?.yield(true)
+            offerResponseStream?.yield(.accepted)
             offerResponseStream?.finish()
             offerResponseStream = nil
         case .fileTransferReject:
-            offerResponseStream?.yield(false)
+            offerResponseStream?.yield(.rejected)
             offerResponseStream?.finish()
             offerResponseStream = nil
         case .fileTransferCancel(let transferId):
@@ -167,6 +180,9 @@ final class FileTransferService: MessageHandler {
     /// dismiss the popup instead of leaving it orphaned (the bug where "Reject"
     /// appeared to do nothing after the connection died).
     func connectionLost() {
+        // An outgoing offer can't be answered over a dead session either —
+        // fail its wait instead of leaving the island stuck on "waiting".
+        failPendingOutgoingWait()
         receivingOwnerKey = nil
         acceptedIncomingTransferIds.removeAll()
         guard hasIncomingOffer else { return }
@@ -183,6 +199,11 @@ final class FileTransferService: MessageHandler {
     /// One device (of possibly several) disconnected: drop only ITS pending
     /// offers. Offers and uploads from the remaining phones stay untouched.
     func deviceDisconnected(connectionId: String) {
+        // If the disconnected device is the one our outgoing offer targets,
+        // its answer can never arrive — fail the wait now.
+        if connectionId == pendingOutgoingConnectionId {
+            failPendingOutgoingWait()
+        }
         let remaining = pendingOffers.filter { $0.connectionId != connectionId }
         guard remaining.count != pendingOffers.count else { return }
         pendingOffers = remaining
@@ -252,7 +273,16 @@ final class FileTransferService: MessageHandler {
             let connectionService = self.connectionService
             Task { try? await connectionService?.sendToActive(Message.fileTransferCancel(transferId: transferId)) }
         }
-        offerResponseStream?.yield(false)
+        offerResponseStream?.yield(.rejected)
+        offerResponseStream?.finish()
+        offerResponseStream = nil
+    }
+
+    /// Ends the wait for an outgoing offer's answer with `.failed` (sender
+    /// disconnected, all connections lost, or the wait timed out). No-op when
+    /// nothing is being waited on.
+    private func failPendingOutgoingWait() {
+        offerResponseStream?.yield(.failed)
         offerResponseStream?.finish()
         offerResponseStream = nil
     }
@@ -284,17 +314,23 @@ final class FileTransferService: MessageHandler {
         self.isRejected = false
         self.isReceivingFile = false
         self.pendingOutgoingTransferId = transferId
+        self.pendingOutgoingConnectionId = connectionService.activeDevice?.connectionId
 
         // Show the popup immediately in waiting state (idempotent — if the
         // user already opened it via Quick Drop, no new window is created)
         TransferPopup.shared.show()
 
+        // Set up the response stream for the offer (accept/reject)
+        // SYNCHRONOUSLY, before the async work below gets a chance to run —
+        // a disconnect arriving in that window must find the continuation
+        // already installed, or its `.failed` yield is lost and the wait
+        // hangs forever.
+        let stream = AsyncStream<OutgoingOfferResponse> { continuation in
+            self.offerResponseStream = continuation
+        }
+
         Task {
-            // 1. Set up response stream for the offer (accept/reject) and
-            //    the HTTP completion stream (phone's GET finishes).
-            let stream = AsyncStream<Bool> { continuation in
-                self.offerResponseStream = continuation
-            }
+            // 1. Set up the HTTP completion stream (phone's GET finishes).
             let (httpStream, httpContinuation) = AsyncStream<Bool>.makeStream()
 
             // 2. Register the file with Mac's HttpUploadServer BEFORE sending
@@ -343,25 +379,41 @@ final class FileTransferService: MessageHandler {
             let offer = Message.fileTransferOffer(transferId: transferId, filename: filename, mimeType: mime, fileSize: fileSize, destinationDir: destinationDir)
             try? await connectionService.sendToActive(offer)
 
-            // 4. Wait for accept/reject (non-blocking for MainActor)
-            var accepted = false
-            for await response in stream {
-                accepted = response
+            // 4. Wait for accept/reject (non-blocking for MainActor). The
+            //    phone answers within 60 s or never (it enforces the same
+            //    timeout on its side) — a disconnected or unresponsive peer
+            //    must not leave the island on "waiting" forever.
+            let offerTimeout = Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(nanoseconds: UInt64(self.offerAcceptTimeout * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                self.failPendingOutgoingWait()
+            }
+            // Stream finishing without a value (defensive) counts as failure.
+            var response = OutgoingOfferResponse.failed
+            for await r in stream {
+                response = r
                 break
             }
+            offerTimeout.cancel()
 
-            guard accepted else {
-                // Rejected — drop the pending outgoing file so a later GET
+            guard response == .accepted else {
+                // Not sent — drop the pending outgoing file so a later GET
                 // (e.g., a retrying stale client) can't accidentally pull it.
                 await connectionService.httpServer.unregisterOutgoingFile(transferId: transferId)
                 httpContinuation.finish()
 
-                // Rejected — let view-side animation handle the morph
+                // Rejected/failed — let view-side animation handle the morph
                 self.isWaitingForAccept = false
                 self.pendingOutgoingTransferId = nil
-                self.isRejected = true
-                // Show rejection for 2s then slide up. Hide animation is
-                // 0.5s — total popup-visible time is 2.5s.
+                self.pendingOutgoingConnectionId = nil
+                if response == .rejected {
+                    self.isRejected = true
+                } else {
+                    self.isFailed = true
+                }
+                // Show rejection/failure for 2s then slide up. Hide animation
+                // is 0.5s — total popup-visible time is 2.5s.
                 TransferPopup.shared.hide(delay: 2.0)
                 // Wait UNTIL the hide animation has fully completed AND the
                 // NSWindow has been orderOut'd before resetting state. If we
@@ -371,6 +423,7 @@ final class FileTransferService: MessageHandler {
                 try? await Task.sleep(nanoseconds: 2_800_000_000)
                 // No withAnimation — popup is already gone, no one observes
                 self.isRejected = false
+                self.isFailed = false
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
                 self.isSendingFromQueue = false
@@ -390,6 +443,7 @@ final class FileTransferService: MessageHandler {
             self.transferEta = 0
             self.isWaitingForAccept = false
             self.pendingOutgoingTransferId = nil
+            self.pendingOutgoingConnectionId = nil
 
             // 6. Wait for phone's GET to finish streaming. Mac's
             //    HttpUploadServer fires onComplete via httpContinuation

@@ -9,6 +9,9 @@ enum TransferPopupState: Equatable {
     case transferring(filename: String, progress: Double, isReceiving: Bool)
     case complete(filename: String, isReceiving: Bool)
     case rejected(filename: String)
+    /// The transfer ended abnormally: the peer disconnected, the offer wait
+    /// timed out, or the upload stalled mid-stream.
+    case failed(filename: String)
     /// Ask-first headphone-switch prompt: playback started on this Mac while
     /// the phone holds idle headphones, and the user hasn't confirmed yet.
     case headphonePrompt
@@ -21,7 +24,8 @@ enum TransferPopupState: Equatable {
              .waiting(let f),
              .transferring(let f, _, _),
              .complete(let f, _),
-             .rejected(let f):
+             .rejected(let f),
+             .failed(let f):
             return f
         }
     }
