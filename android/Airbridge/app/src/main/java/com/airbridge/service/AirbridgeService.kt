@@ -52,7 +52,14 @@ class AirbridgeService : Service() {
 
         const val CHANNEL_ID = "airbridge_service"
         const val CHANNEL_FILES_ID = "airbridge_files"
-        const val CHANNEL_HEADPHONE_ID = "airbridge_headphone"
+        // v2: the original "airbridge_headphone" channel shipped as
+        // IMPORTANCE_LOW, and Android lets an app LOWER a channel's importance
+        // but never raise it — so every install from 2.9.0 onwards kept the
+        // prompt silent (no heads-up), which is exactly what the ask-first
+        // design depends on. A new id is the only way to get HIGH; the old
+        // channel is deleted on startup so it does not linger in settings.
+        const val CHANNEL_HEADPHONE_ID = "airbridge_headphone_v2"
+        private const val CHANNEL_HEADPHONE_ID_LEGACY = "airbridge_headphone"
         const val NOTIFICATION_ID = 1
         private const val HEADPHONE_PROMPT_NOTIFICATION_ID = 8
 
@@ -2296,6 +2303,9 @@ class AirbridgeService : Service() {
         manager.createNotificationChannel(serviceChannel)
         manager.createNotificationChannel(fileChannel)
         manager.createNotificationChannel(headphoneChannel)
+        // Retire the stuck-on-LOW channel so users are not left with a dead
+        // duplicate entry in the system notification settings.
+        manager.deleteNotificationChannel(CHANNEL_HEADPHONE_ID_LEGACY)
     }
 
     private fun openAppPendingIntent(): android.app.PendingIntent =
