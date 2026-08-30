@@ -92,7 +92,7 @@ private fun StatRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label
                 )
             }
         },
-        headlineContent = { Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge) },
+        content = { Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge) },
         trailingContent = {
             Text(
                 pluralStringResource(R.plurals.stats_row_value_files, files, files, formatBytes(bytes)),

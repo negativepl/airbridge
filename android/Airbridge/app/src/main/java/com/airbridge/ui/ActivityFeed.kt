@@ -68,7 +68,7 @@ private fun TransferRow(item: ActivityItem) {
         color = MaterialTheme.colorScheme.surfaceContainerLowest
     ) {
         ListItem(
-            headlineContent = {
+            content = {
                 Text(
                     item.description.ifBlank { item.type },
                     maxLines = 1,

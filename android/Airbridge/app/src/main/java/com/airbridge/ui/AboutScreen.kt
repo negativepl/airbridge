@@ -167,7 +167,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                         )
                     },
                     overlineContent = { Text(stringResource(R.string.about_created_by)) },
-                    headlineContent = { Text(stringResource(R.string.about_author)) },
+                    content = { Text(stringResource(R.string.about_author)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.OpenInNew,
@@ -205,7 +205,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                             )
                         },
                         overlineContent = { Text(stringResource(roleRes)) },
-                        headlineContent = { Text(name) },
+                        content = { Text(name) },
                         supportingContent = noteRes?.let { { Text(stringResource(it)) } },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
@@ -236,7 +236,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    headlineContent = { Text(stringResource(R.string.update_check)) },
+                    content = { Text(stringResource(R.string.update_check)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -259,7 +259,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    headlineContent = { Text(stringResource(R.string.about_source_code)) },
+                    content = { Text(stringResource(R.string.about_source_code)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.OpenInNew,
@@ -286,7 +286,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    headlineContent = { Text(stringResource(R.string.about_report_issue)) },
+                    content = { Text(stringResource(R.string.about_report_issue)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.OpenInNew,

@@ -49,12 +49,12 @@ kotlin {
 
 dependencies {
     // Compose BOM
-    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     // Nadpisuje BOM: komponenty M3 Expressive (LoadingIndicator, WavyProgress, ButtonGroup,
     // FAB menu, MaterialShapes) istnieją dopiero w linii 1.5.0-alpha.
-    implementation("androidx.compose.material3:material3:1.5.0-alpha24")
+    implementation("androidx.compose.material3:material3:1.5.0-alpha27")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.activity:activity-compose:1.13.0")
@@ -63,19 +63,19 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
     // Networking
-    implementation("com.squareup.okhttp3:okhttp:5.4.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
     // QR scanning — versions bumped for 16 KB page-size alignment of bundled
     // native libs (libbarhopper_v3.so, libimage_processing_util_jni.so):
     // ML Kit 17.3.0 + CameraX 1.4.x are the first 16 KB-aligned releases.
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
-    implementation("androidx.camera:camera-camera2:1.6.1")
-    implementation("androidx.camera:camera-lifecycle:1.6.1")
-    implementation("androidx.camera:camera-view:1.6.1")
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
+    implementation("androidx.camera:camera-view:1.6.2")
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("org.json:json:20260522")
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("org.json:json:20260814")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
     // TLS test fixtures (HeldCertificate/HandshakeCertificates) for pinned-TLS tests
-    testImplementation("com.squareup.okhttp3:okhttp-tls:5.4.0")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:5.5.0")
 }

@@ -301,7 +301,7 @@ private fun SettingsContent(
                     )
                 ) {
                     ListItem(
-                        headlineContent = {
+                        content = {
                             Text(
                                 text = downloadFolder,
                                 maxLines = 1,
@@ -344,7 +344,7 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    headlineContent = {
+                    content = {
                         Text(stringResource(R.string.settings_hide_notification))
                     },
                     supportingContent = {
@@ -370,7 +370,7 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_vibrate)) },
+                    content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
                     trailingContent = {
                         Switch(checked = vibrateOnSync, onCheckedChange = null)
@@ -400,7 +400,7 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_auto_connect)) },
+                    content = { Text(stringResource(R.string.settings_auto_connect)) },
                     supportingContent = { Text(stringResource(R.string.settings_auto_connect_desc)) },
                     trailingContent = {
                         Switch(checked = autoConnect, onCheckedChange = null)
@@ -428,7 +428,7 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_headphone_handoff)) },
+                    content = { Text(stringResource(R.string.settings_headphone_handoff)) },
                     supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
                     trailingContent = {
                         Switch(checked = headphoneHandoff, onCheckedChange = null)
@@ -450,7 +450,7 @@ private fun SettingsContent(
                 )
                 if (headphoneHandoff) {
                     ListItem(
-                        headlineContent = { Text(stringResource(R.string.settings_headphone_device)) },
+                        content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
                             Text(headphoneName ?: stringResource(R.string.settings_headphone_device_none))
                         },
@@ -468,7 +468,7 @@ private fun SettingsContent(
                         }
                     )
                     ListItem(
-                        headlineContent = { Text(stringResource(R.string.settings_headphone_auto)) },
+                        content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
                         trailingContent = {
                             Switch(checked = headphoneAutoSwitch, onCheckedChange = null)
@@ -503,7 +503,7 @@ private fun SettingsContent(
                             Column {
                                 devices.forEach { device ->
                                     ListItem(
-                                        headlineContent = { Text(device.name) },
+                                        content = { Text(device.name) },
                                         supportingContent = { Text(device.address) },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         modifier = Modifier.clickable {
@@ -555,7 +555,7 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    headlineContent = { Text(stringResource(R.string.update_check)) },
+                    content = { Text(stringResource(R.string.update_check)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -610,7 +610,7 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    headlineContent = { Text(stringResource(R.string.settings_export_diagnostics)) },
+                    content = { Text(stringResource(R.string.settings_export_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
                     trailingContent = {
                         Icon(

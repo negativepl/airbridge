@@ -597,7 +597,7 @@ private fun DeviceRow(
                 )
             }
         },
-        headlineContent = {
+        content = {
             Text(
                 text = device.deviceName,
                 maxLines = 1,
