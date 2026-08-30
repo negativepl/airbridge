@@ -1981,8 +1981,9 @@ class AirbridgeService : Service() {
                     val speed = bytesSent * 1000 / elapsed
                     transferSpeedBps.value = speed
                     if (speed > peakSpeed) peakSpeed = speed
-                    val remaining = totalBytes - bytesSent
-                    transferEtaSeconds.value = if (speed > 0) (remaining / speed).toInt() else 0
+                    transferEtaSeconds.value = TransferEta.seconds(
+                        remainingBytes = totalBytes - bytesSent, speedBps = speed
+                    )
 
                     // Sample speed every 200ms for chart
                     val now = System.currentTimeMillis()
