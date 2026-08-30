@@ -47,6 +47,9 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -234,9 +237,9 @@ private fun SettingsContent(
                     // Jasny | Systemowy | Ciemny — systemowy w środku jako
                     // punkt neutralny między dwoma jawnymi motywami.
                     val themeOptions = listOf(
-                        "light" to stringResource(R.string.settings_theme_light),
-                        "system" to stringResource(R.string.settings_theme_system),
-                        "dark" to stringResource(R.string.settings_theme_dark)
+                        Triple("light", stringResource(R.string.settings_theme_light), Icons.Rounded.LightMode),
+                        Triple("system", stringResource(R.string.settings_theme_system), Icons.Rounded.BrightnessAuto),
+                        Triple("dark", stringResource(R.string.settings_theme_dark), Icons.Rounded.DarkMode)
                     )
 
                     Row(
@@ -246,7 +249,7 @@ private fun SettingsContent(
                         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
                     ) {
                         themeOptions.forEachIndexed { index, option ->
-                            val (value, label) = option
+                            val (value, label, themeIcon) = option
                             ToggleButton(
                                 checked = themeMode == value,
                                 onCheckedChange = {
@@ -261,7 +264,8 @@ private fun SettingsContent(
                                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                                     themeOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                }
+                                },
+                                icon = { Icon(themeIcon, contentDescription = null) }
                             ) {
                                 Text(label, maxLines = 1)
                             }
