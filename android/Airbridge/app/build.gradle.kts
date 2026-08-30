@@ -61,7 +61,7 @@ dependencies {
     implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     // Image loading
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.0")
     // Networking
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     // QR scanning — versions bumped for 16 KB page-size alignment of bundled
