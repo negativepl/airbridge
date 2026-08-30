@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/macOS-26+-black?logo=apple" />
   <img src="https://img.shields.io/badge/Android-10+-3DDC84?logo=android&logoColor=white" />
   <img src="https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white" />
-  <img src="https://img.shields.io/badge/Kotlin-2.3-7F52FF?logo=kotlin&logoColor=white" />
+  <img src="https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-blue" />
   <img src="https://img.shields.io/github/v/release/negativepl/airbridge" />
 </p>
