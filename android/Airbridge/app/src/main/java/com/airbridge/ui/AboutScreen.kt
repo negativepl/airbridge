@@ -188,7 +188,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                 // each model listed with the job it does around here.
                 val team = listOf(
                     Triple("Claude Fable 5", R.string.about_role_manager, null),
-                    Triple("Claude Opus 4.8", R.string.about_role_foreman, null),
+                    Triple("Claude Opus 5", R.string.about_role_foreman, null),
                     Triple("Claude Sonnet 5", R.string.about_role_engineer, null),
                     Triple("Claude Haiku 4.5", R.string.about_role_intern, R.string.about_intern_note)
                 )
