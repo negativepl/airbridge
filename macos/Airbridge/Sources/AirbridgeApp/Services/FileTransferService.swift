@@ -181,6 +181,20 @@ final class FileTransferService: MessageHandler {
         isAwaitingAcceptedTransfer = false
     }
 
+    /// Seconds remaining, rounded UP: a transfer with a fraction of a second
+    /// left has "1 s" left, not "0". Zero is reserved for "nothing left" and
+    /// "no estimate" — the popup renders it as "calculating…", so truncating
+    /// here used to blank the countdown exactly as a transfer finished.
+    static func etaSeconds(remainingBytes: Int64, speed: Double) -> Int {
+        guard speed > 0, remainingBytes > 0 else { return 0 }
+        return Int((Double(remainingBytes) / speed).rounded(.up))
+    }
+
+    /// Whether enough time has passed to divide bytes by it. Kept low so a
+    /// file that transfers in a few hundred milliseconds still gets an
+    /// estimate instead of showing "calculating…" for its whole life.
+    static func canEstimate(elapsed: TimeInterval) -> Bool { elapsed > 0.2 }
+
     func rejectIncomingOffer() {
         // Always dismiss locally, even if the offer state is already empty (a
         // dropped connection can clear it while the popup is still on screen).
@@ -399,11 +413,12 @@ final class FileTransferService: MessageHandler {
 
                     if let start = self.transferStartTime {
                         let elapsed = Date().timeIntervalSince(start)
-                        if elapsed > 0.5 {
+                        if Self.canEstimate(elapsed: elapsed) {
                             let speed = Double(sent) / elapsed
                             self.transferSpeed = speed
-                            let remaining = total - sent
-                            self.transferEta = speed > 0 ? Int(Double(remaining) / speed) : 0
+                            self.transferEta = Self.etaSeconds(
+                                remainingBytes: total - sent, speed: speed
+                            )
                         }
                     }
                 }
@@ -690,11 +705,12 @@ final class FileTransferService: MessageHandler {
 
                 if let start = self.transferStartTime {
                     let elapsed = Date().timeIntervalSince(start)
-                    if elapsed > 0.5 {
+                    if Self.canEstimate(elapsed: elapsed) {
                         let speed = Double(bytesReceived) / elapsed
                         self.transferSpeed = speed
-                        let remaining = totalBytes - bytesReceived
-                        self.transferEta = speed > 0 ? Int(Double(remaining) / speed) : 0
+                        self.transferEta = Self.etaSeconds(
+                            remainingBytes: Int64(totalBytes - bytesReceived), speed: speed
+                        )
                     }
                 }
             }
