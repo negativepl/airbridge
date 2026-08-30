@@ -73,6 +73,12 @@ class AirbridgeService : Service() {
         const val ACTION_HEADPHONE_TAKEOVER = "com.airbridge.action.HEADPHONE_TAKEOVER"
         const val ACTION_HEADPHONE_REFRESH = "com.airbridge.action.HEADPHONE_REFRESH"
         const val ACTION_HEADPHONE_MOVE_BACK = "com.airbridge.action.HEADPHONE_MOVE_BACK"
+        /** Debug-only: post the ask-first prompt to inspect it without
+         *  reproducing the audio/headphone conditions that normally raise it. */
+        const val ACTION_DEBUG_HEADPHONE_PROMPT = "com.airbridge.action.DEBUG_HEADPHONE_PROMPT"
+        /** Debug-only: render the transfer progress notification at a given
+         *  percentage (extra "p") to inspect how the progress bar draws. */
+        const val ACTION_DEBUG_PROGRESS_NOTIF = "com.airbridge.action.DEBUG_PROGRESS_NOTIF"
         const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
         private const val RING_NOTIFICATION_ID = 7
         private const val TRANSFER_NOTIFICATION_ID = 2
@@ -710,6 +716,15 @@ class AirbridgeService : Service() {
                 takeoverHeadphones(HandoffTrigger.MANUAL)
             }
             ACTION_HEADPHONE_REFRESH -> refreshHeadphoneConfig()
+            ACTION_DEBUG_HEADPHONE_PROMPT -> {
+                if (com.airbridge.BuildConfig.DEBUG) postHeadphonePromptNotification()
+            }
+            ACTION_DEBUG_PROGRESS_NOTIF -> {
+                if (com.airbridge.BuildConfig.DEBUG) {
+                    val p = intent.getIntExtra("p", 50).coerceIn(0, 100)
+                    updateTransferProgress("przyklad.pdf", p.toLong(), 100L)
+                }
+            }
             ACTION_HEADPHONE_MOVE_BACK -> {
                 (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                     .cancel(HEADPHONE_PROMPT_NOTIFICATION_ID)
@@ -1060,7 +1075,8 @@ class AirbridgeService : Service() {
 
         // Throttle notification updates to max every 300ms
         val now = System.currentTimeMillis()
-        if (now - lastProgressNotifUpdate >= 300 || (totalBytes > 0 && bytesReceived >= totalBytes)) {
+        if (now - lastProgressNotifUpdate >= 300 || (totalBytes > 0 && bytesReceived >= totalBytes) ||
+            com.airbridge.BuildConfig.DEBUG) {
             lastProgressNotifUpdate = now
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val sender = connectedDeviceName.value ?: "Mac"

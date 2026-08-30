@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only overrides. The service is not exported in release; here it is
+     opened up so adb can trigger diagnostic actions (e.g. posting the
+     headphone prompt to inspect it without staging the audio conditions). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <service
+            android:name=".service.AirbridgeService"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>
