@@ -105,6 +105,16 @@ struct TransferPopupView: View {
                 isReceiving: fileTransferService.isReceivingFile
             )
         }
+        // Accepted, but the upload has not sent its first byte yet. Without
+        // this the popup would fall through to the idle drop zone and flash
+        // "Drop file here" at someone who just accepted a file.
+        if fileTransferService.isAwaitingAcceptedTransfer {
+            return .transferring(
+                filename: fileTransferService.fileTransferFileName,
+                progress: 0,
+                isReceiving: true
+            )
+        }
         // Clipboard receipt — a transfer in flight still owns the popup, but
         // an arriving link outranks both the headphone question and idle.
         if let preview = clipboardService.incomingPreview {

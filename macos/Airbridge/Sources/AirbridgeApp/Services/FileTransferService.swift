@@ -22,6 +22,13 @@ final class FileTransferService: MessageHandler {
     /// A transfer ended abnormally (peer disconnected, timed out, or the
     /// upload stalled) — drives the island's transient failure state.
     private(set) var isFailed: Bool = false
+    /// True between accepting an offer and the first byte of the upload
+    /// landing. Without it the popup has nothing to show in that gap — the
+    /// offer is gone and progress is still zero — so it fell through to the
+    /// idle drop zone and flashed "Drop file here" at someone who had just
+    /// accepted a file.
+    private(set) var isAwaitingAcceptedTransfer = false
+
     private(set) var incomingOfferTransferId: String? = nil
     private(set) var incomingOfferFileSize: Int64 = 0
     var hasIncomingOffer: Bool { !pendingOffers.isEmpty }
@@ -58,8 +65,15 @@ final class FileTransferService: MessageHandler {
     /// files at once — accept/reject must cover every offer, not just the last).
     /// Each offer remembers its originating connection so the accept/reject
     /// goes back to THAT phone, not to every connected device.
-    @ObservationIgnored private var pendingOffers: [(transferId: String, fileSize: Int64, connectionId: String)] = []
-    @ObservationIgnored private var pendingOffersTotalSize: Int64 = 0
+    ///
+    /// Deliberately OBSERVED: `hasIncomingOffer` is derived from this array and
+    /// is the first thing the popup reads, so while an offer is on screen it is
+    /// the only dependency SwiftUI has recorded. Marking the array
+    /// `@ObservationIgnored` meant answering the offer changed nothing the view
+    /// was watching — the "Incoming file" pane stayed frozen until the hide
+    /// timer fired, so rejecting looked like it did nothing at all.
+    private var pendingOffers: [(transferId: String, fileSize: Int64, connectionId: String)] = []
+    private var pendingOffersTotalSize: Int64 = 0
     /// "host|filename" of the upload that owns the transfer popup. With two
     /// phones uploading concurrently, only the owner drives the shared popup
     /// fields — the other transfer still lands on disk, just without fighting
@@ -150,6 +164,7 @@ final class FileTransferService: MessageHandler {
             TransferPopup.shared.hide(delay: 0)
             return
         }
+        isAwaitingAcceptedTransfer = true
         for offer in offers { acceptedIncomingTransferIds.insert(offer.transferId) }
         let connectionService = self.connectionService
         Task {
@@ -158,6 +173,12 @@ final class FileTransferService: MessageHandler {
             }
         }
         // Keep the popup visible — receive HTTP upload progress will replace it
+    }
+
+    /// The accepted upload has begun (or can no longer begin) — release the
+    /// hold that keeps the island off the idle drop zone.
+    func noteIncomingTransferStarted() {
+        isAwaitingAcceptedTransfer = false
     }
 
     func rejectIncomingOffer() {
@@ -188,6 +209,7 @@ final class FileTransferService: MessageHandler {
             isRejected = false
             fileTransferFileName = ""
             isReceivingFile = false
+        isAwaitingAcceptedTransfer = false
         }
     }
 
@@ -201,6 +223,10 @@ final class FileTransferService: MessageHandler {
         failPendingOutgoingWait()
         receivingOwnerKey = nil
         acceptedIncomingTransferIds.removeAll()
+        // Released BEFORE the offer guard below: after an accept there is no
+        // pending offer left, so an early return here would leave the island
+        // waiting forever for an upload that can no longer arrive.
+        isAwaitingAcceptedTransfer = false
         guard hasIncomingOffer else { return }
         pendingOffers = []
         pendingOffersTotalSize = 0
@@ -209,6 +235,7 @@ final class FileTransferService: MessageHandler {
         isRejected = false
         fileTransferFileName = ""
         isReceivingFile = false
+        isAwaitingAcceptedTransfer = false
         TransferPopup.shared.hide(delay: 0)
     }
 
@@ -231,6 +258,7 @@ final class FileTransferService: MessageHandler {
             isRejected = false
             fileTransferFileName = ""
             isReceivingFile = false
+        isAwaitingAcceptedTransfer = false
             TransferPopup.shared.hide(delay: 0)
         }
     }
@@ -249,6 +277,7 @@ final class FileTransferService: MessageHandler {
             // popup stranded mid-progress.
             receivingOwnerKey = nil
             isReceivingFile = false
+        isAwaitingAcceptedTransfer = false
             transferStartTime = nil
             transferSpeed = 0
             transferEta = 0
@@ -268,6 +297,7 @@ final class FileTransferService: MessageHandler {
             isRejected = false
             fileTransferFileName = ""
             isReceivingFile = false
+        isAwaitingAcceptedTransfer = false
             TransferPopup.shared.hide(delay: 0)
         }
     }
@@ -329,6 +359,7 @@ final class FileTransferService: MessageHandler {
         self.isWaitingForAccept = true
         self.isRejected = false
         self.isReceivingFile = false
+                self.isAwaitingAcceptedTransfer = false
         self.pendingOutgoingTransferId = transferId
         self.pendingOutgoingConnectionId = connectionService.activeDevice?.connectionId
 
@@ -612,6 +643,7 @@ final class FileTransferService: MessageHandler {
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
                 self.isReceivingFile = false
+                self.isAwaitingAcceptedTransfer = false
                 // Fresh speed/ETA baseline for the next receive.
                 self.transferStartTime = nil
                 self.transferSpeed = 0
@@ -642,6 +674,7 @@ final class FileTransferService: MessageHandler {
 
                 self.fileTransferFileName = filename
                 self.fileTransferProgress = progress
+                self.isAwaitingAcceptedTransfer = false
 
                 if !self.isReceivingFile {
                     self.isReceivingFile = true
@@ -698,6 +731,7 @@ final class FileTransferService: MessageHandler {
                 guard ownsPopup else { return }
                 self.receivingOwnerKey = nil
                 self.isReceivingFile = false
+                self.isAwaitingAcceptedTransfer = false
                 self.transferStartTime = nil
                 self.transferSpeed = 0
                 self.transferEta = 0
