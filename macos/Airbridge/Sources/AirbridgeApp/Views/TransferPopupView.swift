@@ -57,6 +57,8 @@ extension NSScreen {
 struct TransferPopupView: View {
     let connectionService: ConnectionService
     let fileTransferService: FileTransferService
+    /// Source of the "content arrived from the phone" receipt state.
+    let clipboardService: ClipboardService
     /// Top inset for the notch on MacBook Pro 14"/16". Content is pushed down
     /// by this amount so it sits below the notch cutout.
     let notchInset: CGFloat
@@ -103,6 +105,11 @@ struct TransferPopupView: View {
                 isReceiving: fileTransferService.isReceivingFile
             )
         }
+        // Clipboard receipt — a transfer in flight still owns the popup, but
+        // an arriving link outranks both the headphone question and idle.
+        if let preview = clipboardService.incomingPreview {
+            return .clipboardReceived(preview: preview, isLink: clipboardService.incomingURL != nil)
+        }
         // Ask-first headphone prompt — below every transfer state (those
         // take priority over the question) but above idle.
         if connectionService.headphonePromptVisible {
@@ -116,6 +123,7 @@ struct TransferPopupView: View {
         switch state {
         case .idle: return .accentColor
         case .incoming, .waiting, .transferring, .headphonePrompt: return .accentColor
+        case .clipboardReceived: return .accentColor
         case .complete: return .green
         case .rejected, .failed: return .red
         }
@@ -128,6 +136,8 @@ struct TransferPopupView: View {
         switch state {
         case .idle, .incoming, .waiting, .transferring, .headphonePrompt:
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
+        case .clipboardReceived:
+            return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
         case .complete:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
         case .rejected, .failed:
@@ -145,6 +155,7 @@ struct TransferPopupView: View {
         case .rejected: return 0.85
         case .failed: return 0.85
         case .headphonePrompt: return 0.9
+        case .clipboardReceived: return 0.9
         }
     }
 
@@ -186,6 +197,7 @@ struct TransferPopupView: View {
         case .rejected: return 5
         case .headphonePrompt: return 6
         case .failed: return 7
+        case .clipboardReceived: return 8
         }
     }
 
@@ -212,6 +224,8 @@ struct TransferPopupView: View {
             failedView(name: name)
         case .headphonePrompt:
             headphonePromptView()
+        case .clipboardReceived(let preview, let isLink):
+            clipboardReceivedView(preview: preview, isLink: isLink)
         }
     }
 
@@ -610,6 +624,55 @@ struct TransferPopupView: View {
         }
     }
 
+    /// Receipt for content synced from the phone: it is already on the
+    /// pasteboard, this only makes that visible. A plain web link also gets
+    /// a one-click Open.
+    private func clipboardReceivedView(preview: String, isLink: Bool) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: isLink ? "link" : "doc.on.clipboard.fill")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: preview)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(isLink ? L10n.clipboardReceivedLinkTitle : L10n.clipboardReceivedTitle)
+                    .font(.ab(.footnote, weight: .medium))
+                    .foregroundStyle(.secondary)
+                if let url = clipboardService.incomingURL {
+                    // Domain leads — it is what tells you where the link goes.
+                    // The path/query is a supporting detail, not the headline.
+                    Text(ClipboardService.linkHost(url))
+                        .font(.ab(.callout, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let detail = ClipboardService.linkDetail(url) {
+                        Text(detail)
+                            .font(.ab(.footnote))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                } else {
+                    Text(preview)
+                        .font(.ab(.callout, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+            }
+
+            Spacer()
+
+            if isLink {
+                Button(L10n.clipboardOpenLink) {
+                    clipboardService.openIncomingURL()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private var speedText: String {
@@ -815,6 +878,7 @@ final class TransferPopup {
     private var isVisible = false
     private weak var connectionService: ConnectionService?
     private weak var fileTransferService: FileTransferService?
+    private weak var clipboardService: ClipboardService?
     private var idleAutoHideTimer: Timer?
     private let idleAutoHideDelay: TimeInterval = 5.0
     private var escapeMonitor: Any?
@@ -830,9 +894,14 @@ final class TransferPopup {
 
     var isShowing: Bool { isVisible }
 
-    func configure(connectionService: ConnectionService, fileTransferService: FileTransferService) {
+    func configure(
+        connectionService: ConnectionService,
+        fileTransferService: FileTransferService,
+        clipboardService: ClipboardService
+    ) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
+        self.clipboardService = clipboardService
     }
 
     /// Toggle for the global shortcut — shows in idle state, hides if visible.
@@ -849,7 +918,7 @@ final class TransferPopup {
     /// internally from the observed services).
     func show() {
         if isVisible { return }
-        guard let connectionService, let fileTransferService else { return }
+        guard let connectionService, let fileTransferService, let clipboardService else { return }
         isVisible = true
 
         guard let screen = NSScreen.main else { return }
@@ -859,6 +928,7 @@ final class TransferPopup {
         let view = TransferPopupView(
             connectionService: connectionService,
             fileTransferService: fileTransferService,
+            clipboardService: clipboardService,
             notchInset: notchInset,
             presentation: presentation
         )
@@ -957,6 +1027,10 @@ final class TransferPopup {
                 panel.orderOut(nil)
                 self.panel = nil
                 self.isVisible = false
+                // The receipt lives exactly as long as the popup that shows
+                // it — otherwise a stale preview would re-appear the next
+                // time the popup opens for something else.
+                self.clipboardService?.dismissIncomingPreview()
             }
         }
     }

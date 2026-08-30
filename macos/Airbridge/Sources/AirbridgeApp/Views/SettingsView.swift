@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var accessibilityAwaitingRestart = false
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
+    @AppStorage("clipboardReceipt") private var clipboardReceipt = true
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
@@ -207,6 +208,9 @@ struct SettingsView: View {
             }
 
             Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
+                .font(.ab(.body))
+
+            Toggle(L10n.clipboardReceiptSetting, isOn: $clipboardReceipt)
                 .font(.ab(.body))
 
             Toggle(L10n.isPL ? "Pokaż w Docku" : "Show in Dock", isOn: Binding(

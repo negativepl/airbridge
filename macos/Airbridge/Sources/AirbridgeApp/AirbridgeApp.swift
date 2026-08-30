@@ -65,7 +65,7 @@ struct AirbridgeApp: App {
         notifications.configure(connectionService: connection)
         filesBrowser.configure(connectionService: connection, fileTransferService: fileTransfer)
         hotkey.configure(connectionService: connection, fileTransferService: fileTransfer)
-        TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer)
+        TransferPopup.shared.configure(connectionService: connection, fileTransferService: fileTransfer, clipboardService: clipboard)
         connection.registerHandlers(clipboard: clipboard, fileTransfer: fileTransfer, gallery: gallery, sms: sms, files: filesBrowser, notifications: notifications)
         connection.mirrorService = mirror
         connection.pairingService = pairing

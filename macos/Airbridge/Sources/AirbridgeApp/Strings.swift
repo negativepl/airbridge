@@ -49,6 +49,15 @@ enum L10n {
     static var connectedToDevice: String { isPL ? "Połączono z" : "Connected to" }
     static var dropFileHere: String { isPL ? "Upuść plik tutaj" : "Drop file here" }
     static var noDeviceConnected: String { isPL ? "Brak połączenia z urządzeniem" : "No device connected" }
+
+    // Clipboard receipt shown in the transfer popup
+    static var clipboardReceivedTitle: String { isPL ? "Skopiowano z telefonu" : "Copied from phone" }
+    static var clipboardReceivedLinkTitle: String { isPL ? "Link z telefonu" : "Link from phone" }
+    static var clipboardReceivedImage: String { isPL ? "Obraz" : "Image" }
+    static var clipboardOpenLink: String { isPL ? "Otwórz" : "Open" }
+    static var clipboardReceiptSetting: String {
+        isPL ? "Pokazuj odebraną zawartość schowka" : "Show received clipboard content"
+    }
     static var quickDropShortcut: String { isPL ? "Skrót Quick Drop" : "Quick Drop shortcut" }
     static var pressNewShortcut: String { isPL ? "Naciśnij nowy skrót..." : "Press new shortcut..." }
     static var resetToDefault: String { isPL ? "Przywróć domyślny" : "Reset to default" }

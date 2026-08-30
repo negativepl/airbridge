@@ -15,10 +15,13 @@ enum TransferPopupState: Equatable {
     /// Ask-first headphone-switch prompt: playback started on this Mac while
     /// the phone holds idle headphones, and the user hasn't confirmed yet.
     case headphonePrompt
+    /// Clipboard content just arrived from the phone and was applied to the
+    /// pasteboard. `isLink` drives the "Open" button for plain web links.
+    case clipboardReceived(preview: String, isLink: Bool)
 
     var filename: String {
         switch self {
-        case .idle, .headphonePrompt:
+        case .idle, .headphonePrompt, .clipboardReceived:
             return ""
         case .incoming(let f, _),
              .waiting(let f),
