@@ -369,9 +369,11 @@ private struct MenuRow: View {
         HStack(spacing: 8) {
             Group {
                 if loading {
+                    // .mini is the smallest NATIVE spinner size. It used to be
+                    // .small shrunk with scaleEffect(0.7), which squashed the
+                    // rendered circle instead of drawing a smaller one.
                     ProgressView()
-                        .controlSize(.small)
-                        .scaleEffect(0.7)
+                        .controlSize(.mini)
                 } else {
                     Image(systemName: systemImage)
                         .font(.ab(.subheadline))
