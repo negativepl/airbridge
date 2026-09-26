@@ -344,7 +344,9 @@ struct TransferPopupView: View {
         } keyframes: { _ in
             KeyframeTrack {
                 CubicKeyframe(14, duration: 0.06)
-                SpringKeyframe(0, duration: 0.55, spring: Spring(response: 0.42, dampingRatio: 0.22))
+                // The keyframe must outlast the spring's settle, or the last
+                // swing is cut off mid-air: ~1 s for this damping.
+                SpringKeyframe(0, duration: 1.1, spring: Spring(response: 0.4, dampingRatio: 0.26))
             }
         }
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
