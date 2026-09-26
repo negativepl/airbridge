@@ -16,9 +16,6 @@ struct FilesBrowserView: View {
     /// listing that arrives sooner never shows one — a spinner that flashes
     /// for a few frames reads as a glitch, not as progress.
     @State private var showSpinner = false
-    /// Depth of the folder shown before the last change: deeper → slide in
-    /// from the right, shallower → from the left (direction-aware navigation).
-    @State private var previousDepth = 0
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
 
@@ -204,40 +201,12 @@ struct FilesBrowserView: View {
         return viewMode == .grid ? .grid : .list
     }
 
-    private var currentDepth: Int { filesBrowserService.breadcrumbs.count }
-
-    /// Direction-aware folder navigation, like the phone app: entering a
-    /// folder slides the new listing in from the right, going up slides it
-    /// in from the left, and the old listing slides out the other way. Keyed
-    /// on the PATH only, so the listing arriving mid-slide fills the new pane
-    /// in place instead of restarting the slide. Within one folder the kinds
-    /// (blank → list, list → empty) just crossfade.
+    /// Folder changes are instant, like the Finder: no slide, no crossfade.
+    /// The listing usually comes straight from the on-disk cache, so the new
+    /// folder is simply there; the spinner appears only when the phone takes
+    /// longer than 350 ms and there is nothing cached to show.
     private var content: some View {
-        let forward = currentDepth >= previousDepth
-        let slideIn: Edge = forward ? .trailing : .leading
-        let slideOut: Edge = forward ? .leading : .trailing
-        // A pure slide: no opacity on the pane (a fade on top of the move read
-        // as a smear), the panes push each other like pages.
-        return ZStack {
-            folderPane
-                .id(filesBrowserService.currentPath)
-                .transition(.asymmetric(insertion: .move(edge: slideIn), removal: .move(edge: slideOut)))
-        }
-        .clipped()
-        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: filesBrowserService.currentPath)
-        .onChange(of: filesBrowserService.currentPath) { _, _ in
-            // Remember where we came from for the NEXT change's direction.
-            Task { @MainActor in previousDepth = currentDepth }
-        }
-        .task(id: filesBrowserService.isLoading) {
-            guard filesBrowserService.isLoading else { showSpinner = false; return }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
-        }
-    }
-
-    private var folderPane: some View {
-        ZStack {
+        Group {
             switch contentKind {
             case .permission:
                 permissionEmptyState
@@ -257,15 +226,12 @@ struct FilesBrowserView: View {
                 listView
             }
         }
-        // The pane's own background: the sliding pane must be opaque, or the
-        // old and new listings show through each other mid-slide.
-        .background(Color(nsColor: .windowBackgroundColor))
-        .id(contentKind)
-        .transition(.opacity)
-        // Within a folder the kinds crossfade; but never while the pane is
-        // sliding in (its listing usually lands mid-slide) — that fade on top
-        // of the move was the "what is happening" moment.
-        .animation(filesBrowserService.isLoading ? nil : .easeOut(duration: 0.18), value: contentKind)
+        .transaction { $0.animation = nil }
+        .task(id: filesBrowserService.isLoading) {
+            guard filesBrowserService.isLoading else { showSpinner = false; return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
+        }
     }
 
     private var listView: some View {
@@ -279,7 +245,6 @@ struct FilesBrowserView: View {
             }
         }
         .listStyle(.inset)
-        .animation(.default, value: filesBrowserService.displayedEntries.count)
     }
 
     @ViewBuilder
@@ -315,7 +280,6 @@ struct FilesBrowserView: View {
             }
             .padding(16)
         }
-        .animation(.default, value: filesBrowserService.displayedEntries.count)
     }
 
     @ViewBuilder
