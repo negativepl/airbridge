@@ -67,9 +67,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun SectionTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 10.dp, top = 18.dp, bottom = 6.dp)
+        modifier = Modifier.padding(start = 10.dp, top = 18.dp, bottom = 8.dp)
     )
 }
 

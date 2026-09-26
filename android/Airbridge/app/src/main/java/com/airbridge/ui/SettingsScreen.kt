@@ -46,12 +46,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material3.ToggleButton
@@ -219,13 +219,28 @@ private fun SettingsContent(
             }
         }
 
-        // Add new Mac button
-        Button(
+        // Pair another Mac: a row card like the rest of Settings, under the
+        // device cards it adds to.
+        AirbridgeCard(
             onClick = { onScanQr() },
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+            )
         ) {
-            Text(stringResource(R.string.pairing_add_mac))
+            SettingsRow(
+                content = { Text(stringResource(R.string.pairing_add_mac)) },
+                trailingContent = {
+                    Icon(
+                        Icons.Rounded.QrCodeScanner,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
         }
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
