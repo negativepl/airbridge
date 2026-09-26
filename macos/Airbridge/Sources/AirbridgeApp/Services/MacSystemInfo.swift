@@ -67,7 +67,12 @@ enum MacSystemInfo {
         config.height = Int(window.frame.height * scale)
         config.showsCursor = false
         guard let cg = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else { return nil }
-        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        // The scaled capture leaves an unfilled (white) column or row at the far
+        // edge from the size rounding; trim a couple of pixels all round.
+        let inset = 2
+        let rect = CGRect(x: inset, y: inset, width: cg.width - 2 * inset, height: cg.height - 2 * inset)
+        let trimmed = cg.cropping(to: rect) ?? cg
+        return NSImage(cgImage: trimmed, size: NSSize(width: trimmed.width, height: trimmed.height))
     }
 
     private static func wallpaperFileJPEGBase64() -> String {

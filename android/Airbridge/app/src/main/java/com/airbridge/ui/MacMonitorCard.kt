@@ -388,7 +388,7 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 private val GLOW_HEIGHT = 180.dp
 // Reach of the light past the card: tighter above (the top bar is close), wider elsewhere.
 private val SPILL = 28.dp
-private val SPILL_TOP = 30.dp
+private val SPILL_TOP = 18.dp
 
 /**
  * Ambilight: the blurred wallpaper centred behind the card and reaching
