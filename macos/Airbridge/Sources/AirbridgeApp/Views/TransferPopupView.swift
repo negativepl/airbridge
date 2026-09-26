@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import Observation
-import UniformTypeIdentifiers
 
 // MARK: - Popup presentation state
 // Tiny @Observable holding the popup's "is visually presented" flag.
