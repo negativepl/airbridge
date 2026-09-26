@@ -266,8 +266,9 @@ internal fun isVersionMismatch(remoteVersion: String, localVersion: String): Boo
 private fun versionBase(version: String): String = version.substringBefore("-")
 
 /** Live CPU/RAM/disk rings for the connected Mac. */
+/** [info] null (not connected yet): the three rings sit empty with "–" in place of numbers. */
 @Composable
-fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
+fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
     AirbridgeCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
@@ -279,6 +280,11 @@ fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
+            if (info == null) {
+                MonitorRing(0f, "–", stringResource(R.string.home_monitor_cpu), null)
+                MonitorRing(0f, "–", stringResource(R.string.home_monitor_ram), null)
+                MonitorRing(0f, "–", stringResource(R.string.home_monitor_disk), null)
+            } else {
             MonitorRing(
                 fraction = info.cpuLoadPercent / 100f,
                 centerText = "${info.cpuLoadPercent}%",
@@ -298,6 +304,7 @@ fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
                 label = stringResource(R.string.home_monitor_disk),
                 detail = "${gb(usedStorage)} / ${gb(info.totalStorageBytes)}"
             )
+            }
         }
     }
 }

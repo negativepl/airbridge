@@ -83,15 +83,17 @@ fun QuickActionsRow(
     onSendClipboard: () -> Unit,
     onMacScreen: () -> Unit,
     macScreenEnabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** False while there is no Mac to send to: the tiles stay in place, dimmed. */
+    enabled: Boolean = true
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         SectionTitle(stringResource(R.string.home_section_quick_actions))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QuickTile(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, modifier = Modifier.weight(1f))
-            QuickTile(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, modifier = Modifier.weight(1f))
-            QuickTile(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, modifier = Modifier.weight(1f))
-            QuickTile(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = macScreenEnabled, modifier = Modifier.weight(1f))
+            QuickTile(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickTile(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickTile(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickTile(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -140,7 +142,7 @@ private fun QuickTile(
  * and a button that sends the current clipboard to the Mac.
  */
 @Composable
-fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifier: Modifier = Modifier) {
+fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val last = remember(items) { items.firstOrNull { it.type == "clipboard_sent" || it.type == "clipboard_received" } }
     val now = System.currentTimeMillis()
     Column(modifier = modifier.fillMaxWidth()) {
@@ -170,7 +172,7 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
                 },
                 supportingContent = last?.let { { Text(formatTimeAgo(it.timestamp, now)) } },
                 trailingContent = {
-                    FilledTonalButton(onClick = onSendClipboard) {
+                    FilledTonalButton(onClick = onSendClipboard, enabled = enabled) {
                         Text(stringResource(R.string.clipboard_send_now))
                     }
                 },

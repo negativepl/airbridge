@@ -134,6 +134,22 @@ class MainActivity : ComponentActivity() {
                 !(AirbridgeService.isConnected.value && AirbridgeService.macInfo.value != null) &&
                 SystemClock.uptimeMillis() - startedAt < STARTUP_HOLD_MS
         }
+        // Exit: the icon grows and fades, uncovering the home screen underneath.
+        splash.setOnExitAnimationListener { view ->
+            val icon = view.iconView
+            val duration = 380L
+            icon.animate()
+                .scaleX(6f).scaleY(6f).alpha(0f)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f))
+                .setDuration(duration)
+                .start()
+            view.view.animate()
+                .alpha(0f)
+                .setStartDelay(duration / 3)
+                .setDuration(duration * 2 / 3)
+                .withEndAction { view.remove() }
+                .start()
+        }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 

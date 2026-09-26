@@ -164,29 +164,11 @@ fun MainScreen(
                 2 -> {
                     val macLocal = macInfo
                     if (macLocal != null) {
-                        Column {
-                            MacDeviceCard(
-                                info = macLocal,
-                                wallpaperBase64 = macWallpaper,
-                                onDisconnect = { viewModel.disconnect() }
-                            )
-                            // Extra room under the device card: its light needs space
-                            // before the next section title.
-                            Spacer(modifier = Modifier.height(28.dp))
-                            val mirror = rememberMirrorLauncher()
-                            QuickActionsRow(
-                                onSendFile = onSendFile,
-                                onSendPhoto = onSendPhoto,
-                                onSendClipboard = onSendClipboard,
-                                onMacScreen = { mirror.launch(0) },
-                                macScreenEnabled = mirror.ready
-                            )
-                            ClipboardCard(items = activity, onSendClipboard = onSendClipboard)
-                            HeadphonesCard(viewModel = viewModel)
-
-                            SectionTitle(stringResource(R.string.home_monitor_title))
-                            MacMonitorRings(info = macLocal)
-                        }
+                        MacDeviceCard(
+                            info = macLocal,
+                            wallpaperBase64 = macWallpaper,
+                            onDisconnect = { viewModel.disconnect() }
+                        )
                     }
                 }
                 // Połączono, ale dane Maca jeszcze nie dotarły — spójny stan ładowania
@@ -200,6 +182,26 @@ fun MainScreen(
                 )
             }
         }
+
+        // The rest of Home is always laid out, whatever the connection state:
+        // only the device card above changes. Controls that need the Mac are
+        // disabled, not hidden, so nothing jumps when the connection comes in.
+        val macReady = connState == 2
+        Spacer(modifier = Modifier.height(28.dp))
+        val mirror = rememberMirrorLauncher()
+        QuickActionsRow(
+            onSendFile = onSendFile,
+            onSendPhoto = onSendPhoto,
+            onSendClipboard = onSendClipboard,
+            onMacScreen = { mirror.launch(0) },
+            macScreenEnabled = mirror.ready,
+            enabled = macReady
+        )
+        ClipboardCard(items = activity, onSendClipboard = onSendClipboard, enabled = macReady)
+        HeadphonesCard(viewModel = viewModel)
+
+        SectionTitle(stringResource(R.string.home_monitor_title))
+        MacMonitorRings(info = mac)
 
         // ── Re-pair guidance (TLS pin missing or Mac certificate changed) ──
         val pairingIssue by AirbridgeService.pairingIssue.collectAsState()
