@@ -123,7 +123,7 @@ fun MainScreen(
             .padding(horizontal = 8.dp)
     ) {
         // Generous room under the bar before the first card.
-        Spacer(modifier = Modifier.height(topInset + 40.dp))
+        Spacer(modifier = Modifier.height(topInset + 48.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()

@@ -123,7 +123,7 @@ fun MacDeviceCard(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
         ) {
 
-        Box(modifier = Modifier.fillMaxWidth().height(172.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap,
@@ -446,6 +446,16 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 )
                 drawRect(
                     brush = Brush.horizontalGradient(0f to Color.Transparent, fx to Color.Black, 1f - fx to Color.Black, 1f to Color.Transparent),
+                    blendMode = BlendMode.DstIn
+                )
+                // Round it off: dim towards the corners so the halo reads as light
+                // pooling around the card, not a rectangle with soft edges.
+                drawRect(
+                    brush = Brush.radialGradient(
+                        0f to Color.Black, 0.55f to Color.Black, 1f to Color.Black.copy(alpha = 0.1f),
+                        center = Offset(size.width / 2f, size.height / 2f),
+                        radius = kotlin.math.hypot(size.width / 2f, size.height / 2f)
+                    ),
                     blendMode = BlendMode.DstIn
                 )
             }
