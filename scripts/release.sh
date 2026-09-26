@@ -55,7 +55,20 @@ if ! swift build -c release > "$BUILD_LOG" 2>&1; then
     exit 1
 fi
 echo "  macOS build succeeded"
-MACOS_BIN="$ROOT/macos/Airbridge/.build/arm64-apple-macosx/release/AirbridgeApp"
+# `.build/release` is the symlink SwiftPM keeps pointing at the current
+# products dir regardless of build system (the classic
+# `.build/arm64-apple-macosx/release` layout, or `.build/out/Products/Release`
+# under the Swift Build system that ships with Swift 6.4+). The hardcoded triple
+# path shipped a stale 3.1.0 binary as 3.2.0.
+MACOS_BIN="$ROOT/macos/Airbridge/.build/release/AirbridgeApp"
+# Refuse a product older than any source file — a stale binary must never
+# ship again. (Compared against sources, not the build log: an incremental
+# build with nothing to do leaves the binary's mtime untouched.)
+STALE=$(find "$ROOT/macos/Airbridge/Sources" "$ROOT/macos/Airbridge/Package.swift" -newer "$MACOS_BIN" -type f | head -1)
+if [ -n "$STALE" ]; then
+    echo "Error: $MACOS_BIN predates $STALE — stale product, aborting."
+    exit 1
+fi
 
 # Build app bundle from scratch in a temp staging dir. The only user-visible
 # copy lives in /Applications (synced below) — keeping the bundle out of
