@@ -11,8 +11,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
@@ -34,6 +36,23 @@ fun Modifier.edgeLight(shape: Shape): Modifier {
     return this
         .border(width = 0.75.dp, color = outline, shape = shape)
         .innerShadow(shape, Shadow(radius = 1.dp, color = highlight, offset = DpOffset(0.dp, 1.dp)))
+}
+
+/**
+ * The card's edge light for a full-width bar (the dock): a hairline along the
+ * top edge and the same line of light right under it, nothing on the sides.
+ */
+@Composable
+fun Modifier.topEdgeLight(): Modifier {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val highlight = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
+    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (dark) 0.35f else 0.6f)
+    return this.drawWithContent {
+        drawContent()
+        val hairline = 0.75.dp.toPx()
+        drawRect(color = outline, size = Size(size.width, hairline))
+        drawRect(color = highlight, topLeft = Offset(0f, hairline), size = Size(size.width, 1.dp.toPx()))
+    }
 }
 
 /** Material Card with the edge light applied. Same parameters as [Card]. */

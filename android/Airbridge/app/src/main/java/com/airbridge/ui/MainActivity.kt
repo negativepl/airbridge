@@ -272,9 +272,11 @@ class MainActivity : ComponentActivity() {
                             // the dock reads as a distinct bar above the content.
                             NavigationBar(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.onGloballyPositioned {
-                                    dockTopPx = it.boundsInWindow().top
-                                }
+                                modifier = Modifier
+                                    .topEdgeLight()
+                                    .onGloballyPositioned {
+                                        dockTopPx = it.boundsInWindow().top
+                                    }
                             ) {
                                 navItems.forEachIndexed { index, item ->
                                     NavigationBarItem(
