@@ -26,6 +26,12 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedContent
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.ui.graphics.Color
@@ -414,46 +420,61 @@ class MainActivity : ComponentActivity() {
                         // reserves the top bar height and the dock height plus the FAB
                         // clearance itself, and the bars blur what scrolls beneath them.
                         val pageBottomClearance = fabClearance + innerPadding.calculateBottomPadding()
-                        HorizontalPager(
-                            state = pagerState,
-                            beyondViewportPageCount = 1,
-                        ) { page ->
-                            val topInset = androidx.compose.material3.TopAppBarDefaults.TopAppBarExpandedHeight +
-                                WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                // Each page's content is a haze source of its own: the top bar
-                                // (a sibling here) and the dock blur what passes under them.
+                        val topInset = androidx.compose.material3.TopAppBarDefaults.TopAppBarExpandedHeight +
+                            WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            HorizontalPager(
+                                state = pagerState,
+                                beyondViewportPageCount = 1,
+                            ) { page ->
+                                // Each page's content is a haze source: the top bar and the
+                                // dock (siblings of the pager) blur what passes under them.
                                 Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
-                                when (page) {
-                                    0 -> MainScreen(
-                                        viewModel = viewModel,
-                                        onScanQr = { showQrScanner = true },
-                                        bottomClearance = pageBottomClearance,
-                                        topInset = topInset,
-                                        onSendFile = sendFileAction,
-                                        onSendPhoto = sendPhotoAction,
-                                        onSendClipboard = sendClipboardAction
-                                    )
-                                    1 -> ScreenShareScreen(bottomClearance = pageBottomClearance, topInset = topInset)
-                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = pageBottomClearance, topInset = topInset)
+                                    when (page) {
+                                        0 -> MainScreen(
+                                            viewModel = viewModel,
+                                            onScanQr = { showQrScanner = true },
+                                            bottomClearance = pageBottomClearance,
+                                            topInset = topInset,
+                                            onSendFile = sendFileAction,
+                                            onSendPhoto = sendPhotoAction,
+                                            onSendClipboard = sendClipboardAction
+                                        )
+                                        1 -> ScreenShareScreen(bottomClearance = pageBottomClearance, topInset = topInset)
+                                        2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = pageBottomClearance, topInset = topInset)
+                                    }
                                 }
-                                }
-                                key(MaterialTheme.colorScheme.surfaceContainer) {
-                                    TopAppBar(
-                                        title = { Text(stringResource(pageTitles[page])) },
-                                        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                            containerColor = Color.Transparent
-                                        ),
-                                        actions = {
-                                            IconButton(onClick = { showSettings = true }) {
-                                                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.TopCenter)
-                                            .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
-                                    )
-                                }
+                            }
+                            // One fixed bar over the pager: the settings action stays put and
+                            // only the title changes, fading and sliding with the page.
+                            val titleFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                            val titleSlide = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+                            val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                            key(MaterialTheme.colorScheme.surfaceContainer) {
+                                TopAppBar(
+                                    title = {
+                                        AnimatedContent(
+                                            targetState = pagerState.targetPage.coerceIn(0, pageTitles.lastIndex),
+                                            transitionSpec = {
+                                                val forward = targetState > initialState
+                                                (fadeIn(titleFade) + slideInVertically(titleSlide) { if (forward) it / 2 else -it / 2 }) togetherWith
+                                                    (fadeOut(titleExit) + slideOutVertically(titleSlide) { if (forward) -it / 2 else it / 2 })
+                                            },
+                                            label = "pageTitle"
+                                        ) { page -> Text(stringResource(pageTitles[page])) }
+                                    },
+                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                                        containerColor = Color.Transparent
+                                    ),
+                                    actions = {
+                                        IconButton(onClick = { showSettings = true }) {
+                                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
+                                )
                             }
                         }
                     }
