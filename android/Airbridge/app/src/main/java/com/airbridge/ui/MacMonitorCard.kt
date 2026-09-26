@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -233,7 +234,7 @@ fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
                 fraction = info.cpuLoadPercent / 100f,
                 centerText = "${info.cpuLoadPercent}%",
                 label = stringResource(R.string.home_monitor_cpu),
-                detail = null
+                detail = if (info.cpuCores > 0) pluralStringResource(R.plurals.home_monitor_cores, info.cpuCores, info.cpuCores) else null
             )
             MonitorRing(
                 fraction = frac(info.usedRamBytes, info.totalRamBytes),

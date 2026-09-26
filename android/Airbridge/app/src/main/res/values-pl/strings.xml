@@ -257,4 +257,10 @@
         <item quantity="many">%d plików</item>
         <item quantity="other">%d pliku</item>
     </plurals>
+    <plurals name="home_monitor_cores">
+        <item quantity="one">%d rdzeń</item>
+        <item quantity="few">%d rdzenie</item>
+        <item quantity="many">%d rdzeni</item>
+        <item quantity="other">%d rdzenia</item>
+    </plurals>
 </resources>
