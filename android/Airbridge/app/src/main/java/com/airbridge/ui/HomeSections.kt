@@ -69,7 +69,7 @@ fun SectionTitle(text: String) {
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 14.dp, top = 18.dp, bottom = 6.dp)
+        modifier = Modifier.padding(start = 10.dp, top = 18.dp, bottom = 6.dp)
     )
 }
 
