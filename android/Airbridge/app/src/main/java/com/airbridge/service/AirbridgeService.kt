@@ -1260,6 +1260,26 @@ class AirbridgeService : Service() {
         }
     }
 
+    /** What both session starts (auth after reconnect, fresh pairing) need once the socket is trusted. */
+    private fun onSessionEstablished() {
+        // Pull the Mac's system info + wallpaper for the Home monitor.
+        webSocketClient.send(Message.MacInfoRequest)
+        webSocketClient.send(Message.MacWallpaperRequest)
+        // Tell the Mac where the headphones are right now (it has no
+        // other way to learn the phone-side state after a reconnect).
+        val hpAddress = headphonePrefs().getString("headphone_address", null)
+        if (headphoneHandoffEnabled() && hpAddress != null) {
+            headphoneManager.selectedAddress = hpAddress
+            headphoneManager.start()
+            webSocketClient.send(Message.HeadphoneState(
+                connected = headphoneManager.isConnected(hpAddress),
+                address = hpAddress,
+                name = headphonePrefs().getString("headphone_name", "") ?: "",
+                audioActive = localAudioActive
+            ))
+        }
+    }
+
     private fun handleFileTransferOffer(offer: Message.FileTransferOffer) {
         pendingOffers[offer.transferId] = offer
         val sender = connectedDeviceName.value ?: "Mac"
@@ -1358,23 +1378,7 @@ class AirbridgeService : Service() {
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
                     pairingIssue.value = null
-                    // Pull the Mac's system info + wallpaper for the Home monitor.
-                    webSocketClient.send(Message.MacInfoRequest)
-                    webSocketClient.send(Message.MacWallpaperRequest)
-                    // Tell the Mac where the headphones are right now (it has no
-                    // other way to learn the phone-side state after a reconnect).
-                    val hpAddress = headphonePrefs().getString("headphone_address", null)
-                    if (headphoneHandoffEnabled() && hpAddress != null) {
-                        headphoneManager.selectedAddress = hpAddress
-                        headphoneManager.start()
-                        webSocketClient.send(Message.HeadphoneState(
-                            connected = headphoneManager.isConnected(hpAddress),
-                            address = hpAddress,
-                            name = headphonePrefs().getString("headphone_name", "") ?: "",
-                            audioActive = localAudioActive
-                        ))
-                    }
-                    // connection status tracked via StateFlow
+                    onSessionEstablished()
                 } else {
                     Log.w(TAG, "Auth rejected: ${message.reason}")
                     webSocketClient.shouldReconnect = false
@@ -1418,7 +1422,9 @@ class AirbridgeService : Service() {
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
                     pairingIssue.value = null
-                    // pairing status tracked via StateFlow
+                    // A fresh pairing is a session too: the Mac's info and
+                    // wallpaper must be pulled now, not on the next reconnect.
+                    onSessionEstablished()
                 } else {
                     connectedDeviceName.value = null
                     isConnected.value = false

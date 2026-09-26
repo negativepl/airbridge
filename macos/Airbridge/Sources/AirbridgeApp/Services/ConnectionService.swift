@@ -729,6 +729,23 @@ final class ConnectionService {
                 print("[ConnectionService] Failed to send pair response: \(error)")
                 #endif
             }
+            // A fresh pairing is a session too: pull the phone's info and
+            // wallpaper for the Home card now, as the auth path does.
+            await self.requestSessionData(connectionId: connectionId)
+        }
+    }
+
+    /// What every trusted session start (auth after reconnect, fresh pairing)
+    /// asks of the phone: richer device info, the wallpaper, and it tells the
+    /// phone the current headphone state.
+    private func requestSessionData(connectionId: String) async {
+        try? await server.sendTo(.deviceInfoRequest, connectionId: connectionId)
+        try? await server.sendTo(.wallpaperRequest, connectionId: connectionId)
+        if let ba = bluetoothAudio, ba.enabled, let address = ba.selectedAddress {
+            let name = ba.selectedName ?? address
+            try? await server.sendTo(
+                .headphoneState(connected: ba.selectedConnected, address: address, name: name, audioActive: ba.systemAudioActive),
+                connectionId: connectionId)
         }
     }
 
@@ -781,21 +798,9 @@ final class ConnectionService {
             self.statusMessage = L10n.isPL ? "Połączono z \(self.connectedDeviceName)" : "Connected to \(self.connectedDeviceName)"
             self.phase = .connected
 
-            // Pull richer device info (exact name, storage, RAM, battery) and the
-            // wallpaper for the Home screen — targeted to this connection so each
-            // device gets its own data instead of a lossy broadcast.
-            try? await self.server.sendTo(.deviceInfoRequest, connectionId: connectionId)
-            try? await self.server.sendTo(.wallpaperRequest, connectionId: connectionId)
-
-            // Let the newly authenticated phone know the current headphone state
-            // right away, instead of waiting for the next poll-driven change.
-            if let ba = self.bluetoothAudio, ba.enabled, let address = ba.selectedAddress {
-                let name = ba.selectedName ?? address
-                let connected = ba.selectedConnected
-                try? await self.server.sendTo(
-                    .headphoneState(connected: connected, address: address, name: name, audioActive: ba.systemAudioActive),
-                    connectionId: connectionId)
-            }
+            // Device info, wallpaper, headphone state — targeted to this
+            // connection so each device gets its own data.
+            await self.requestSessionData(connectionId: connectionId)
         }
     }
 
