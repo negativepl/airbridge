@@ -23,8 +23,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -176,6 +177,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     val pagerState = rememberPagerState(pageCount = { 3 })
+                    val hazeState = rememberHazeState()
                     val coroutineScope = rememberCoroutineScope()
                     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(this@MainActivity) }
                     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
@@ -271,13 +273,13 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         bottomBar = {
-                            // Stock Material 3 navigation bar. Its default container is
-                            // surfaceContainer — the same token as our screen background — so
-                            // it would blend in; give it the cards' surface instead, so with
-                            // the edge light it reads as one more card at the bottom.
+                            // Stock Material 3 navigation bar as a glass dock: the cards'
+                            // surface as its tint over the blurred content passing beneath,
+                            // with the cards' edge light on top.
                             NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                containerColor = Color.Transparent,
                                 modifier = Modifier
+                                    .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainerLowest)
                                     .topEdgeLight()
                                     .onGloballyPositioned {
                                         dockTopPx = it.boundsInWindow().top
@@ -373,48 +375,48 @@ class MainActivity : ComponentActivity() {
                         // The top bar lives inside each page (not in the Scaffold) so the
                         // title travels with its content during a swipe instead of
                         // snapping to the target page's name mid-gesture.
+                        // Pages run under both bars (no Scaffold padding); each page
+                        // reserves the top bar height and the dock height plus the FAB
+                        // clearance itself, and the bars blur what scrolls beneath them.
+                        val pageBottomClearance = fabClearance + innerPadding.calculateBottomPadding()
                         HorizontalPager(
                             state = pagerState,
-                            // Only the bottom inset from the Scaffold: the per-page top bar
-                            // applies the status bar inset itself.
-                            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
                             beyondViewportPageCount = 1,
                         ) { page ->
-                            // The bar overlays the page with a transparent container, so
-                            // the wallpaper light behind the Mac card runs under it; once
-                            // content scrolls beneath, the pinned behaviour tints the bar.
-                            val scrollBehavior = androidx.compose.material3.TopAppBarDefaults.pinnedScrollBehavior()
                             val topInset = androidx.compose.material3.TopAppBarDefaults.TopAppBarExpandedHeight +
                                 WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                             Box(modifier = Modifier.fillMaxSize()) {
+                                // Each page's content is a haze source of its own: the top bar
+                                // (a sibling here) and the dock blur what passes under them.
+                                Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
                                 when (page) {
                                     0 -> MainScreen(
                                         viewModel = viewModel,
                                         onScanQr = { showQrScanner = true },
-                                        bottomClearance = fabClearance,
+                                        bottomClearance = pageBottomClearance,
                                         topInset = topInset,
-                                        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                                         onSendFile = sendFileAction,
                                         onSendPhoto = sendPhotoAction,
                                         onSendClipboard = sendClipboardAction
                                     )
-                                    1 -> ScreenShareScreen(bottomClearance = fabClearance, topInset = topInset)
-                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance, topInset = topInset)
+                                    1 -> ScreenShareScreen(bottomClearance = pageBottomClearance, topInset = topInset)
+                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = pageBottomClearance, topInset = topInset)
+                                }
                                 }
                                 key(MaterialTheme.colorScheme.surfaceContainer) {
                                     TopAppBar(
                                         title = { Text(stringResource(pageTitles[page])) },
                                         colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                            containerColor = Color.Transparent,
-                                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                                            containerColor = Color.Transparent
                                         ),
                                         actions = {
                                             IconButton(onClick = { showSettings = true }) {
                                                 Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                                             }
                                         },
-                                        scrollBehavior = scrollBehavior,
-                                        modifier = Modifier.align(Alignment.TopCenter)
+                                        modifier = Modifier
+                                            .align(Alignment.TopCenter)
+                                            .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
                                     )
                                 }
                             }

@@ -22,6 +22,11 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 
 /**
  * Hairline and light-line colours for the edge light. Dark surfaces sit on an
@@ -109,4 +114,22 @@ fun DashedDivider(
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))
         )
     }
+}
+
+/**
+ * Glass treatment for a bar the content scrolls under (top bar, dock): the
+ * content behind is blurred and tinted with [tint], so sections fade in and
+ * out under the bar instead of being cut off by an opaque edge. Where blur
+ * is unavailable the bar falls back to the opaque tint.
+ */
+@Composable
+fun Modifier.glassBar(hazeState: HazeState, tint: Color): Modifier {
+    val style = HazeBlurStyle {
+        blurRadius(24.dp)
+        noiseFactor(0f)
+        backgroundColor(tint)
+        colorEffects(listOf(HazeColorEffect.tint(tint.copy(alpha = 0.72f))))
+        fallbackColorEffect(HazeColorEffect.tint(tint))
+    }
+    return this.hazeBlur(input = HazeInput.Sources(hazeState), style = style)
 }

@@ -71,6 +71,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")
+    // Glass bars: the top bar and the dock blur the content passing under them.
+    implementation("dev.chrisbanes.haze:haze:2.0.0")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
