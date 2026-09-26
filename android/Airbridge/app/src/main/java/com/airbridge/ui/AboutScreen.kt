@@ -189,7 +189,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     Triple("Claude Fable 5.1", R.string.about_role_manager, null),
                     Triple("Claude Opus 5.5", R.string.about_role_foreman, null),
                     Triple("Claude Sonnet 5", R.string.about_role_engineer, null),
-                    Triple("Claude Haiku 4.5", R.string.about_role_intern, R.string.about_intern_note)
+                    Triple("Claude Haiku 4.5", R.string.about_role_intern, null)
                 )
                 team.forEach { (name, roleRes, noteRes) ->
                     DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))

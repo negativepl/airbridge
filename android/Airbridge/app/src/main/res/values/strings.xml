@@ -179,7 +179,6 @@
     <string name="about_role_foreman">Foreman</string>
     <string name="about_role_engineer">Software engineer</string>
     <string name="about_role_intern">Intern</string>
-    <string name="about_intern_note">Makes the coffee</string>
     <string name="about_source_code">Source code on GitHub</string>
     <string name="about_report_issue">Report an issue</string>
     <string name="about_open_source">AirBridge is open source</string>

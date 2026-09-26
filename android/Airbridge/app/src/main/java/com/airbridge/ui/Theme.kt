@@ -5,6 +5,9 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -117,6 +120,11 @@ fun AirbridgeTheme(
 
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        // Tighter corners than Material's defaults (28/16): cards read less bloated.
+        shapes = Shapes(
+            large = RoundedCornerShape(14.dp),
+            extraLarge = RoundedCornerShape(18.dp),
+        ),
         typography = AirbridgeTypography,
         content = content
     )
