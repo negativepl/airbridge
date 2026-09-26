@@ -44,6 +44,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -211,6 +226,7 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val enterSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val exitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val enterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val enterSizeInt = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val state = when {
         showSuccess -> TakeoverState.SUCCESS
         handoffPhase == HandoffPhase.IN_PROGRESS -> TakeoverState.IN_PROGRESS
@@ -232,11 +248,27 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             ) {
                 ListItem(
                     leadingContent = {
+                        // Sound playing on the Mac: the headphone icon gives way to a
+                        // small live equaliser; back to the icon when it goes quiet.
+                        val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE
                         Box(
                             modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                            AnimatedContent(
+                                targetState = playing,
+                                transitionSpec = {
+                                    (fadeIn(enterFade) + scaleIn(initialScale = 0.7f, animationSpec = enterScale)) togetherWith
+                                        (fadeOut(exitFade) + scaleOut(targetScale = 0.7f, animationSpec = exitFade))
+                                },
+                                label = "headphoneGlyph"
+                            ) { isPlaying ->
+                                if (isPlaying) {
+                                    SoundBars(color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                                } else {
+                                    Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                                }
+                            }
                         }
                     },
                     content = {
@@ -247,7 +279,21 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         )
                     },
                     supportingContent = {
-                        Text(stringResource(if (state == TakeoverState.SUCCESS) R.string.headphones_moved else R.string.headphones_on_mac))
+                        // Status line: playing / connected but quiet / moved here. Swapped
+                        // with a short fade and vertical slide instead of a hard cut.
+                        val statusRes = when {
+                            state == TakeoverState.SUCCESS -> R.string.headphones_moved
+                            macHeadphoneState?.audioActive == true -> R.string.headphones_on_mac
+                            else -> R.string.headphones_connected_mac
+                        }
+                        AnimatedContent(
+                            targetState = statusRes,
+                            transitionSpec = {
+                                (fadeIn(enterFade) + slideInVertically(enterSizeInt) { it / 2 }) togetherWith
+                                    (fadeOut(exitFade) + slideOutVertically(enterSizeInt) { -it / 2 })
+                            },
+                            label = "headphoneStatus"
+                        ) { res -> Text(stringResource(res)) }
                     },
                     trailingContent = {
                         FilledTonalButton(
@@ -289,6 +335,36 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Three bars rising and falling out of phase: "sound is playing" without a
+ * level meter's pretence of accuracy. Static when system animations are off.
+ */
+@Composable
+private fun SoundBars(color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "soundBars")
+    val phases = listOf(0, 140, 280).map { delay ->
+        transition.animateFloat(
+            initialValue = 0.3f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(520, easing = EaseInOutSine),
+                repeatMode = RepeatMode.Reverse,
+                initialStartOffset = StartOffset(delay)
+            ),
+            label = "bar$delay"
+        )
+    }
+    Canvas(modifier = modifier) {
+        val barWidth = size.width / 5f
+        val gap = barWidth
+        val radius = CornerRadius(barWidth / 2f)
+        phases.forEachIndexed { i, level ->
+            val h = size.height * level.value
+            val x = i * (barWidth + gap)
+            drawRoundRect(color = color, topLeft = Offset(x, (size.height - h) / 2f), size = Size(barWidth, h), cornerRadius = radius)
         }
     }
 }

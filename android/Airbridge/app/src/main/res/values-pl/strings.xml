@@ -303,4 +303,5 @@
         <item quantity="many">Jeszcze %d dotknięć</item>
         <item quantity="other">Jeszcze %d dotknięcia</item>
     </plurals>
+    <string name="headphones_connected_mac">Podłączone do Maka</string>
 </resources>

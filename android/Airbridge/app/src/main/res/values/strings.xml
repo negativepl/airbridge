@@ -286,4 +286,5 @@
         <item quantity="one">%d tap to go</item>
         <item quantity="other">%d taps to go</item>
     </plurals>
+    <string name="headphones_connected_mac">Connected to the Mac</string>
 </resources>
