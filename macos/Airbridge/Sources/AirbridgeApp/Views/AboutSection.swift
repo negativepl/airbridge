@@ -93,9 +93,8 @@ struct AboutSection: View {
     private var updateRowTrailing: some View {
         switch updateService.phase {
         case .idle:
-            Image(systemName: "arrow.up.right")
-                .font(.ab(.caption, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            // An action, not a link: no external-link arrow here.
+            EmptyView()
 
         case .checking:
             ProgressView()
