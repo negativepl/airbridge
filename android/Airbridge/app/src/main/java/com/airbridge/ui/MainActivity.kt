@@ -474,7 +474,6 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.TopCenter)
                                         .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
-                                        .bottomEdgeLight()
                                 )
                             }
                         }

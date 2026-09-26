@@ -48,7 +48,6 @@ fun GlassTopBarScreen(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
-                        .bottomEdgeLight()
                 )
             }
         }

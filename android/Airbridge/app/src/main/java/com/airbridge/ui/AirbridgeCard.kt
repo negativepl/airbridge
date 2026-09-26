@@ -74,22 +74,6 @@ fun Modifier.topEdgeLight(): Modifier {
     }
 }
 
-/**
- * The dock's edge light mirrored for the top bar: a hairline along the bottom
- * edge with the line of light just above it (the bar is lit from below, the
- * dock from above).
- */
-@Composable
-fun Modifier.bottomEdgeLight(): Modifier {
-    val (outline, highlight) = edgeLightColors()
-    return this.drawWithContent {
-        drawContent()
-        val hairline = 0.75.dp.toPx()
-        drawRect(color = outline, topLeft = Offset(0f, size.height - hairline), size = Size(size.width, hairline))
-        drawRect(color = highlight, topLeft = Offset(0f, size.height - hairline - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx()))
-    }
-}
-
 /** Material Card with the edge light applied. Same parameters as [Card]. */
 @Composable
 fun AirbridgeCard(
