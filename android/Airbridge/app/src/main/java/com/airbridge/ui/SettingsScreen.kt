@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -225,32 +226,25 @@ private fun SettingsContent(
                     onRemove = {
                         com.airbridge.device.WallpaperCache.delete(context, device.deviceName)
                         pairedDeviceStore.remove(device.publicKeyFingerprint)
-                    }
+                    },
+                    // "Pair with a Mac" lives inside the last device's card.
+                    footer = if (device === pairedDevices.last()) {
+                        { PairMacRow(modifier = Modifier.clickable { onScanQr() }) }
+                    } else null
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                if (device !== pairedDevices.last()) Spacer(modifier = Modifier.height(12.dp))
             }
         }
 
-        // Pair another Mac: a row card like the rest of Settings, under the
-        // device cards it adds to.
-        AirbridgeCard(
-            onClick = { onScanQr() },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-            )
-        ) {
-            SettingsRow(
-                content = { Text(stringResource(R.string.pairing_add_mac)) },
-                trailingContent = {
-                    Icon(
-                        Icons.Rounded.QrCodeScanner,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            )
+        if (pairedDevices.isEmpty()) {
+            AirbridgeCard(
+                onClick = { onScanQr() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) { PairMacRow() }
         }
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -663,7 +657,9 @@ private fun PairedDeviceCard(
     subtitle: String,
     wallpaper: androidx.compose.ui.graphics.ImageBitmap?,
     isConnected: Boolean,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    /** Rows under the wallpaper, inside the same card (the pairing row on the last device). */
+    footer: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
@@ -731,6 +727,7 @@ private fun PairedDeviceCard(
                 )
             }
         }
+        footer?.invoke(this)
     }
 
     if (showConfirm) {
@@ -758,6 +755,21 @@ private fun PairedDeviceCard(
     }
 }
 
+@Composable
+private fun PairMacRow(modifier: Modifier = Modifier) {
+    SettingsRow(
+        modifier = modifier,
+        content = { Text(stringResource(R.string.pairing_add_mac)) },
+        trailingContent = {
+            Icon(
+                Icons.Rounded.QrCodeScanner,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+    )
+}
+
 const val DIAGNOSTICS_UNLOCKED_KEY = "diagnostics_unlocked"
 
 @Composable
@@ -769,7 +781,7 @@ private fun SectionHeader(text: String) = SectionTitle(text)
  * top-align the control once the supporting text wraps to two lines.)
  */
 @Composable
-private fun SettingsRow(
+fun SettingsRow(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
     supportingContent: (@Composable () -> Unit)? = null,

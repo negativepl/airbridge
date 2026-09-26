@@ -44,6 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
@@ -246,39 +252,40 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
             ) {
-                ListItem(
-                    leadingContent = {
-                        // Sound playing on the Mac: the headphone icon gives way to a
-                        // small live equaliser; back to the icon when it goes quiet.
-                        val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE
-                        Box(
-                            modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedContent(
-                                targetState = playing,
-                                transitionSpec = {
-                                    (fadeIn(enterFade) + scaleIn(initialScale = 0.7f, animationSpec = enterScale)) togetherWith
-                                        (fadeOut(exitFade) + scaleOut(targetScale = 0.7f, animationSpec = exitFade))
-                                },
-                                label = "headphoneGlyph"
-                            ) { isPlaying ->
-                                if (isPlaying) {
-                                    SoundBars(color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
-                                } else {
-                                    Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
-                                }
+                // Sound playing on the Mac: the headphone glyph gives way to a live
+                // wave; back to the glyph when it goes quiet.
+                val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedContent(
+                            targetState = playing,
+                            transitionSpec = {
+                                (fadeIn(enterFade) + scaleIn(initialScale = 0.7f, animationSpec = enterScale)) togetherWith
+                                    (fadeOut(exitFade) + scaleOut(targetScale = 0.7f, animationSpec = exitFade))
+                            },
+                            label = "headphoneGlyph"
+                        ) { isPlaying ->
+                            if (isPlaying) {
+                                SoundWave(color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(width = 22.dp, height = 16.dp))
+                            } else {
+                                Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
                             }
                         }
-                    },
-                    content = {
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             macHeadphoneState?.name?.ifBlank { null } ?: stringResource(R.string.settings_headphone_device),
+                            style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                    },
-                    supportingContent = {
                         // Status line: playing / connected but quiet / moved here. Swapped
                         // with a short fade and vertical slide instead of a hard cut.
                         val statusRes = when {
@@ -293,35 +300,30 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                                     (fadeOut(exitFade) + slideOutVertically(enterSizeInt) { -it / 2 })
                             },
                             label = "headphoneStatus"
-                        ) { res -> Text(stringResource(res)) }
-                    },
-                    trailingContent = {
-                        FilledTonalButton(
-                            onClick = { viewModel.takeoverHeadphones() },
-                            enabled = state == TakeoverState.IDLE
-                        ) {
-                            AnimatedContent(
-                                targetState = state,
-                                transitionSpec = {
-                                    (fadeIn(enterFade) + scaleIn(initialScale = 0.9f, animationSpec = enterScale)) togetherWith fadeOut(exitFade)
-                                },
-                                label = "headphoneTakeover"
-                            ) { s ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    when (s) {
-                                        TakeoverState.SUCCESS -> Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(18.dp))
-                                        TakeoverState.IDLE -> {
-                                            Text(stringResource(R.string.headphones_switch_here))
-                                        }
-                                    }
-                                    if (s != TakeoverState.IDLE) Spacer(Modifier.width(0.dp))
-                                }
+                        ) { res ->
+                            Text(stringResource(res), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    FilledTonalButton(
+                        onClick = { viewModel.takeoverHeadphones() },
+                        enabled = state == TakeoverState.IDLE
+                    ) {
+                        AnimatedContent(
+                            targetState = state,
+                            transitionSpec = {
+                                (fadeIn(enterFade) + scaleIn(initialScale = 0.9f, animationSpec = enterScale)) togetherWith fadeOut(exitFade)
+                            },
+                            label = "headphoneTakeover"
+                        ) { s ->
+                            when (s) {
+                                TakeoverState.SUCCESS -> Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(18.dp))
+                                TakeoverState.IDLE -> Text(stringResource(R.string.headphones_switch_here))
                             }
                         }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
+                    }
+                }
                 AnimatedVisibility(
                     visible = handoffPhase == HandoffPhase.FAILED,
                     enter = fadeIn(enterFade) + expandVertically(enterSize),
@@ -340,31 +342,35 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 }
 
 /**
- * Three bars rising and falling out of phase: "sound is playing" without a
- * level meter's pretence of accuracy. Static when system animations are off.
+ * A sine wave sliding along, its amplitude breathing: "sound is playing" as a
+ * single stroke rather than a level meter.
  */
 @Composable
-private fun SoundBars(color: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "soundBars")
-    val phases = listOf(0, 140, 280).map { delay ->
-        transition.animateFloat(
-            initialValue = 0.3f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(520, easing = EaseInOutSine),
-                repeatMode = RepeatMode.Reverse,
-                initialStartOffset = StartOffset(delay)
-            ),
-            label = "bar$delay"
-        )
-    }
+private fun SoundWave(color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "soundWave")
+    val phase by transition.animateFloat(
+        initialValue = 0f, targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(1_100, easing = LinearEasing)),
+        label = "phase"
+    )
+    val breath by transition.animateFloat(
+        initialValue = 0.55f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = EaseInOutSine), RepeatMode.Reverse),
+        label = "breath"
+    )
+    val stroke = with(LocalDensity.current) { 2.dp.toPx() }
     Canvas(modifier = modifier) {
-        val barWidth = size.width / 5f
-        val gap = barWidth
-        val radius = CornerRadius(barWidth / 2f)
-        phases.forEachIndexed { i, level ->
-            val h = size.height * level.value
-            val x = i * (barWidth + gap)
-            drawRoundRect(color = color, topLeft = Offset(x, (size.height - h) / 2f), size = Size(barWidth, h), cornerRadius = radius)
+        val midY = size.height / 2f
+        val amp = (size.height / 2f - stroke) * breath
+        val path = Path()
+        val steps = 32
+        for (i in 0..steps) {
+            val x = size.width * i / steps
+            // Two full waves across the width; edges taper so the ends sit on the axis.
+            val taper = kotlin.math.sin(Math.PI * i / steps).toFloat()
+            val y = midY + amp * taper * kotlin.math.sin(2 * 2 * Math.PI * i / steps + phase).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
+        drawPath(path, color = color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
