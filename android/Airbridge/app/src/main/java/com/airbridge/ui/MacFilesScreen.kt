@@ -230,7 +230,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = bottomClearance)
+                    // Rows carry 2 dp of their own vertical padding; take it off the
+                    // clearance so the last row ends at the same height as the other tabs.
+                    contentPadding = PaddingValues(bottom = (bottomClearance - 2.dp).coerceAtLeast(0.dp))
                 ) {
                     itemsIndexed(paneEntries, key = { _, it -> it.relativePath }) { index, entry ->
                         val thumb = thumbs[entry.relativePath]
