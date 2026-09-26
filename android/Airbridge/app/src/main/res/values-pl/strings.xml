@@ -304,4 +304,5 @@
     </plurals>
     <string name="headphones_connected_mac">Podłączone do Maka</string>
     <string name="home_section_connected_device">Podłączone urządzenie</string>
+    <string name="screen_section_modes">Tryby wyświetlania</string>
 </resources>

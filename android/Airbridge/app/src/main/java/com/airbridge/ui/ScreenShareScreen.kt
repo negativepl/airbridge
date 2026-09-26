@@ -45,9 +45,11 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 8.dp, top = topInset + 8.dp, bottom = bottomClearance),
+            .padding(start = 8.dp, end = 8.dp, top = topInset - 4.dp, bottom = bottomClearance),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Same opening as the other tabs: a section title under the bar.
+        SectionTitle(stringResource(R.string.screen_section_modes))
         if (ready) {
             ShareTile(
                 polygon = MaterialShapes.Cookie9Sided,

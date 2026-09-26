@@ -287,4 +287,5 @@
     </plurals>
     <string name="headphones_connected_mac">Connected to the Mac</string>
     <string name="home_section_connected_device">Connected device</string>
+    <string name="screen_section_modes">Display modes</string>
 </resources>

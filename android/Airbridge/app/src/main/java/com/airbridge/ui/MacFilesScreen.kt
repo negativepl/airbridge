@@ -59,7 +59,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
@@ -133,7 +132,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = topInset)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = topInset - 4.dp)) {
         // Breadcrumb path bar — tappable segments, each jumps straight to that
         // ancestor (mirror of the macOS FilesBrowserView path bar).
         if (isConnected) {
@@ -377,11 +376,13 @@ private fun folderDepth(path: String): Int =
 @Composable
 private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
     val segments = remember(path) { path.split('/').filter { it.isNotEmpty() } }
+    // Sits where a section title sits on the other tabs (same inset and
+    // vertical rhythm), with the current folder in the title style.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(start = 10.dp, end = 8.dp, top = 26.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PathSegment(
@@ -409,14 +410,13 @@ private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
 private fun PathSegment(label: String, isCurrent: Boolean, onClick: () -> Unit) {
     Text(
         text = label,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        style = if (isCurrent) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+        color = if (isCurrent) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
             .clickable(enabled = !isCurrent, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = if (isCurrent) 0.dp else 6.dp)
     )
 }
 
