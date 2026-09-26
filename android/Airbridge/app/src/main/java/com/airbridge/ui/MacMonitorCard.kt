@@ -123,7 +123,7 @@ fun MacDeviceCard(
     Box(modifier = Modifier.fillMaxWidth().padding(FRAME_MARGIN)) {
         // Below API 31 there is no RenderEffect; a colour glow stands in.
         if (bitmap != null && blurSupported && cardHeightPx > 0) {
-            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.7f else 0.6f)
+            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.9f else 0.75f)
         }
         Box(
             modifier = Modifier
@@ -393,7 +393,8 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 
 private val GLOW_HEIGHT = 180.dp
 /** Margin between the picture and the card edge; the light fades out across exactly this band. */
-private val FRAME_MARGIN = 16.dp
+private val FRAME_MARGIN = 18.dp
+private const val EDGE_FLOOR = 0.4f
 private val SPILL = FRAME_MARGIN
 private val SPILL_TOP = FRAME_MARGIN
 
@@ -458,8 +459,11 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val onTop = Color.Black.copy(alpha = shownAlpha * 0.6f)
                 // Eased ramps (quadratic-ish stops) rather than linear ones: a linear
                 // fade over a bright picture still reads as a band with an edge.
+                // The light does not die out at the card edge: it keeps EDGE_FLOOR of
+                // its strength there, so the card's translucent hairline picks up
+                // the wallpaper's colour too.
                 fun ramp(from: Float, to: Float, c: Color, rising: Boolean): List<Pair<Float, Color>> {
-                    val a = { t: Float -> c.copy(alpha = c.alpha * t * t) }
+                    val a = { t: Float -> c.copy(alpha = c.alpha * (EDGE_FLOOR + (1f - EDGE_FLOOR) * t * t)) }
                     val span = to - from
                     return if (rising) listOf(from to a(0f), from + span * 0.5f to a(0.5f), from + span * 0.8f to a(0.8f), to to c)
                     else listOf(from to c, from + span * 0.2f to a(0.8f), from + span * 0.5f to a(0.5f), to to a(0f))
@@ -480,7 +484,7 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 // pooling around the card, not a rectangle with soft edges.
                 drawRect(
                     brush = Brush.radialGradient(
-                        0f to Color.Black, 0.55f to Color.Black, 1f to Color.Black.copy(alpha = 0.1f),
+                        0f to Color.Black, 0.55f to Color.Black, 1f to Color.Black.copy(alpha = 0.45f),
                         center = Offset(size.width / 2f, size.height / 2f),
                         radius = kotlin.math.hypot(size.width / 2f, size.height / 2f)
                     ),
