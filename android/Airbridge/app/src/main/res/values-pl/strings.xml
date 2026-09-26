@@ -229,7 +229,6 @@
     <string name="stats_sent_row">Wysłane</string>
     <string name="stats_received_row">Odebrane</string>
     <!-- Update check -->
-    <string name="update_section_title">Aktualizacje</string>
     <string name="update_check">Sprawdź aktualizacje</string>
     <string name="update_checking">Sprawdzanie…</string>
     <string name="update_up_to_date">Masz najnowszą wersję</string>

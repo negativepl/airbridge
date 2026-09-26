@@ -595,19 +595,33 @@ private fun SettingsContent(
             Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Updates section — manual check only, never on a schedule.
-            SectionHeader(text = stringResource(R.string.update_section_title))
+            // About: update check and the About screen in one card.
+            SectionHeader(text = stringResource(R.string.nav_about))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             AirbridgeCard(
-                onClick = { checkUpdateTrigger = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
+                // Manual check only, never on a schedule.
                 SettingsRow(
+                    modifier = Modifier.clickable { checkUpdateTrigger = true },
                     content = { Text(stringResource(R.string.update_check)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                )
+                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                SettingsRow(
+                    modifier = Modifier.clickable { onOpenAbout() },
+                    content = { Text(stringResource(R.string.about_row_title)) },
+                    supportingContent = { Text(stringResource(R.string.about_open_source)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -621,31 +635,6 @@ private fun SettingsContent(
                 trigger = checkUpdateTrigger,
                 onDone = { checkUpdateTrigger = false }
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // About — moved here from the home screen's overflow menu.
-            SectionHeader(text = stringResource(R.string.nav_about))
-            AirbridgeCard(
-                onClick = { onOpenAbout() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
-                SettingsRow(
-                    content = { Text(stringResource(R.string.about_row_title)) },
-                    supportingContent = { Text(stringResource(R.string.about_open_source)) },
-                    trailingContent = {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                )
-            }
 
         Spacer(modifier = Modifier.height(32.dp))
     }
