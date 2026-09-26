@@ -111,9 +111,7 @@ fun MacDeviceCard(
 
     Column(modifier = modifier.fillMaxWidth()) {
     // The connection state is the section title, not a pill over the picture.
-    // Extra room under it so the wallpaper light stops short of the text.
     SectionTitle(stringResource(R.string.home_section_connected_device))
-    Spacer(modifier = Modifier.height(16.dp))
     Box(modifier = Modifier.fillMaxWidth()) {
         // The wallpaper itself, blurred at full resolution (RenderEffect), drawn
         // behind the card and spilling GLOW_HEIGHT below it, faded out at the
@@ -451,12 +449,24 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val on = Color.Black.copy(alpha = shownAlpha)
                 // Dimmer above the card than below: the title sits up there.
                 val onTop = Color.Black.copy(alpha = shownAlpha * 0.6f)
+                // Eased ramps (quadratic-ish stops) rather than linear ones: a linear
+                // fade over a bright picture still reads as a band with an edge.
+                fun ramp(from: Float, to: Float, c: Color, rising: Boolean): List<Pair<Float, Color>> {
+                    val a = { t: Float -> c.copy(alpha = c.alpha * t * t) }
+                    val span = to - from
+                    return if (rising) listOf(from to a(0f), from + span * 0.5f to a(0.5f), from + span * 0.8f to a(0.8f), to to c)
+                    else listOf(from to c, from + span * 0.2f to a(0.8f), from + span * 0.5f to a(0.5f), to to a(0f))
+                }
                 drawRect(
-                    brush = Brush.verticalGradient(0f to Color.Transparent, fyTop to onTop, 1f - fy to on, 1f to Color.Transparent),
+                    brush = Brush.verticalGradient(
+                        *(ramp(0f, fyTop, onTop, rising = true) + listOf(1f - fy to on) + ramp(1f - fy, 1f, on, rising = false)).toTypedArray()
+                    ),
                     blendMode = BlendMode.DstIn
                 )
                 drawRect(
-                    brush = Brush.horizontalGradient(0f to Color.Transparent, fx to Color.Black, 1f - fx to Color.Black, 1f to Color.Transparent),
+                    brush = Brush.horizontalGradient(
+                        *(ramp(0f, fx, Color.Black, rising = true) + ramp(1f - fx, 1f, Color.Black, rising = false)).toTypedArray()
+                    ),
                     blendMode = BlendMode.DstIn
                 )
                 // Round it off: dim towards the corners so the halo reads as light
