@@ -88,6 +88,8 @@ struct TransferPopupView: View {
         let w = islandWidth, h = islandHeight
         switch state {
         case .idle(let connected):
+            // A file hovering over the zone: the island opens up to catch it.
+            if connected && isTargeted { return CGSize(width: w, height: h) }
             return connected ? CGSize(width: w * 0.70, height: h * 0.86) : CGSize(width: w * 0.66, height: h * 0.80)
         case .incoming, .transferring:
             return CGSize(width: w, height: h)
@@ -393,6 +395,8 @@ struct TransferPopupView: View {
         // The one animation for a state change: shell size, content swap.
         // Keyed on the state KIND so progress ticks never restart it.
         .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.44, dampingFraction: 0.84), value: stateKind)
+        // Drag-over: the shell opens up (and closes again) with a livelier spring.
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.72), value: isTargeted)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
@@ -524,15 +528,17 @@ struct TransferPopupView: View {
     private func idleView(connected: Bool) -> some View {
         if connected {
             islandRow {
-                Image(systemName: "arrow.down.doc")
+                Image(systemName: isTargeted ? "tray.and.arrow.down.fill" : "arrow.down.doc")
                     .font(.system(size: 30, weight: .medium))
                     .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
+                    .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
                     .symbolEffect(.bounce, value: isTargeted)
             } texts: {
-                Text(L10n.dropFileHere)
+                Text(isTargeted ? (L10n.isPL ? "Puść, aby wysłać" : "Release to send") : L10n.dropFileHere)
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.primary)
+                    .contentTransition(.opacity)
             } controls: {
                 // Put the drop zone away now instead of waiting out the countdown.
                 IslandIconButton(systemName: "xmark", label: L10n.close) {
