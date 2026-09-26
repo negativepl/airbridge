@@ -499,8 +499,7 @@ fun MainScreen(
             }
         }
 
-        StatsSection(stats)
-        ActivityFeed(activity)
+        ActivityCard(stats, activity)
 
         // The FAB floats over the scroll content (Scaffold's innerPadding only
         // reserves the nav bar, not the FAB). The clearance is measured from the

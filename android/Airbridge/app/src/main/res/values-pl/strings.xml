@@ -60,7 +60,6 @@
     <!-- Kafle szybkich akcji na Home (krótkie etykiety do rzędu 4 kafli) -->
 
     <!-- Activity -->
-    <string name="recent_activity">Ostatnia aktywność</string>
     <string name="no_activity">Brak transferów</string>
     <string name="activity_sent">Wysłano do Maka</string>
     <string name="activity_received">Odebrano z Maka</string>
@@ -231,16 +230,8 @@
     <string name="home_monitor_disk">Dysk</string>
 
     <!-- Statistics -->
-    <string name="stats_title">Statystyki</string>
     <string name="stats_sent_row">Wysłane</string>
     <string name="stats_received_row">Odebrane</string>
-    <plurals name="stats_row_value_files">
-        <item quantity="one">%1$d plik · %2$s</item>
-        <item quantity="few">%1$d pliki · %2$s</item>
-        <item quantity="many">%1$d plików · %2$s</item>
-        <item quantity="other">%1$d pliku · %2$s</item>
-    </plurals>
-
     <!-- Update check -->
     <string name="update_section_title">Aktualizacje</string>
     <string name="update_check">Sprawdź aktualizacje</string>
@@ -260,4 +251,11 @@
     <string name="settings_export_diagnostics">Eksportuj raport diagnostyczny</string>
     <string name="settings_export_diagnostics_desc">Tworzy plik tekstowy z wersją aplikacji, informacjami o urządzeniu, stanem połączenia i ostatnimi logami. Nic nie jest wysyłane bez Twojego działania.</string>
     <string name="settings_export_diagnostics_failed">Nie udało się utworzyć raportu diagnostycznego</string>
+    <string name="home_section_activity">Aktywność</string>
+    <plurals name="activity_file_count">
+        <item quantity="one">%d plik</item>
+        <item quantity="few">%d pliki</item>
+        <item quantity="many">%d plików</item>
+        <item quantity="other">%d pliku</item>
+    </plurals>
 </resources>

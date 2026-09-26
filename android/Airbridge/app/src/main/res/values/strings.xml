@@ -60,7 +60,6 @@
     <!-- Home quick action tiles (short labels for a 4-up row) -->
 
     <!-- Activity -->
-    <string name="recent_activity">Recent activity</string>
     <string name="no_activity">No transfers yet</string>
     <string name="activity_sent">Sent to Mac</string>
     <string name="activity_received">Received from Mac</string>
@@ -226,14 +225,8 @@
     <string name="home_monitor_disk">Disk</string>
 
     <!-- Statistics -->
-    <string name="stats_title">Statistics</string>
     <string name="stats_sent_row">Sent</string>
     <string name="stats_received_row">Received</string>
-    <plurals name="stats_row_value_files">
-        <item quantity="one">%1$d file · %2$s</item>
-        <item quantity="other">%1$d files · %2$s</item>
-    </plurals>
-
     <!-- Update check -->
     <string name="update_section_title">Updates</string>
     <string name="update_check">Check for updates</string>
@@ -253,4 +246,9 @@
     <string name="settings_export_diagnostics">Export diagnostic report</string>
     <string name="settings_export_diagnostics_desc">Creates a text file with the app version, device information, connection state and recent logs. Nothing is sent without your action.</string>
     <string name="settings_export_diagnostics_failed">Could not create the diagnostic report</string>
+    <string name="home_section_activity">Activity</string>
+    <plurals name="activity_file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
 </resources>
