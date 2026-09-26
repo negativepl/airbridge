@@ -159,7 +159,7 @@ private fun SettingsContent(
             .padding(horizontal = 8.dp)
     ) {
         // Same distance under the bar as the first section on Home.
-        Spacer(modifier = Modifier.height(topInset + 4.dp))
+        Spacer(modifier = Modifier.height(topInset - 4.dp))
 
         // Paired Devices section
         SectionHeader(text = stringResource(R.string.pairing_paired_devices))
@@ -234,7 +234,6 @@ private fun SettingsContent(
                 )
             ) { PairMacRow() }
         }
-        Spacer(modifier = Modifier.height(8.dp))
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
@@ -286,7 +285,6 @@ private fun SettingsContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Download folder section
             SectionHeader(text = stringResource(R.string.settings_download_folder))
@@ -336,7 +334,6 @@ private fun SettingsContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
@@ -387,7 +384,6 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
@@ -415,7 +411,6 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
             SectionHeader(text = stringResource(R.string.settings_headphones))
             AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -528,7 +523,6 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Diagnostics section — builds the report off the main thread and
             // hands the file to the system share sheet; nothing is uploaded.
@@ -580,7 +574,6 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
             }
 
             // About: update check and the About screen in one card.
