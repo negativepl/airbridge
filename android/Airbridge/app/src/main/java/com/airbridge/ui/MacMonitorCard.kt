@@ -36,6 +36,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.runtime.mutableIntStateOf
+import android.os.Build
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.luminance
@@ -80,16 +91,28 @@ fun MacDeviceCard(
         }
     }
     val bitmap = remember(decoded) { decoded?.asImageBitmap() }
-    val glowColors = remember(decoded) { decoded?.let(::wallpaperGlowColors) }
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val blurSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val glowColors = remember(decoded, blurSupported) {
+        if (blurSupported) null else decoded?.let(::wallpaperGlowColors)
+    }
+    var cardHeightPx by remember { mutableIntStateOf(0) }
 
-    AirbridgeCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+    Box(modifier = modifier.fillMaxWidth()) {
+        // The wallpaper itself, blurred at full resolution (RenderEffect), drawn
+        // behind the card and spilling GLOW_HEIGHT below it, faded out at the
+        // bottom. Below API 31 there is no RenderEffect; a colour glow stands in.
+        if (bitmap != null && blurSupported && cardHeightPx > 0) {
+            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.65f else 0.55f)
+        }
+        AirbridgeCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { cardHeightPx = it.height }
+                .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+        ) {
 
         Box(modifier = Modifier.fillMaxWidth().height(172.dp)) {
             if (bitmap != null) {
@@ -180,6 +203,7 @@ fun MacDeviceCard(
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.padding(16.dp)
             )
+        }
         }
     }
 
@@ -353,4 +377,51 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
     }
 }
 
-private val GLOW_HEIGHT = 150.dp
+private val GLOW_HEIGHT = 180.dp
+
+/**
+ * The blurred wallpaper behind the card: laid out at card height plus
+ * GLOW_HEIGHT but reported as zero height, so it takes no room in the
+ * column. An alpha mask hides it behind the card body (so nothing peeks out
+ * at the rounded corners) and fades the spill out towards the bottom.
+ */
+@Composable
+private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float) {
+    Image(
+        bitmap = bitmap,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .layout { measurable, constraints ->
+                val glow = GLOW_HEIGHT.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, cardHeightPx + glow)
+                )
+                layout(constraints.maxWidth, 0) { placeable.place(0, 0) }
+            }
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val cardBottom = cardHeightPx.toFloat()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        (cardBottom - 24.dp.toPx()) / size.height to Color.Transparent,
+                        cardBottom / size.height to Color.Black.copy(alpha = alpha),
+                        1f to Color.Transparent,
+                        startY = 0f, endY = size.height
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+                // Fade the sides too, so the spill pools under the middle of the
+                // card instead of running edge to edge like a banner.
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        0f to Color.Transparent, 0.2f to Color.Black, 0.8f to Color.Black, 1f to Color.Transparent
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            }
+            .blur(56.dp, BlurredEdgeTreatment.Unbounded)
+    )
+}
