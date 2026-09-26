@@ -70,10 +70,10 @@ struct TransferPopupView: View {
 
     @State private var showComplete = false
     @State private var isTargeted = false
-    /// Rejection/failure shake: set to a kick without animation, then released
-    /// to 0 through an underdamped spring — the spring does the oscillating
-    /// and the decay, which is what makes it read as a physical "no".
-    @State private var shakeX: CGFloat = 0
+    /// Rejection/failure shake trigger. The motion starts from 0 (no jump on
+    /// the first frame): a fast push out, then an underdamped spring back to
+    /// centre that does the oscillating and the decay.
+    @State private var shakeTrigger = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The island morphs: each state gets its own size, the settings hold
@@ -337,9 +337,16 @@ struct TransferPopupView: View {
         }
         // Rejection / failure shake: sideways only. No rotation — Liquid
         // Glass renders mirrored artefacts when rotated, and a tilt pushed
-        // the shell past the panel's edge where it got clipped. The kick is
-        // sized to stay inside the panel's side padding at full swing.
-        .offset(x: shakeX)
+        // the shell past the panel's edge where it got clipped. The swing is
+        // sized to stay inside the panel's side padding.
+        .keyframeAnimator(initialValue: CGFloat(0), trigger: shakeTrigger) { content, x in
+            content.offset(x: reduceMotion ? 0 : x)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(14, duration: 0.06)
+                SpringKeyframe(0, duration: 0.55, spring: Spring(response: 0.42, dampingRatio: 0.22))
+            }
+        }
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
@@ -390,12 +397,7 @@ struct TransferPopupView: View {
         .onChange(of: state) { _, newState in
             switch newState {
             case .rejected, .failed:
-                guard !reduceMotion else { break }
-                // Kick, then let the spring swing it back: response 0.5 s,
-                // damping 0.22 → about three visible swings, each smaller.
-                var kick = Transaction(); kick.disablesAnimations = true
-                withTransaction(kick) { shakeX = 16 }
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.24)) { shakeX = 0 }
+                shakeTrigger += 1
             default: break
             }
             // Any activity (incoming offer, waiting, transferring, etc.)
@@ -472,10 +474,12 @@ struct TransferPopupView: View {
                     .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
                     .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
                     .symbolEffect(.bounce, value: isTargeted)
+                    .staggerIn(0)
 
                 Text(L10n.dropFileHere)
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.primary)
+                    .staggerIn(1)
 
                 Spacer()
             }
@@ -485,9 +489,11 @@ struct TransferPopupView: View {
                 Image(systemName: "wifi.slash")
                     .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .staggerIn(0)
                 Text(L10n.noDeviceConnected)
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .staggerIn(1)
                 Spacer()
             }
         }
@@ -499,6 +505,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: name)
+                .staggerIn(0)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
@@ -514,6 +521,7 @@ struct TransferPopupView: View {
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
+            .staggerIn(1)
             Spacer()
             HStack(spacing: 8) {
                 Button(L10n.isPL ? "Odrzuć" : "Reject") {
@@ -527,6 +535,7 @@ struct TransferPopupView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             }
+            .staggerIn(2)
         }
     }
 
@@ -536,6 +545,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.pulse, options: .repeating)
+                .staggerIn(0)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
@@ -547,11 +557,13 @@ struct TransferPopupView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .staggerIn(1)
             Spacer()
             Button(L10n.isPL ? "Anuluj" : "Cancel") {
                 fileTransferService.cancelPendingTransfer()
             }
             .controlSize(.large)
+            .staggerIn(2)
         }
     }
 
@@ -561,6 +573,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 26, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.variableColor, options: .repeating)
+                .staggerIn(0)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(isReceiving
@@ -594,6 +607,7 @@ struct TransferPopupView: View {
                         .contentTransition(.numericText())
                 }
             }
+            .staggerIn(1)
 
             Text("\(Int(progress * 100))%")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -601,6 +615,7 @@ struct TransferPopupView: View {
                 .foregroundStyle(.primary)
                 .frame(width: 72, alignment: .trailing)
                 .contentTransition(.numericText())
+                .staggerIn(2)
         }
     }
 
@@ -611,11 +626,13 @@ struct TransferPopupView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: isReceiving)
+                .staggerIn(0)
             Text(isReceiving
                 ? (L10n.isPL ? "Plik odebrany!" : "File received!")
                 : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
                 .font(.ab(.title3, weight: .bold))
                 .foregroundStyle(.primary)
+                .staggerIn(1)
             Spacer()
         }
     }
@@ -627,6 +644,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 32, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: name)
+                .staggerIn(0)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
                     .font(.ab(.headline, weight: .semibold))
@@ -637,6 +655,7 @@ struct TransferPopupView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .staggerIn(1)
             Spacer()
         }
     }
@@ -648,6 +667,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 32, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: name)
+                .staggerIn(0)
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.isPL ? "Przesyłanie nie powiodło się" : "Transfer failed")
                     .font(.ab(.headline, weight: .semibold))
@@ -658,6 +678,7 @@ struct TransferPopupView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .staggerIn(1)
             Spacer()
         }
     }
@@ -670,10 +691,12 @@ struct TransferPopupView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce)
+                .staggerIn(0)
 
             Text(L10n.isPL ? "Przełączyć słuchawki na Maka?" : "Switch the headphones to this Mac?")
                 .font(.ab(.callout, weight: .semibold))
                 .foregroundStyle(.primary)
+                .staggerIn(1)
 
             Spacer()
 
@@ -689,6 +712,7 @@ struct TransferPopupView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             }
+            .staggerIn(2)
         }
     }
 
@@ -701,6 +725,7 @@ struct TransferPopupView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: preview)
+                .staggerIn(0)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(isLink ? L10n.clipboardReceivedLinkTitle : L10n.clipboardReceivedTitle)
@@ -728,6 +753,7 @@ struct TransferPopupView: View {
                         .truncationMode(.middle)
                 }
             }
+            .staggerIn(1)
 
             Spacer()
 
@@ -751,6 +777,7 @@ struct TransferPopupView: View {
             .buttonStyle(.plain)
             .help(L10n.close)
             .accessibilityLabel(L10n.close)
+            .staggerIn(2)
         }
         // The whole receipt is a target: a click anywhere puts it away, the
         // panel is non-activating so Escape only works while the app is frontmost.
@@ -793,6 +820,39 @@ struct TransferPopupView: View {
         if size > 1024 * 1024 { return String(format: "%.1f MB", Double(size) / (1024.0 * 1024.0)) }
         if size > 1024 { return String(format: "%.0f KB", Double(size) / 1024.0) }
         return "\(size) B"
+    }
+}
+
+// MARK: - StaggerIn
+// Parts of a state's content arrive one after another (icon, then text,
+// then controls), each rising a few points out of a light blur, so a state
+// change reads as one choreographed moment rather than a block crossfade.
+// Instant under reduced motion.
+
+private struct StaggerIn: ViewModifier {
+    let delay: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 7)
+            .blur(radius: shown ? 0 : 3)
+            .onAppear {
+                if reduceMotion {
+                    shown = true
+                } else {
+                    withAnimation(.spring(response: 0.42, dampingFraction: 0.8).delay(delay)) { shown = true }
+                }
+            }
+    }
+}
+
+private extension View {
+    /// `order` 0 = the lead (icon), 1 = text, 2 = controls; 45 ms apart.
+    func staggerIn(_ order: Int) -> some View {
+        modifier(StaggerIn(delay: 0.06 + Double(order) * 0.045))
     }
 }
 
