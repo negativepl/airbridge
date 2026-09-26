@@ -383,7 +383,8 @@ private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
             // 6 dp here plus the first row's 2 dp of its own = the title's 8 dp.
-            .padding(start = 10.dp, end = 8.dp, top = 26.dp, bottom = 6.dp),
+            // 18 dp = the 8 dp page gutter the other tabs have plus the title inset.
+            .padding(start = 18.dp, end = 8.dp, top = 26.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PathSegment(
