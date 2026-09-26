@@ -254,4 +254,18 @@
         <item quantity="one">%d core</item>
         <item quantity="other">%d cores</item>
     </plurals>
+    <string name="home_section_quick_actions">Quick actions</string>
+    <string name="quick_file">File</string>
+    <string name="quick_photo">Photo</string>
+    <string name="quick_clipboard">Clipboard</string>
+    <string name="quick_mac_screen">Mac screen</string>
+    <string name="home_section_clipboard">Clipboard</string>
+    <string name="clipboard_last_sent">Sent to Mac</string>
+    <string name="clipboard_last_received">Received from Mac</string>
+    <string name="clipboard_never">Nothing synced yet</string>
+    <string name="clipboard_send_now">Send</string>
+    <string name="home_section_headphones">Headphones</string>
+    <string name="headphones_on_mac">Playing on the Mac</string>
+    <string name="headphones_moved">Moved to this phone</string>
+    <string name="headphones_switch_here">Switch here</string>
 </resources>

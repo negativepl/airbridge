@@ -1,6 +1,5 @@
 package com.airbridge.ui
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,38 +32,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.RoundedPolygon
 import com.airbridge.R
-import com.airbridge.mirror.ReverseMirrorActivity
-import com.airbridge.service.AirbridgeService
 
 @Composable
 fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
-    val context = LocalContext.current
-    val isConnected by AirbridgeService.isConnected.collectAsState()
-    val host by AirbridgeService.connectedHost.collectAsState()
-    val mirrorPort by AirbridgeService.mirrorPortFlow.collectAsState()
-    // The mirror hello token is this phone's own Ed25519 public-key prefix (16
-    // bytes) — that's what the Mac validates against the paired device. (The old
-    // `mirror_token` pref was the 24-byte pairing token, which overflowed the
-    // 16-byte hello buffer and never matched.)
-    val token = remember {
-        runCatching { com.airbridge.security.KeyManager(context).getRawPublicKeyBytes().copyOf(16) }.getOrNull()
-    }
-    val ready = isConnected && host != null && mirrorPort != null && token != null
-
-    fun launch(mode: Int) {
-        val h = host ?: return
-        val p = mirrorPort ?: return
-        val t = token ?: return
-        val intent = Intent(context, ReverseMirrorActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(ReverseMirrorActivity.EXTRA_HOST, h)
-            putExtra(ReverseMirrorActivity.EXTRA_PORT, p)
-            putExtra(ReverseMirrorActivity.EXTRA_TOKEN, t)
-            putExtra(ReverseMirrorActivity.EXTRA_MODE, mode)
-            putExtra(ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, AirbridgeService.certFingerprintInUse())
-        }
-        context.startActivity(intent)
-    }
+    val mirror = rememberMirrorLauncher()
+    val ready = mirror.ready
+    fun launch(mode: Int) = mirror.launch(mode)
 
     // Only two modes — render them as full-height tiles that split the screen so
     // the tab reads as a deliberate mode picker instead of two rows stranded at

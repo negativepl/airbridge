@@ -263,4 +263,18 @@
         <item quantity="many">%d rdzeni</item>
         <item quantity="other">%d rdzenia</item>
     </plurals>
+    <string name="home_section_quick_actions">Szybkie akcje</string>
+    <string name="quick_file">Plik</string>
+    <string name="quick_photo">Zdjęcie</string>
+    <string name="quick_clipboard">Schowek</string>
+    <string name="quick_mac_screen">Ekran Maka</string>
+    <string name="home_section_clipboard">Schowek</string>
+    <string name="clipboard_last_sent">Wysłano do Maka</string>
+    <string name="clipboard_last_received">Odebrano z Maka</string>
+    <string name="clipboard_never">Jeszcze nic nie synchronizowano</string>
+    <string name="clipboard_send_now">Wyślij</string>
+    <string name="home_section_headphones">Słuchawki</string>
+    <string name="headphones_on_mac">Grają na Maku</string>
+    <string name="headphones_moved">Przeniesione na telefon</string>
+    <string name="headphones_switch_here">Przełącz tutaj</string>
 </resources>

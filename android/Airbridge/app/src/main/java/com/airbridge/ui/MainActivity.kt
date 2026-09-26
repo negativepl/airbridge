@@ -395,7 +395,10 @@ class MainActivity : ComponentActivity() {
                                 0 -> MainScreen(
                                     viewModel = viewModel,
                                     onScanQr = { showQrScanner = true },
-                                    bottomClearance = fabClearance
+                                    bottomClearance = fabClearance,
+                                    onSendFile = sendFileAction,
+                                    onSendPhoto = sendPhotoAction,
+                                    onSendClipboard = sendClipboardAction
                                 )
                                 1 -> ScreenShareScreen(bottomClearance = fabClearance)
                                 2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
