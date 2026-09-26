@@ -170,6 +170,9 @@ fun MainScreen(
                                 wallpaperBase64 = macWallpaper,
                                 onDisconnect = { viewModel.disconnect() }
                             )
+                            // Extra room under the device card: its light needs space
+                            // before the next section title.
+                            Spacer(modifier = Modifier.height(12.dp))
                             val mirror = rememberMirrorLauncher()
                             QuickActionsRow(
                                 onSendFile = onSendFile,

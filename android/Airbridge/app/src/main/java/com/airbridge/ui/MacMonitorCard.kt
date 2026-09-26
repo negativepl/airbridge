@@ -388,6 +388,7 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 
 private val GLOW_HEIGHT = 180.dp
 private val SPILL = 40.dp
+private val SPILL_SHIFT = 20.dp
 
 /**
  * Ambilight: the blurred wallpaper centred behind the card and reaching
@@ -420,7 +421,10 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val placeable = measurable.measure(
                     Constraints.fixed(constraints.maxWidth + 2 * spill, cardHeightPx + 2 * spill)
                 )
-                layout(constraints.maxWidth, 0) { placeable.place(-spill, -spill) }
+                // Shifted down by SPILL_SHIFT: less light above the card (it would
+                // otherwise run into the top bar), more below.
+                val shift = SPILL_SHIFT.roundToPx()
+                layout(constraints.maxWidth, 0) { placeable.place(-spill, -spill + shift) }
             }
             .graphicsLayer {
                 compositingStrategy = CompositingStrategy.Offscreen
