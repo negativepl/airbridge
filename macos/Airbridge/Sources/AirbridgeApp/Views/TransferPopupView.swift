@@ -476,320 +476,237 @@ struct TransferPopupView: View {
     )
 
     // MARK: - Subviews per state
+    //
+    // Every state is the same row: a state glyph in a fixed 40 pt column, a
+    // text stack, and the controls pinned to the trailing edge as round icon
+    // buttons (✓ accept / confirm, ✕ reject / cancel / close, ↗ open). Same
+    // places in every state, so the eye never has to search.
+
+    @ViewBuilder
+    private func islandRow<Glyph: View, Texts: View, Controls: View>(
+        @ViewBuilder glyph: () -> Glyph,
+        @ViewBuilder texts: () -> Texts,
+        @ViewBuilder controls: () -> Controls
+    ) -> some View {
+        HStack(spacing: 16) {
+            glyph()
+                .frame(width: 40, alignment: .center)
+                .staggerIn(0)
+            texts()
+                .staggerIn(1)
+            Spacer(minLength: 12)
+            HStack(spacing: 10) { controls() }
+                .staggerIn(2)
+        }
+    }
+
+    private func glyph(_ systemName: String, size: CGFloat = 28, color: Color = .primary) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: size, weight: .medium))
+            .foregroundStyle(color)
+    }
+
+    private func caption(_ text: String) -> some View {
+        Text(text).font(.ab(.footnote, weight: .medium)).foregroundStyle(.secondary)
+    }
+
+    private func headline(_ text: String, lines: Int = 1) -> some View {
+        Text(text)
+            .font(.ab(.callout, weight: .semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(lines)
+            .truncationMode(.middle)
+    }
 
     @ViewBuilder
     private func idleView(connected: Bool) -> some View {
         if connected {
-            HStack(spacing: 14) {
+            islandRow {
                 Image(systemName: "arrow.down.doc")
-                    .font(.system(size: 32, weight: .medium))
+                    .font(.system(size: 30, weight: .medium))
                     .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
                     .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
                     .symbolEffect(.bounce, value: isTargeted)
-                    .staggerIn(0)
-
+            } texts: {
                 Text(L10n.dropFileHere)
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .staggerIn(1)
-
-                Spacer()
+            } controls: {
+                EmptyView()
             }
         } else {
-            HStack(spacing: 14) {
-                Spacer()
-                Image(systemName: "wifi.slash")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .staggerIn(0)
+            islandRow {
+                glyph("wifi.slash", color: .secondary)
+            } texts: {
                 Text(L10n.noDeviceConnected)
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .staggerIn(1)
-                Spacer()
+            } controls: {
+                EmptyView()
             }
         }
     }
 
     private func incomingView(name: String, size: Int64) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "arrow.down.doc.fill")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: name)
-                .staggerIn(0)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.isPL ? "Przychodzący plik" : "Incoming file")
-                    .font(.ab(.footnote, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text(name)
-                    .font(.ab(.callout, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        islandRow {
+            glyph("arrow.down.doc.fill").symbolEffect(.bounce, value: name)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(L10n.isPL ? "Przychodzący plik" : "Incoming file")
+                headline(name)
                 Text(formatBytes(size))
                     .font(.ab(.footnote))
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
-            .staggerIn(1)
-            Spacer()
-            HStack(spacing: 8) {
-                Button(L10n.isPL ? "Odrzuć" : "Reject") {
-                    fileTransferService.rejectIncomingOffer()
-                }
-                .controlSize(.large)
-
-                Button(L10n.isPL ? "Akceptuj" : "Accept") {
-                    fileTransferService.acceptIncomingOffer()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+        } controls: {
+            IslandIconButton(systemName: "xmark", label: L10n.isPL ? "Odrzuć" : "Reject") {
+                fileTransferService.rejectIncomingOffer()
             }
-            .staggerIn(2)
+            IslandIconButton(systemName: "checkmark", label: L10n.isPL ? "Akceptuj" : "Accept", prominent: true) {
+                fileTransferService.acceptIncomingOffer()
+            }
         }
     }
 
     private func waitingView(name: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "hourglass")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.pulse, options: .repeating)
-                .staggerIn(0)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.isPL ? "Czekam na akceptację..." : "Waiting for acceptance...")
-                    .font(.ab(.callout, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Text(name)
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        islandRow {
+            glyph("hourglass").symbolEffect(.pulse, options: .repeating)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(L10n.isPL ? "Czekam na akceptację…" : "Waiting for acceptance…")
+                headline(name)
             }
-            .staggerIn(1)
-            Spacer()
-            Button(L10n.isPL ? "Anuluj" : "Cancel") {
+        } controls: {
+            IslandIconButton(systemName: "xmark", label: L10n.isPL ? "Anuluj" : "Cancel") {
                 fileTransferService.cancelPendingTransfer()
             }
-            .controlSize(.large)
-            .staggerIn(2)
         }
     }
 
     private func transferringView(name: String, progress: Double, isReceiving: Bool) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: isReceiving ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(.primary)
+        // No progress bar: the edge comet and the aurora fill already show how
+        // far along it is; the number gives the precision.
+        islandRow {
+            glyph(isReceiving ? "arrow.down.circle.fill" : "arrow.up.circle.fill", size: 26)
                 .symbolEffect(.variableColor, options: .repeating)
-                .staggerIn(0)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(isReceiving
-                    ? (L10n.isPL ? "Odbieram" : "Receiving")
-                    : (L10n.isPL ? "Wysyłam" : "Sending"))
-                    .font(.ab(.footnote, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                Text(name)
-                    .font(.ab(.callout, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                ProgressView(value: min(max(progress, 0), 1))
-                    .progressViewStyle(.linear)
-                    .tint(.accentColor)
-                    .animation(.easeOut(duration: 0.2), value: progress)
-
-                HStack {
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(isReceiving ? (L10n.isPL ? "Odbieram" : "Receiving") : (L10n.isPL ? "Wysyłam" : "Sending"))
+                headline(name)
+                HStack(spacing: 12) {
                     Text(speedText)
-                        .font(.ab(.footnote, weight: .medium))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
-                    Spacer()
                     Text(etaText)
-                        .font(.ab(.footnote, weight: .medium))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
                 }
+                .font(.ab(.footnote, weight: .medium))
+                .foregroundStyle(.secondary)
             }
-            .staggerIn(1)
-
+        } controls: {
             Text("\(Int(progress * 100))%")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
-                .frame(width: 72, alignment: .trailing)
+                .frame(width: 76, alignment: .trailing)
                 .contentTransition(.numericText())
-                .staggerIn(2)
         }
     }
 
     private func completeView(isReceiving: Bool) -> some View {
-        HStack(spacing: 14) {
-            Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: isReceiving)
-                .staggerIn(0)
+        islandRow {
+            glyph("checkmark.circle.fill").symbolEffect(.bounce, value: isReceiving)
+        } texts: {
             Text(isReceiving
-                ? (L10n.isPL ? "Plik odebrany!" : "File received!")
-                : (L10n.isPL ? "Plik wysłany!" : "File sent!"))
+                ? (L10n.isPL ? "Plik odebrany" : "File received")
+                : (L10n.isPL ? "Plik wysłany" : "File sent"))
                 .font(.ab(.title3, weight: .bold))
                 .foregroundStyle(.primary)
-                .staggerIn(1)
-            Spacer()
+        } controls: {
+            EmptyView()
         }
     }
 
     private func rejectedView(name: String) -> some View {
-        HStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 32, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: name)
-                .staggerIn(0)
-            VStack(alignment: .leading, spacing: 4) {
+        islandRow {
+            glyph("xmark.circle.fill").symbolEffect(.bounce, value: name)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(L10n.isPL ? "Przesyłanie odrzucone" : "Transfer rejected")
                     .font(.ab(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(name)
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Text(name).font(.ab(.subheadline)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
-            .staggerIn(1)
-            Spacer()
+        } controls: {
+            EmptyView()
         }
     }
 
     private func failedView(name: String) -> some View {
-        HStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 32, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: name)
-                .staggerIn(0)
-            VStack(alignment: .leading, spacing: 4) {
+        islandRow {
+            glyph("exclamationmark.triangle.fill").symbolEffect(.bounce, value: name)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(L10n.isPL ? "Przesyłanie nie powiodło się" : "Transfer failed")
                     .font(.ab(.headline, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(name)
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Text(name).font(.ab(.subheadline)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
-            .staggerIn(1)
-            Spacer()
+        } controls: {
+            EmptyView()
         }
     }
 
     /// Ask-first: playback started on this Mac while the phone holds idle
     /// headphones. One click confirms — nothing moves until then.
     private func headphonePromptView() -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "headphones")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce)
-                .staggerIn(0)
-
-            Text(L10n.isPL ? "Przełączyć słuchawki na Maka?" : "Switch the headphones to this Mac?")
-                .font(.ab(.callout, weight: .semibold))
-                .foregroundStyle(.primary)
-                .staggerIn(1)
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                Button(L10n.isPL ? "Nie teraz" : "Not now") {
-                    connectionService.dismissHeadphonePrompt()
-                }
-                .controlSize(.large)
-
-                Button(L10n.isPL ? "Przełącz" : "Switch") {
-                    connectionService.confirmHeadphoneSwitch()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+        islandRow {
+            glyph("headphones").symbolEffect(.bounce)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(L10n.isPL ? "Słuchawki" : "Headphones")
+                headline(L10n.isPL ? "Przełączyć na Maka?" : "Switch to this Mac?")
             }
-            .staggerIn(2)
+        } controls: {
+            IslandIconButton(systemName: "xmark", label: L10n.isPL ? "Nie teraz" : "Not now") {
+                connectionService.dismissHeadphonePrompt()
+            }
+            IslandIconButton(systemName: "checkmark", label: L10n.isPL ? "Przełącz" : "Switch", prominent: true) {
+                connectionService.confirmHeadphoneSwitch()
+            }
         }
     }
 
     /// Receipt for content synced from the phone: it is already on the
-    /// pasteboard, this only makes that visible. A plain web link also gets
-    /// a one-click Open.
+    /// pasteboard, this only makes that visible (so no "copy" — there is
+    /// nothing left to copy). A plain web link also gets a one-click Open.
     private func clipboardReceivedView(preview: String, isLink: Bool) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: isLink ? "link" : "doc.on.clipboard.fill")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: preview)
-                .staggerIn(0)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(isLink ? L10n.clipboardReceivedLinkTitle : L10n.clipboardReceivedTitle)
-                    .font(.ab(.footnote, weight: .medium))
-                    .foregroundStyle(.secondary)
+        islandRow {
+            glyph(isLink ? "link" : "doc.on.clipboard.fill").symbolEffect(.bounce, value: preview)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(isLink ? L10n.clipboardReceivedLinkTitle : L10n.clipboardReceivedTitle)
                 if let url = clipboardService.incomingURL {
                     // Domain leads — it is what tells you where the link goes.
-                    // The path/query is a supporting detail, not the headline.
-                    Text(ClipboardService.linkHost(url))
-                        .font(.ab(.callout, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    headline(ClipboardService.linkHost(url))
                     if let detail = ClipboardService.linkDetail(url) {
-                        Text(detail)
-                            .font(.ab(.footnote))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        Text(detail).font(.ab(.footnote)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                     }
                 } else {
-                    Text(preview)
-                        .font(.ab(.callout, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
+                    headline(preview, lines: 2)
                 }
             }
-            .staggerIn(1)
-
-            Spacer()
-
+        } controls: {
+            IslandIconButton(systemName: "xmark", label: L10n.close) {
+                dismissClipboardReceipt()
+            }
             if isLink {
-                Button(L10n.clipboardOpenLink) {
+                IslandIconButton(systemName: "arrow.up.right", label: L10n.clipboardOpenLink, prominent: true) {
                     clipboardService.openIncomingURL()
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
-
-            Button {
-                dismissClipboardReceipt()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(.quaternary, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .help(L10n.close)
-            .accessibilityLabel(L10n.close)
-            .staggerIn(2)
         }
         // The whole receipt is a target: a click anywhere puts it away, the
         // panel is non-activating so Escape only works while the app is frontmost.
@@ -832,6 +749,42 @@ struct TransferPopupView: View {
         if size > 1024 * 1024 { return String(format: "%.1f MB", Double(size) / (1024.0 * 1024.0)) }
         if size > 1024 { return String(format: "%.0f KB", Double(size) / 1024.0) }
         return "\(size) B"
+    }
+}
+
+// MARK: - IslandIconButton
+// The island's one control: a 36 pt round glass button with a symbol. The
+// prominent one (accept / confirm / open) is tinted with the accent; the
+// plain one (reject / cancel / close) is clear glass. Press feedback is a
+// 0.94 scale, 120 ms — the interface heard you.
+
+private struct IslandIconButton: View {
+    let systemName: String
+    let label: String
+    var prominent: Bool = false
+    let action: () -> Void
+
+    @State private var pressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(prominent ? Color.white : Color.primary)
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(prominent ? .regular.tint(Color.accentColor).interactive() : .regular.interactive(), in: .circle)
+        .scaleEffect(pressed ? 0.94 : 1)
+        .animation(.easeOut(duration: 0.12), value: pressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in pressed = true }
+                .onEnded { _ in pressed = false }
+        )
+        .help(label)
+        .accessibilityLabel(label)
     }
 }
 
