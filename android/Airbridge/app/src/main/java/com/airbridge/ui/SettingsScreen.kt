@@ -246,7 +246,7 @@ private fun SettingsContent(
                 )
             ) { PairMacRow() }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
@@ -298,7 +298,7 @@ private fun SettingsContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Download folder section
             SectionHeader(text = stringResource(R.string.settings_download_folder))
@@ -348,7 +348,7 @@ private fun SettingsContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
@@ -399,7 +399,7 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
@@ -427,7 +427,7 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             SectionHeader(text = stringResource(R.string.settings_headphones))
             AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -540,7 +540,7 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Diagnostics section — builds the report off the main thread and
             // hands the file to the system share sheet; nothing is uploaded.
@@ -592,7 +592,7 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Updates section — manual check only, never on a schedule.
@@ -622,7 +622,7 @@ private fun SettingsContent(
                 onDone = { checkUpdateTrigger = false }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // About — moved here from the home screen's overflow menu.
             SectionHeader(text = stringResource(R.string.nav_about))
