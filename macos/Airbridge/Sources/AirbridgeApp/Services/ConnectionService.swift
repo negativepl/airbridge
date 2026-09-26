@@ -5,6 +5,7 @@ import os
 // @preconcurrency downgrades the (false-positive) actor-crossing diagnostics.
 @preconcurrency import Security
 import SwiftUI
+import AppKit
 import Protocol
 import AirbridgeSecurity
 import Clipboard
@@ -223,6 +224,7 @@ final class ConnectionService {
         statusMessage = L10n.isPL ? "Uruchamianie…" : "Starting…"
         phase = .starting
         startDeviceInfoPolling()
+        startWallpaperWatch()
 
         do {
             macFilesService.configure(server: server, uploadServer: httpServer)
@@ -402,6 +404,36 @@ final class ConnectionService {
                 }
             }
         }
+    }
+
+    /// Wallpaper watch: the phone pulls the wallpaper once on connect, so a
+    /// change on the Mac would never reach it. macOS has no notification for it,
+    /// so poll the desktop image URL every 20 s while connected and push the
+    /// new image when it changes. The URL is also compared by modification
+    /// date, so re-saving the same file counts too.
+    private var wallpaperWatchTask: Task<Void, Never>?
+    private var lastWallpaperKey: String?
+    private func startWallpaperWatch() {
+        wallpaperWatchTask?.cancel()
+        lastWallpaperKey = Self.currentWallpaperKey()
+        wallpaperWatchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                guard let self else { return }
+                let key = Self.currentWallpaperKey()
+                guard self.isConnected, key != self.lastWallpaperKey else { continue }
+                self.lastWallpaperKey = key
+                let image = MacSystemInfo.wallpaperJPEGBase64()
+                try? await self.server.broadcast(.macWallpaperResponse(imageBase64: image))
+            }
+        }
+    }
+
+    private static func currentWallpaperKey() -> String? {
+        guard let screen = NSScreen.main ?? NSScreen.screens.first,
+              let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return "\(url.path)|\(modified?.timeIntervalSince1970 ?? 0)"
     }
 
     /// Zadzwoń na telefon (głośny alarm) / zatrzymaj dzwonienie.
