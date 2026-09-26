@@ -11,12 +11,16 @@
         <item name="android:navigationBarColor">@color/white</item>
     </style>
 
-    <style name="Theme.Airbridge.Splash" parent="Theme.Material3.Light.NoActionBar">
+    <!-- System splash (core-splashscreen): held on screen by MainActivity until
+         the Mac connection and its info are in, so the home screen composes in
+         its final state instead of sections popping in one by one. -->
+    <style name="Theme.Airbridge.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Airbridge</item>
         <item name="android:windowBackground">@color/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
     <!-- Full-screen theme for ShareReceiverActivity. Uses DayNight so the

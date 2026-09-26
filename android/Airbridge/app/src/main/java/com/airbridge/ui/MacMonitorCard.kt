@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.tween
@@ -412,6 +414,14 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
         label = "ambilightPhase"
     )
     val sway = with(LocalDensity.current) { 6.dp.toPx() }
+    // The light fades in over ~0.6 s once the wallpaper is here instead of popping.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val shownAlpha by animateFloatAsState(
+        targetValue = if (appeared) alpha else 0f,
+        animationSpec = tween(600, easing = EaseInOutSine),
+        label = "ambilightAlpha"
+    )
     Image(
         bitmap = bitmap,
         contentDescription = null,
@@ -439,7 +449,7 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val fx = SPILL.toPx() / size.width
                 val fyTop = SPILL_TOP.toPx() / size.height
                 val fy = SPILL.toPx() / size.height
-                val on = Color.Black.copy(alpha = alpha)
+                val on = Color.Black.copy(alpha = shownAlpha)
                 drawRect(
                     brush = Brush.verticalGradient(0f to Color.Transparent, fyTop to on, 1f - fy to on, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn

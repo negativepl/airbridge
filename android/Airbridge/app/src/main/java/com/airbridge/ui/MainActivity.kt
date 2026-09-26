@@ -3,6 +3,7 @@ package com.airbridge.ui
 import android.content.ClipboardManager
 import androidx.core.content.edit
 import android.content.Context
+import com.airbridge.service.AirbridgeService
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -11,6 +12,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import android.os.SystemClock
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -109,12 +112,28 @@ private val ScreenSlideEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
 private val ScreenEnterSpec = tween<IntOffset>(durationMillis = 350, easing = ScreenSlideEasing)
 private val ScreenExitSpec = tween<IntOffset>(durationMillis = 250, easing = ScreenSlideEasing)
 
+private const val STARTUP_HOLD_MS = 4_000L
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
     @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Hold the system splash until the Mac is connected and has reported
+        // its info (wallpaper, stats), so Home composes straight into its final
+        // layout. Bounded: if nothing arrives within STARTUP_HOLD_MS, or there is
+        // nothing to connect to, the splash goes away anyway.
+        val splash = installSplashScreen()
+        val startedAt = SystemClock.uptimeMillis()
+        val expectsConnection = savedInstanceState == null &&
+            getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE).getBoolean("auto_connect", true) &&
+            com.airbridge.security.PairedDeviceStore(this).getAll().isNotEmpty()
+        splash.setKeepOnScreenCondition {
+            expectsConnection &&
+                !(AirbridgeService.isConnected.value && AirbridgeService.macInfo.value != null) &&
+                SystemClock.uptimeMillis() - startedAt < STARTUP_HOLD_MS
+        }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
