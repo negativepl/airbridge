@@ -165,7 +165,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                             contentScale = ContentScale.Crop
                         )
                     },
-                    overlineContent = { Text(stringResource(R.string.about_created_by)) },
+                    overlineContent = { Text(stringResource(R.string.about_created_by), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     content = { Text(stringResource(R.string.about_author)) },
                     trailingContent = {
                         Icon(
@@ -204,7 +204,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                                 contentScale = ContentScale.Fit
                             )
                         },
-                        overlineContent = { Text(stringResource(roleRes)) },
+                        overlineContent = { Text(stringResource(roleRes), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         content = { Text(name) },
                         supportingContent = noteRes?.let { { Text(stringResource(it)) } },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)

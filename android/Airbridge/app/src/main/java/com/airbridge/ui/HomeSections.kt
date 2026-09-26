@@ -59,14 +59,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Home section title, the same rhythm as the Monitor and Activity headers. */
+/**
+ * Section title used on every screen: text colour (not the accent), 16 sp
+ * semibold, sitting close to its card.
+ */
 @Composable
 fun SectionTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 4.dp, top = 18.dp, bottom = 6.dp)
     )
 }
 

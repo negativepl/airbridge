@@ -227,7 +227,6 @@ private fun SettingsContent(
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
-            Spacer(modifier = Modifier.height(8.dp))
             AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -280,7 +279,6 @@ private fun SettingsContent(
 
             // Download folder section
             SectionHeader(text = stringResource(R.string.settings_download_folder))
-            Spacer(modifier = Modifier.height(8.dp))
             run {
                 val defaultFolder = android.os.Environment.getExternalStoragePublicDirectory(
                     android.os.Environment.DIRECTORY_DOWNLOADS
@@ -333,23 +331,21 @@ private fun SettingsContent(
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
-            Spacer(modifier = Modifier.height(8.dp))
             AirbridgeCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, com.airbridge.service.AirbridgeService.CHANNEL_ID)
-                        }
-                        context.startActivity(intent)
-                    },
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
                 ListItem(
+                    modifier = Modifier.clickable {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, com.airbridge.service.AirbridgeService.CHANNEL_ID)
+                        }
+                        context.startActivity(intent)
+                    },
                     content = {
                         Text(stringResource(R.string.settings_hide_notification))
                     },
@@ -365,16 +361,7 @@ private fun SettingsContent(
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 ListItem(
                     content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
@@ -397,7 +384,6 @@ private fun SettingsContent(
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
-            Spacer(modifier = Modifier.height(8.dp))
             AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -425,7 +411,6 @@ private fun SettingsContent(
 
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader(text = stringResource(R.string.settings_headphones))
-            Spacer(modifier = Modifier.height(8.dp))
             AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -455,6 +440,7 @@ private fun SettingsContent(
                     )
                 )
                 if (headphoneHandoff) {
+                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                     ListItem(
                         content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
@@ -473,6 +459,7 @@ private fun SettingsContent(
                             }
                         }
                     )
+                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                     ListItem(
                         content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
@@ -542,7 +529,6 @@ private fun SettingsContent(
 
             // Updates section — manual check only, never on a schedule.
             SectionHeader(text = stringResource(R.string.update_section_title))
-            Spacer(modifier = Modifier.height(8.dp))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             AirbridgeCard(
                 modifier = Modifier
@@ -582,7 +568,6 @@ private fun SettingsContent(
             // Diagnostics section — builds the report off the main thread and
             // hands the file to the system share sheet; nothing is uploaded.
             SectionHeader(text = stringResource(R.string.settings_diagnostics))
-            Spacer(modifier = Modifier.height(8.dp))
             val exportScope = rememberCoroutineScope()
             val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
             AirbridgeCard(
@@ -633,7 +618,6 @@ private fun SettingsContent(
 
             // About — moved here from the home screen's overflow menu.
             SectionHeader(text = stringResource(R.string.nav_about))
-            Spacer(modifier = Modifier.height(8.dp))
             AirbridgeCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -766,12 +750,4 @@ private fun PairedDeviceCard(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp)
-    )
-}
+private fun SectionHeader(text: String) = SectionTitle(text)

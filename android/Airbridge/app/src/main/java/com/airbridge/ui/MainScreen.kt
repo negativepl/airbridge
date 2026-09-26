@@ -177,12 +177,7 @@ fun MainScreen(
                             ClipboardCard(items = activity, onSendClipboard = onSendClipboard)
                             HeadphonesCard(viewModel = viewModel)
 
-                            Text(
-                                stringResource(R.string.home_monitor_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
-                            )
+                            SectionTitle(stringResource(R.string.home_monitor_title))
                             MacMonitorRings(info = macLocal)
                         }
                     }

@@ -137,7 +137,7 @@
 
     <!-- Settings -->
     <string name="settings_appearance">Wygląd</string>
-    <string name="settings_theme_system">Systemowy</string>
+    <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Jasny</string>
     <string name="settings_theme_dark">Ciemny</string>
     <string name="settings_connection">Połączenie</string>

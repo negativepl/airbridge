@@ -55,12 +55,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
         items.filter { it.type == "file_sent" || it.type == "file_received" }.take(FEED_LIMIT)
     }
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            stringResource(R.string.home_section_activity),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
-        )
+        SectionTitle(stringResource(R.string.home_section_activity))
         AirbridgeCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
