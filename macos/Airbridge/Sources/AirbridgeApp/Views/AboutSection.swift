@@ -11,6 +11,14 @@ struct AboutSection: View {
 
     private let version: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
 
+    /// Diagnostics is a hidden section, unlocked the developer-options way:
+    /// seven clicks on the version line. A short hint replaces the version
+    /// text while counting down.
+    @AppStorage(DiagnosticsUnlock.key) private var diagnosticsUnlocked = false
+    @State private var versionClicks = 0
+    @State private var versionHint: String?
+    @State private var hintReset: Task<Void, Never>?
+
     var body: some View {
         GlassSection(title: LocalizedStringKey(L10n.isPL ? "O aplikacji" : "About"), systemImage: "info.circle") {
             VStack(alignment: .leading, spacing: 0) {
@@ -206,10 +214,39 @@ struct AboutSection: View {
             Text("·")
             Text("© 2026 Marcin Baszewski")
             Spacer(minLength: 0)
-            Text(L10n.isPL ? "Wersja \(version)" : "Version \(version)")
+            Text(versionHint ?? (L10n.isPL ? "Wersja \(version)" : "Version \(version)"))
+                .foregroundStyle(versionHint == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
+                .contentShape(Rectangle())
+                .onTapGesture { versionTapped() }
         }
         .font(.ab(.caption2))
         .foregroundStyle(.tertiary)
+    }
+
+    private func versionTapped() {
+        if diagnosticsUnlocked {
+            showHint(L10n.isPL ? "Diagnostyka jest już włączona" : "Diagnostics is already enabled")
+            return
+        }
+        versionClicks += 1
+        let left = DiagnosticsUnlock.taps - versionClicks
+        if left <= 0 {
+            diagnosticsUnlocked = true
+            versionClicks = 0
+            showHint(L10n.isPL ? "Diagnostyka włączona" : "Diagnostics enabled")
+        } else if left <= 3 {
+            showHint(L10n.isPL ? "Jeszcze \(left) \(left == 1 ? "kliknięcie" : "kliknięcia")" : "\(left) \(left == 1 ? "click" : "clicks") to go")
+        }
+    }
+
+    private func showHint(_ text: String) {
+        versionHint = text
+        hintReset?.cancel()
+        hintReset = Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            versionHint = nil
+        }
     }
 
     // MARK: - Rows
@@ -298,4 +335,10 @@ enum ClaudeTeam {
                    role: L10n.isPL ? "Stażysta" : "Intern")
         ]
     }
+}
+
+/// Shared by the About section (unlock) and Settings (visibility, hide row).
+enum DiagnosticsUnlock {
+    static let key = "diagnostics_unlocked"
+    static let taps = 7
 }

@@ -3,6 +3,7 @@ import AirbridgeSecurity
 import Protocol
 
 struct SettingsView: View {
+    @AppStorage(DiagnosticsUnlock.key) private var diagnosticsUnlocked = false
     let connectionService: ConnectionService
     let pairingService: PairingService
     let hotkeyService: GlobalHotkeyService
@@ -48,7 +49,9 @@ struct SettingsView: View {
             notificationsSection
             quickDropSection
             fileTransferSection
-            diagnosticsSection
+            if diagnosticsUnlocked {
+                diagnosticsSection
+            }
             AboutSection(updateService: updateService, phoneAppVersion: connectionService.deviceInfo?.appVersion)
         }
         .onAppear {
@@ -383,6 +386,19 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.extraLarge)
+            }
+            Divider()
+            HStack {
+                Text(L10n.isPL
+                     ? "Ukrywa tę sekcję. Aby ją przywrócić, kliknij numer wersji w sekcji O aplikacji siedem razy."
+                     : "Hides this section. Click the version number in About seven times to bring it back.")
+                    .font(.ab(.footnote))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(L10n.isPL ? "Ukryj diagnostykę" : "Hide diagnostics") {
+                    diagnosticsUnlocked = false
+                }
+                .controlSize(.large)
             }
         }
     }
