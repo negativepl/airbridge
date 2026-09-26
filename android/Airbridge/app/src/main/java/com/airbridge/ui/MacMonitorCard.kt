@@ -111,7 +111,9 @@ fun MacDeviceCard(
 
     Column(modifier = modifier.fillMaxWidth()) {
     // The connection state is the section title, not a pill over the picture.
+    // Extra room under it so the wallpaper light stops short of the text.
     SectionTitle(stringResource(R.string.home_section_connected_device))
+    Spacer(modifier = Modifier.height(16.dp))
     Box(modifier = Modifier.fillMaxWidth()) {
         // The wallpaper itself, blurred at full resolution (RenderEffect), drawn
         // behind the card and spilling GLOW_HEIGHT below it, faded out at the
