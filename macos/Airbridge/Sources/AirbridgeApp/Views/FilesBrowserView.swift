@@ -12,6 +12,10 @@ struct FilesBrowserView: View {
     @State private var entryPendingDeletion: FileEntry?
     /// A file drag is over the window: the folder lights up as the target.
     @State private var isDropTargeted = false
+    /// The spinner only appears once a load has taken a moment (350 ms). A
+    /// listing that arrives sooner never shows one — a spinner that flashes
+    /// for a few frames reads as a glitch, not as progress.
+    @State private var showSpinner = false
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
 
@@ -186,23 +190,47 @@ struct FilesBrowserView: View {
         }
     }
 
-    @ViewBuilder
+    private enum ContentKind: Hashable { case permission, loading, blank, failed, empty, grid, list }
+
+    private var contentKind: ContentKind {
+        let s = filesBrowserService
+        if s.needsPermission { return .permission }
+        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return showSpinner ? .loading : .blank }
+        if s.loadFailed && s.displayedEntries.isEmpty { return .failed }
+        if s.displayedEntries.isEmpty && s.hasLoadedOnce { return .empty }
+        return viewMode == .grid ? .grid : .list
+    }
+
+    /// One content view per kind, crossfading between kinds so a folder
+    /// change never pops.
     private var content: some View {
-        if filesBrowserService.needsPermission {
-            permissionEmptyState
-        } else if filesBrowserService.displayedEntries.isEmpty
-                    && (filesBrowserService.isLoading || filesBrowserService.isLoadingMoreRows) {
-            ProgressView()
-                .controlSize(.large)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if filesBrowserService.loadFailed && filesBrowserService.displayedEntries.isEmpty {
-            loadFailedState
-        } else if filesBrowserService.displayedEntries.isEmpty && filesBrowserService.hasLoadedOnce {
-            emptyFolderState
-        } else if viewMode == .grid {
-            gridView
-        } else {
-            listView
+        ZStack {
+            switch contentKind {
+            case .permission:
+                permissionEmptyState
+            case .loading:
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .blank:
+                Color.clear
+            case .failed:
+                loadFailedState
+            case .empty:
+                emptyFolderState
+            case .grid:
+                gridView
+            case .list:
+                listView
+            }
+        }
+        .id(contentKind)
+        .transition(.opacity)
+        .animation(.easeOut(duration: 0.18), value: contentKind)
+        .task(id: filesBrowserService.isLoading) {
+            guard filesBrowserService.isLoading else { showSpinner = false; return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
         }
     }
 
