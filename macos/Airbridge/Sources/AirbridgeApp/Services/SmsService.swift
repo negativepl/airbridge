@@ -33,11 +33,40 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         self.connectionService = connectionService
     }
 
+    // MARK: - Cache
+
+    private var deviceKey: String? { connectionService?.activeDevice?.publicKey }
+    private let cache = DeviceDataCache.shared
+
+    private struct CachedConversations: Codable {
+        let conversations: [SmsConversationMeta]
+        let total: Int
+    }
+    private struct CachedThread: Codable {
+        let messages: [SmsMessageMeta]
+        let total: Int
+    }
+
+    /// Show the last conversation list this phone gave us before asking again.
+    private func restoreConversationsFromCache() {
+        guard conversations.isEmpty, let deviceKey,
+              let cached = cache.load(CachedConversations.self, device: deviceKey, name: "sms-conversations") else { return }
+        conversations = cached.conversations
+        totalConversations = cached.total
+    }
+
+    private func restoreThreadFromCache(threadId: String) {
+        guard let deviceKey,
+              let cached = cache.load(CachedThread.self, device: deviceKey, name: "sms-thread-" + DeviceDataCache.hash(threadId)) else { return }
+        currentMessages = cached.messages
+        totalMessages = cached.total
+    }
+
     func loadConversations(page: Int = 0) {
         guard let connectionService, connectionService.isConnected, !isLoadingConversations else { return }
         isLoadingConversations = true
         conversationsLoadFailed = false
-        if page == 0 { conversations = [] }
+        if page == 0 { restoreConversationsFromCache() }
         Task {
             try? await connectionService.sendToActive(Message.smsConversationsRequest(page: page, pageSize: pageSize))
         }
@@ -56,6 +85,8 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         if page == 0 || currentThreadId != threadId {
             currentMessages = []
             currentThreadId = threadId
+            // The thread as last seen, while the fresh copy is on its way.
+            restoreThreadFromCache(threadId: threadId)
         }
         Task {
             try? await connectionService.sendToActive(Message.smsMessagesRequest(threadId: threadId, page: page, pageSize: pageSize))
@@ -107,6 +138,7 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         totalConversations = 0
         totalMessages = 0
         sendResult = nil
+        restoreConversationsFromCache()
     }
 
     func handleMessage(_ message: Message) {
@@ -121,6 +153,9 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
             }
             totalConversations = total
             isLoadingConversations = false
+            if let deviceKey {
+                cache.save(CachedConversations(conversations: conversations, total: total), device: deviceKey, name: "sms-conversations")
+            }
 
         case .smsMessagesResponse(let threadId, let msgs, let total, let page):
             guard threadId == currentThreadId else { return }
@@ -133,6 +168,10 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
             }
             totalMessages = total
             isLoadingMessages = false
+            if let deviceKey {
+                cache.save(CachedThread(messages: currentMessages, total: total), device: deviceKey,
+                           name: "sms-thread-" + DeviceDataCache.hash(threadId))
+            }
 
         case .smsSendResponse(let success, let error):
             sendResult = (success, error)

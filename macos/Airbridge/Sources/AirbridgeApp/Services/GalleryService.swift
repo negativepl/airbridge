@@ -30,6 +30,25 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         self.connectionService = connectionService
     }
 
+    // MARK: - Cache
+
+    private var deviceKey: String? { connectionService?.activeDevice?.publicKey }
+    private let cache = DeviceDataCache.shared
+
+    private struct CachedListing: Codable {
+        let photos: [GalleryPhotoMeta]
+        let totalCount: Int
+    }
+
+    /// Show the last listing this phone gave us, if any, before asking again.
+    private func restoreFromCache() {
+        guard photos.isEmpty, let deviceKey,
+              let cached = cache.load(CachedListing.self, device: deviceKey, name: "gallery") else { return }
+        photos = cached.photos
+        totalCount = cached.totalCount
+        currentPage = 0
+    }
+
     // MARK: - Requests
 
     func loadPhotos(page: Int = 0) {
@@ -37,8 +56,9 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         isLoading = true
         loadFailed = false
         if page == 0 {
-            photos = []
-            thumbnailImages = [:]
+            // Keep whatever is on screen (or restore the cached listing) while
+            // the fresh page 0 is on its way; the response replaces it.
+            restoreFromCache()
             requestedThumbnails = []
         }
         let message = Message.galleryRequest(page: page, pageSize: pageSize)
@@ -87,6 +107,10 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         guard thumbnailImages[photoId] == nil,
               !requestedThumbnails.contains(photoId),
               let connectionService else { return }
+        if let deviceKey, let cached = cache.loadImage(device: deviceKey, folder: "gallery-thumbs", key: photoId) {
+            thumbnailImages[photoId] = cached
+            return
+        }
         requestedThumbnails.insert(photoId)
         let message = Message.galleryThumbnailRequest(photoId: photoId)
         Task {
@@ -132,6 +156,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         requestedPreviews = []
         totalCount = 0
         currentPage = 0
+        restoreFromCache()
     }
 
     // MARK: - MessageHandler
@@ -149,6 +174,9 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
             totalCount = total
             currentPage = page
             isLoading = false
+            if let deviceKey {
+                cache.save(CachedListing(photos: photos, totalCount: total), device: deviceKey, name: "gallery")
+            }
 
             for photo in newPhotos {
                 requestThumbnail(photoId: photo.id)
@@ -158,6 +186,9 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
             if let imageData = Data(base64Encoded: data),
                let image = NSImage(data: imageData) {
                 thumbnailImages[photoId] = image
+                if let deviceKey {
+                    cache.saveImage(imageData, device: deviceKey, folder: "gallery-thumbs", key: photoId)
+                }
             }
 
         case .galleryPreviewResponse(let photoId, let data):
