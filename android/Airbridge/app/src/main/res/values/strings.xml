@@ -278,4 +278,12 @@
         <item quantity="one">%d day ago</item>
         <item quantity="other">%d days ago</item>
     </plurals>
+    <string name="settings_hide_diagnostics">Hide diagnostics</string>
+    <string name="settings_hide_diagnostics_desc">Removes this section from Settings. Tap the version number in About seven times to bring it back.</string>
+    <string name="diagnostics_unlocked">Diagnostics enabled in Settings</string>
+    <string name="diagnostics_already_unlocked">Diagnostics is already enabled</string>
+    <plurals name="diagnostics_taps_to_go">
+        <item quantity="one">%d tap to go</item>
+        <item quantity="other">%d taps to go</item>
+    </plurals>
 </resources>

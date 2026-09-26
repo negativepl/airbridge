@@ -71,6 +71,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -134,6 +135,17 @@ private fun SettingsContent(
 ) {
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
     var autoConnect by remember { mutableStateOf(prefs.getBoolean("auto_connect", true)) }
+    // Diagnostics is a hidden section: unlocked from the version number in
+    // About (seven taps), hidden again from its own row. Observed live so the
+    // section appears as soon as About unlocks it.
+    var diagnosticsUnlocked by remember { mutableStateOf(prefs.getBoolean(DIAGNOSTICS_UNLOCKED_KEY, false)) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == DIAGNOSTICS_UNLOCKED_KEY) diagnosticsUnlocked = p.getBoolean(key, false)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var vibrateOnSync by remember { mutableStateOf(prefs.getBoolean("vibrate_on_sync", false)) }
     var headphoneHandoff by remember {
         mutableStateOf(prefs.getBoolean("headphone_handoff_enabled", false))
@@ -536,6 +548,59 @@ private fun SettingsContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Diagnostics section — builds the report off the main thread and
+            // hands the file to the system share sheet; nothing is uploaded.
+            if (diagnosticsUnlocked) {
+            SectionHeader(text = stringResource(R.string.settings_diagnostics))
+            val exportScope = rememberCoroutineScope()
+            val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
+            val exportReport: () -> Unit = {
+                        exportScope.launch {
+                            val intent = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val file = DiagnosticReportExporter.export(context)
+                                    DiagnosticReportExporter.shareIntent(context, file)
+                                }.getOrNull()
+                            }
+                            if (intent != null) {
+                                context.startActivity(intent)
+                            } else {
+                                Toast.makeText(context, exportFailedMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+            AirbridgeCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) {
+                SettingsRow(
+                    modifier = Modifier.clickable { exportReport() },
+                    content = { Text(stringResource(R.string.settings_export_diagnostics)) },
+                    supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                )
+                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                SettingsRow(
+                    modifier = Modifier.clickable {
+                        prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, false) }
+                    },
+                    content = { Text(stringResource(R.string.settings_hide_diagnostics)) },
+                    supportingContent = { Text(stringResource(R.string.settings_hide_diagnostics_desc)) },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            }
+
             // Updates section — manual check only, never on a schedule.
             SectionHeader(text = stringResource(R.string.update_section_title))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
@@ -562,48 +627,6 @@ private fun SettingsContent(
                 trigger = checkUpdateTrigger,
                 onDone = { checkUpdateTrigger = false }
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Diagnostics section — builds the report off the main thread and
-            // hands the file to the system share sheet; nothing is uploaded.
-            SectionHeader(text = stringResource(R.string.settings_diagnostics))
-            val exportScope = rememberCoroutineScope()
-            val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
-            AirbridgeCard(
-                onClick = {
-                        exportScope.launch {
-                            val intent = withContext(Dispatchers.IO) {
-                                runCatching {
-                                    val file = DiagnosticReportExporter.export(context)
-                                    DiagnosticReportExporter.shareIntent(context, file)
-                                }.getOrNull()
-                            }
-                            if (intent != null) {
-                                context.startActivity(intent)
-                            } else {
-                                Toast.makeText(context, exportFailedMessage, Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
-                SettingsRow(
-                    content = { Text(stringResource(R.string.settings_export_diagnostics)) },
-                    supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
-                    trailingContent = {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                )
-            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -734,6 +757,8 @@ private fun PairedDeviceCard(
         )
     }
 }
+
+const val DIAGNOSTICS_UNLOCKED_KEY = "diagnostics_unlocked"
 
 @Composable
 private fun SectionHeader(text: String) = SectionTitle(text)

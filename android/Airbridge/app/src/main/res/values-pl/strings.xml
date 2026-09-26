@@ -293,4 +293,14 @@
         <item quantity="many">%d dni temu</item>
         <item quantity="other">%d dnia temu</item>
     </plurals>
+    <string name="settings_hide_diagnostics">Ukryj diagnostykę</string>
+    <string name="settings_hide_diagnostics_desc">Usuwa tę sekcję z Ustawień. Aby ją przywrócić, dotknij numer wersji w sekcji O aplikacji siedem razy.</string>
+    <string name="diagnostics_unlocked">Diagnostyka włączona w Ustawieniach</string>
+    <string name="diagnostics_already_unlocked">Diagnostyka jest już włączona</string>
+    <plurals name="diagnostics_taps_to_go">
+        <item quantity="one">Jeszcze %d dotknięcie</item>
+        <item quantity="few">Jeszcze %d dotknięcia</item>
+        <item quantity="many">Jeszcze %d dotknięć</item>
+        <item quantity="other">Jeszcze %d dotknięcia</item>
+    </plurals>
 </resources>

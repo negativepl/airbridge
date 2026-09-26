@@ -48,6 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
+import androidx.compose.runtime.mutableIntStateOf
+import android.widget.Toast
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -328,13 +331,39 @@ private fun AboutContent(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Version in bottom right
+        // Version in bottom right. Seven taps unlock the Diagnostics section
+        // in Settings (the Android developer-options gesture).
+        val prefs = remember { context.getSharedPreferences("airbridge_prefs", android.content.Context.MODE_PRIVATE) }
+        var versionTaps by remember { mutableIntStateOf(0) }
+        val alreadyUnlockedMsg = stringResource(R.string.diagnostics_already_unlocked)
+        val unlockedMsg = stringResource(R.string.diagnostics_unlocked)
+        val resources = context.resources
         Text(
             text = "v${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(interactionSource = null, indication = null) {
+                    if (prefs.getBoolean(DIAGNOSTICS_UNLOCKED_KEY, false)) {
+                        Toast.makeText(context, alreadyUnlockedMsg, Toast.LENGTH_SHORT).show()
+                        return@clickable
+                    }
+                    versionTaps += 1
+                    val left = 7 - versionTaps
+                    when {
+                        left <= 0 -> {
+                            prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, true) }
+                            versionTaps = 0
+                            Toast.makeText(context, unlockedMsg, Toast.LENGTH_SHORT).show()
+                        }
+                        left <= 3 -> Toast.makeText(
+                            context,
+                            resources.getQuantityString(R.plurals.diagnostics_taps_to_go, left, left),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
                 .padding(bottom = 16.dp),
             textAlign = TextAlign.End
         )
