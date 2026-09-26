@@ -130,6 +130,9 @@ fun MacDeviceCard(
                 .fillMaxWidth()
                 .onSizeChanged { cardHeightPx = it.height }
                 .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f)
+                // The picture gets the same edge light as a card: a hairline and
+                // a line of light on its top edge, so it reads as an inset pane.
+                .edgeLight(MaterialTheme.shapes.large)
                 .clip(MaterialTheme.shapes.large)
         ) {
 
