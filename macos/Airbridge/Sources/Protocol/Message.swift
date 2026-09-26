@@ -52,6 +52,10 @@ public enum Message: Equatable, Sendable {
     case galleryPreviewRequest(photoId: String, maxSize: Int)
     case galleryPreviewResponse(photoId: String, data: String)
     case galleryDownloadRequest(photoId: String)
+    /// Mac -> phone: delete this photo from the phone's library. The phone
+    /// asks its user for consent (Android media deletion) and answers.
+    case galleryDeleteRequest(photoId: String)
+    case galleryDeleteResponse(photoId: String, success: Bool, error: String?)
     case filesListRequest(path: String, page: Int, pageSize: Int,
                           sortBy: String = "name", sortDir: String = "asc",
                           foldersFirst: Bool = true, query: String = "")
@@ -413,6 +417,8 @@ extension Message: Codable {
         case galleryPreviewRequest    = "gallery_preview_request"
         case galleryPreviewResponse   = "gallery_preview_response"
         case galleryDownloadRequest   = "gallery_download_request"
+        case galleryDeleteRequest     = "gallery_delete_request"
+        case galleryDeleteResponse    = "gallery_delete_response"
         case filesListRequest         = "files_list_request"
         case filesListResponse        = "files_list_response"
         case fileThumbnailRequest     = "file_thumbnail_request"
@@ -634,6 +640,16 @@ extension Message: Codable {
         case .galleryDownloadRequest(let photoId):
             try container.encode(TypeKey.galleryDownloadRequest.rawValue, forKey: .type)
             try container.encode(photoId, forKey: .photoId)
+
+        case .galleryDeleteRequest(let photoId):
+            try container.encode(TypeKey.galleryDeleteRequest.rawValue, forKey: .type)
+            try container.encode(photoId, forKey: .photoId)
+
+        case .galleryDeleteResponse(let photoId, let success, let error):
+            try container.encode(TypeKey.galleryDeleteResponse.rawValue, forKey: .type)
+            try container.encode(photoId, forKey: .photoId)
+            try container.encode(success, forKey: .success)
+            try container.encodeIfPresent(error, forKey: .error)
 
         case .filesListRequest(let path, let page, let pageSize, let sortBy, let sortDir, let foldersFirst, let query):
             try container.encode(TypeKey.filesListRequest.rawValue, forKey: .type)
@@ -1005,6 +1021,16 @@ extension Message: Codable {
         case .galleryDownloadRequest:
             let photoId = try container.decode(String.self, forKey: .photoId)
             self = .galleryDownloadRequest(photoId: photoId)
+
+        case .galleryDeleteRequest:
+            let photoId = try container.decode(String.self, forKey: .photoId)
+            self = .galleryDeleteRequest(photoId: photoId)
+
+        case .galleryDeleteResponse:
+            let photoId = try container.decode(String.self, forKey: .photoId)
+            let success = try container.decode(Bool.self, forKey: .success)
+            let error = try container.decodeIfPresent(String.self, forKey: .error)
+            self = .galleryDeleteResponse(photoId: photoId, success: success, error: error)
 
         case .filesListRequest:
             let path = try container.decode(String.self, forKey: .path)

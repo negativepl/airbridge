@@ -361,6 +361,29 @@ sealed class Message {
         }.toString()
     }
 
+    /** Mac -> phone: delete this photo from the library (the phone asks its user first). */
+    data class GalleryDeleteRequest(
+        val photoId: String
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "gallery_delete_request")
+            put("photo_id", photoId)
+        }.toString()
+    }
+
+    data class GalleryDeleteResponse(
+        val photoId: String,
+        val success: Boolean,
+        val error: String? = null
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "gallery_delete_response")
+            put("photo_id", photoId)
+            put("success", success)
+            if (error != null) put("error", error)
+        }.toString()
+    }
+
     data class FilesListRequest(
         val path: String,
         val page: Int,
@@ -1004,6 +1027,14 @@ sealed class Message {
                 )
                 "gallery_download_request" -> GalleryDownloadRequest(
                     photoId = obj.getString("photo_id")
+                )
+                "gallery_delete_request" -> GalleryDeleteRequest(
+                    photoId = obj.getString("photo_id")
+                )
+                "gallery_delete_response" -> GalleryDeleteResponse(
+                    photoId = obj.getString("photo_id"),
+                    success = obj.getBoolean("success"),
+                    error = if (obj.has("error")) obj.getString("error") else null
                 )
                 "files_list_request" -> FilesListRequest(
                     path = obj.getString("path"),

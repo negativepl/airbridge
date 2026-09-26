@@ -110,6 +110,14 @@
             android:taskAffinity=""
             android:noHistory="true" />
 
+        <activity
+            android:name=".ui.GalleryDeleteActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Airbridge.TransparentDialog"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="true" />
+
         <service
             android:name=".service.AirbridgeService"
             android:exported="false"

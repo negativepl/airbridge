@@ -15,6 +15,25 @@ struct GalleryView: View {
 
     private var viewMode: GalleryViewMode { GalleryViewMode(rawValue: viewModeRaw) ?? .filmstrip }
 
+    @State private var photoPendingDeletion: GalleryPhotoMeta?
+
+    /// Right-click actions on a photo: download it, or delete it on the phone
+    /// (after a confirmation here; the phone asks once more with its own sheet).
+    @ViewBuilder
+    private func photoContextMenu(_ photo: GalleryPhotoMeta) -> some View {
+        Button {
+            galleryService.downloadPhoto(photoId: photo.id)
+        } label: {
+            Label(L10n.isPL ? "Pobierz" : "Download", systemImage: "arrow.down.circle")
+        }
+        Divider()
+        Button(role: .destructive) {
+            photoPendingDeletion = photo
+        } label: {
+            Label(L10n.isPL ? "Usuń z telefonu" : "Delete from Phone", systemImage: "trash")
+        }
+    }
+
     var body: some View {
         Group {
             if !connectionService.isConnected {
@@ -46,6 +65,31 @@ struct GalleryView: View {
         }
         .sheet(item: $selectedPhoto) { photo in
             PhotoDetailView(photo: photo, galleryService: galleryService, onClose: { selectedPhoto = nil })
+        }
+        .alert(
+            photoPendingDeletion.map { L10n.isPL ? "Usunąć „\($0.filename)” z telefonu?" : "Delete \"\($0.filename)\" from the phone?" } ?? "",
+            isPresented: Binding(get: { photoPendingDeletion != nil }, set: { if !$0 { photoPendingDeletion = nil } }),
+            presenting: photoPendingDeletion
+        ) { photo in
+            Button(L10n.isPL ? "Usuń" : "Delete", role: .destructive) {
+                galleryService.deletePhoto(photoId: photo.id)
+                photoPendingDeletion = nil
+            }
+            Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) { photoPendingDeletion = nil }
+        } message: { _ in
+            Text(L10n.isPL
+                 ? "Telefon poprosi o potwierdzenie. Zdjęcie zostanie usunięte z biblioteki telefonu."
+                 : "The phone will ask you to confirm. The photo will be removed from the phone's library.")
+        }
+        .alert(
+            L10n.isPL ? "Nie udało się usunąć zdjęcia" : "Could Not Delete Photo",
+            isPresented: Binding(get: { galleryService.deleteError != nil }, set: { if !$0 { galleryService.deleteError = nil } })
+        ) {
+            Button("OK") { galleryService.deleteError = nil }
+        } message: {
+            Text(galleryService.deleteError == "declined"
+                 ? (L10n.isPL ? "Usunięcie zostało odrzucone na telefonie." : "The deletion was declined on the phone.")
+                 : (L10n.isPL ? "Telefon nie mógł usunąć tego zdjęcia." : "The phone could not delete this photo."))
         }
     }
 
@@ -124,6 +168,7 @@ struct GalleryView: View {
                         ) {
                             selectedPhoto = photo
                         }
+                        .contextMenu { photoContextMenu(photo) }
                         .onAppear {
                             if photo.id == galleryService.photos.last?.id {
                                 galleryService.loadNextPage()
@@ -156,6 +201,7 @@ struct GalleryView: View {
                             GalleryGridCell(photo: photo, galleryService: galleryService) {
                                 selectedPhoto = photo
                             }
+                            .contextMenu { photoContextMenu(photo) }
                             .onAppear {
                                 if photo.id == galleryService.photos.last?.id {
                                     galleryService.loadNextPage()

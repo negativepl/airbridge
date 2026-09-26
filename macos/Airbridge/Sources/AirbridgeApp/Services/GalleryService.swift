@@ -139,6 +139,17 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         }
     }
 
+    /// Ask the phone to delete a photo. The phone shows its own consent sheet;
+    /// the photo leaves this listing only when it confirms the deletion.
+    func deletePhoto(photoId: String) {
+        guard let connectionService else { return }
+        deleteError = nil
+        Task { try? await connectionService.sendToActive(Message.galleryDeleteRequest(photoId: photoId)) }
+    }
+
+    /// Last deletion failure ("declined", "not_found", …), for the view to show.
+    var deleteError: String?
+
     // MARK: - ActiveDeviceObserver
 
     /// The device our requests target changed (switch, drop, or disconnect):
@@ -180,6 +191,19 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
 
             for photo in newPhotos {
                 requestThumbnail(photoId: photo.id)
+            }
+
+        case .galleryDeleteResponse(let photoId, let success, let error):
+            if success {
+                photos.removeAll { $0.id == photoId }
+                thumbnailImages[photoId] = nil
+                previewImages[photoId] = nil
+                totalCount = max(0, totalCount - 1)
+                if let deviceKey {
+                    cache.save(CachedListing(photos: photos, totalCount: totalCount), device: deviceKey, name: "gallery")
+                }
+            } else {
+                deleteError = error ?? "delete_failed"
             }
 
         case .galleryThumbnailResponse(let photoId, let data):

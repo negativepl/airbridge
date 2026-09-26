@@ -237,6 +237,14 @@ class AirbridgeService : Service() {
             instance?.unpairMac(fingerprint)
         }
 
+        /** Outcome of a Mac-requested photo deletion (from the consent activity). */
+        fun reportGalleryDelete(photoId: String, success: Boolean, error: String?) {
+            val svc = instance ?: return
+            if (svc.webSocketClient.isConnected) {
+                svc.webSocketClient.send(Message.GalleryDeleteResponse(photoId, success, error))
+            }
+        }
+
         fun requestMacInfo() {
             val svc = instance ?: return
             if (svc.webSocketClient.isConnected) svc.webSocketClient.send(Message.MacInfoRequest)
@@ -1538,6 +1546,20 @@ class AirbridgeService : Service() {
                     } else {
                         Log.d(TAG, "getPreview returned null for ${message.photoId}")
                     }
+                }
+            }
+            is Message.GalleryDeleteRequest -> {
+                // Deleting from the shared library needs the user's consent:
+                // hand it to an invisible activity that shows the system sheet.
+                val uri = galleryProvider.getPhotoUri(message.photoId)
+                if (uri == null) {
+                    webSocketClient.send(Message.GalleryDeleteResponse(message.photoId, false, "not_found"))
+                } else {
+                    startActivity(Intent(this, com.airbridge.ui.GalleryDeleteActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        putExtra(com.airbridge.ui.GalleryDeleteActivity.EXTRA_PHOTO_ID, message.photoId)
+                        putExtra(com.airbridge.ui.GalleryDeleteActivity.EXTRA_URI, uri)
+                    })
                 }
             }
             is Message.GalleryDownloadRequest -> {
