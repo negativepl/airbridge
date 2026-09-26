@@ -317,7 +317,6 @@ struct TransferPopupView: View {
             // The shell morphs between the per-state sizes with a spring
             // (interruptible: a state change mid-morph retargets, no restart).
             .frame(width: islandSize.width, height: islandSize.height + notchInset)
-            .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.46, dampingFraction: 0.82), value: stateKind)
             // Black overscan glued to the island's top edge, extending upward
             // off-screen, so no sliver of desktop ever shows above the shell.
             // It scales/fades WITH the island on hide.
@@ -352,6 +351,9 @@ struct TransferPopupView: View {
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
+        // The one animation for a state change: shell size, content swap.
+        // Keyed on the state KIND so progress ticks never restart it.
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.44, dampingFraction: 0.84), value: stateKind)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
@@ -415,15 +417,17 @@ struct TransferPopupView: View {
     /// materialises with a soft spring (blur + a hair of scale, inside the
     /// clipped glass pill so the shell never bumps), the old one leaves fast.
     /// Slow where the user reads, fast where the system moves on.
+    /// One animation drives both the shell morph and this swap (see the
+    /// `.animation(value: stateKind)` on the body): per-transition animations
+    /// left both sides frozen mid-flight when states changed in quick
+    /// succession (offer → transfer), so the asymmetry lives in the values.
     static let stateTransition: AnyTransition = .asymmetric(
         insertion: .opacity
             .combined(with: .blurTransition(radius: 14))
-            .combined(with: .scale(scale: 0.96, anchor: .center))
-            .animation(.spring(response: 0.42, dampingFraction: 0.86)),
+            .combined(with: .scale(scale: 0.96, anchor: .center)),
         removal: .opacity
-            .combined(with: .blurTransition(radius: 10))
+            .combined(with: .blurTransition(radius: 6))
             .combined(with: .scale(scale: 0.98, anchor: .center))
-            .animation(.easeOut(duration: 0.16))
     )
 
     // MARK: - Subviews per state
