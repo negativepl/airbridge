@@ -58,6 +58,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SystemUpdate
 import android.widget.Toast
 import com.airbridge.diagnostics.DiagnosticReportExporter
@@ -91,7 +92,8 @@ fun SettingsScreen(
     prefs: SharedPreferences,
     onThemeChanged: (String) -> Unit,
     onScanQr: () -> Unit = {},
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onOpenAbout: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     Scaffold(
@@ -116,7 +118,7 @@ fun SettingsScreen(
             }
         }
     ) { pad ->
-        SettingsContent(prefs, onThemeChanged, onScanQr, Modifier.padding(pad))
+        SettingsContent(prefs, onThemeChanged, onScanQr, onOpenAbout, Modifier.padding(pad))
     }
 }
 
@@ -125,6 +127,7 @@ private fun SettingsContent(
     prefs: SharedPreferences,
     onThemeChanged: (String) -> Unit,
     onScanQr: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
@@ -615,6 +618,37 @@ private fun SettingsContent(
                     },
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // About — moved here from the home screen's overflow menu.
+            SectionHeader(text = stringResource(R.string.nav_about))
+            Spacer(modifier = Modifier.height(8.dp))
+            AirbridgeCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenAbout() },
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                )
+            ) {
+                ListItem(
+                    leadingContent = {
+                        Icon(Icons.Rounded.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    content = { Text(stringResource(R.string.nav_about)) },
+                    supportingContent = { Text(stringResource(R.string.about_open_source)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,

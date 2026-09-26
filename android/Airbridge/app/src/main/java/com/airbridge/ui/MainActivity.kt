@@ -44,13 +44,9 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -182,7 +178,6 @@ class MainActivity : ComponentActivity() {
                         pairedDeviceStore.getAll().isNotEmpty()
                     }
                     var fabMenuExpanded by remember { mutableStateOf(false) }
-                    var topMenuExpanded by remember { mutableStateOf(false) }
                     var showSettings by remember { mutableStateOf(false) }
                     var showAbout by remember { mutableStateOf(false) }
                     var pendingFileUri by remember { mutableStateOf<Uri?>(null) }
@@ -288,22 +283,6 @@ class MainActivity : ComponentActivity() {
                                 actions = {
                                     IconButton(onClick = { showSettings = true }) {
                                         Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
-                                    }
-                                    IconButton(onClick = { topMenuExpanded = true }) {
-                                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.nav_about))
-                                    }
-                                    DropdownMenu(
-                                        expanded = topMenuExpanded,
-                                        onDismissRequest = { topMenuExpanded = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.nav_about)) },
-                                            leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-                                            onClick = {
-                                                topMenuExpanded = false
-                                                showAbout = true
-                                            }
-                                        )
                                     }
                                 }
                             )
@@ -444,7 +423,8 @@ class MainActivity : ComponentActivity() {
                                 showSettings = false
                                 showQrScanner = true
                             },
-                            onBack = { showSettings = false }
+                            onBack = { showSettings = false },
+                            onOpenAbout = { showAbout = true }
                         )
                     }
                     AnimatedVisibility(
