@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BatteryChargingFull
-import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -139,14 +137,13 @@ fun MacDeviceCard(
                 if (info.batteryPercent >= 0) {
                     Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (info.batteryCharging) Icons.Rounded.BatteryChargingFull
-                                          else Icons.Rounded.BatteryFull,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(16.dp)
+                        // Horizontal battery, filled to the reported level; a bolt while charging.
+                        BatteryGlyph(
+                            percent = info.batteryPercent,
+                            charging = info.batteryCharging,
+                            color = Color.White.copy(alpha = 0.9f)
                         )
-                        Spacer(Modifier.size(4.dp))
+                        Spacer(Modifier.size(6.dp))
                         Text(
                             text = batteryLine(info),
                             style = MaterialTheme.typography.bodyMedium,
