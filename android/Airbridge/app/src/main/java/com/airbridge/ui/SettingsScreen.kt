@@ -57,9 +57,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.SystemUpdate
 import android.widget.Toast
 import com.airbridge.diagnostics.DiagnosticReportExporter
 import kotlinx.coroutines.Dispatchers
@@ -538,13 +535,6 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    leadingContent = {
-                        Icon(
-                            Icons.Rounded.SystemUpdate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
                     content = { Text(stringResource(R.string.update_check)) },
                     trailingContent = {
                         Icon(
@@ -591,13 +581,6 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    leadingContent = {
-                        Icon(
-                            Icons.Rounded.Description,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
                     trailingContent = {
@@ -624,9 +607,6 @@ private fun SettingsContent(
                 )
             ) {
                 ListItem(
-                    leadingContent = {
-                        Icon(Icons.Rounded.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    },
                     content = { Text(stringResource(R.string.nav_about)) },
                     supportingContent = { Text(stringResource(R.string.about_open_source)) },
                     trailingContent = {
