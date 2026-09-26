@@ -216,16 +216,15 @@ struct FilesBrowserView: View {
         let forward = currentDepth >= previousDepth
         let slideIn: Edge = forward ? .trailing : .leading
         let slideOut: Edge = forward ? .leading : .trailing
+        // A pure slide: no opacity on the pane (a fade on top of the move read
+        // as a smear), the panes push each other like pages.
         return ZStack {
             folderPane
                 .id(filesBrowserService.currentPath)
-                .transition(.asymmetric(
-                    insertion: .move(edge: slideIn).combined(with: .opacity),
-                    removal: .move(edge: slideOut).combined(with: .opacity)
-                ))
+                .transition(.asymmetric(insertion: .move(edge: slideIn), removal: .move(edge: slideOut)))
         }
         .clipped()
-        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: filesBrowserService.currentPath)
+        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: filesBrowserService.currentPath)
         .onChange(of: filesBrowserService.currentPath) { _, _ in
             // Remember where we came from for the NEXT change's direction.
             Task { @MainActor in previousDepth = currentDepth }
@@ -258,9 +257,15 @@ struct FilesBrowserView: View {
                 listView
             }
         }
+        // The pane's own background: the sliding pane must be opaque, or the
+        // old and new listings show through each other mid-slide.
+        .background(Color(nsColor: .windowBackgroundColor))
         .id(contentKind)
         .transition(.opacity)
-        .animation(.easeOut(duration: 0.18), value: contentKind)
+        // Within a folder the kinds crossfade; but never while the pane is
+        // sliding in (its listing usually lands mid-slide) — that fade on top
+        // of the move was the "what is happening" moment.
+        .animation(filesBrowserService.isLoading ? nil : .easeOut(duration: 0.18), value: contentKind)
     }
 
     private var listView: some View {
