@@ -1,6 +1,7 @@
 package com.airbridge.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,14 +22,18 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
- * A one-dp line of light on the top edge of a card, so surfaces read as lit
- * from above instead of flat. Tuned per mode: soft on light surfaces, faint on dark.
+ * Card surface treatment: a faint hairline border around the card plus a
+ * one-dp line of light on the top edge, so surfaces read as lit from above
+ * instead of flat. Kept dim on purpose: it should be felt, not seen.
  */
 @Composable
 fun Modifier.edgeLight(shape: Shape): Modifier {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val highlight = if (dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.75f)
-    return innerShadow(shape, Shadow(radius = 1.dp, color = highlight, offset = DpOffset(0.dp, 1.dp)))
+    val highlight = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
+    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (dark) 0.35f else 0.6f)
+    return this
+        .border(width = 0.75.dp, color = outline, shape = shape)
+        .innerShadow(shape, Shadow(radius = 1.dp, color = highlight, offset = DpOffset(0.dp, 1.dp)))
 }
 
 /** Material Card with the edge light applied. Same parameters as [Card]. */
