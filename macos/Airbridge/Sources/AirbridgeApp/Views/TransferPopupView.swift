@@ -619,13 +619,29 @@ struct TransferPopupView: View {
         islandRow {
             glyph("checkmark.circle.fill").symbolEffect(.bounce, value: isReceiving)
         } texts: {
-            Text(isReceiving
-                ? (L10n.isPL ? "Plik odebrany" : "File received")
-                : (L10n.isPL ? "Plik wysłany" : "File sent"))
-                .font(.ab(.title3, weight: .bold))
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(isReceiving
+                    ? (L10n.isPL ? "Plik odebrany" : "File received")
+                    : (L10n.isPL ? "Plik wysłany" : "File sent"))
+                    .font(.ab(.title3, weight: .bold))
+                    .foregroundStyle(.primary)
+                if isReceiving, let url = fileTransferService.lastReceivedFileURL {
+                    Text(url.lastPathComponent)
+                        .font(.ab(.footnote))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
         } controls: {
-            EmptyView()
+            // Open the file that just arrived (its default app, or Finder when
+            // nothing on this Mac claims the type). Holds the island while shown.
+            if isReceiving, fileTransferService.lastReceivedFileURL != nil {
+                IslandIconButton(systemName: "arrow.up.forward.app", label: L10n.isPL ? "Otwórz" : "Open", prominent: true) {
+                    fileTransferService.openLastReceivedFile()
+                    TransferPopup.shared.hide(delay: 0)
+                }
+            }
         }
     }
 

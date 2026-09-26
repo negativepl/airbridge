@@ -15,6 +15,9 @@ final class FileTransferService: MessageHandler {
     private(set) var fileTransferProgress: Double = 0
     private(set) var fileTransferFileName: String = ""
     private(set) var isReceivingFile: Bool = false
+    /// Where the last received file landed (Downloads or the requested folder),
+    /// so the island can open it or reveal it right after "File received".
+    private(set) var lastReceivedFileURL: URL?
     private(set) var transferSpeed: Double = 0
     private(set) var transferEta: Int = 0
     private(set) var isWaitingForAccept: Bool = false
@@ -616,6 +619,7 @@ final class FileTransferService: MessageHandler {
                           let safeDest = Self.uniqueDestination(in: targetDir, filename: filename) {
                     do {
                         try FileManager.default.moveItem(at: tempURL, to: safeDest)
+                        if ownsPopup { self.lastReceivedFileURL = safeDest }
                         self.playReceiveSound()
                     } catch {
                         #if DEBUG
@@ -623,7 +627,8 @@ final class FileTransferService: MessageHandler {
                         #endif
                         // Move to custom dir failed — fall back to Downloads rather than silently deleting.
                         do {
-                            let _ = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
+                            let saved = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
+                            if ownsPopup { self.lastReceivedFileURL = saved }
                             self.playReceiveSound()
                         } catch {
                             #if DEBUG
@@ -634,7 +639,8 @@ final class FileTransferService: MessageHandler {
                     }
                 } else {
                     do {
-                        let _ = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
+                        let saved = try self.saveToDownloads(filename: filename, movingFrom: tempURL)
+                        if ownsPopup { self.lastReceivedFileURL = saved }
                         self.playReceiveSound()
                     } catch {
                         #if DEBUG
@@ -652,9 +658,10 @@ final class FileTransferService: MessageHandler {
                 // already-finished multi-file batch is harmless (fresh UUID
                 // per offer, so it can never collide with a live transfer).
                 self.acceptedIncomingTransferIds.removeAll()
-                TransferPopup.shared.hide()
+                // Long enough to reach the Open button; the island leaves on its own after.
+                TransferPopup.shared.hide(delay: 5.0)
 
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                try? await Task.sleep(nanoseconds: 5_500_000_000)
                 self.fileTransferProgress = 0
                 self.fileTransferFileName = ""
                 self.isReceivingFile = false
@@ -814,6 +821,21 @@ final class FileTransferService: MessageHandler {
             return fileURL
         } catch {
             return nil
+        }
+    }
+
+    // MARK: - Opening what arrived
+
+    /// Open the last received file with its default app; when nothing on this
+    /// Mac claims the type (or the file is gone), reveal it in Finder instead.
+    func openLastReceivedFile() {
+        guard let url = lastReceivedFileURL else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let canOpen = NSWorkspace.shared.urlForApplication(toOpen: url) != nil
+        if canOpen {
+            NSWorkspace.shared.open(url)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
         }
     }
 
