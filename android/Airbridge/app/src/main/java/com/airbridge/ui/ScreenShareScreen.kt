@@ -45,11 +45,15 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 8.dp, top = topInset - 4.dp, bottom = bottomClearance),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(start = 8.dp, end = 8.dp, top = topInset - 4.dp, bottom = bottomClearance)
     ) {
-        // Same opening as the other tabs: a section title under the bar.
+        // Same opening as the other tabs: a section title under the bar, the
+        // content right below it at the title's own bottom padding.
         SectionTitle(stringResource(R.string.screen_section_modes))
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         if (ready) {
             ShareTile(
                 polygon = MaterialShapes.Cookie9Sided,
@@ -73,6 +77,7 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
             )
         } else {
             NotConnected(modifier = Modifier.weight(1f))
+        }
         }
     }
 }

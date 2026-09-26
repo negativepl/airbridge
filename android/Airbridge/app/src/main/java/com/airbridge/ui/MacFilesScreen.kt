@@ -382,7 +382,8 @@ private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(start = 10.dp, end = 8.dp, top = 26.dp, bottom = 8.dp),
+            // 6 dp here plus the first row's 2 dp of its own = the title's 8 dp.
+            .padding(start = 10.dp, end = 8.dp, top = 26.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PathSegment(

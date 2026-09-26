@@ -89,7 +89,8 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
             .padding(horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(topInset + 8.dp))
+        // No section title here; the logo starts where a first card would.
+        Spacer(modifier = Modifier.height(topInset + 22.dp))
 
         // Logo on a light tile (the mark is dark, so it needs a light backdrop)
         Box(
