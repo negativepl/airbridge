@@ -41,6 +41,10 @@ final class FileTransferService: MessageHandler {
     @ObservationIgnored private var transferStartTime: Date?
     @ObservationIgnored private weak var connectionService: ConnectionService?
     @ObservationIgnored private var sendQueue: [(url: URL, destinationDir: String?)] = []
+    /// Fired when an upload to the phone has landed, with the folder it went
+    /// to (nil = the phone's default download folder). The Files browser
+    /// listens so the folder on screen refreshes by itself.
+    @ObservationIgnored var onOutgoingTransferCompleted: ((String?) -> Void)?
     @ObservationIgnored private var isSendingFromQueue = false
     /// How the wait for an outgoing offer's answer ended. `.failed` covers
     /// everything that is not an explicit answer from the phone: the sender
@@ -541,6 +545,7 @@ final class FileTransferService: MessageHandler {
             if success {
                 self.fileTransferProgress = 1.0
                 self.playReceiveSound()
+                self.onOutgoingTransferCompleted?(destinationDir)
                 TransferPopup.shared.hide()
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             } else {

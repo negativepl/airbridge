@@ -76,6 +76,13 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
     func configure(connectionService: ConnectionService, fileTransferService: FileTransferService) {
         self.connectionService = connectionService
         self.fileTransferService = fileTransferService
+        // A file just uploaded into the folder on screen: show it without
+        // making the user reload. (nil = the phone's default download folder,
+        // which is not a browsed path, so nothing to refresh.)
+        fileTransferService.onOutgoingTransferCompleted = { [weak self] destinationDir in
+            guard let self, let destinationDir, destinationDir == self.currentPath else { return }
+            self.reload()
+        }
     }
 
     // MARK: - Cache
