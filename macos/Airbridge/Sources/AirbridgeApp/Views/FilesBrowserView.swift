@@ -163,6 +163,8 @@ struct FilesBrowserView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if filesBrowserService.loadFailed && filesBrowserService.displayedEntries.isEmpty {
             loadFailedState
+        } else if filesBrowserService.displayedEntries.isEmpty && filesBrowserService.hasLoadedOnce {
+            emptyFolderState
         } else if viewMode == .grid {
             gridView
         } else {
@@ -310,6 +312,29 @@ struct FilesBrowserView: View {
                 Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { filesBrowserService.reload() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+            }
+        }
+    }
+
+    /// The folder (or the search) came back with nothing in it.
+    private var emptyFolderState: some View {
+        EmptyStateContainer {
+            if filesBrowserService.isSearching {
+                EmptyStateView(
+                    systemImage: "magnifyingglass",
+                    title: L10n.isPL ? "Brak wyników" : "No Results",
+                    subtitle: L10n.isPL
+                        ? "Żaden plik ani folder nie pasuje do „\(filesBrowserService.searchQuery)”."
+                        : "No file or folder matches \"\(filesBrowserService.searchQuery)\"."
+                )
+            } else {
+                EmptyStateView(
+                    systemImage: "folder",
+                    title: L10n.isPL ? "Ten folder jest pusty" : "This Folder Is Empty",
+                    subtitle: L10n.isPL
+                        ? "Nie ma tu żadnych plików ani folderów. Upuść plik w tym oknie, aby wysłać go tutaj."
+                        : "There are no files or folders here. Drop a file on this window to send it here."
+                )
             }
         }
     }
