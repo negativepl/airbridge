@@ -163,6 +163,24 @@ struct FilesBrowserView: View {
     /// While a file hovers over the window: an accent-tinted, dashed frame
     /// inside the content area and the name of the folder it will land in,
     /// so the drop reads as "into this folder", not "somewhere in the app".
+    /// A row that has just become ready (its folder stats arrived) settles in
+    /// from a few points up with a short fade. Only the arriving row moves;
+    /// rows already on screen stay put — the list itself never animates.
+    private struct RowReveal: ViewModifier {
+        @State private var shown = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        func body(content: Content) -> some View {
+            content
+                .opacity(shown ? 1 : 0)
+                .offset(y: shown ? 0 : -6)
+                .onAppear {
+                    if reduceMotion { shown = true } else {
+                        withAnimation(.easeOut(duration: 0.22)) { shown = true }
+                    }
+                }
+        }
+    }
+
     @ViewBuilder
     private var dropTargetOverlay: some View {
         if isDropTargeted {
@@ -238,7 +256,10 @@ struct FilesBrowserView: View {
         List {
             ForEach(entryGroups) { group in
                 Section {
-                    ForEach(group.entries) { entry in listRow(entry) }
+                    ForEach(group.entries) { entry in
+                        listRow(entry)
+                            .modifier(RowReveal())
+                    }
                 } header: {
                     if !group.title.isEmpty { Text(group.title) }
                 }
