@@ -532,7 +532,10 @@ struct TransferPopupView: View {
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.primary)
             } controls: {
-                EmptyView()
+                // Put the drop zone away now instead of waiting out the countdown.
+                IslandIconButton(systemName: "xmark", label: L10n.close) {
+                    TransferPopup.shared.hide(delay: 0)
+                }
             }
         } else {
             islandRow {
@@ -542,7 +545,9 @@ struct TransferPopupView: View {
                     .font(.ab(.title3, weight: .semibold))
                     .foregroundStyle(.secondary)
             } controls: {
-                EmptyView()
+                IslandIconButton(systemName: "xmark", label: L10n.close) {
+                    TransferPopup.shared.hide(delay: 0)
+                }
             }
         }
     }
