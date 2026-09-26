@@ -36,6 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.drawBehind
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -63,19 +71,25 @@ fun MacDeviceCard(
 ) {
     var showDisconnectConfirm by remember { mutableStateOf(false) }
 
+    val decoded = remember(wallpaperBase64) {
+        wallpaperBase64?.let {
+            runCatching {
+                val bytes = Base64.decode(it, Base64.NO_WRAP)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            }.getOrNull()
+        }
+    }
+    val bitmap = remember(decoded) { decoded?.asImageBitmap() }
+    val glowColors = remember(decoded) { decoded?.let(::wallpaperGlowColors) }
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
     AirbridgeCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
-        val bitmap = remember(wallpaperBase64) {
-            wallpaperBase64?.let {
-                runCatching {
-                    val bytes = Base64.decode(it, Base64.NO_WRAP)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                }.getOrNull()
-            }
-        }
 
         Box(modifier = Modifier.fillMaxWidth().height(172.dp)) {
             if (bitmap != null) {
@@ -283,3 +297,60 @@ private fun gb(bytes: Long): String {
     val g = bytes.toDouble() / 1_000_000_000.0
     return if (g >= 100) "${g.roundToInt()} GB" else "${(g * 10).roundToInt() / 10.0} GB"
 }
+
+/**
+ * Three colours the wallpaper's lower third averages to (left, centre,
+ * right), nudged towards saturation so the glow keeps the picture's hue
+ * rather than its muddy mean.
+ */
+private fun wallpaperGlowColors(bitmap: Bitmap): List<Color> {
+    val top = bitmap.height * 2 / 3
+    val band = Bitmap.createBitmap(bitmap, 0, top, bitmap.width, bitmap.height - top)
+    val samples = Bitmap.createScaledBitmap(band, 3, 1, true)
+    return (0 until 3).map { x ->
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(samples.getPixel(x, 0), hsv)
+        hsv[1] = hsv[1].coerceAtLeast(0.45f)
+        hsv[2] = hsv[2].coerceIn(0.55f, 0.9f)
+        Color(android.graphics.Color.HSVToColor(hsv))
+    }
+}
+
+/**
+ * Light spilling from the wallpaper onto the background below the card: a
+ * horizontal blend of [colors] masked by a wide ellipse centred on the card's
+ * bottom edge, so it fades out smoothly downwards and to the sides. Drawn
+ * behind the card, so only the spill is visible.
+ */
+private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier {
+    if (colors == null) return this
+    return drawBehind {
+        val glow = GLOW_HEIGHT.toPx()
+        val rect = Rect(0f, size.height * 0.5f, size.width, size.height + glow)
+        drawContext.canvas.saveLayer(rect, Paint())
+        drawRect(
+            brush = Brush.horizontalGradient(colors),
+            topLeft = rect.topLeft,
+            size = rect.size,
+            alpha = alpha
+        )
+        // Elliptical alpha mask: a circle of radius glow, stretched to 1.4x the
+        // card width, centred on the bottom edge.
+        val centre = Offset(size.width / 2f, size.height)
+        val sx = size.width * 0.7f / glow
+        scale(scaleX = sx, scaleY = 1f, pivot = centre) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    0f to Color.Black, 1f to Color.Transparent,
+                    center = centre, radius = glow
+                ),
+                topLeft = rect.topLeft,
+                size = rect.size,
+                blendMode = BlendMode.DstIn
+            )
+        }
+        drawContext.canvas.restore()
+    }
+}
+
+private val GLOW_HEIGHT = 150.dp
