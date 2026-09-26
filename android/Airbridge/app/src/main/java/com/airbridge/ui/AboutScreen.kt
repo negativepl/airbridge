@@ -338,6 +338,13 @@ private fun AboutContent(modifier: Modifier = Modifier) {
         val alreadyUnlockedMsg = stringResource(R.string.diagnostics_already_unlocked)
         val unlockedMsg = stringResource(R.string.diagnostics_unlocked)
         val resources = context.resources
+        // One toast at a time: cancel the previous before showing the next, or the
+        // countdown queues up and lags behind the taps.
+        var tapToast by remember { mutableStateOf<Toast?>(null) }
+        val showToast: (String) -> Unit = { text ->
+            tapToast?.cancel()
+            tapToast = Toast.makeText(context, text, Toast.LENGTH_SHORT).also { it.show() }
+        }
         Text(
             text = "v${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
             style = MaterialTheme.typography.bodySmall,
@@ -346,7 +353,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .clickable(interactionSource = null, indication = null) {
                     if (prefs.getBoolean(DIAGNOSTICS_UNLOCKED_KEY, false)) {
-                        Toast.makeText(context, alreadyUnlockedMsg, Toast.LENGTH_SHORT).show()
+                        showToast(alreadyUnlockedMsg)
                         return@clickable
                     }
                     versionTaps += 1
@@ -355,13 +362,9 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                         left <= 0 -> {
                             prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, true) }
                             versionTaps = 0
-                            Toast.makeText(context, unlockedMsg, Toast.LENGTH_SHORT).show()
+                            showToast(unlockedMsg)
                         }
-                        left <= 3 -> Toast.makeText(
-                            context,
-                            resources.getQuantityString(R.plurals.diagnostics_taps_to_go, left, left),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        left <= 3 -> showToast(resources.getQuantityString(R.plurals.diagnostics_taps_to_go, left, left))
                     }
                 }
                 .padding(bottom = 16.dp),
