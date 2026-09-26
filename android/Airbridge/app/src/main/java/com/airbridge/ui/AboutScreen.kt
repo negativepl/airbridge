@@ -186,12 +186,13 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                 // The Claude crew — a wink at how this app actually gets built:
                 // each model listed with the job it does around here.
                 val team = listOf(
-                    Triple("Claude Fable 5", R.string.about_role_manager, null),
-                    Triple("Claude Opus 5", R.string.about_role_foreman, null),
+                    Triple("Claude Fable 5.1", R.string.about_role_manager, null),
+                    Triple("Claude Opus 5.5", R.string.about_role_foreman, null),
                     Triple("Claude Sonnet 5", R.string.about_role_engineer, null),
                     Triple("Claude Haiku 4.5", R.string.about_role_intern, R.string.about_intern_note)
                 )
                 team.forEach { (name, roleRes, noteRes) ->
+                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                     ListItem(
                         leadingContent = {
                             Image(
@@ -248,6 +249,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     modifier = Modifier.clickable { checkUpdateTrigger = true }
                 )
 
+                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 // Source code
                 ListItem(
                     leadingContent = {
@@ -275,6 +277,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
                     }
                 )
 
+                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 // Report issue
                 ListItem(
                     leadingContent = {
