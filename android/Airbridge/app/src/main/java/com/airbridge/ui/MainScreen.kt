@@ -122,8 +122,8 @@ fun MainScreen(
             .verticalScroll(scrollState)
             .padding(horizontal = 8.dp)
     ) {
-        // Same breathing room under the bar as between sections.
-        Spacer(modifier = Modifier.height(topInset + 24.dp))
+        // Generous room under the bar before the first card.
+        Spacer(modifier = Modifier.height(topInset + 40.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
@@ -172,7 +172,7 @@ fun MainScreen(
                             )
                             // Extra room under the device card: its light needs space
                             // before the next section title.
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(28.dp))
                             val mirror = rememberMirrorLauncher()
                             QuickActionsRow(
                                 onSendFile = onSendFile,
