@@ -335,11 +335,11 @@ struct TransferPopupView: View {
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
-        // Rejection / failure shake. Sideways offset plus a hair of rotation
-        // pivoting on the top edge, so the shell swings like something hung
-        // from the notch; the top edge itself never moves.
+        // Rejection / failure shake: sideways only. No rotation — Liquid
+        // Glass renders mirrored artefacts when rotated, and a tilt pushed
+        // the shell past the panel's edge where it got clipped. The kick is
+        // sized to stay inside the panel's side padding at full swing.
         .offset(x: shakeX)
-        .rotationEffect(.degrees(Double(shakeX) * 0.12), anchor: .top)
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
@@ -394,8 +394,8 @@ struct TransferPopupView: View {
                 // Kick, then let the spring swing it back: response 0.5 s,
                 // damping 0.22 → about three visible swings, each smaller.
                 var kick = Transaction(); kick.disablesAnimations = true
-                withTransaction(kick) { shakeX = 22 }
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.22)) { shakeX = 0 }
+                withTransaction(kick) { shakeX = 16 }
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.24)) { shakeX = 0 }
             default: break
             }
             // Any activity (incoming offer, waiting, transferring, etc.)
