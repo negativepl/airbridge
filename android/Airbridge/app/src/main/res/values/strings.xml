@@ -177,6 +177,7 @@
     <string name="about_role_intern">Intern</string>
     <string name="about_source_code">Source code on GitHub</string>
     <string name="about_report_issue">Report an issue</string>
+    <string name="about_row_title">About AirBridge</string>
     <string name="about_open_source">AirBridge is open source</string>
     <string name="about_license">MIT License</string>
     <!-- Pairing -->

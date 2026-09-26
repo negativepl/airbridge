@@ -181,6 +181,7 @@
     <string name="about_role_intern">Stażysta</string>
     <string name="about_source_code">Kod źródłowy na GitHub</string>
     <string name="about_report_issue">Zgłoś problem</string>
+    <string name="about_row_title">O AirBridge</string>
     <string name="about_open_source">AirBridge jest open source</string>
     <string name="about_license">Licencja MIT</string>
 

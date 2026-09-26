@@ -23,6 +23,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -300,7 +305,7 @@ private fun SettingsContent(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                     )
                 ) {
-                    ListItem(
+                    SettingsRow(
                         content = {
                             Text(
                                 text = downloadFolder,
@@ -318,7 +323,6 @@ private fun SettingsContent(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
                 }
             }
@@ -334,7 +338,7 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
+                SettingsRow(
                     modifier = Modifier.clickable {
                         val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
                             putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -355,16 +359,14 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
                 DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                ListItem(
+                SettingsRow(
                     content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
                     trailingContent = {
                         Switch(checked = vibrateOnSync, onCheckedChange = null)
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.toggleable(
                         value = vibrateOnSync,
                         role = Role.Switch,
@@ -387,13 +389,12 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
+                SettingsRow(
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
                     supportingContent = { Text(stringResource(R.string.settings_auto_connect_desc)) },
                     trailingContent = {
                         Switch(checked = autoConnect, onCheckedChange = null)
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.toggleable(
                         value = autoConnect,
                         role = Role.Switch,
@@ -414,13 +415,12 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
+                SettingsRow(
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
                     supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
                     trailingContent = {
                         Switch(checked = headphoneHandoff, onCheckedChange = null)
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.toggleable(
                         value = headphoneHandoff,
                         role = Role.Switch,
@@ -437,12 +437,11 @@ private fun SettingsContent(
                 )
                 if (headphoneHandoff) {
                     DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                    ListItem(
+                    SettingsRow(
                         content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
                             Text(headphoneName ?: stringResource(R.string.settings_headphone_device_none))
                         },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                                 ContextCompat.checkSelfPermission(
@@ -456,13 +455,12 @@ private fun SettingsContent(
                         }
                     )
                     DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                    ListItem(
+                    SettingsRow(
                         content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
                         trailingContent = {
                             Switch(checked = headphoneAutoSwitch, onCheckedChange = null)
                         },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.toggleable(
                             value = headphoneAutoSwitch,
                             role = Role.Switch,
@@ -534,7 +532,7 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
+                SettingsRow(
                     content = { Text(stringResource(R.string.update_check)) },
                     trailingContent = {
                         Icon(
@@ -543,7 +541,6 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
             com.airbridge.update.UpdateFlowHost(
@@ -580,7 +577,7 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
+                SettingsRow(
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
                     trailingContent = {
@@ -590,7 +587,6 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
 
@@ -606,8 +602,8 @@ private fun SettingsContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             ) {
-                ListItem(
-                    content = { Text(stringResource(R.string.nav_about)) },
+                SettingsRow(
+                    content = { Text(stringResource(R.string.about_row_title)) },
                     supportingContent = { Text(stringResource(R.string.about_open_source)) },
                     trailingContent = {
                         Icon(
@@ -616,7 +612,6 @@ private fun SettingsContent(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
 
@@ -727,3 +722,37 @@ private fun PairedDeviceCard(
 
 @Composable
 private fun SectionHeader(text: String) = SectionTitle(text)
+
+/**
+ * A settings row: headline and supporting text on the left, the control on
+ * the right, vertically centred whatever the text height. (ListItem would
+ * top-align the control once the supporting text wraps to two lines.)
+ */
+@Composable
+private fun SettingsRow(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+    supportingContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            ProvideTextStyle(MaterialTheme.typography.bodyLarge) { content() }
+            if (supportingContent != null) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                    ProvideTextStyle(MaterialTheme.typography.bodyMedium) { supportingContent() }
+                }
+            }
+        }
+        if (trailingContent != null) {
+            Spacer(modifier = Modifier.width(16.dp))
+            trailingContent()
+        }
+    }
+}
