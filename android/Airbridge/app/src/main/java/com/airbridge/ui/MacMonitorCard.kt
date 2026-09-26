@@ -112,21 +112,25 @@ fun MacDeviceCard(
     Column(modifier = modifier.fillMaxWidth()) {
     // The connection state is the section title, not a pill over the picture.
     SectionTitle(stringResource(R.string.home_section_connected_device))
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // The wallpaper itself, blurred at full resolution (RenderEffect), drawn
-        // behind the card and spilling GLOW_HEIGHT below it, faded out at the
-        // bottom. Below API 31 there is no RenderEffect; a colour glow stands in.
+    // The card is a frame: the picture sits inside it with a margin, and the
+    // wallpaper's blurred light spreads over the card surface around the
+    // picture, ending at the card's own edge. Nothing leaks into the page.
+    AirbridgeCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+    ) {
+    Box(modifier = Modifier.fillMaxWidth().padding(FRAME_MARGIN)) {
+        // Below API 31 there is no RenderEffect; a colour glow stands in.
         if (bitmap != null && blurSupported && cardHeightPx > 0) {
-            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.65f else 0.55f)
+            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.7f else 0.6f)
         }
-        AirbridgeCard(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { cardHeightPx = it.height }
-                .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-            highlight = false
+                .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f)
+                .clip(MaterialTheme.shapes.large)
         ) {
 
         Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
@@ -196,14 +200,16 @@ fun MacDeviceCard(
             }
         }
 
+        }
+        }
+
         if (isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)) {
             Text(
                 text = stringResource(R.string.update_version_mismatch, info.appVersion),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
             )
-        }
         }
     }
     }
@@ -386,9 +392,10 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 }
 
 private val GLOW_HEIGHT = 180.dp
-// Reach of the light past the card: tighter above (the top bar is close), wider elsewhere.
-private val SPILL = 28.dp
-private val SPILL_TOP = 18.dp
+/** Margin between the picture and the card edge; the light fades out across exactly this band. */
+private val FRAME_MARGIN = 16.dp
+private val SPILL = FRAME_MARGIN
+private val SPILL_TOP = FRAME_MARGIN
 
 /**
  * Ambilight: the blurred wallpaper centred behind the card and reaching
