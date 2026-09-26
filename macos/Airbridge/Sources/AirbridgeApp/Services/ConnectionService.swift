@@ -406,34 +406,36 @@ final class ConnectionService {
         }
     }
 
-    /// Wallpaper watch: the phone pulls the wallpaper once on connect, so a
-    /// change on the Mac would never reach it. macOS has no notification for it,
-    /// so poll the desktop image URL every 20 s while connected and push the
-    /// new image when it changes. The URL is also compared by modification
-    /// date, so re-saving the same file counts too.
-    private var wallpaperWatchTask: Task<Void, Never>?
-    private var lastWallpaperKey: String?
+    /// Wallpaper watch. The phone pulls the wallpaper once on connect; a change
+    /// on the Mac has to be pushed. macOS writes every wallpaper change to
+    /// ~/Library/Application Support/com.apple.wallpaper/Store, so a file-system
+    /// event source on that directory is the signal: no polling, nothing runs
+    /// until the wallpaper actually changes. Debounced, because a change lands
+    /// as a few writes.
+    private var wallpaperWatchSource: DispatchSourceFileSystemObject?
+    private var wallpaperPushTask: Task<Void, Never>?
     private func startWallpaperWatch() {
-        wallpaperWatchTask?.cancel()
-        lastWallpaperKey = Self.currentWallpaperKey()
-        wallpaperWatchTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 20_000_000_000)
-                guard let self else { return }
-                let key = Self.currentWallpaperKey()
-                guard self.isConnected, key != self.lastWallpaperKey else { continue }
-                self.lastWallpaperKey = key
-                let image = MacSystemInfo.wallpaperJPEGBase64()
-                try? await self.server.broadcast(.macWallpaperResponse(imageBase64: image))
-            }
-        }
+        wallpaperWatchSource?.cancel()
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store")
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .extend], queue: .main)
+        source.setEventHandler { [weak self] in self?.scheduleWallpaperPush() }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        wallpaperWatchSource = source
     }
 
-    private static func currentWallpaperKey() -> String? {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first,
-              let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
-        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-        return "\(url.path)|\(modified?.timeIntervalSince1970 ?? 0)"
+    private func scheduleWallpaperPush() {
+        wallpaperPushTask?.cancel()
+        wallpaperPushTask = Task { [weak self] in
+            // Let the new wallpaper render before capturing it.
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard let self, !Task.isCancelled, self.isConnected else { return }
+            let image = await MacSystemInfo.wallpaperJPEGBase64()
+            try? await self.server.broadcast(.macWallpaperResponse(imageBase64: image))
+        }
     }
 
     /// Zadzwoń na telefon (głośny alarm) / zatrzymaj dzwonienie.
@@ -844,8 +846,10 @@ final class ConnectionService {
             let info = MacSystemInfo.collect()
             Task { try? await server.sendTo(.macInfoResponse(info: info), connectionId: connectionId) }
         case .macWallpaperRequest:
-            let image = MacSystemInfo.wallpaperJPEGBase64()
-            Task { try? await server.sendTo(.macWallpaperResponse(imageBase64: image), connectionId: connectionId) }
+            Task {
+                let image = await MacSystemInfo.wallpaperJPEGBase64()
+                try? await server.sendTo(.macWallpaperResponse(imageBase64: image), connectionId: connectionId)
+            }
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:

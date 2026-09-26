@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import IOKit.ps
+import ScreenCaptureKit
 import Protocol
 
 /// Collects the Mac's own system info + wallpaper so the phone can act as a
@@ -35,15 +36,51 @@ enum MacSystemInfo {
     }
 
     /// The desktop wallpaper as base64 JPEG (empty string if unavailable).
-    static func wallpaperJPEGBase64() -> String {
+    ///
+    /// Captured from the WindowManager "Wallpaper" window through ScreenCaptureKit,
+    /// so it is what the desktop actually shows: aerials, dynamic HEICs and photo
+    /// shuffles included. `desktopImageURL` only knows plain image files and
+    /// reports the system default for everything else. Falls back to that file
+    /// when the capture is unavailable (no Screen Recording permission).
+    static func wallpaperJPEGBase64() async -> String {
+        if let captured = await captureWallpaperWindow() { return jpegBase64(captured) }
+        return wallpaperFileJPEGBase64()
+    }
+
+    private static func captureWallpaperWindow() async -> NSImage? {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return nil }
+        let mainID = (NSScreen.main ?? NSScreen.screens.first)?
+            .deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        let display = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first
+        guard let display else { return nil }
+        let windows = content.windows.filter {
+            $0.owningApplication?.bundleIdentifier == "com.apple.WindowManager" && $0.title == "Wallpaper"
+        }
+        // The wallpaper window on the main display: the one whose frame covers it.
+        let window = windows.first(where: { $0.frame.intersects(display.frame) }) ?? windows.first
+        guard let window else { return nil }
+
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let config = SCStreamConfiguration()
+        let scale = max(window.frame.width, window.frame.height) > 900 ? 900 / max(window.frame.width, window.frame.height) : 1
+        config.width = Int(window.frame.width * scale)
+        config.height = Int(window.frame.height * scale)
+        config.showsCursor = false
+        guard let cg = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
+    private static func wallpaperFileJPEGBase64() -> String {
         let screen = NSScreen.main ?? NSScreen.screens.first
         guard let screen,
               let url = NSWorkspace.shared.desktopImageURL(for: screen),
-              let image = NSImage(contentsOf: url),
-              let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return "" }
+              let image = NSImage(contentsOf: url) else { return "" }
+        return jpegBase64(image)
+    }
 
-        // Downscale to a sane size for the phone.
+    /// Downscaled (long edge 900 px) JPEG, base64.
+    private static func jpegBase64(_ image: NSImage) -> String {
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return "" }
         let maxLong: CGFloat = 900
         let w = CGFloat(rep.pixelsWide), h = CGFloat(rep.pixelsHigh)
         let scale = max(w, h) > maxLong ? maxLong / max(w, h) : 1.0
