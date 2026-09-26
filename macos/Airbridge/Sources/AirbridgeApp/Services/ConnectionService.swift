@@ -871,7 +871,7 @@ final class ConnectionService {
             clipboardHandler?.handleMessage(message)
         case .fileTransferAccept, .fileTransferReject, .fileTransferOffer, .fileTransferCancel:
             fileTransferHandler?.handleMessage(message, from: connectionId)
-        case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse:
+        case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse, .galleryDeleteResponse:
             galleryHandler?.handleMessage(message)
         case .smsConversationsResponse, .smsMessagesResponse, .smsSendResponse:
             smsHandler?.handleMessage(message)

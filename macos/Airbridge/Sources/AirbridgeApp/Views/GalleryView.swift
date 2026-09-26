@@ -78,8 +78,8 @@ struct GalleryView: View {
             Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) { photoPendingDeletion = nil }
         } message: { _ in
             Text(L10n.isPL
-                 ? "Telefon poprosi o potwierdzenie. Zdjęcie zostanie usunięte z biblioteki telefonu."
-                 : "The phone will ask you to confirm. The photo will be removed from the phone's library.")
+                 ? "Zdjęcie zostanie usunięte z biblioteki telefonu. Tej operacji nie można cofnąć."
+                 : "The photo will be removed from the phone's library. This cannot be undone.")
         }
         .alert(
             L10n.isPL ? "Nie udało się usunąć zdjęcia" : "Could Not Delete Photo",

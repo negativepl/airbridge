@@ -144,7 +144,11 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
     func deletePhoto(photoId: String) {
         guard let connectionService else { return }
         deleteError = nil
-        Task { try? await connectionService.sendToActive(Message.galleryDeleteRequest(photoId: photoId)) }
+        Diag.log("Gallery", "delete requested for photo \(photoId)")
+        Task {
+            do { try await connectionService.sendToActive(Message.galleryDeleteRequest(photoId: photoId)) }
+            catch { Diag.log("Gallery", "delete request failed to send: \(error)") }
+        }
     }
 
     /// Last deletion failure ("declined", "not_found", …), for the view to show.
