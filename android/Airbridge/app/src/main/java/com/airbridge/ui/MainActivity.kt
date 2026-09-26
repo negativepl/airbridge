@@ -261,33 +261,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Static top bar — no collapse. The bar would otherwise be shared
-                    // across both pager pages, and a bar collapsed on Home looked broken
-                    // on the short Screen page (and jumped when resetting). A fixed bar is
-                    // cleaner for a two-tab pager.
+                    // No shared top bar: each pager page carries its own static one
+                    // (see the pager below), so the title moves with the page.
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        topBar = {
-                            // Reset the TopAppBar's internal color animation on theme
-                            // change so it switches instantly with the rest of the UI
-                            // (Scaffold/nav bar) instead of lagging by a fade.
-                            key(MaterialTheme.colorScheme.surfaceContainer) {
-                            TopAppBar(
-                                title = {
-                                    Text(stringResource(pageTitles[pagerState.targetPage.coerceIn(0, pageTitles.lastIndex)]))
-                                },
-                                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                                ),
-                                actions = {
-                                    IconButton(onClick = { showSettings = true }) {
-                                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
-                                    }
-                                }
-                            )
-                            }
-                        },
                         bottomBar = {
                             // Stock Material 3 navigation bar. Its default container is
                             // surfaceContainer — the same token as our screen background — so
@@ -386,22 +363,43 @@ class MainActivity : ComponentActivity() {
                         },
                         floatingActionButtonPosition = FabPosition.End
                     ) { innerPadding ->
+                        // The top bar lives inside each page (not in the Scaffold) so the
+                        // title travels with its content during a swipe instead of
+                        // snapping to the target page's name mid-gesture.
                         HorizontalPager(
                             state = pagerState,
-                            modifier = Modifier.padding(innerPadding),
+                            // Only the bottom inset from the Scaffold: the per-page top bar
+                            // applies the status bar inset itself.
+                            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
                             beyondViewportPageCount = 1,
                         ) { page ->
-                            when (page) {
-                                0 -> MainScreen(
-                                    viewModel = viewModel,
-                                    onScanQr = { showQrScanner = true },
-                                    bottomClearance = fabClearance,
-                                    onSendFile = sendFileAction,
-                                    onSendPhoto = sendPhotoAction,
-                                    onSendClipboard = sendClipboardAction
-                                )
-                                1 -> ScreenShareScreen(bottomClearance = fabClearance)
-                                2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                key(MaterialTheme.colorScheme.surfaceContainer) {
+                                    TopAppBar(
+                                        title = { Text(stringResource(pageTitles[page])) },
+                                        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                                        ),
+                                        actions = {
+                                            IconButton(onClick = { showSettings = true }) {
+                                                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
+                                            }
+                                        }
+                                    )
+                                }
+                                when (page) {
+                                    0 -> MainScreen(
+                                        viewModel = viewModel,
+                                        onScanQr = { showQrScanner = true },
+                                        bottomClearance = fabClearance,
+                                        onSendFile = sendFileAction,
+                                        onSendPhoto = sendPhotoAction,
+                                        onSendClipboard = sendClipboardAction
+                                    )
+                                    1 -> ScreenShareScreen(bottomClearance = fabClearance)
+                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
+                                }
                             }
                         }
                     }
