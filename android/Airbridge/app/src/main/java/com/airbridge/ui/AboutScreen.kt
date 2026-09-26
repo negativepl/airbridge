@@ -32,14 +32,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,6 +51,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbridge.R
@@ -64,34 +61,23 @@ import com.airbridge.R
 @Composable
 fun AboutScreen(onBack: () -> Unit = {}) {
     BackHandler { onBack() }
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        topBar = {
-            key(MaterialTheme.colorScheme.surfaceContainer) {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.nav_about)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.nav_back)
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                    )
+    GlassTopBarScreen(
+        title = stringResource(R.string.nav_about),
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.nav_back)
                 )
             }
         }
-    ) { pad ->
-        AboutContent(Modifier.padding(pad))
+    ) { topInset ->
+        AboutContent(topInset = topInset)
     }
 }
 
 @Composable
-private fun AboutContent(modifier: Modifier = Modifier) {
+private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     val scrollState = rememberScrollState()
@@ -103,7 +89,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
             .padding(horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(topInset + 8.dp))
 
         // Logo on a light tile (the mark is dark, so it needs a light backdrop)
         Box(

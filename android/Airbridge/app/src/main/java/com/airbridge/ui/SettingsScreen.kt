@@ -38,9 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -74,7 +71,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +79,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -100,29 +97,18 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {}
 ) {
     BackHandler { onBack() }
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        topBar = {
-            key(MaterialTheme.colorScheme.surfaceContainer) {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.nav_settings)) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.nav_back)
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                    )
+    GlassTopBarScreen(
+        title = stringResource(R.string.nav_settings),
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.nav_back)
                 )
             }
         }
-    ) { pad ->
-        SettingsContent(prefs, onThemeChanged, onScanQr, onOpenAbout, Modifier.padding(pad))
+    ) { topInset ->
+        SettingsContent(prefs, onThemeChanged, onScanQr, onOpenAbout, topInset = topInset)
     }
 }
 
@@ -132,6 +118,7 @@ private fun SettingsContent(
     onThemeChanged: (String) -> Unit,
     onScanQr: () -> Unit,
     onOpenAbout: () -> Unit,
+    topInset: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
@@ -171,7 +158,8 @@ private fun SettingsContent(
             .verticalScroll(scrollState)
             .padding(horizontal = 8.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        // Same distance under the bar as the first section on Home.
+        Spacer(modifier = Modifier.height(topInset + 4.dp))
 
         // Paired Devices section
         SectionHeader(text = stringResource(R.string.pairing_paired_devices))
