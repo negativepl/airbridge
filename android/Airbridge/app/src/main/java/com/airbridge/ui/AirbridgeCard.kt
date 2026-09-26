@@ -24,15 +24,28 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
+ * Hairline and light-line colours for the edge light. Dark surfaces sit on an
+ * equally dark background, so the tonal outlineVariant vanishes there; a faint
+ * white does the job on both the card edge and the dock.
+ */
+@Composable
+private fun edgeLightColors(): Pair<Color, Color> {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    return if (dark) {
+        Color.White.copy(alpha = 0.22f) to Color.White.copy(alpha = 0.16f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f) to Color.White.copy(alpha = 0.55f)
+    }
+}
+
+/**
  * Card surface treatment: a faint hairline border around the card plus a
  * one-dp line of light on the top edge, so surfaces read as lit from above
  * instead of flat. Kept dim on purpose: it should be felt, not seen.
  */
 @Composable
 fun Modifier.edgeLight(shape: Shape): Modifier {
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val highlight = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
-    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (dark) 0.35f else 0.6f)
+    val (outline, highlight) = edgeLightColors()
     return this
         .border(width = 0.75.dp, color = outline, shape = shape)
         .innerShadow(shape, Shadow(radius = 1.dp, color = highlight, offset = DpOffset(0.dp, 1.dp)))
@@ -44,9 +57,7 @@ fun Modifier.edgeLight(shape: Shape): Modifier {
  */
 @Composable
 fun Modifier.topEdgeLight(): Modifier {
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val highlight = if (dark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.55f)
-    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (dark) 0.35f else 0.6f)
+    val (outline, highlight) = edgeLightColors()
     return this.drawWithContent {
         drawContent()
         val hairline = 0.75.dp.toPx()
