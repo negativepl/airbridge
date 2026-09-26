@@ -335,12 +335,17 @@ struct TransferPopupView: View {
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
         .environment(\.colorScheme, .dark)
-        // Entrance: the shell drops out of the notch (from -16 pt), materialises
-        // from blur and a hair of scale, anchored at the top so its top edge
-        // never leaves the screen edge. Exit runs the same path back, faster.
-        .scaleEffect(presentation.isPresented || reduceMotion ? 1.0 : 0.96, anchor: .top)
-        .offset(y: presentation.isPresented || reduceMotion ? 0 : -16)
-        .blur(radius: presentation.isPresented || reduceMotion ? 0 : 8)
+        // Entrance: the shell grows out of the notch — scale anchored at the
+        // TOP, so the bounce lands on the bottom and the sides while the top
+        // edge never moves (no gap above it). No vertical offset here on
+        // purpose: an offset overshoot would pull the top edge off the screen
+        // edge. Blur and opacity ride along.
+        .scaleEffect(
+            x: presentation.isPresented || reduceMotion ? 1.0 : 0.90,
+            y: presentation.isPresented || reduceMotion ? 1.0 : 0.70,
+            anchor: .top
+        )
+        .blur(radius: presentation.isPresented || reduceMotion ? 0 : 10)
         .opacity(presentation.isPresented ? 1.0 : 0.0)
         .padding(.horizontal, Self.windowPadding)
         .padding(.top, Self.windowPadding)
@@ -363,7 +368,9 @@ struct TransferPopupView: View {
             // from inside the view (this is the canonical SwiftUI pattern;
             // doing it externally via withAnimation in show() races with the
             // first render and the interpolation gets skipped).
-            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.82)) {
+            // A little bounce on arrival (the island is a rare, physical
+            // moment); the exit in TransferPopup.hide has none and is faster.
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.28)) {
                 presentation.isPresented = true
             }
             // Idle auto-hide countdown (also for a clipboard receipt)
@@ -1144,7 +1151,7 @@ final class TransferPopup {
             // overshoot in the opposite direction). On completion the window
             // is orderOut'd. The window itself never moves.
             // Exit is faster than entrance: the system is moving on, not arriving.
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+            withAnimation(.spring(duration: 0.3, bounce: 0)) {
                 self.presentation.isPresented = false
             } completion: {
                 panel.orderOut(nil)
