@@ -36,6 +36,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.EaseInOutSine
+import android.provider.Settings
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.layout
@@ -388,6 +397,19 @@ private val SPILL = 40.dp
  */
 @Composable
 private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float) {
+    // A barely-there drift: the light breathes (2% scale) and sways a few dp
+    // sideways over ~9 s, so it reads as light rather than a printed halo.
+    // Skipped when the system has animations turned off.
+    val animationsOn = LocalContext.current.let {
+        Settings.Global.getFloat(it.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    }
+    val drift = rememberInfiniteTransition(label = "ambilight")
+    val phase by drift.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(9_000, easing = EaseInOutSine), RepeatMode.Reverse),
+        label = "ambilightPhase"
+    )
+    val sway = with(LocalDensity.current) { 6.dp.toPx() }
     Image(
         bitmap = bitmap,
         contentDescription = null,
@@ -400,7 +422,15 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 )
                 layout(constraints.maxWidth, 0) { placeable.place(-spill, -spill) }
             }
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+                if (animationsOn) {
+                    val t = phase * 2f - 1f  // -1..1
+                    scaleX = 1.02f + 0.02f * t
+                    scaleY = 1.02f + 0.02f * t
+                    translationX = sway * t
+                }
+            }
             .drawWithContent {
                 drawContent()
                 val fx = SPILL.toPx() / size.width

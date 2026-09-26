@@ -164,12 +164,8 @@ fun MainScreen(
                     val macLocal = macInfo
                     if (macLocal != null) {
                         Column {
-                            MacDeviceCard(
-                                info = macLocal,
-                                wallpaperBase64 = macWallpaper,
-                                onDisconnect = { viewModel.disconnect() }
-                            )
-
+                            // Quick actions first: what the app is for, in thumb reach;
+                            // the device card follows.
                             val mirror = rememberMirrorLauncher()
                             QuickActionsRow(
                                 onSendFile = onSendFile,
@@ -177,6 +173,12 @@ fun MainScreen(
                                 onSendClipboard = onSendClipboard,
                                 onMacScreen = { mirror.launch(0) },
                                 macScreenEnabled = mirror.ready
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            MacDeviceCard(
+                                info = macLocal,
+                                wallpaperBase64 = macWallpaper,
+                                onDisconnect = { viewModel.disconnect() }
                             )
                             ClipboardCard(items = activity, onSendClipboard = onSendClipboard)
                             HeadphonesCard(viewModel = viewModel)
