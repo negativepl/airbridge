@@ -70,6 +70,31 @@ struct TransferPopupView: View {
 
     @State private var showComplete = false
     @State private var isTargeted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The island morphs: each state gets its own size, the settings hold
+    /// the fully expanded one. Compact for a notice, full for anything with
+    /// buttons or a progress bar. The window is always laid out for the
+    /// expanded size; the shell animates inside it, pinned to the top.
+    private func size(for state: TransferPopupState) -> CGSize {
+        let w = islandWidth, h = islandHeight
+        switch state {
+        case .idle(let connected):
+            return connected ? CGSize(width: w * 0.70, height: h * 0.86) : CGSize(width: w * 0.66, height: h * 0.80)
+        case .incoming, .transferring:
+            return CGSize(width: w, height: h)
+        case .waiting:
+            return CGSize(width: w * 0.88, height: h * 0.90)
+        case .complete:
+            return CGSize(width: w * 0.66, height: h * 0.80)
+        case .rejected, .failed:
+            return CGSize(width: w * 0.88, height: h * 0.90)
+        case .headphonePrompt:
+            return CGSize(width: w, height: h * 0.90)
+        case .clipboardReceived:
+            return CGSize(width: w * 0.94, height: h)
+        }
+    }
 
     private var state: TransferPopupState {
         if fileTransferService.hasIncomingOffer {
@@ -250,6 +275,7 @@ struct TransferPopupView: View {
     )
 
     var body: some View {
+        let islandSize = size(for: state)
         GlassEffectContainer(spacing: 0) {
             ZStack {
                 // Layer 1: solid black outer shell. Square TOP corners hang
@@ -258,12 +284,14 @@ struct TransferPopupView: View {
                 Self.islandShape
                     .fill(Color.black)
 
-                // Layer 2: aurora — multi-blob drifting gradient
+                // Layer 2: aurora — drifting light at the bottom, and the
+                // shell's edge picking that light up (plus the progress comet).
                 TransferStateEffects(
                     palette: palette(for: state),
                     intensity: intensity(for: state),
                     notchInset: notchInset,
-                    transferProgress: transferProgress
+                    transferProgress: transferProgress,
+                    reduceMotion: reduceMotion
                 )
                 .clipShape(Self.islandShape)
                 .allowsHitTesting(false)
@@ -275,28 +303,27 @@ struct TransferPopupView: View {
                     contentForState(state)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .id(stateKind)
-                        .transition(Self.stateTransition)
+                        .transition(reduceMotion ? .opacity : Self.stateTransition)
                 }
-                .padding(14)
+                .padding(12)
                 .glassEffect(
                     isTargeted && isIdleConnected
                         ? .regular.tint(.accentColor).interactive()
                         : .regular.interactive(),
                     in: .rect(cornerRadius: 18, style: .continuous)
                 )
-                .padding(EdgeInsets(top: 18 + notchInset, leading: 18, bottom: 18, trailing: 18))
+                .padding(EdgeInsets(top: 16 + notchInset, leading: 16, bottom: 16, trailing: 16))
             }
-            .frame(width: islandWidth, height: islandHeight + notchInset)
+            // The shell morphs between the per-state sizes with a spring
+            // (interruptible: a state change mid-morph retargets, no restart).
+            .frame(width: islandSize.width, height: islandSize.height + notchInset)
+            .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.46, dampingFraction: 0.82), value: stateKind)
             // Black overscan glued to the island's top edge, extending upward
-            // off-screen. The island top can sit a hair below the physical
-            // screen top (safe-area rounding), leaving a constant sliver of
-            // desktop above it that becomes visible when the aurora dims during
-            // a state change. This fills that sliver with black. It's part of
-            // the island view, so it scales/fades WITH it on hide — no static
-            // square left behind.
+            // off-screen, so no sliver of desktop ever shows above the shell.
+            // It scales/fades WITH the island on hide.
             .background(alignment: .top) {
                 Color.black
-                    .frame(width: islandWidth, height: 120)
+                    .frame(width: islandSize.width, height: 120)
                     .offset(y: -120)
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
@@ -305,19 +332,17 @@ struct TransferPopupView: View {
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
         .environment(\.colorScheme, .dark)
-        // No shell "bump" on state change — scaling the whole island (even
-        // anchored top) momentarily moved its edges and flashed a sliver of
-        // desktop above the notch. The per-state content morph (blur + scale,
-        // inside the glass) is the only feedback now, so the shell stays put.
-        .offset(y: presentation.isPresented ? 0 : -22)
-        .blur(radius: presentation.isPresented ? 0 : 8)
+        // Entrance: the shell drops out of the notch (from -16 pt), materialises
+        // from blur and a hair of scale, anchored at the top so its top edge
+        // never leaves the screen edge. Exit runs the same path back, faster.
+        .scaleEffect(presentation.isPresented || reduceMotion ? 1.0 : 0.96, anchor: .top)
+        .offset(y: presentation.isPresented || reduceMotion ? 0 : -16)
+        .blur(radius: presentation.isPresented || reduceMotion ? 0 : 8)
         .opacity(presentation.isPresented ? 1.0 : 0.0)
         .padding(.horizontal, Self.windowPadding)
         .padding(.top, Self.windowPadding)
         // TOP-align (not center) so the island's top edge stays pinned to the
-        // screen edge / notch. Centering let any sub-1.0 bump overshoot shrink
-        // the island and drop its top, exposing a sliver above it. The extra
-        // vertical room now spills to the bottom instead.
+        // screen edge / notch; the extra room spills to the bottom and sides.
         .frame(
             width: islandWidth + Self.windowPadding * 2,
             height: islandHeight + notchInset + Self.windowPadding * 2,
@@ -327,15 +352,12 @@ struct TransferPopupView: View {
         .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers)
         }
-        // Animate only between state KINDS — progress ticks keep the same
-        // stateKind, so they don't re-trigger the cross-fade or re-mount.
-        .animation(.easeInOut(duration: 0.28), value: stateKind)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
             // doing it externally via withAnimation in show() races with the
             // first render and the interpolation gets skipped).
-            withAnimation(.spring(response: 0.72, dampingFraction: 0.84)) {
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.82)) {
                 presentation.isPresented = true
             }
             // Idle auto-hide countdown (also for a clipboard receipt)
@@ -389,20 +411,20 @@ struct TransferPopupView: View {
 
     static let windowPadding: CGFloat = 40
 
-    /// Transition used between all popup state views. Opacity + blur only —
-    /// NO scale. A center scale (even subtle) combined with the bouncy
-    /// `airbridgeStateMorph` overshoot read as the whole island "growing and
-    /// shrinking", which nudged the top edge and flashed desktop above the
-    /// notch. Content now just materializes from blur.
-    // Scale is SAFE here because it's on the CONTENT transition (inside the
-    // inset, clipped glass pill) — it never touches the island shell or its
-    // top edge. The pulsing/top-gap before came from scaling the whole island
-    // (entrance 0.62 + bump) plus a bouncy spring that overshot past 1.0. With
-    // a non-bouncy `easeInOut` the content just settles up to 1.0 — gives the
-    // animation body without any overshoot.
-    static let stateTransition: AnyTransition = .opacity
-        .combined(with: .blurTransition(radius: 18))
-        .combined(with: .scale(scale: 0.94, anchor: .center))
+    /// Content swap between states. Asymmetric on purpose: the new content
+    /// materialises with a soft spring (blur + a hair of scale, inside the
+    /// clipped glass pill so the shell never bumps), the old one leaves fast.
+    /// Slow where the user reads, fast where the system moves on.
+    static let stateTransition: AnyTransition = .asymmetric(
+        insertion: .opacity
+            .combined(with: .blurTransition(radius: 14))
+            .combined(with: .scale(scale: 0.96, anchor: .center))
+            .animation(.spring(response: 0.42, dampingFraction: 0.86)),
+        removal: .opacity
+            .combined(with: .blurTransition(radius: 10))
+            .combined(with: .scale(scale: 0.98, anchor: .center))
+            .animation(.easeOut(duration: 0.16))
+    )
 
     // MARK: - Subviews per state
 
@@ -768,6 +790,7 @@ private struct TransferStateEffects: View {
     let intensity: Double
     let notchInset: CGFloat
     let transferProgress: Double
+    var reduceMotion: Bool = false
 
     @State private var revealed: Bool = false
     @State private var animPrimary: Color = .blue
@@ -788,9 +811,9 @@ private struct TransferStateEffects: View {
             // ── Ambient energy: constant and calm. Progress does NOT speed
             // the drift up (fast wobble + high-rate pulsing read as flicker);
             // instead progress drives a soft left-to-right light fill below.
-            let st = t * 0.55                        // slow, constant drift
+            let st = reduceMotion ? 0.0 : t * 0.55   // slow, constant drift (none under reduced motion)
             let yAmp = 1.0
-            let breathe = 1.0 + sin(t * twoPi * 0.35) * 0.08   // gentle 0.35 Hz
+            let breathe = reduceMotion ? 1.0 : 1.0 + sin(t * twoPi * 0.35) * 0.08   // gentle 0.35 Hz
             let glow = animIntensity * breathe
             let blurR = 22.0
 
@@ -853,6 +876,10 @@ private struct TransferStateEffects: View {
                         endPoint: .bottom
                     )
                 )
+                .overlay {
+                    edgeLight(width: w, height: h, glow: glow, progress: tp)
+                        .opacity(revealed ? 1 : 0)
+                }
             }
         }
         .onAppear {
@@ -880,6 +907,60 @@ private struct TransferStateEffects: View {
         .onChange(of: transferProgress) { _, new in
             withAnimation(.easeInOut(duration: 0.5)) { animTP = new }
         }
+    }
+
+    /// The shell's edge, lit by the aurora: a faint hairline all round, the
+    /// palette colour strongest along the bottom where the light pools, a soft
+    /// bloom behind it, and during a transfer a bright comet on the bottom
+    /// edge sitting exactly where the progress fill ends.
+    private func edgeLight(width w: CGFloat, height h: CGFloat, glow: Double, progress tp: Double) -> some View {
+        let shape = TransferPopupView.islandShape
+        let bottomHalf = LinearGradient(
+            stops: [.init(color: .clear, location: 0.35), .init(color: .black, location: 0.8)],
+            startPoint: .top, endPoint: .bottom
+        )
+        return ZStack {
+            // Hairline: the shell has an edge even with the light off.
+            shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+
+            // Colour picked up from the light below.
+            shape.strokeBorder(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.15),
+                        .init(color: animSecondary.opacity(0.45 * glow), location: 0.6),
+                        .init(color: animPrimary.opacity(0.95 * glow), location: 1.0),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                ),
+                lineWidth: 1.5
+            )
+
+            // Bloom of that edge, bottom only.
+            shape.strokeBorder(animPrimary.opacity(0.7 * glow), lineWidth: 3)
+                .blur(radius: 7)
+                .mask(bottomHalf)
+
+            // Progress comet: a bright head on the bottom edge at the fill's end.
+            if tp > 0.005 {
+                let head = min(max(tp, 0.06), 0.98)
+                let comet = LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: max(0, head - 0.16)),
+                        .init(color: animSecondary.opacity(0.9), location: max(0, head - 0.03)),
+                        .init(color: .white.opacity(0.95), location: head),
+                        .init(color: .clear, location: min(1, head + 0.02)),
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                shape.strokeBorder(comet, lineWidth: 2.5)
+                    .mask(bottomHalf)
+                shape.strokeBorder(comet, lineWidth: 6)
+                    .blur(radius: 6)
+                    .mask(bottomHalf)
+            }
+        }
+        .frame(width: w, height: h)
     }
 
     private func blob(
@@ -1054,7 +1135,8 @@ final class TransferPopup {
             // back to 0 with a spring (slight anticipation via the spring's
             // overshoot in the opposite direction). On completion the window
             // is orderOut'd. The window itself never moves.
-            withAnimation(.spring(response: 0.52, dampingFraction: 0.88)) {
+            // Exit is faster than entrance: the system is moving on, not arriving.
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
                 self.presentation.isPresented = false
             } completion: {
                 panel.orderOut(nil)
