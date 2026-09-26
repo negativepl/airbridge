@@ -1551,7 +1551,13 @@ class AirbridgeService : Service() {
             is Message.GalleryDeleteRequest -> {
                 // Deleting from the shared library needs the user's consent:
                 // hand it to an invisible activity that shows the system sheet.
-                val uri = galleryProvider.getPhotoUri(message.photoId)
+                // createDeleteRequest rejects the legacy "external" URI; it wants
+                // the volume-specific one ("external_primary").
+                val uri = message.photoId.toLongOrNull()?.let { id ->
+                    android.content.ContentUris.withAppendedId(
+                        android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY), id
+                    )
+                }
                 if (uri == null) {
                     webSocketClient.send(Message.GalleryDeleteResponse(message.photoId, false, "not_found"))
                 } else {
