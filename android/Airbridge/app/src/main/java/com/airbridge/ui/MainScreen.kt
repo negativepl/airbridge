@@ -123,7 +123,7 @@ fun MainScreen(
             .padding(horizontal = 8.dp)
     ) {
         // Generous room under the bar before the first card.
-        Spacer(modifier = Modifier.height(topInset + 48.dp))
+        Spacer(modifier = Modifier.height(topInset + 56.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
@@ -187,7 +187,7 @@ fun MainScreen(
         // only the device card above changes. Controls that need the Mac are
         // disabled, not hidden, so nothing jumps when the connection comes in.
         val macReady = connState == 2
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(36.dp))
         val mirror = rememberMirrorLauncher()
         QuickActionsRow(
             onSendFile = onSendFile,
