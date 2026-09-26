@@ -454,13 +454,13 @@ struct TransferPopupView: View {
     /// `.animation(value: stateKind)` on the body): per-transition animations
     /// left both sides frozen mid-flight when states changed in quick
     /// succession (offer → transfer), so the asymmetry lives in the values.
+    /// The block itself only crossfades through a light blur: the visible
+    /// motion belongs to its parts (StaggerIn), so it must not compete.
     static let stateTransition: AnyTransition = .asymmetric(
-        insertion: .opacity
-            .combined(with: .blurTransition(radius: 14))
-            .combined(with: .scale(scale: 0.96, anchor: .center)),
+        insertion: .opacity.combined(with: .blurTransition(radius: 8)),
         removal: .opacity
             .combined(with: .blurTransition(radius: 6))
-            .combined(with: .scale(scale: 0.98, anchor: .center))
+            .combined(with: .scale(scale: 0.97, anchor: .center))
     )
 
     // MARK: - Subviews per state
@@ -830,29 +830,39 @@ struct TransferPopupView: View {
 // Instant under reduced motion.
 
 private struct StaggerIn: ViewModifier {
-    let delay: Double
+    /// 0 = the lead (icon): pops in from 60% with a bounce.
+    /// 1 = text: rises 14 pt with a hair of scale.
+    /// 2 = controls: rise 10 pt, settle last.
+    let order: Int
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
+
+    private var delay: Double { 0.05 + Double(order) * 0.06 }
+    private var startScale: CGFloat { order == 0 ? 0.6 : 0.94 }
+    private var startOffset: CGFloat { order == 0 ? 0 : (order == 1 ? 14 : 10) }
+    private var spring: Animation {
+        order == 0 ? .spring(duration: 0.5, bounce: 0.35) : .spring(duration: 0.45, bounce: 0.18)
+    }
 
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 7)
-            .blur(radius: shown ? 0 : 3)
+            .scaleEffect(shown ? 1 : startScale)
+            .offset(y: shown ? 0 : startOffset)
+            .blur(radius: shown ? 0 : 6)
             .onAppear {
                 if reduceMotion {
                     shown = true
                 } else {
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.8).delay(delay)) { shown = true }
+                    withAnimation(spring.delay(delay)) { shown = true }
                 }
             }
     }
 }
 
 private extension View {
-    /// `order` 0 = the lead (icon), 1 = text, 2 = controls; 45 ms apart.
     func staggerIn(_ order: Int) -> some View {
-        modifier(StaggerIn(delay: 0.06 + Double(order) * 0.045))
+        modifier(StaggerIn(order: order))
     }
 }
 
