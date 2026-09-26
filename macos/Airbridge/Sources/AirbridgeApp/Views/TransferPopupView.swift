@@ -19,6 +19,60 @@ final class TransferPopupPresentation {
     /// arrival: it is sucked into the notch (genie) rather than shrinking back
     /// the way it came.
     var isExiting: Bool = false
+    /// A file drag is hovering over the panel. Set by `IslandDropView` (AppKit),
+    /// not by SwiftUI's `.onDrop`: the SwiftUI path activated the app when a
+    /// drag lingered, which brought the main window to the front.
+    var isDropTargeted: Bool = false
+}
+
+// MARK: - IslandDropView
+// The panel's content view: an AppKit drag destination hosting the SwiftUI
+// island. AppKit drag handling never activates the app or the window, so a
+// file can hover here as long as it likes. Accepts file URLs only.
+
+@MainActor
+final class IslandDropView: NSView {
+    private let presentation: TransferPopupPresentation
+    private let onDrop: ([URL]) -> Void
+
+    init(presentation: TransferPopupPresentation, onDrop: @escaping ([URL]) -> Void) {
+        self.presentation = presentation
+        self.onDrop = onDrop
+        super.init(frame: .zero)
+        registerForDraggedTypes([.fileURL])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    private func fileURLs(_ sender: NSDraggingInfo) -> [URL] {
+        (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard !fileURLs(sender).isEmpty else { return [] }
+        presentation.isDropTargeted = true
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        presentation.isDropTargeted ? .copy : []
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        presentation.isDropTargeted = false
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        presentation.isDropTargeted = false
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = fileURLs(sender)
+        presentation.isDropTargeted = false
+        guard !urls.isEmpty else { return false }
+        onDrop(urls)
+        return true
+    }
 }
 
 // MARK: - Blur transition
@@ -73,7 +127,7 @@ struct TransferPopupView: View {
     @AppStorage("islandHeight") private var islandHeight: Double = 130
 
     @State private var showComplete = false
-    @State private var isTargeted = false
+    private var isTargeted: Bool { presentation.isDropTargeted }
     /// Rejection/failure shake trigger. The motion starts from 0 (no jump on
     /// the first frame): a fast push out, then an underdamped spring back to
     /// centre that does the oscillating and the decay.
@@ -213,19 +267,6 @@ struct TransferPopupView: View {
     private var isIdleConnected: Bool {
         if case .idle(let connected) = state { return connected }
         return false
-    }
-
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard connectionService.isConnected else { return false }
-        guard let provider = providers.first else { return false }
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-            Task { @MainActor in
-                fileTransferService.sendFile(url: url)
-            }
-        }
-        return true
     }
 
     /// Stable identity for the state TYPE — changes only when the popup
@@ -389,9 +430,6 @@ struct TransferPopupView: View {
             alignment: .top
         )
         .contentShape(Rectangle())
-        .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
-            handleDrop(providers)
-        }
         // The one animation for a state change: shell size, content swap.
         // Keyed on the state KIND so progress ticks never restart it.
         .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.44, dampingFraction: 0.84), value: stateKind)
@@ -431,7 +469,7 @@ struct TransferPopupView: View {
                 TransferPopup.shared.cancelIdleAutoHide()
             }
         }
-        .onChange(of: isTargeted) { _, targeted in
+        .onChange(of: presentation.isDropTargeted) { _, targeted in
             // While a file is hovering over the drop zone, suppress the
             // idle auto-hide — the user is clearly trying to drop.
             // When the drag leaves, restart the countdown (if still idle).
@@ -1181,6 +1219,15 @@ final class TransferPopup {
             presentation: presentation
         )
         let hostingView = NSHostingView(rootView: view)
+        // AppKit drag destination around the SwiftUI island (see IslandDropView).
+        let dropView = IslandDropView(presentation: presentation) { [weak fileTransferService, weak connectionService] urls in
+            guard connectionService?.isConnected == true else { return }
+            for url in urls { fileTransferService?.sendFile(url: url) }
+        }
+        dropView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        hostingView.frame = dropView.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        dropView.addSubview(hostingView)
 
         // A non-activating panel: clicking its buttons (Accept/Reject) must NOT
         // activate the app, otherwise the SwiftUI WindowGroup restores the main
@@ -1193,7 +1240,7 @@ final class TransferPopup {
         )
         window.isFloatingPanel = true
         window.becomesKeyOnlyIfNeeded = true
-        window.contentView = hostingView
+        window.contentView = dropView
         window.level = NSWindow.Level(Int(CGWindowLevelForKey(.popUpMenuWindow)))
         window.hasShadow = false
         window.isOpaque = false
@@ -1202,9 +1249,6 @@ final class TransferPopup {
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         window.acceptsMouseMovedEvents = true
         window.ignoresMouseEvents = false
-
-        // Register drag types on the window's content view so drops land here
-        hostingView.registerForDraggedTypes([.fileURL])
 
         // The window goes up immediately at full target frame (no NSWindow
         // animation). The visual appear animation happens entirely inside
@@ -1215,6 +1259,7 @@ final class TransferPopup {
         // .onAppear withAnimation can interpolate up to true.
         presentation.isPresented = false
         presentation.isExiting = false
+        presentation.isDropTargeted = false
         window.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         window.alphaValue = 1
         window.orderFrontRegardless()
