@@ -390,6 +390,8 @@ class AirbridgeService : Service() {
      */
     @Volatile
     private var expectedMacPublicKey: String? = null
+    /** Fingerprint of the paired Mac the current connection attempt targets. */
+    private var connectingFingerprint: String? = null
 
     /**
      * The Mac's TLS cert fingerprint from the scanned QR code, held between
@@ -947,6 +949,7 @@ class AirbridgeService : Service() {
                 pairingIssue.value = getString(com.airbridge.R.string.repair_needed_cert_changed, deviceName)
                 return@handler
             }
+            connectingFingerprint = fingerprint
             Log.d(TAG, "NSD: paired device $deviceName found at $host:$port — connecting (mirrorPort=$mirrorPort)")
             connectedHost.value = host
             connectedDeviceName.value = deviceName
@@ -1384,13 +1387,19 @@ class AirbridgeService : Service() {
                     webSocketClient.shouldReconnect = false
                     webSocketClient.disconnect()
                     isConnected.value = false
-                    // The Mac no longer knows us (unpaired there): say so on Home
-                    // instead of silently staying disconnected.
+                    // The Mac no longer knows us (unpaired there). A pairing one
+                    // side dropped is no pairing: forget the Mac here too, drop its
+                    // cached wallpaper, and say so on Home with a way to re-pair.
                     if (message.reason == "not_paired") {
-                        pairingIssue.value = getString(
-                            com.airbridge.R.string.repair_needed_unpaired,
-                            connectedDeviceName.value ?: "Mac"
-                        )
+                        val name = connectedDeviceName.value ?: "Mac"
+                        connectingFingerprint?.let { fp ->
+                            pairedDeviceStore.findByFingerprint(fp)?.let { dev ->
+                                com.airbridge.device.WallpaperCache.delete(applicationContext, dev.deviceName)
+                                pairedDeviceStore.remove(fp)
+                            }
+                        }
+                        connectedDeviceName.value = null
+                        pairingIssue.value = getString(com.airbridge.R.string.repair_needed_unpaired, name)
                     }
                     // auth failure tracked via StateFlow
                 }
