@@ -15,6 +15,10 @@ import UniformTypeIdentifiers
 @MainActor
 final class TransferPopupPresentation {
     var isPresented: Bool = false
+    /// True while the island is on its way out. The geometry differs from
+    /// arrival: it is sucked into the notch (genie) rather than shrinking back
+    /// the way it came.
+    var isExiting: Bool = false
 }
 
 // MARK: - Blur transition
@@ -362,9 +366,15 @@ struct TransferPopupView: View {
         // width, so the shell lands like something with give in it instead
         // of a uniform zoom. Opacity and blur clear quickly and without
         // bounce, so they never smear the overshoot.
-        .modifier(IslandEntrance(presented: presentation.isPresented || reduceMotion))
+        .modifier(IslandEntrance(presented: presentation.isPresented || reduceMotion, exiting: presentation.isExiting && !reduceMotion))
         .opacity(presentation.isPresented ? 1.0 : 0.0)
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.22), value: presentation.isPresented)
+        // Arrival: opacity clears fast. Exit: it holds while the shell is being
+        // drawn into the notch and only goes at the very end (genie).
+        .animation(
+            reduceMotion ? .easeOut(duration: 0.2)
+                : (presentation.isExiting ? .easeIn(duration: 0.34).delay(0.06) : .easeOut(duration: 0.22)),
+            value: presentation.isPresented
+        )
         .padding(.horizontal, Self.windowPadding)
         .padding(.top, Self.windowPadding)
         // TOP-align (not center) so the island's top edge stays pinned to the
@@ -876,15 +886,30 @@ private extension View {
 
 private struct IslandEntrance: ViewModifier {
     let presented: Bool
+    /// Genie exit: the shell is drawn into the notch — width collapses to
+    /// about the notch's width first, height follows, all anchored at the
+    /// top centre so it converges on the notch itself.
+    let exiting: Bool
+
+    private var hiddenScaleX: CGFloat { exiting ? 0.34 : 0.88 }
+    private var hiddenScaleY: CGFloat { exiting ? 0.10 : 0.62 }
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(x: 1.0, y: presented ? 1.0 : 0.62, anchor: .top)
-            .animation(presented ? .spring(duration: 0.62, bounce: 0.38) : .spring(duration: 0.3, bounce: 0), value: presented)
-            .scaleEffect(x: presented ? 1.0 : 0.88, y: 1.0, anchor: .top)
-            .animation(presented ? .spring(duration: 0.5, bounce: 0.22) : .spring(duration: 0.3, bounce: 0), value: presented)
-            .blur(radius: presented ? 0 : 10)
-            .animation(.easeOut(duration: 0.22), value: presented)
+            .scaleEffect(x: 1.0, y: presented ? 1.0 : hiddenScaleY, anchor: .top)
+            .animation(
+                presented ? .spring(duration: 0.62, bounce: 0.38)
+                    : (exiting ? .spring(duration: 0.42, bounce: 0) : .spring(duration: 0.3, bounce: 0)),
+                value: presented
+            )
+            .scaleEffect(x: presented ? 1.0 : hiddenScaleX, y: 1.0, anchor: .top)
+            .animation(
+                presented ? .spring(duration: 0.5, bounce: 0.22)
+                    : (exiting ? .spring(duration: 0.32, bounce: 0) : .spring(duration: 0.3, bounce: 0)),
+                value: presented
+            )
+            .blur(radius: presented ? 0 : (exiting ? 14 : 10))
+            .animation(presented ? .easeOut(duration: 0.22) : .easeIn(duration: 0.3), value: presented)
     }
 }
 
@@ -1207,6 +1232,7 @@ final class TransferPopup {
         // Reset to false so the view mounts in the "before" state and the
         // .onAppear withAnimation can interpolate up to true.
         presentation.isPresented = false
+        presentation.isExiting = false
         window.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         window.alphaValue = 1
         window.orderFrontRegardless()
@@ -1265,7 +1291,10 @@ final class TransferPopup {
             // Exit is faster than entrance: the system is moving on, not arriving.
             // Exit: the modifiers' own animations key on this flag (scale
             // springs without bounce on the way out, opacity eases out).
-            withAnimation(.spring(duration: 0.3, bounce: 0)) {
+            // Genie: the modifiers read `isExiting` to pick the into-the-notch
+            // geometry and their own timings; this transaction just flips it.
+            self.presentation.isExiting = true
+            withAnimation(.spring(duration: 0.42, bounce: 0)) {
                 self.presentation.isPresented = false
             } completion: {
                 panel.orderOut(nil)
