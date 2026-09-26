@@ -10,6 +10,8 @@ struct FilesBrowserView: View {
     @AppStorage("files.viewMode") private var viewModeRaw: String = FileViewMode.list.rawValue
     @State private var searchText: String = ""
     @State private var entryPendingDeletion: FileEntry?
+    /// A file drag is over the window: the folder lights up as the target.
+    @State private var isDropTargeted = false
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
 
@@ -30,6 +32,7 @@ struct FilesBrowserView: View {
             } else {
                 VStack(spacing: 0) {
                     content
+                        .overlay { dropTargetOverlay }
                     Divider()
                     pathBar
                 }
@@ -61,9 +64,10 @@ struct FilesBrowserView: View {
         .onChange(of: filesBrowserService.searchQuery) { _, q in
             if q.isEmpty && !searchText.isEmpty { searchText = "" }
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: isDropTargeted)
         .alert(
             deletionAlertTitle,
             isPresented: Binding(
@@ -150,6 +154,36 @@ struct FilesBrowserView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.bar)
+    }
+
+    /// While a file hovers over the window: an accent-tinted, dashed frame
+    /// inside the content area and the name of the folder it will land in,
+    /// so the drop reads as "into this folder", not "somewhere in the app".
+    @ViewBuilder
+    private var dropTargetOverlay: some View {
+        if isDropTargeted {
+            let folder = filesBrowserService.breadcrumbs.last ?? (L10n.isPL ? "Telefon" : "Phone")
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.08))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.accentColor.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                VStack(spacing: 10) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 36, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .symbolEffect(.bounce, value: isDropTargeted)
+                    Text(L10n.isPL ? "Puść, aby wysłać do „\(folder)”" : "Release to send to \"\(folder)\"")
+                        .font(.ab(.title3, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+                .padding(20)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16, style: .continuous))
+            }
+            .padding(12)
+            .allowsHitTesting(false)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        }
     }
 
     @ViewBuilder
