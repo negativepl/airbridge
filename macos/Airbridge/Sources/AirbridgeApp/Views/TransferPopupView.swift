@@ -70,8 +70,10 @@ struct TransferPopupView: View {
 
     @State private var showComplete = false
     @State private var isTargeted = false
-    /// Bumped on rejection/failure: the shell shakes side to side ("no").
-    @State private var shakeTrigger = 0
+    /// Rejection/failure shake: set to a kick without animation, then released
+    /// to 0 through an underdamped spring — the spring does the oscillating
+    /// and the decay, which is what makes it read as a physical "no".
+    @State private var shakeX: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The island morphs: each state gets its own size, the settings hold
@@ -333,20 +335,11 @@ struct TransferPopupView: View {
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
-        // Rejection / failure: a quick horizontal shake, decaying — the
-        // universal "no". Sideways only, so the top edge stays on the notch.
-        .keyframeAnimator(initialValue: 0.0, trigger: shakeTrigger) { content, x in
-            content.offset(x: reduceMotion ? 0 : x)
-        } keyframes: { _ in
-            KeyframeTrack {
-                CubicKeyframe(-14, duration: 0.06)
-                CubicKeyframe(12, duration: 0.07)
-                CubicKeyframe(-8, duration: 0.07)
-                CubicKeyframe(5, duration: 0.07)
-                CubicKeyframe(-2, duration: 0.06)
-                CubicKeyframe(0, duration: 0.07)
-            }
-        }
+        // Rejection / failure shake. Sideways offset plus a hair of rotation
+        // pivoting on the top edge, so the shell swings like something hung
+        // from the notch; the top edge itself never moves.
+        .offset(x: shakeX)
+        .rotationEffect(.degrees(Double(shakeX) * 0.12), anchor: .top)
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
@@ -356,13 +349,13 @@ struct TransferPopupView: View {
         // edge never moves (no gap above it). No vertical offset here on
         // purpose: an offset overshoot would pull the top edge off the screen
         // edge. Blur and opacity ride along.
-        .scaleEffect(
-            x: presentation.isPresented || reduceMotion ? 1.0 : 0.90,
-            y: presentation.isPresented || reduceMotion ? 1.0 : 0.70,
-            anchor: .top
-        )
-        .blur(radius: presentation.isPresented || reduceMotion ? 0 : 10)
+        // Two springs, two axes: height bounces more and settles later than
+        // width, so the shell lands like something with give in it instead
+        // of a uniform zoom. Opacity and blur clear quickly and without
+        // bounce, so they never smear the overshoot.
+        .modifier(IslandEntrance(presented: presentation.isPresented || reduceMotion))
         .opacity(presentation.isPresented ? 1.0 : 0.0)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.22), value: presentation.isPresented)
         .padding(.horizontal, Self.windowPadding)
         .padding(.top, Self.windowPadding)
         // TOP-align (not center) so the island's top edge stays pinned to the
@@ -384,11 +377,9 @@ struct TransferPopupView: View {
             // from inside the view (this is the canonical SwiftUI pattern;
             // doing it externally via withAnimation in show() races with the
             // first render and the interpolation gets skipped).
-            // A little bounce on arrival (the island is a rare, physical
-            // moment); the exit in TransferPopup.hide has none and is faster.
-            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.28)) {
-                presentation.isPresented = true
-            }
+            // The per-property animations live on the modifiers
+            // (IslandEntrance, opacity); this just flips the flag.
+            presentation.isPresented = true
             // Idle auto-hide countdown (also for a clipboard receipt)
             if state.autoHides {
                 TransferPopup.shared.resetIdleAutoHideTimer()
@@ -398,7 +389,13 @@ struct TransferPopupView: View {
         }
         .onChange(of: state) { _, newState in
             switch newState {
-            case .rejected, .failed: shakeTrigger += 1
+            case .rejected, .failed:
+                guard !reduceMotion else { break }
+                // Kick, then let the spring swing it back: response 0.5 s,
+                // damping 0.22 → about three visible swings, each smaller.
+                var kick = Transaction(); kick.disablesAnimations = true
+                withTransaction(kick) { shakeX = 22 }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.22)) { shakeX = 0 }
             default: break
             }
             // Any activity (incoming offer, waiting, transferring, etc.)
@@ -799,6 +796,26 @@ struct TransferPopupView: View {
     }
 }
 
+// MARK: - IslandEntrance
+// Entrance/exit geometry of the shell. Scale anchored at the TOP so the top
+// edge never leaves the screen edge: all the overshoot lands on the bottom
+// and the sides. Height and width get their own springs (different bounce,
+// different settle) so the arrival has give; leaving uses no bounce.
+
+private struct IslandEntrance: ViewModifier {
+    let presented: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(x: 1.0, y: presented ? 1.0 : 0.62, anchor: .top)
+            .animation(presented ? .spring(duration: 0.62, bounce: 0.38) : .spring(duration: 0.3, bounce: 0), value: presented)
+            .scaleEffect(x: presented ? 1.0 : 0.88, y: 1.0, anchor: .top)
+            .animation(presented ? .spring(duration: 0.5, bounce: 0.22) : .spring(duration: 0.3, bounce: 0), value: presented)
+            .blur(radius: presented ? 0 : 10)
+            .animation(.easeOut(duration: 0.22), value: presented)
+    }
+}
+
 // MARK: - TransferStateEffects
 // One radial glow anchored at the BOTTOM edge of the pill, its color
 // driven by the popup's state tint. Uses a native SwiftUI `Rectangle`
@@ -1174,6 +1191,8 @@ final class TransferPopup {
             // overshoot in the opposite direction). On completion the window
             // is orderOut'd. The window itself never moves.
             // Exit is faster than entrance: the system is moving on, not arriving.
+            // Exit: the modifiers' own animations key on this flag (scale
+            // springs without bounce on the way out, opacity eases out).
             withAnimation(.spring(duration: 0.3, bounce: 0)) {
                 self.presentation.isPresented = false
             } completion: {
