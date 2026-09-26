@@ -19,6 +19,16 @@ enum TransferPopupState: Equatable {
     /// pasteboard. `isLink` drives the "Open" button for plain web links.
     case clipboardReceived(preview: String, isLink: Bool)
 
+    /// States the popup may leave on its own: nothing is in flight, so the
+    /// idle countdown (with its hover pause) applies. A clipboard receipt is a
+    /// notice, not a job — it must never hold the island open.
+    var autoHides: Bool {
+        switch self {
+        case .idle, .clipboardReceived: return true
+        default: return false
+        }
+    }
+
     var filename: String {
         switch self {
         case .idle, .headphonePrompt, .clipboardReceived:

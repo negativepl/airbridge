@@ -338,8 +338,8 @@ struct TransferPopupView: View {
             withAnimation(.spring(response: 0.72, dampingFraction: 0.84)) {
                 presentation.isPresented = true
             }
-            // Idle auto-hide countdown
-            if case .idle = state {
+            // Idle auto-hide countdown (also for a clipboard receipt)
+            if state.autoHides {
                 TransferPopup.shared.resetIdleAutoHideTimer()
             } else {
                 TransferPopup.shared.cancelIdleAutoHide()
@@ -347,8 +347,9 @@ struct TransferPopupView: View {
         }
         .onChange(of: state) { _, newState in
             // Any activity (incoming offer, waiting, transferring, etc.)
-            // cancels the idle auto-hide. Returning to idle restarts it.
-            if case .idle = newState {
+            // cancels the idle auto-hide. Returning to idle, or showing a
+            // clipboard receipt, (re)starts it — a receipt never holds the island.
+            if newState.autoHides {
                 if isTargeted {
                     TransferPopup.shared.cancelIdleAutoHide()
                 } else {
@@ -364,7 +365,7 @@ struct TransferPopupView: View {
             // When the drag leaves, restart the countdown (if still idle).
             if targeted {
                 TransferPopup.shared.cancelIdleAutoHide()
-            } else if case .idle = state {
+            } else if state.autoHides {
                 TransferPopup.shared.resetIdleAutoHideTimer()
             }
         }
@@ -680,7 +681,29 @@ struct TransferPopupView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
             }
+
+            Button {
+                dismissClipboardReceipt()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(.quaternary, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.close)
+            .accessibilityLabel(L10n.close)
         }
+        // The whole receipt is a target: a click anywhere puts it away, the
+        // panel is non-activating so Escape only works while the app is frontmost.
+        .contentShape(Rectangle())
+        .onTapGesture { dismissClipboardReceipt() }
+    }
+
+    private func dismissClipboardReceipt() {
+        clipboardService.dismissIncomingPreview()
+        TransferPopup.shared.hide(delay: 0)
     }
 
     // MARK: - Helpers
