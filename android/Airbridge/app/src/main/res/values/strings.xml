@@ -286,4 +286,5 @@
         <item quantity="other">%d taps to go</item>
     </plurals>
     <string name="headphones_connected_mac">Connected to the Mac</string>
+    <string name="home_section_connected_device">Connected device</string>
 </resources>

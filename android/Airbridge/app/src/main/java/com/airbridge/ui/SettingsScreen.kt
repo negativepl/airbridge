@@ -655,7 +655,8 @@ private fun PairedDeviceCard(
     AirbridgeCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        highlight = false
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
             if (wallpaper != null) {

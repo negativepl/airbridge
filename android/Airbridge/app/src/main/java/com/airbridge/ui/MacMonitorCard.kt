@@ -109,7 +109,10 @@ fun MacDeviceCard(
     }
     var cardHeightPx by remember { mutableIntStateOf(0) }
 
-    Box(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
+    // The connection state is the section title, not a pill over the picture.
+    SectionTitle(stringResource(R.string.home_section_connected_device))
+    Box(modifier = Modifier.fillMaxWidth()) {
         // The wallpaper itself, blurred at full resolution (RenderEffect), drawn
         // behind the card and spilling GLOW_HEIGHT below it, faded out at the
         // bottom. Below API 31 there is no RenderEffect; a colour glow stands in.
@@ -122,7 +125,8 @@ fun MacDeviceCard(
                 .onSizeChanged { cardHeightPx = it.height }
                 .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f),
             shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+            highlight = false
         ) {
 
         Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
@@ -142,21 +146,6 @@ fun MacDeviceCard(
                     Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
                 )
             )
-            // Status — pigułka u góry po lewej, jak w Ustawieniach.
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    stringResource(R.string.home_status_connected),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White
-                )
-            }
             // Rozłączanie — wtopione w obraz i strzeżone potwierdzeniem, żeby
             // przypadkowy tap nie zrywał sesji.
             Box(
@@ -216,6 +205,7 @@ fun MacDeviceCard(
             )
         }
         }
+    }
     }
 
     if (showDisconnectConfirm) {

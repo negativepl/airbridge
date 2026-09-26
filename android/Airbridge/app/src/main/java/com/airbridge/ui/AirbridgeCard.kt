@@ -49,11 +49,13 @@ private fun edgeLightColors(): Pair<Color, Color> {
  * instead of flat. Kept dim on purpose: it should be felt, not seen.
  */
 @Composable
-fun Modifier.edgeLight(shape: Shape): Modifier {
-    val (outline, highlight) = edgeLightColors()
-    return this
-        .border(width = 0.75.dp, color = outline, shape = shape)
-        .innerShadow(shape, Shadow(radius = 1.dp, color = highlight, offset = DpOffset(0.dp, 1.dp)))
+fun Modifier.edgeLight(shape: Shape, highlight: Boolean = true): Modifier {
+    val (outline, light) = edgeLightColors()
+    val bordered = this.border(width = 0.75.dp, color = outline, shape = shape)
+    // The light line reads as a white streak on a photo, so image cards skip it.
+    return if (highlight) {
+        bordered.innerShadow(shape, Shadow(radius = 1.dp, color = light, offset = DpOffset(0.dp, 1.dp)))
+    } else bordered
 }
 
 /**
@@ -77,9 +79,11 @@ fun AirbridgeCard(
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.extraLarge,
     colors: CardColors = CardDefaults.cardColors(),
+    /** False for cards whose top edge is an image. */
+    highlight: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(modifier = modifier.edgeLight(shape), shape = shape, colors = colors, content = content)
+    Card(modifier = modifier.edgeLight(shape, highlight), shape = shape, colors = colors, content = content)
 }
 
 /** Clickable Material Card with the edge light applied. Same parameters as the clickable [Card]. */
