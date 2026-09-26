@@ -164,8 +164,16 @@ fun MainScreen(
                     val macLocal = macInfo
                     if (macLocal != null) {
                         Column {
-                            // Quick actions first: what the app is for, in thumb reach;
-                            // the device card follows.
+                            // The Mac's live state first (monitor, then the device card
+                            // with its light), then what the app is for.
+                            SectionTitle(stringResource(R.string.home_monitor_title))
+                            MacMonitorRings(info = macLocal)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            MacDeviceCard(
+                                info = macLocal,
+                                wallpaperBase64 = macWallpaper,
+                                onDisconnect = { viewModel.disconnect() }
+                            )
                             val mirror = rememberMirrorLauncher()
                             QuickActionsRow(
                                 onSendFile = onSendFile,
@@ -174,17 +182,8 @@ fun MainScreen(
                                 onMacScreen = { mirror.launch(0) },
                                 macScreenEnabled = mirror.ready
                             )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            MacDeviceCard(
-                                info = macLocal,
-                                wallpaperBase64 = macWallpaper,
-                                onDisconnect = { viewModel.disconnect() }
-                            )
                             ClipboardCard(items = activity, onSendClipboard = onSendClipboard)
                             HeadphonesCard(viewModel = viewModel)
-
-                            SectionTitle(stringResource(R.string.home_monitor_title))
-                            MacMonitorRings(info = macLocal)
                         }
                     }
                 }
