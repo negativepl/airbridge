@@ -48,8 +48,8 @@ struct SettingsView: View {
             notificationsSection
             quickDropSection
             fileTransferSection
-            updateSection
             diagnosticsSection
+            AboutSection(updateService: updateService, phoneAppVersion: connectionService.deviceInfo?.appVersion)
         }
         .onAppear {
             pairingService.refreshPairedDevices()
@@ -368,130 +368,6 @@ struct SettingsView: View {
         }
     }
 
-    private var updateSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Aktualizacje" : "Updates"), systemImage: "arrow.down.circle") {
-            VStack(alignment: .leading, spacing: 8) {
-                updatePhaseContent
-                if let mismatchedVersion {
-                    Text(L10n.isPL
-                         ? "Telefon ma wersję AirBridge \(mismatchedVersion). Zaktualizuj obie aplikacje, aby zachować zgodność."
-                         : "Your phone runs AirBridge \(mismatchedVersion). Update both apps to keep them in sync.")
-                        .font(.ab(.footnote))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    /// The phone's app version when it differs (ignoring a "-beta" suffix)
-    /// from this Mac's own version — purely a comparison of versions already
-    /// exchanged over the LAN, no update-server traffic involved.
-    private var mismatchedVersion: String? {
-        guard let remote = connectionService.deviceInfo?.appVersion, !remote.isEmpty else { return nil }
-        let local = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        guard !local.isEmpty, versionBase(remote) != versionBase(local) else { return nil }
-        return remote
-    }
-
-    @ViewBuilder
-    private var updatePhaseContent: some View {
-        switch updateService.phase {
-            case .idle:
-                HStack {
-                    Text(L10n.isPL ? "Sprawdź, czy dostępna jest nowsza wersja AirBridge."
-                                   : "Check whether a newer version of AirBridge is available.")
-                        .font(.ab(.body))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    checkButton
-                }
-
-            case .checking:
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L10n.isPL ? "Sprawdzanie…" : "Checking…")
-                        .font(.ab(.body))
-                        .foregroundStyle(.secondary)
-                }
-
-            case .upToDate:
-                HStack {
-                    Label(L10n.isPL ? "Masz najnowszą wersję" : "You are on the latest version",
-                          systemImage: "checkmark.circle.fill")
-                        .font(.ab(.body))
-                        .foregroundStyle(.green)
-                    Spacer()
-                    checkButton
-                }
-
-            case .available(let manifest):
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L10n.isPL ? "Dostępna aktualizacja: \(manifest.version)"
-                                           : "Update available: \(manifest.version)")
-                                .font(.ab(.body, weight: .medium))
-                            Text(L10n.isPL ? "Wydano \(manifest.publishedAt)" : "Released \(manifest.publishedAt)")
-                                .font(.ab(.footnote))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(L10n.isPL ? "Zaktualizuj" : "Update") {
-                            Task { await updateService.downloadAndInstall() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.extraLarge)
-                    }
-
-                    let items = L10n.isPL ? manifest.changelog.pl : manifest.changelog.en
-                    if !items.isEmpty {
-                        Divider()
-                        Text(L10n.isPL ? "Co nowego" : "What's new")
-                            .font(.ab(.subheadline, weight: .semibold))
-                        ForEach(items, id: \.self) { item in
-                            Text("• \(item)")
-                                .font(.ab(.body))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-            case .downloading(let progress):
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.isPL ? "Pobieranie…" : "Downloading…")
-                        .font(.ab(.body))
-                    ProgressView(value: progress)
-                }
-
-            case .installing:
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L10n.isPL ? "Instalowanie…" : "Installing…")
-                        .font(.ab(.body))
-                        .foregroundStyle(.secondary)
-                }
-
-            case .failed(let message):
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(L10n.isPL ? "Nie udało się sprawdzić aktualizacji" : "Could not check for updates")
-                            .font(.ab(.body))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button(L10n.isPL ? "Spróbuj ponownie" : "Retry") {
-                            Task { await updateService.checkForUpdates() }
-                        }
-                        .controlSize(.extraLarge)
-                    }
-                    Text(message)
-                        .font(.ab(.caption))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-
     private var diagnosticsSection: some View {
         GlassSection(title: LocalizedStringKey(L10n.isPL ? "Diagnostyka" : "Diagnostics"),
                      systemImage: "doc.text.magnifyingglass") {
@@ -519,14 +395,6 @@ struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             try? report.write(to: url, atomically: true, encoding: .utf8)
         }
-    }
-
-    private var checkButton: some View {
-        Button(L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates") {
-            Task { await updateService.checkForUpdates() }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.extraLarge)
     }
 
     private func chooseDownloadFolder() {

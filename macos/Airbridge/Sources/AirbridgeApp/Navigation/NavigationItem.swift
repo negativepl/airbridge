@@ -8,7 +8,6 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
     case messages
     case mirror
     case settings
-    case about
 
     var id: String { rawValue }
 
@@ -21,7 +20,6 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .messages: return "message.fill"
         case .mirror: return "iphone.gen3.radiowaves.left.and.right"
         case .settings: return "gearshape.fill"
-        case .about: return "info.circle.fill"
         }
     }
 
@@ -34,11 +32,10 @@ enum NavigationItem: String, CaseIterable, Identifiable, Hashable {
         case .messages: return L10n.isPL ? "Wiadomości" : "Messages"
         case .mirror: return L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing"
         case .settings: return L10n.isPL ? "Ustawienia" : "Settings"
-        case .about: return L10n.isPL ? "O aplikacji" : "About"
         }
     }
 
     static var topItems: [NavigationItem] {
-        [.home, .send, .gallery, .files, .messages, .mirror, .settings, .about]
+        [.home, .send, .gallery, .files, .messages, .mirror, .settings]
     }
 }

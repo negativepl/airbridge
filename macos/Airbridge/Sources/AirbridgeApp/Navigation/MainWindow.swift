@@ -79,12 +79,6 @@ struct MainWindow: View {
                     )
                 }
             }
-
-            Tab(NavigationItem.about.title, systemImage: "info.circle.fill", value: .about) {
-                ScreenContainer {
-                    AboutTabView(updateService: updateService)
-                }
-            }
         }
         .tabViewStyle(.sidebarAdaptable)
         .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
