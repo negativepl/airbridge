@@ -63,10 +63,6 @@
     <string name="no_activity">No transfers yet</string>
     <string name="activity_sent">Sent to Mac</string>
     <string name="activity_received">Received from Mac</string>
-    <string name="time_now">now</string>
-    <string name="time_minutes">%dm</string>
-    <string name="time_hours">%dh</string>
-    <string name="time_days">%dd</string>
 
     <!-- Permissions -->
 
@@ -268,4 +264,17 @@
     <string name="headphones_on_mac">Playing on the Mac</string>
     <string name="headphones_moved">Moved to this phone</string>
     <string name="headphones_switch_here">Switch here</string>
+    <string name="time_ago_now">just now</string>
+    <plurals name="time_ago_minutes">
+        <item quantity="one">%d minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="time_ago_hours">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="time_ago_days">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
 </resources>
