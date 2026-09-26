@@ -387,7 +387,9 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 }
 
 private val GLOW_HEIGHT = 180.dp
-private val SPILL = 40.dp
+// Reach of the light past the card: tighter above (the top bar is close), wider elsewhere.
+private val SPILL = 28.dp
+private val SPILL_TOP = 14.dp
 
 /**
  * Ambilight: the blurred wallpaper centred behind the card and reaching
@@ -417,10 +419,11 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
         modifier = Modifier
             .layout { measurable, constraints ->
                 val spill = SPILL.roundToPx()
+                val top = SPILL_TOP.roundToPx()
                 val placeable = measurable.measure(
-                    Constraints.fixed(constraints.maxWidth + 2 * spill, cardHeightPx + 2 * spill)
+                    Constraints.fixed(constraints.maxWidth + 2 * spill, cardHeightPx + top + spill)
                 )
-                layout(constraints.maxWidth, 0) { placeable.place(-spill, -spill) }
+                layout(constraints.maxWidth, 0) { placeable.place(-spill, -top) }
             }
             .graphicsLayer {
                 compositingStrategy = CompositingStrategy.Offscreen
@@ -434,10 +437,11 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
             .drawWithContent {
                 drawContent()
                 val fx = SPILL.toPx() / size.width
+                val fyTop = SPILL_TOP.toPx() / size.height
                 val fy = SPILL.toPx() / size.height
                 val on = Color.Black.copy(alpha = alpha)
                 drawRect(
-                    brush = Brush.verticalGradient(0f to Color.Transparent, fy to on, 1f - fy to on, 1f to Color.Transparent),
+                    brush = Brush.verticalGradient(0f to Color.Transparent, fyTop to on, 1f - fy to on, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn
                 )
                 drawRect(
