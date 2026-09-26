@@ -50,12 +50,13 @@ private fun edgeLightColors(): Pair<Color, Color> {
  */
 @Composable
 fun Modifier.edgeLight(shape: Shape, highlight: Boolean = true): Modifier {
+    // Both the hairline and the light line read as white streaks on a photo, so
+    // image cards (highlight = false) get neither; the picture is its own edge.
+    if (!highlight) return this
     val (outline, light) = edgeLightColors()
-    val bordered = this.border(width = 0.75.dp, color = outline, shape = shape)
-    // The light line reads as a white streak on a photo, so image cards skip it.
-    return if (highlight) {
-        bordered.innerShadow(shape, Shadow(radius = 1.dp, color = light, offset = DpOffset(0.dp, 1.dp)))
-    } else bordered
+    return this
+        .border(width = 0.75.dp, color = outline, shape = shape)
+        .innerShadow(shape, Shadow(radius = 1.dp, color = light, offset = DpOffset(0.dp, 1.dp)))
 }
 
 /**

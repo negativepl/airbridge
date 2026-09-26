@@ -449,8 +449,10 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val fyTop = SPILL_TOP.toPx() / size.height
                 val fy = SPILL.toPx() / size.height
                 val on = Color.Black.copy(alpha = shownAlpha)
+                // Dimmer above the card than below: the title sits up there.
+                val onTop = Color.Black.copy(alpha = shownAlpha * 0.6f)
                 drawRect(
-                    brush = Brush.verticalGradient(0f to Color.Transparent, fyTop to on, 1f - fy to on, 1f to Color.Transparent),
+                    brush = Brush.verticalGradient(0f to Color.Transparent, fyTop to onTop, 1f - fy to on, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn
                 )
                 drawRect(

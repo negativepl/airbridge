@@ -122,8 +122,8 @@ fun MainScreen(
             .verticalScroll(scrollState)
             .padding(horizontal = 8.dp)
     ) {
-        // Generous room under the bar before the first card.
-        Spacer(modifier = Modifier.height(topInset + 24.dp))
+        // The first section title sits under the bar like any other title.
+        Spacer(modifier = Modifier.height(topInset + 4.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
