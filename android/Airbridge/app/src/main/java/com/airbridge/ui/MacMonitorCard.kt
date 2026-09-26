@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -63,7 +62,7 @@ fun MacDeviceCard(
 ) {
     var showDisconnectConfirm by remember { mutableStateOf(false) }
 
-    Card(
+    AirbridgeCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -219,7 +218,7 @@ private fun versionBase(version: String): String = version.substringBefore("-")
 /** Live CPU/RAM/disk rings for the connected Mac. */
 @Composable
 fun MacMonitorRings(info: MacInfo, modifier: Modifier = Modifier) {
-    Card(
+    AirbridgeCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)

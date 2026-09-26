@@ -16,9 +16,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -63,7 +61,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
         )
-        Card(
+        AirbridgeCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -89,10 +87,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
                     modifier = Modifier.weight(1f)
                 )
             }
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
+            DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
             if (transfers.isEmpty()) {
                 Text(
                     stringResource(R.string.no_activity),
@@ -103,10 +98,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
             } else {
                 transfers.forEachIndexed { index, item ->
                     if (index > 0) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp, end = 20.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
                     }
                     TransferRow(item)
                 }
@@ -131,8 +123,10 @@ private fun StatColumn(icon: ImageVector, value: String, label: String, caption:
             )
         }
         Spacer(Modifier.height(4.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(start = 22.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

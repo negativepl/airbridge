@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -146,7 +145,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(28.dp))
 
         // Credits card
-        Card(
+        AirbridgeCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(
@@ -218,7 +217,7 @@ private fun AboutContent(modifier: Modifier = Modifier) {
         var checkUpdateTrigger by remember { mutableStateOf(false) }
 
         // Links card
-        Card(
+        AirbridgeCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(

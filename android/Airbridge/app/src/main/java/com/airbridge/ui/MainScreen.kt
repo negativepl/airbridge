@@ -38,7 +38,6 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -317,7 +316,7 @@ fun MainScreen(
         ) {
             Column {
                 Spacer(modifier = Modifier.height(8.dp))
-                Card(
+                AirbridgeCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
@@ -367,7 +366,7 @@ fun MainScreen(
             // Section rhythm on Home: 16dp above, same as the section headers.
             Spacer(modifier = Modifier.height(16.dp))
 
-            Card(
+            AirbridgeCard(
                 onClick = { transferExpanded = !transferExpanded },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,

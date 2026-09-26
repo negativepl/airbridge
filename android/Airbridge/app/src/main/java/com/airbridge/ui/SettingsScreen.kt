@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -226,7 +225,7 @@ private fun SettingsContent(
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
+            AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
@@ -295,7 +294,7 @@ private fun SettingsContent(
                         prefs.edit { putString("download_folder", path) }
                     }
                 }
-                Card(
+                AirbridgeCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { folderPicker.launch(null) },
@@ -332,7 +331,7 @@ private fun SettingsContent(
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
+            AirbridgeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
@@ -366,7 +365,7 @@ private fun SettingsContent(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
+            AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
@@ -396,7 +395,7 @@ private fun SettingsContent(
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
+            AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
@@ -424,7 +423,7 @@ private fun SettingsContent(
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader(text = stringResource(R.string.settings_headphones))
             Spacer(modifier = Modifier.height(8.dp))
-            Card(
+            AirbridgeCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
@@ -542,7 +541,7 @@ private fun SettingsContent(
             SectionHeader(text = stringResource(R.string.update_section_title))
             Spacer(modifier = Modifier.height(8.dp))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
-            Card(
+            AirbridgeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { checkUpdateTrigger = true },
@@ -583,7 +582,7 @@ private fun SettingsContent(
             Spacer(modifier = Modifier.height(8.dp))
             val exportScope = rememberCoroutineScope()
             val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
-            Card(
+            AirbridgeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
@@ -641,7 +640,7 @@ private fun PairedDeviceCard(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    Card(
+    AirbridgeCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
