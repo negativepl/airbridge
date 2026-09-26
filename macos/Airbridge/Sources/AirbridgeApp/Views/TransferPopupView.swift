@@ -70,6 +70,8 @@ struct TransferPopupView: View {
 
     @State private var showComplete = false
     @State private var isTargeted = false
+    /// Bumped on rejection/failure: the shell shakes side to side ("no").
+    @State private var shakeTrigger = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The island morphs: each state gets its own size, the settings hold
@@ -331,6 +333,20 @@ struct TransferPopupView: View {
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         }
+        // Rejection / failure: a quick horizontal shake, decaying — the
+        // universal "no". Sideways only, so the top edge stays on the notch.
+        .keyframeAnimator(initialValue: 0.0, trigger: shakeTrigger) { content, x in
+            content.offset(x: reduceMotion ? 0 : x)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(-14, duration: 0.06)
+                CubicKeyframe(12, duration: 0.07)
+                CubicKeyframe(-8, duration: 0.07)
+                CubicKeyframe(5, duration: 0.07)
+                CubicKeyframe(-2, duration: 0.06)
+                CubicKeyframe(0, duration: 0.07)
+            }
+        }
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
         // renderować się w ciemnym schemacie niezależnie od motywu systemu —
         // inaczej na jasnym motywie glass robi się mleczny, a tekst czarny.
@@ -381,6 +397,10 @@ struct TransferPopupView: View {
             }
         }
         .onChange(of: state) { _, newState in
+            switch newState {
+            case .rejected, .failed: shakeTrigger += 1
+            default: break
+            }
             // Any activity (incoming offer, waiting, transferring, etc.)
             // cancels the idle auto-hide. Returning to idle, or showing a
             // clipboard receipt, (re)starts it — a receipt never holds the island.
@@ -410,8 +430,11 @@ struct TransferPopupView: View {
                 // Small/fast files used to jump to "complete" with the bar
                 // stuck at a partial value because progress hit 1.0 and the
                 // state flipped in the same instant.
+                // Just long enough for the bar to land on 100% (its own
+                // animation is 0.2 s); any longer reads as a stall before the
+                // dim of the swap.
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    try? await Task.sleep(nanoseconds: 220_000_000)
                     if fileTransferService.fileTransferProgress >= 1.0 {
                         showComplete = true
                     }
@@ -558,7 +581,7 @@ struct TransferPopupView: View {
                 ProgressView(value: min(max(progress, 0), 1))
                     .progressViewStyle(.linear)
                     .tint(.accentColor)
-                    .animation(.easeOut(duration: 0.3), value: progress)
+                    .animation(.easeOut(duration: 0.2), value: progress)
 
                 HStack {
                     Text(speedText)
