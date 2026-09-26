@@ -23,6 +23,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -375,32 +380,42 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
                             beyondViewportPageCount = 1,
                         ) { page ->
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            // The bar overlays the page with a transparent container, so
+                            // the wallpaper light behind the Mac card runs under it; once
+                            // content scrolls beneath, the pinned behaviour tints the bar.
+                            val scrollBehavior = androidx.compose.material3.TopAppBarDefaults.pinnedScrollBehavior()
+                            val topInset = androidx.compose.material3.TopAppBarDefaults.TopAppBarExpandedHeight +
+                                WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                when (page) {
+                                    0 -> MainScreen(
+                                        viewModel = viewModel,
+                                        onScanQr = { showQrScanner = true },
+                                        bottomClearance = fabClearance,
+                                        topInset = topInset,
+                                        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+                                        onSendFile = sendFileAction,
+                                        onSendPhoto = sendPhotoAction,
+                                        onSendClipboard = sendClipboardAction
+                                    )
+                                    1 -> ScreenShareScreen(bottomClearance = fabClearance, topInset = topInset)
+                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance, topInset = topInset)
+                                }
                                 key(MaterialTheme.colorScheme.surfaceContainer) {
                                     TopAppBar(
                                         title = { Text(stringResource(pageTitles[page])) },
                                         colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            containerColor = Color.Transparent,
                                             scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                                         ),
                                         actions = {
                                             IconButton(onClick = { showSettings = true }) {
                                                 Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                                             }
-                                        }
+                                        },
+                                        scrollBehavior = scrollBehavior,
+                                        modifier = Modifier.align(Alignment.TopCenter)
                                     )
-                                }
-                                when (page) {
-                                    0 -> MainScreen(
-                                        viewModel = viewModel,
-                                        onScanQr = { showQrScanner = true },
-                                        bottomClearance = fabClearance,
-                                        onSendFile = sendFileAction,
-                                        onSendPhoto = sendPhotoAction,
-                                        onSendClipboard = sendClipboardAction
-                                    )
-                                    1 -> ScreenShareScreen(bottomClearance = fabClearance)
-                                    2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = fabClearance)
                                 }
                             }
                         }

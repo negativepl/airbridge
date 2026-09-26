@@ -378,12 +378,13 @@ private fun Modifier.wallpaperGlow(colors: List<Color>?, alpha: Float): Modifier
 }
 
 private val GLOW_HEIGHT = 180.dp
+private val SPILL = 40.dp
 
 /**
- * The blurred wallpaper behind the card: laid out at card height plus
- * GLOW_HEIGHT but reported as zero height, so it takes no room in the
- * column. An alpha mask hides it behind the card body (so nothing peeks out
- * at the rounded corners) and fades the spill out towards the bottom.
+ * Ambilight: the blurred wallpaper centred behind the card and reaching
+ * SPILL past every edge. Laid out larger than the card but reported as zero
+ * size, so it takes no room in the column; an alpha mask fades it out
+ * towards its own edges so the light pools around the card.
  */
 @Composable
 private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float) {
@@ -393,35 +394,27 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .layout { measurable, constraints ->
-                val glow = GLOW_HEIGHT.roundToPx()
+                val spill = SPILL.roundToPx()
                 val placeable = measurable.measure(
-                    Constraints.fixed(constraints.maxWidth, cardHeightPx + glow)
+                    Constraints.fixed(constraints.maxWidth + 2 * spill, cardHeightPx + 2 * spill)
                 )
-                layout(constraints.maxWidth, 0) { placeable.place(0, 0) }
+                layout(constraints.maxWidth, 0) { placeable.place(-spill, -spill) }
             }
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
-                val cardBottom = cardHeightPx.toFloat()
+                val fx = SPILL.toPx() / size.width
+                val fy = SPILL.toPx() / size.height
+                val on = Color.Black.copy(alpha = alpha)
                 drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        (cardBottom - 24.dp.toPx()) / size.height to Color.Transparent,
-                        cardBottom / size.height to Color.Black.copy(alpha = alpha),
-                        1f to Color.Transparent,
-                        startY = 0f, endY = size.height
-                    ),
+                    brush = Brush.verticalGradient(0f to Color.Transparent, fy to on, 1f - fy to on, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn
                 )
-                // Fade the sides too, so the spill pools under the middle of the
-                // card instead of running edge to edge like a banner.
                 drawRect(
-                    brush = Brush.horizontalGradient(
-                        0f to Color.Transparent, 0.2f to Color.Black, 0.8f to Color.Black, 1f to Color.Transparent
-                    ),
+                    brush = Brush.horizontalGradient(0f to Color.Transparent, fx to Color.Black, 1f - fx to Color.Black, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn
                 )
             }
-            .blur(56.dp, BlurredEdgeTreatment.Unbounded)
+            .blur(48.dp, BlurredEdgeTreatment.Unbounded)
     )
 }

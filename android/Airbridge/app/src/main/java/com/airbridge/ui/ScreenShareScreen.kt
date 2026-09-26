@@ -34,7 +34,7 @@ import androidx.graphics.shapes.RoundedPolygon
 import com.airbridge.R
 
 @Composable
-fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
+fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     val mirror = rememberMirrorLauncher()
     val ready = mirror.ready
     fun launch(mode: Int) = mirror.launch(mode)
@@ -45,7 +45,7 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = bottomClearance),
+            .padding(start = 8.dp, end = 8.dp, top = topInset + 8.dp, bottom = bottomClearance),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (ready) {

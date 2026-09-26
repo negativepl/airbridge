@@ -81,7 +81,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
+fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInset: Dp = 0.dp) {
     val path by viewModel.macFilesPath.collectAsState()
     val entries by viewModel.macFilesEntries.collectAsState()
     val needsPermission by viewModel.macFilesNeedsPermission.collectAsState()
@@ -133,7 +133,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp) {
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = topInset)) {
         // Breadcrumb path bar — tappable segments, each jumps straight to that
         // ancestor (mirror of the macOS FilesBrowserView path bar).
         if (isConnected) {

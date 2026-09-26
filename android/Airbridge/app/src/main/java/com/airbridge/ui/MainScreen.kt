@@ -71,6 +71,8 @@ fun MainScreen(
     viewModel: MainViewModel,
     onScanQr: () -> Unit = {},
     bottomClearance: Dp = 88.dp,
+    topInset: Dp = 0.dp,
+    modifier: Modifier = Modifier,
     onSendFile: () -> Unit = {},
     onSendPhoto: () -> Unit = {},
     onSendClipboard: () -> Unit = {}
@@ -112,13 +114,15 @@ fun MainScreen(
 
     val scrollState = rememberScrollState()
     ScrollLimitHaptics(scrollState)
+    // topInset: the page runs under the (transparent) top bar, so the content
+    // starts below it but the scroll area, and the wallpaper light, reach up.
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(horizontal = 8.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(topInset + 8.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
