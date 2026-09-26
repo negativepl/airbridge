@@ -268,10 +268,10 @@ class MainActivity : ComponentActivity() {
                         bottomBar = {
                             // Stock Material 3 navigation bar. Its default container is
                             // surfaceContainer — the same token as our screen background — so
-                            // it would blend in; lift it one step to surfaceContainerHigh so
-                            // the dock reads as a distinct bar above the content.
+                            // it would blend in; give it the cards' surface instead, so with
+                            // the edge light it reads as one more card at the bottom.
                             NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                                 modifier = Modifier
                                     .topEdgeLight()
                                     .onGloballyPositioned {
