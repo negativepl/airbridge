@@ -122,7 +122,8 @@ fun MainScreen(
             .verticalScroll(scrollState)
             .padding(horizontal = 8.dp)
     ) {
-        Spacer(modifier = Modifier.height(topInset + 8.dp))
+        // Same breathing room under the bar as between sections.
+        Spacer(modifier = Modifier.height(topInset + 24.dp))
 
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
@@ -164,11 +165,6 @@ fun MainScreen(
                     val macLocal = macInfo
                     if (macLocal != null) {
                         Column {
-                            // The Mac's live state first (monitor, then the device card
-                            // with its light), then what the app is for.
-                            SectionTitle(stringResource(R.string.home_monitor_title))
-                            MacMonitorRings(info = macLocal)
-                            Spacer(modifier = Modifier.height(24.dp))
                             MacDeviceCard(
                                 info = macLocal,
                                 wallpaperBase64 = macWallpaper,
@@ -184,6 +180,9 @@ fun MainScreen(
                             )
                             ClipboardCard(items = activity, onSendClipboard = onSendClipboard)
                             HeadphonesCard(viewModel = viewModel)
+
+                            SectionTitle(stringResource(R.string.home_monitor_title))
+                            MacMonitorRings(info = macLocal)
                         }
                     }
                 }
