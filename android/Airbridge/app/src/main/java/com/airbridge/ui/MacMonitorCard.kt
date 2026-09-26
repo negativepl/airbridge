@@ -455,8 +455,8 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
                 val fyTop = SPILL_TOP.toPx() / size.height
                 val fy = SPILL.toPx() / size.height
                 val on = Color.Black.copy(alpha = shownAlpha)
-                // Dimmer above the card than below: the title sits up there.
-                val onTop = Color.Black.copy(alpha = shownAlpha * 0.6f)
+                // Same strength on every side: the light is centred on the picture.
+                val onTop = on
                 // Eased ramps (quadratic-ish stops) rather than linear ones: a linear
                 // fade over a bright picture still reads as a band with an edge.
                 // The light does not die out at the card edge: it keeps EDGE_FLOOR of
