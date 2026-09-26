@@ -688,7 +688,11 @@ final class FileTransferService: MessageHandler {
                 guard self.receivingOwnerKey == ownerKey else { return }
 
                 self.fileTransferFileName = filename
-                self.fileTransferProgress = progress
+                // Clamp away from 0: the first tick can report zero bytes, and
+                // with the accept hold released below that computed to .idle
+                // for one frame — the island shrank to the drop zone and
+                // sprang back on the next tick.
+                self.fileTransferProgress = max(progress, 0.001)
                 self.isAwaitingAcceptedTransfer = false
 
                 if !self.isReceivingFile {

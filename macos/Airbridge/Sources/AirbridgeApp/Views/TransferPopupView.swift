@@ -306,6 +306,10 @@ struct TransferPopupView: View {
                         .transition(reduceMotion ? .opacity : Self.stateTransition)
                 }
                 .padding(12)
+                // The pill clips its content: while the shell shrinks, the
+                // leaving content stays inside the glass instead of spilling
+                // past its edge.
+                .clipShape(.rect(cornerRadius: 18, style: .continuous))
                 .glassEffect(
                     isTargeted && isIdleConnected
                         ? .regular.tint(.accentColor).interactive()
