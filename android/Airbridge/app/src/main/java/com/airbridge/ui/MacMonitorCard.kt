@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalDensity
@@ -123,7 +125,7 @@ fun MacDeviceCard(
     Box(modifier = Modifier.fillMaxWidth().padding(FRAME_MARGIN)) {
         // Below API 31 there is no RenderEffect; a colour glow stands in.
         if (bitmap != null && blurSupported && cardHeightPx > 0) {
-            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.9f else 0.75f)
+            WallpaperSpill(bitmap = bitmap, cardHeightPx = cardHeightPx, alpha = if (dark) 0.9f else 1f, saturation = if (dark) 1f else 1.6f)
         }
         Box(
             modifier = Modifier
@@ -408,7 +410,7 @@ private val SPILL_TOP = FRAME_MARGIN
  * towards its own edges so the light pools around the card.
  */
 @Composable
-private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float) {
+private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float, saturation: Float = 1f) {
     // A barely-there drift: the light breathes (2% scale) and sways a few dp
     // sideways over ~9 s, so it reads as light rather than a printed halo.
     // Skipped when the system has animations turned off.
@@ -430,10 +432,16 @@ private fun WallpaperSpill(bitmap: ImageBitmap, cardHeightPx: Int, alpha: Float)
         animationSpec = tween(600, easing = EaseInOutSine),
         label = "ambilightAlpha"
     )
+    // Over a white card the blurred picture washes out, so the light theme
+    // pushes the saturation up: the light keeps the wallpaper's colour.
+    val colorFilter = remember(saturation) {
+        if (saturation == 1f) null else ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(saturation) })
+    }
     Image(
         bitmap = bitmap,
         contentDescription = null,
         contentScale = ContentScale.Crop,
+        colorFilter = colorFilter,
         modifier = Modifier
             .layout { measurable, constraints ->
                 val spill = SPILL.roundToPx()
