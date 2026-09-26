@@ -305,4 +305,6 @@
     <string name="headphones_connected_mac">Podłączone do Maka</string>
     <string name="home_section_connected_device">Podłączone urządzenie</string>
     <string name="screen_section_modes">Tryby wyświetlania</string>
+    <string name="pairing_status_paired">Sparowano</string>
+    <string name="repair_needed_unpaired">%s usunął ten telefon ze sparowanych urządzeń. Sparuj ponownie, skanując kod QR na Maku.</string>
 </resources>

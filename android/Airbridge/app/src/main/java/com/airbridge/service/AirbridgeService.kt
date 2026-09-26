@@ -1384,6 +1384,14 @@ class AirbridgeService : Service() {
                     webSocketClient.shouldReconnect = false
                     webSocketClient.disconnect()
                     isConnected.value = false
+                    // The Mac no longer knows us (unpaired there): say so on Home
+                    // instead of silently staying disconnected.
+                    if (message.reason == "not_paired") {
+                        pairingIssue.value = getString(
+                            com.airbridge.R.string.repair_needed_unpaired,
+                            connectedDeviceName.value ?: "Mac"
+                        )
+                    }
                     // auth failure tracked via StateFlow
                 }
             }

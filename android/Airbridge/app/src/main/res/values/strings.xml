@@ -288,4 +288,6 @@
     <string name="headphones_connected_mac">Connected to the Mac</string>
     <string name="home_section_connected_device">Connected device</string>
     <string name="screen_section_modes">Display modes</string>
+    <string name="pairing_status_paired">Paired</string>
+    <string name="repair_needed_unpaired">%s removed this phone from its paired devices. Pair again by scanning the QR code on the Mac.</string>
 </resources>

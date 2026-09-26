@@ -174,6 +174,7 @@ private fun SettingsContent(
         val macInfo by com.airbridge.service.AirbridgeService.macInfo.collectAsState()
         val macWallpaper by com.airbridge.service.AirbridgeService.macWallpaper.collectAsState()
         val connectedDeviceName by com.airbridge.service.AirbridgeService.connectedDeviceName.collectAsState()
+        val isConnectedNow by com.airbridge.service.AirbridgeService.isConnected.collectAsState()
 
         if (pairedDevices.isEmpty()) {
             Text(
@@ -184,7 +185,9 @@ private fun SettingsContent(
             )
         } else {
             pairedDevices.forEach { device ->
-                val isLive = connectedDeviceName == device.deviceName
+                // "Connected" only while the socket is actually up: the last
+                // connected name alone lingers after the Mac drops or unpairs us.
+                val isLive = isConnectedNow && connectedDeviceName == device.deviceName
                 val liveWallpaper = if (isLive) macWallpaper else null
                 // Prefer the live wallpaper; fall back to the last cached one so the
                 // card still shows the Mac's wallpaper while it's offline.
@@ -655,8 +658,8 @@ private fun PairedDeviceCard(
                     Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
                 )
             )
-            // Connection status — top-left pill, mirroring the home hero card.
-            if (isConnected) {
+            // Status pill — "Connected" while the session is up, "Paired" otherwise.
+            run {
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -666,7 +669,7 @@ private fun PairedDeviceCard(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
-                        stringResource(R.string.pairing_connected),
+                        stringResource(if (isConnected) R.string.pairing_connected else R.string.pairing_status_paired),
                         style = MaterialTheme.typography.labelLarge,
                         color = Color.White
                     )
