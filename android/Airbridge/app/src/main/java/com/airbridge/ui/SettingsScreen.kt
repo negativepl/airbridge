@@ -296,9 +296,8 @@ private fun SettingsContent(
                     }
                 }
                 AirbridgeCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { folderPicker.launch(null) },
+                    onClick = { folderPicker.launch(null) },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -531,9 +530,8 @@ private fun SettingsContent(
             SectionHeader(text = stringResource(R.string.update_section_title))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             AirbridgeCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { checkUpdateTrigger = true },
+                onClick = { checkUpdateTrigger = true },
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -571,9 +569,7 @@ private fun SettingsContent(
             val exportScope = rememberCoroutineScope()
             val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
             AirbridgeCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
+                onClick = {
                         exportScope.launch {
                             val intent = withContext(Dispatchers.IO) {
                                 runCatching {
@@ -588,6 +584,7 @@ private fun SettingsContent(
                             }
                         }
                     },
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -619,9 +616,8 @@ private fun SettingsContent(
             // About — moved here from the home screen's overflow menu.
             SectionHeader(text = stringResource(R.string.nav_about))
             AirbridgeCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenAbout() },
+                onClick = { onOpenAbout() },
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
