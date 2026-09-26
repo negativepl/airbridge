@@ -59,16 +59,24 @@ fun AirbridgeCard(
     Card(onClick = onClick, modifier = modifier.edgeLight(shape), shape = shape, colors = colors, content = content)
 }
 
-/** Dashed hairline used inside cards instead of a solid border. */
+/**
+ * Dashed hairline between rows of one card. One physical pixel, short dense
+ * dashes, low contrast: it separates without being noticed (the way Medusa's
+ * admin UI draws its borders).
+ */
 @Composable
-fun DashedDivider(modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.outlineVariant) {
+fun DashedDivider(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+) {
     Canvas(modifier = modifier.fillMaxWidth().height(1.dp)) {
+        val y = size.height / 2f
         drawLine(
             color = color,
-            start = Offset(0f, size.height / 2f),
-            end = Offset(size.width, size.height / 2f),
-            strokeWidth = size.height,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))
         )
     }
 }
