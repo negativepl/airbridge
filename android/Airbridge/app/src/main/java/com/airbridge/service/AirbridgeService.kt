@@ -1284,6 +1284,8 @@ class AirbridgeService : Service() {
         connectedDeviceName.value = null
         connectedHost.value = null
         recordAndClearConnectedSince()
+        macInfo.value = null
+        macWallpaper.value = null
         pairingIssue.value = getString(com.airbridge.R.string.repair_needed_unpaired, name)
     }
 
@@ -1300,6 +1302,8 @@ class AirbridgeService : Service() {
             connectedDeviceName.value = null
             connectedHost.value = null
             recordAndClearConnectedSince()
+            macInfo.value = null
+            macWallpaper.value = null
         }
     }
 

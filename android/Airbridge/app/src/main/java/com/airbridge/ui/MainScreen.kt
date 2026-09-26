@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -125,6 +126,54 @@ fun MainScreen(
         // The first section title sits under the bar like any other title.
         Spacer(modifier = Modifier.height(topInset - 4.dp))
 
+        // ── Re-pair guidance first: if the Mac dropped us, nothing below is live ──
+        // ── Re-pair guidance (TLS pin missing or Mac certificate changed) ──
+        val pairingIssue by AirbridgeService.pairingIssue.collectAsState()
+        androidx.compose.animation.AnimatedVisibility(
+            visible = pairingIssue != null,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(4.dp))
+                AirbridgeCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Rounded.WarningAmber,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = pairingIssue ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        // Direct path to the QR scanner from the warning, so the
+                        // user does not have to find re-pairing on their own.
+                        TextButton(
+                            onClick = onScanQr,
+                            modifier = Modifier.align(Alignment.End),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Text(stringResource(R.string.repair_action_scan))
+                        }
+                    }
+                }
+            }
+        }
+
         // ── Device / Mac monitor ──
         val macInfo by AirbridgeService.macInfo.collectAsState()
         val macWallpaper by AirbridgeService.macWallpaper.collectAsState()
@@ -196,58 +245,12 @@ fun MainScreen(
             macScreenEnabled = mirror.ready,
             enabled = macReady
         )
-        ClipboardCard(items = activity, onSendClipboard = onSendClipboard, enabled = macReady)
+        ClipboardCard(items = activity, onSendClipboard = onSendClipboard, enabled = macReady, modifier = Modifier.alpha(if (macReady) 1f else 0.5f))
         HeadphonesCard(viewModel = viewModel)
 
         SectionTitle(stringResource(R.string.home_monitor_title))
-        MacMonitorRings(info = mac)
-
-        // ── Re-pair guidance (TLS pin missing or Mac certificate changed) ──
-        val pairingIssue by AirbridgeService.pairingIssue.collectAsState()
-        androidx.compose.animation.AnimatedVisibility(
-            visible = pairingIssue != null,
-            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
-        ) {
-            Column {
-                Spacer(modifier = Modifier.height(8.dp))
-                AirbridgeCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Rounded.WarningAmber,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = pairingIssue ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                        // Direct path to the QR scanner from the warning, so the
-                        // user does not have to find re-pairing on their own.
-                        TextButton(
-                            onClick = onScanQr,
-                            modifier = Modifier.align(Alignment.End),
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        ) {
-                            Text(stringResource(R.string.repair_action_scan))
-                        }
-                    }
-                }
-            }
-        }
+        // Never show numbers from a session that is over: empty rings, dimmed.
+        MacMonitorRings(info = if (macReady) mac else null, modifier = Modifier.alpha(if (macReady) 1f else 0.5f))
 
         // ── Transfer progress ──
         var transferExpanded by remember { mutableStateOf(false) }
