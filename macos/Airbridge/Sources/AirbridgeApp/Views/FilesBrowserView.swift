@@ -16,6 +16,9 @@ struct FilesBrowserView: View {
     /// listing that arrives sooner never shows one — a spinner that flashes
     /// for a few frames reads as a glitch, not as progress.
     @State private var showSpinner = false
+    /// Depth of the folder shown before the last change: deeper → slide in
+    /// from the right, shallower → from the left (direction-aware navigation).
+    @State private var previousDepth = 0
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
 
@@ -201,9 +204,40 @@ struct FilesBrowserView: View {
         return viewMode == .grid ? .grid : .list
     }
 
-    /// One content view per kind, crossfading between kinds so a folder
-    /// change never pops.
+    private var currentDepth: Int { filesBrowserService.breadcrumbs.count }
+
+    /// Direction-aware folder navigation, like the phone app: entering a
+    /// folder slides the new listing in from the right, going up slides it
+    /// in from the left, and the old listing slides out the other way. Keyed
+    /// on the PATH only, so the listing arriving mid-slide fills the new pane
+    /// in place instead of restarting the slide. Within one folder the kinds
+    /// (blank → list, list → empty) just crossfade.
     private var content: some View {
+        let forward = currentDepth >= previousDepth
+        let slideIn: Edge = forward ? .trailing : .leading
+        let slideOut: Edge = forward ? .leading : .trailing
+        return ZStack {
+            folderPane
+                .id(filesBrowserService.currentPath)
+                .transition(.asymmetric(
+                    insertion: .move(edge: slideIn).combined(with: .opacity),
+                    removal: .move(edge: slideOut).combined(with: .opacity)
+                ))
+        }
+        .clipped()
+        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: filesBrowserService.currentPath)
+        .onChange(of: filesBrowserService.currentPath) { _, _ in
+            // Remember where we came from for the NEXT change's direction.
+            Task { @MainActor in previousDepth = currentDepth }
+        }
+        .task(id: filesBrowserService.isLoading) {
+            guard filesBrowserService.isLoading else { showSpinner = false; return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
+        }
+    }
+
+    private var folderPane: some View {
         ZStack {
             switch contentKind {
             case .permission:
@@ -227,11 +261,6 @@ struct FilesBrowserView: View {
         .id(contentKind)
         .transition(.opacity)
         .animation(.easeOut(duration: 0.18), value: contentKind)
-        .task(id: filesBrowserService.isLoading) {
-            guard filesBrowserService.isLoading else { showSpinner = false; return }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
-        }
     }
 
     private var listView: some View {
