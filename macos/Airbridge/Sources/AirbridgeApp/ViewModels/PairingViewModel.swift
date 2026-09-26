@@ -36,12 +36,13 @@ final class PairingViewModel {
     /// (bumped on every successful pairing) rather than `isConnected`, so the QR
     /// dismisses even when another device is already connected — in that case
     /// `isConnected` stays `true` and never fires a change.
+    /// By the time the signal fires the phone is paired, registered and
+    /// authenticated, so there is nothing left to wait for: straight to "Paired!".
+    /// (An interim "Pairing…" screen used to sit here on a 1.5 s timer; it
+    /// showed nothing real.)
     func onPaired() {
         guard phase == 0 else { return }
         pairedDeviceName = connectionService.connectedDeviceName
-        phase = 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.phase = 2
-        }
+        phase = 2
     }
 }

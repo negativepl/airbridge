@@ -21,6 +21,7 @@ struct PairingView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 56))
                                 .foregroundStyle(.green)
+                                .symbolEffect(.bounce, options: .nonRepeating, value: vm.phase)
                             Text(isPL ? "Sparowano!" : "Paired!")
                                 .font(.title).fontWeight(.bold)
                             Text(vm.pairedDeviceName)
@@ -36,23 +37,7 @@ struct PairingView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                case 1:
-                    GlassSection {
-                        VStack(spacing: 16) {
-                            Spacer()
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 48))
-                                .foregroundStyle(.secondary)
-                                .symbolEffect(.variableColor, options: .repeating)
-                            Spacer().frame(height: 8)
-                            Text(isPL ? "Parowanie…" : "Pairing…")
-                                .font(.title2).fontWeight(.semibold)
-                            Text(isPL ? "Łączenie z telefonem" : "Connecting to phone")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
                 default:
                     GlassSection(title: LocalizedStringKey(isPL ? "Zeskanuj kod QR" : "Scan this QR code"), systemImage: "qrcode") {
                         VStack(spacing: 12) {
@@ -62,6 +47,7 @@ struct PairingView: View {
                             if let qrImage = vm.qrImage {
                                 Image(nsImage: qrImage).interpolation(.none).resizable().scaledToFit()
                                     .frame(width: 256, height: 256).clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .transition(.scale(scale: 0.92).combined(with: .opacity))
                             } else if let errorMessage = vm.errorMessage {
                                 Text(errorMessage).foregroundStyle(.red).font(.caption)
                             } else {
@@ -72,6 +58,7 @@ struct PairingView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
 
                     Spacer().frame(height: 8)
 
@@ -91,6 +78,9 @@ struct PairingView: View {
         .padding(32)
         .frame(width: 420, height: 540)
         .presentationBackground(.thinMaterial)
+        // The QR card and the "Paired!" card swap with a spring, not a cut.
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: viewModel?.phase)
+        .animation(.easeOut(duration: 0.3), value: viewModel?.qrImage != nil)
         .onAppear {
             if viewModel == nil {
                 let vm = PairingViewModel(
