@@ -187,7 +187,6 @@ fun MainScreen(
         // only the device card above changes. Controls that need the Mac are
         // disabled, not hidden, so nothing jumps when the connection comes in.
         val macReady = connState == 2
-        Spacer(modifier = Modifier.height(36.dp))
         val mirror = rememberMirrorLauncher()
         QuickActionsRow(
             onSendFile = onSendFile,
