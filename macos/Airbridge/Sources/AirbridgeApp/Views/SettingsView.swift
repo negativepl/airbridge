@@ -69,6 +69,9 @@ struct SettingsView: View {
             isRecordingShortcut = false
             stopRecordingShortcut()
         }
+        .onChange(of: connectionService.pairingRevision) { _, _ in
+            pairingService.refreshPairedDevices()
+        }
         .onChange(of: connectionService.isConnected) { _, _ in
             pairingService.refreshPairedDevices()
         }

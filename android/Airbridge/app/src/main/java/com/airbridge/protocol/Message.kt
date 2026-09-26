@@ -681,6 +681,13 @@ sealed class Message {
 
     /** Either direction: "take the headphones back", used for the Move-back action
      *  from an auto-switch notification, bypassing cooldowns. */
+    /** Either direction: the sender removed this pairing; the receiver forgets it too and disconnects. */
+    data object Unpair : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "unpair")
+        }.toString()
+    }
+
     data object HeadphoneTakeoverRequest : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "headphone_takeover_request")
@@ -1115,6 +1122,7 @@ sealed class Message {
                     audioActive = if (obj.has("audio_active")) obj.getBoolean("audio_active") else null
                 )
                 "headphone_takeover_request" -> HeadphoneTakeoverRequest
+                "unpair" -> Unpair
                 "file_transfer_cancel" -> FileTransferCancel(
                     transferId = obj.getString("transfer_id")
                 )

@@ -685,6 +685,46 @@ final class ConnectionService {
         updateActiveDeviceId(connectedDevices.last?.connectionId)
     }
 
+    /// Bumped whenever the paired-device list changes from the network side
+    /// (a phone unpaired us), so Settings can refresh its list.
+    private(set) var pairingRevision: Int = 0
+
+    /// The phone removed this Mac from its paired devices: forget the phone here
+    /// too and drop its connection.
+    private func handleUnpair(from connectionId: String) {
+        guard let device = connectedDevices.first(where: { $0.connectionId == connectionId }) else { return }
+        Diag.log("Pairing", "\(device.name) unpaired us — removing the pairing")
+        pairingManager.unpair(publicKey: device.publicKey)
+        pairingRevision += 1
+        Task { await server.disconnectClient(connectionId) }
+        connectedDevices.removeAll { $0.connectionId == connectionId }
+        refreshAllowedUploadHosts()
+        ensureActiveDeviceValid()
+        if connectedDevices.isEmpty {
+            statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
+            phase = .disconnected
+        }
+    }
+
+    /// This Mac removed a phone's pairing: tell the phone (so it forgets us
+    /// too) and drop only that phone's connections, leaving others alone.
+    func notifyUnpair(publicKey: String) {
+        let targets = connectedDevices.filter { $0.publicKey == publicKey }
+        connectedDevices.removeAll { $0.publicKey == publicKey }
+        refreshAllowedUploadHosts()
+        ensureActiveDeviceValid()
+        if connectedDevices.isEmpty {
+            statusMessage = L10n.isPL ? "Rozłączono" : "Disconnected"
+            phase = .disconnected
+        }
+        Task {
+            for device in targets {
+                try? await server.sendTo(.unpair, connectionId: device.connectionId)
+                await server.disconnectClient(device.connectionId)
+            }
+        }
+    }
+
     /// Bumped on every successful pairing so the pairing UI can advance to the
     /// "Paired!" state even when another device is already connected (in which
     /// case `isConnected` does not transition false→true and would not fire).
@@ -859,6 +899,8 @@ final class ConnectionService {
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
         case .phoneRingStop:
             handlePhoneRingStopped()
+        case .unpair:
+            handleUnpair(from: connectionId)
         case let .headphoneState(connected, address, name, audioActive):
             Diag.log("Headphone", "phone reports connected=\(connected) (\(name))")
             phoneHeadphoneState = PhoneHeadphoneState(connected: connected, address: address, name: name, audioActive: audioActive)

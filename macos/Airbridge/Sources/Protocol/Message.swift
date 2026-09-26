@@ -79,6 +79,9 @@ public enum Message: Equatable, Sendable {
     /// Mac -> phone: zadzwoń/znajdź telefon (głośny alarm) i zatrzymaj.
     case phoneRing
     case phoneRingStop
+    /// Either direction: the sender removed this pairing. The receiver forgets
+    /// it too and closes the connection: a pairing dropped on one side is gone.
+    case unpair
     case deviceInfoRequest
     case deviceInfoResponse(info: DeviceInfo)
     /// Mac -> phone: send your wallpaper for the Home hero. phone -> Mac: the
@@ -431,6 +434,7 @@ extension Message: Codable {
         case mirrorStop               = "mirror_stop"
         case phoneRing                = "phone_ring"
         case phoneRingStop            = "phone_ring_stop"
+        case unpair                   = "unpair"
         case headphoneState           = "headphone_state"
         case headphoneReleaseRequest  = "headphone_release_request"
         case headphoneReleaseResponse = "headphone_release_response"
@@ -740,6 +744,9 @@ extension Message: Codable {
 
         case .phoneRingStop:
             try container.encode(TypeKey.phoneRingStop.rawValue, forKey: .type)
+
+        case .unpair:
+            try container.encode(TypeKey.unpair.rawValue, forKey: .type)
 
         case let .headphoneState(connected, address, name, audioActive):
             try container.encode(TypeKey.headphoneState.rawValue, forKey: .type)
@@ -1110,6 +1117,9 @@ extension Message: Codable {
 
         case .phoneRingStop:
             self = .phoneRingStop
+
+        case .unpair:
+            self = .unpair
 
         case .headphoneState:
             let connected = try container.decode(Bool.self, forKey: .connected)

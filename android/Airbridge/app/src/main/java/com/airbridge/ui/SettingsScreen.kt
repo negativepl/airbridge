@@ -215,6 +215,7 @@ private fun SettingsContent(
                     wallpaper = wallpaper,
                     isConnected = isLive,
                     onRemove = {
+                        com.airbridge.service.AirbridgeService.unpairMac(device.publicKeyFingerprint)
                         com.airbridge.device.WallpaperCache.delete(context, device.deviceName)
                         pairedDeviceStore.remove(device.publicKeyFingerprint)
                     },

@@ -31,18 +31,19 @@ final class PairingService {
 
     func unpairDevice(publicKey: String) {
         guard let connectionService else { return }
+        // Tell the phone first (it forgets us too), then drop its connection.
+        connectionService.notifyUnpair(publicKey: publicKey)
         connectionService.pairingManager.unpair(publicKey: publicKey)
         refreshPairedDevices()
-        connectionService.disconnect()
     }
 
     func unpairAll() {
         guard let connectionService else { return }
         for device in connectionService.pairingManager.pairedDevices {
+            connectionService.notifyUnpair(publicKey: device.publicKeyBase64)
             connectionService.pairingManager.unpair(publicKey: device.publicKeyBase64)
         }
         refreshPairedDevices()
-        connectionService.disconnect()
     }
 
     func refreshPairedDevices() {

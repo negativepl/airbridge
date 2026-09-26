@@ -232,6 +232,11 @@ class AirbridgeService : Service() {
         }
 
         /** Re-request the Mac's live system info (for the Home monitor refresh). */
+        /** Settings removed a paired Mac: notify it and drop the session if it is the current one. */
+        fun unpairMac(fingerprint: String) {
+            instance?.unpairMac(fingerprint)
+        }
+
         fun requestMacInfo() {
             val svc = instance ?: return
             if (svc.webSocketClient.isConnected) svc.webSocketClient.send(Message.MacInfoRequest)
@@ -1263,6 +1268,41 @@ class AirbridgeService : Service() {
         }
     }
 
+    /**
+     * The Mac we were talking to no longer knows us (it unpaired this phone): a
+     * pairing dropped on one side is gone, so forget the Mac here too, drop its
+     * cached wallpaper, and explain on Home with a way to pair again.
+     */
+    private fun forgetCurrentMac() {
+        val name = connectedDeviceName.value ?: "Mac"
+        connectingFingerprint?.let { fp ->
+            pairedDeviceStore.findByFingerprint(fp)?.let { dev ->
+                com.airbridge.device.WallpaperCache.delete(applicationContext, dev.deviceName)
+                pairedDeviceStore.remove(fp)
+            }
+        }
+        connectedDeviceName.value = null
+        connectedHost.value = null
+        recordAndClearConnectedSince()
+        pairingIssue.value = getString(com.airbridge.R.string.repair_needed_unpaired, name)
+    }
+
+    /**
+     * This phone removed a Mac's pairing (Settings): tell the Mac so it forgets
+     * us too, and drop the connection if it was to that Mac.
+     */
+    fun unpairMac(fingerprint: String) {
+        if (webSocketClient.isConnected && connectingFingerprint == fingerprint) {
+            webSocketClient.send(Message.Unpair)
+            webSocketClient.shouldReconnect = false
+            webSocketClient.disconnect()
+            isConnected.value = false
+            connectedDeviceName.value = null
+            connectedHost.value = null
+            recordAndClearConnectedSince()
+        }
+    }
+
     /** What both session starts (auth after reconnect, fresh pairing) need once the socket is trusted. */
     private fun onSessionEstablished() {
         // Pull the Mac's system info + wallpaper for the Home monitor.
@@ -1390,17 +1430,7 @@ class AirbridgeService : Service() {
                     // The Mac no longer knows us (unpaired there). A pairing one
                     // side dropped is no pairing: forget the Mac here too, drop its
                     // cached wallpaper, and say so on Home with a way to re-pair.
-                    if (message.reason == "not_paired") {
-                        val name = connectedDeviceName.value ?: "Mac"
-                        connectingFingerprint?.let { fp ->
-                            pairedDeviceStore.findByFingerprint(fp)?.let { dev ->
-                                com.airbridge.device.WallpaperCache.delete(applicationContext, dev.deviceName)
-                                pairedDeviceStore.remove(fp)
-                            }
-                        }
-                        connectedDeviceName.value = null
-                        pairingIssue.value = getString(com.airbridge.R.string.repair_needed_unpaired, name)
-                    }
+                    if (message.reason == "not_paired") forgetCurrentMac()
                     // auth failure tracked via StateFlow
                 }
             }
@@ -1752,6 +1782,14 @@ class AirbridgeService : Service() {
                 if (headphoneHandoffPhase.value == HandoffPhase.IN_PROGRESS) {
                     pendingRelease?.complete(message)
                 }
+            }
+            is Message.Unpair -> {
+                // The Mac removed this phone from its paired devices.
+                Log.i(TAG, "Mac unpaired us — forgetting it")
+                webSocketClient.shouldReconnect = false
+                webSocketClient.disconnect()
+                isConnected.value = false
+                forgetCurrentMac()
             }
             is Message.HeadphoneTakeoverRequest -> {
                 // The Mac is asking for the headphones back (its own
