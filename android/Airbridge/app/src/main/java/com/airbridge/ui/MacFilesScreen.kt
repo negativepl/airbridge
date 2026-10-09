@@ -241,11 +241,14 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                         // reads as one rounded group (M3 Expressive style).
                         val isFirst = index == 0
                         val isLast = index == paneEntries.lastIndex
+                        // Corner sizes come from the theme's shape tokens.
+                        val outer = MaterialTheme.shapes.largeIncreased.topStart
+                        val inner = MaterialTheme.shapes.small.topStart
                         val shape = RoundedCornerShape(
-                            topStart = if (isFirst) 20.dp else 8.dp,
-                            topEnd = if (isFirst) 20.dp else 8.dp,
-                            bottomStart = if (isLast) 20.dp else 8.dp,
-                            bottomEnd = if (isLast) 20.dp else 8.dp
+                            topStart = if (isFirst) outer else inner,
+                            topEnd = if (isFirst) outer else inner,
+                            bottomEnd = if (isLast) outer else inner,
+                            bottomStart = if (isLast) outer else inner
                         )
 
                         // Request a thumbnail for media files on appearance — but only if we
@@ -303,7 +306,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                                         },
                                         contentAlignment = Alignment.Center,
                                         transitionSpec = {
-                                            // The badge springs in; the ring just fades out.
+                                            // The badge scales in on the motion scheme's spatial spec; the ring just fades out.
                                             (fadeIn(fastEffects) + scaleIn(initialScale = 0.5f, animationSpec = spatial)) togetherWith
                                                 fadeOut(fastEffects) using null
                                         },

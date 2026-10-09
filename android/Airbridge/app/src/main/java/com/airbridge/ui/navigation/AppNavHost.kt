@@ -54,6 +54,7 @@ fun AppNavHost(
         // Entries slide a quarter width while cross-fading, so the host must
         // carry the surface colour itself or the window background shows at the edges.
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+        // NavDisplay only handles back while the stack has more than one entry, so the tabs' own BackHandlers win at the root and the stack never empties.
         onBack = { backStack.removeLastOrNull() },
         entryDecorators = listOf(
             rememberSaveableStateHolderNavEntryDecorator(),

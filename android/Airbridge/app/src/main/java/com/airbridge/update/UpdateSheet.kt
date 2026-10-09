@@ -19,7 +19,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
@@ -32,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import kotlinx.coroutines.launch
@@ -97,8 +97,10 @@ fun UpdateFlowHost(trigger: Boolean, onDone: () -> Unit) {
     // above, after its toast, so the sheet isn't shown for it.
     val currentState = state
     if (currentState !is FlowState.Idle) {
-        @Suppress("DEPRECATION")
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val sheetState = rememberBottomSheetState(
+            SheetValue.Hidden,
+            setOf(SheetValue.Hidden, SheetValue.Expanded)
+        )
         ModalBottomSheet(
             onDismissRequest = {
                 state = FlowState.Idle
@@ -162,7 +164,6 @@ private fun UpdateUpToDateSheet(installedVersion: String) {
         Text(
             text = stringResource(R.string.update_up_to_date),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (installedVersion.isNotEmpty()) {
@@ -213,7 +214,6 @@ private fun UpdateAvailableSheet(
         Text(
             text = stringResource(R.string.update_whats_new),
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface
         )
 

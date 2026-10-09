@@ -68,7 +68,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.content.Intent
@@ -561,8 +560,7 @@ private fun PermissionsPage() {
                 Text(
                     text = stringResource(R.string.onboarding_perm_all_granted),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.success,
-                    fontWeight = FontWeight.Medium
+                    color = MaterialTheme.colorScheme.success
                 )
             }
         }

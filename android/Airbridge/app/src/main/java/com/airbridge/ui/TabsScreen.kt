@@ -60,7 +60,8 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -384,14 +385,12 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         }
     }
 
-
     // File/photo confirmation sheet
     if (pendingFileUri != null) {
-        // rememberModalBottomSheetState is deprecated in favour of
-        // rememberBottomSheetState(Hidden), which is not yet present in
-        // material3 1.5.0-alpha22 — keep this until the replacement ships.
-        @Suppress("DEPRECATION")
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val sheetState = rememberBottomSheetState(
+            SheetValue.Hidden,
+            setOf(SheetValue.Hidden, SheetValue.Expanded)
+        )
         ModalBottomSheet(
             onDismissRequest = { pendingFileUri = null },
             sheetState = sheetState
