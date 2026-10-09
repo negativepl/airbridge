@@ -10,12 +10,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,11 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
@@ -129,13 +124,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = topInset - 4.dp)) {
-        // Breadcrumb path bar — tappable segments, each jumps straight to that
-        // ancestor (mirror of the macOS FilesBrowserView path bar).
-        if (isConnected) {
-            MacPathBar(path = path, onNavigate = { viewModel.openMacFolder(it) })
-        }
-
+    Column(modifier = Modifier.fillMaxSize().padding(top = topInset)) {
         // Directional folder navigation: entering a folder pushes the new listing in
         // from the right, going up slides it back from the left (by path depth).
         //
@@ -368,58 +357,6 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
 private fun folderDepth(path: String): Int =
     if (path.isEmpty()) 0 else path.split('/').count { it.isNotEmpty() }
 
-/**
- * Horizontally-scrollable breadcrumb. The root segment is the Mac itself; each
- * path component is tappable and navigates straight to that ancestor. The last
- * segment is the current directory (highlighted, not clickable).
- */
-@Composable
-private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
-    val segments = remember(path) { path.split('/').filter { it.isNotEmpty() } }
-    // Sits where a section title sits on the other tabs (same inset and
-    // vertical rhythm), with the current folder in the title style.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            // Same 16 dp screen margin as the list rows below.
-            .padding(start = 16.dp, end = 16.dp, top = 26.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        PathSegment(
-            label = stringResource(R.string.mac_files_root),
-            isCurrent = segments.isEmpty(),
-            onClick = { onNavigate("") }
-        )
-        segments.forEachIndexed { index, segment ->
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-            PathSegment(
-                label = segment,
-                isCurrent = index == segments.lastIndex,
-                onClick = { onNavigate(segments.take(index + 1).joinToString("/")) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun PathSegment(label: String, isCurrent: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        style = if (isCurrent) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-        color = if (isCurrent) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.small)
-            .clickable(enabled = !isCurrent, onClick = onClick)
-            .padding(horizontal = if (isCurrent) 0.dp else 6.dp)
-    )
-}
 
 /**
  * Decodes a base64-encoded JPEG/PNG string and renders it as a square thumbnail.

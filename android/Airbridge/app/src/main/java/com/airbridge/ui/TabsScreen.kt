@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Close
@@ -39,7 +41,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -366,23 +368,51 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     }
                 }
             }
-            // One fixed centred bar over the tabs: the settings action stays put
-            // and only the title changes, fading with the tab.
+            // One fixed bar over the tabs, title centred. Inside a Mac folder the
+            // bar takes the folder's name as its title, the path above it as the
+            // subtitle and an up arrow, the way Google's file browsers do; the
+            // settings action stays put throughout.
             val titleFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-            CenterAlignedTopAppBar(
+            val navScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+            val folderSegments = remember(macFilesPath) { macFilesPath.split('/').filter { it.isNotEmpty() } }
+            val inFolder = selectedTab == 2 && folderSegments.isNotEmpty()
+            val barTitle = if (inFolder) folderSegments.last() else stringResource(pageTitles[selectedTab])
+            val barSubtitle: String? = if (inFolder) {
+                (listOf(stringResource(R.string.mac_files_root)) + folderSegments.dropLast(1)).joinToString(" / ")
+            } else null
+            TopAppBar(
                 title = {
                     AnimatedContent(
-                        targetState = selectedTab,
+                        targetState = barTitle,
                         transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
                         label = "pageTitle"
-                    ) { tab -> Text(stringResource(pageTitles[tab])) }
+                    ) { title -> Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                },
+                subtitle = {
+                    AnimatedContent(
+                        targetState = barSubtitle,
+                        transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
+                        label = "pageSubtitle"
+                    ) { subtitle -> if (subtitle != null) Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                },
+                navigationIcon = {
+                    AnimatedVisibility(
+                        visible = inFolder,
+                        enter = fadeIn(titleFade) + scaleIn(initialScale = 0.8f, animationSpec = navScale),
+                        exit = fadeOut(titleExit)
+                    ) {
+                        IconButton(onClick = { viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', "")) }) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
+                        }
+                    }
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }
                 },
+                titleHorizontalAlignment = Alignment.CenterHorizontally,
                 colors = pageTopAppBarColors(),
                 scrollBehavior = topBarBehaviors[selectedTab],
                 modifier = Modifier.align(Alignment.TopCenter)
