@@ -28,6 +28,8 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -119,48 +121,52 @@ fun QuickActionsRow(
     onMacScreen: () -> Unit,
     macScreenEnabled: Boolean,
     modifier: Modifier = Modifier,
-    /** False while there is no Mac to send to: the tiles stay in place, dimmed. */
+    /** False while there is no Mac to send to: the actions stay in place, disabled. */
     enabled: Boolean = true
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.home_section_quick_actions))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QuickTile(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickTile(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickTile(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickTile(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled, modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun QuickTile(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    PageCard(
-        onClick = onClick,
-        enabled = enabled,
-        // Material disabled content alpha.
-        modifier = modifier.alpha(if (enabled) 1f else 0.38f),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+    val fileLabel = stringResource(R.string.quick_file)
+    val photoLabel = stringResource(R.string.quick_photo)
+    val clipboardLabel = stringResource(R.string.quick_clipboard)
+    val macScreenLabel = stringResource(R.string.quick_mac_screen)
+    // One card like "Appearance" in Settings: the title at the top, the four
+    // actions as a stock button group underneath (the pressed button widens,
+    // its neighbours give way; actions that do not fit move to the overflow menu).
+    PageCard(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
+        CardHeader(stringResource(R.string.home_section_quick_actions))
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
+            ButtonGroup(
+                overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                clickableItem(
+                    onClick = onSendFile,
+                    label = fileLabel,
+                    enabled = enabled,
+                    icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
+                    weight = 1f
+                )
+                clickableItem(
+                    onClick = onSendPhoto,
+                    label = photoLabel,
+                    enabled = enabled,
+                    icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
+                    weight = 1f
+                )
+                clickableItem(
+                    onClick = onSendClipboard,
+                    label = clipboardLabel,
+                    enabled = enabled,
+                    icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                    weight = 1f
+                )
+                clickableItem(
+                    onClick = onMacScreen,
+                    label = macScreenLabel,
+                    enabled = enabled && macScreenEnabled,
+                    icon = { Icon(Icons.AutoMirrored.Rounded.ScreenShare, contentDescription = null) },
+                    weight = 1f
+                )
+            }
         }
     }
 }
