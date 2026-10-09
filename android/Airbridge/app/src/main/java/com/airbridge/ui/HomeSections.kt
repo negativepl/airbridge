@@ -29,7 +29,9 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -125,18 +127,18 @@ fun QuickActionsRow(
     enabled: Boolean = true
 ) {
     // One card like "Appearance" in Settings: the title at the top, the four
-    // actions as tonal buttons underneath. Icon above label, so the labels
-    // stay whole on the cover screen (a single-row button group clipped them).
+    // actions as tonal icon buttons underneath. Icons only: labels did not
+    // fit four buttons on the cover screen.
     PageCard(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         CardHeader(stringResource(R.string.home_section_quick_actions))
         Row(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            QuickAction(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickAction(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickAction(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled, modifier = Modifier.weight(1f))
-            QuickAction(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled, modifier = Modifier.weight(1f))
+            QuickAction(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled)
+            QuickAction(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled)
+            QuickAction(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled)
+            QuickAction(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled)
         }
     }
 }
@@ -146,20 +148,17 @@ private fun QuickAction(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    FilledTonalButton(
+    // Medium size from the Expressive icon button scale; the label becomes
+    // the content description.
+    FilledTonalIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp)
+        modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
+        shapes = IconButtonDefaults.shapes()
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.height(4.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        Icon(icon, contentDescription = label, modifier = Modifier.size(IconButtonDefaults.mediumIconSize))
     }
 }
 
@@ -196,7 +195,8 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
                 },
                 supportingContent = last?.let { { Text(formatTimeAgo(it.timestamp, now)) } },
                 trailingContent = {
-                    Button(onClick = onSendClipboard, enabled = enabled) {
+                    // Stock shape morph: the button squares off while pressed.
+                    Button(onClick = onSendClipboard, enabled = enabled, shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(R.string.clipboard_send_now))
                     }
                 },
@@ -306,7 +306,8 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     Spacer(Modifier.width(16.dp))
                     Button(
                         onClick = { viewModel.takeoverHeadphones() },
-                        enabled = state == TakeoverState.IDLE
+                        enabled = state == TakeoverState.IDLE,
+                        shapes = ButtonDefaults.shapes()
                     ) {
                         AnimatedContent(
                             targetState = state,
