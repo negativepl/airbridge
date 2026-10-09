@@ -124,7 +124,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = topInset)) {
+    // Same opening as the other tabs: the first row sits 16 dp under the bar
+    // (14 dp here plus the row's own 2 dp vertical padding).
+    Column(modifier = Modifier.fillMaxSize().padding(top = topInset + 14.dp)) {
         // Directional folder navigation: entering a folder pushes the new listing in
         // from the right, going up slides it back from the left (by path depth).
         //
