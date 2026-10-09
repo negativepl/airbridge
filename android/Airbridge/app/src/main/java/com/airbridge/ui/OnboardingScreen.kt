@@ -7,10 +7,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -31,9 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.graphics.shapes.RoundedPolygon
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material.icons.Icons
@@ -83,22 +79,11 @@ import android.provider.Settings
 import com.airbridge.R
 import kotlinx.coroutines.launch
 
-private val PillShape = RoundedCornerShape(50)
-
 // "All files access" (MANAGE_EXTERNAL_STORAGE) only exists from API 30 (R). On API 29
 // the method is absent — calling it would crash — and the grant is unobtainable, so the
 // files feature is simply reported as ungranted there.
 private fun isAllFilesAccessGranted(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
-
-// "Next" page change: emphasized-easing tween, NOT a spring — a spring overshoots
-// (bounces) at the end, which reads as broken next to a standard app screen
-// transition. Google apps don't bounce between screens; this curve accelerates
-// then settles smoothly with no overshoot.
-private val PageScrollSpec = tween<Float>(
-    durationMillis = 400,
-    easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
-)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -108,6 +93,7 @@ fun OnboardingScreen(
     onSkipPairing: () -> Unit = onFinished
 ) {
     val pagerState = rememberPagerState(pageCount = { 4 })
+    val pageScrollSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -157,7 +143,7 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .height(8.dp)
                                 .width(dotWidth)
-                                .clip(PillShape)
+                                .clip(MaterialTheme.shapes.extraLarge)
                                 .background(color)
                         )
                     }
@@ -193,7 +179,7 @@ fun OnboardingScreen(
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }
-                        FilledTonalButton(
+                        Button(
                             onClick = { onScanQr() },
                             modifier = Modifier
                                 .weight(1f)
@@ -206,14 +192,14 @@ fun OnboardingScreen(
                         }
                     }
                 } else {
-                    // "Next" — native FilledTonalButton; pressed feedback (state layer
+                    // "Next" — native Button; pressed feedback (state layer
                     // + Expressive shape) is built in, no hand-rolled scale needed.
-                    FilledTonalButton(
+                    Button(
                         onClick = {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(
                                     pagerState.currentPage + 1,
-                                    animationSpec = PageScrollSpec
+                                    animationSpec = pageScrollSpec
                                 )
                             }
                         },
@@ -647,7 +633,7 @@ private fun PermissionRow(
                         color = MaterialTheme.colorScheme.success
                     )
                 } else {
-                    FilledTonalButton(onClick = onRequest) {
+                    Button(onClick = onRequest) {
                         Text(stringResource(R.string.onboarding_perm_allow_btn))
                     }
                 }

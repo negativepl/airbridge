@@ -45,7 +45,7 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 8.dp, end = 8.dp, top = topInset - 4.dp, bottom = bottomClearance)
+            .padding(start = 16.dp, end = 16.dp, top = topInset - 4.dp, bottom = bottomClearance)
     ) {
         // Same opening as the other tabs: a section title under the bar, the
         // content right below it at the title's own bottom padding.

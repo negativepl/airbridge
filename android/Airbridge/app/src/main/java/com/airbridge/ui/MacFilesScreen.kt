@@ -5,10 +5,6 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -60,6 +56,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
 import com.airbridge.protocol.FileEntry
@@ -150,14 +147,16 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
         // play" bug). With the path as the key, content fills in by plain
         // recomposition of the pane and the slide always completes. The exiting pane
         // reads its listing from the cache so it keeps its content while sliding out.
+        val folderSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+        val folderEffects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         AnimatedContent(
             targetState = path,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
                 val dir = if (folderDepth(targetState) >= folderDepth(initialState))
                     SlideDirection.Left else SlideDirection.Right
-                (slideIntoContainer(dir, tween(330, easing = FastOutSlowInEasing)) + fadeIn(tween(220))) togetherWith
-                    (slideOutOfContainer(dir, tween(300, easing = FastOutSlowInEasing)) + fadeOut(tween(200)))
+                (slideIntoContainer(dir, folderSpatial) + fadeIn(folderEffects)) togetherWith
+                    (slideOutOfContainer(dir, folderSpatial) + fadeOut(folderEffects))
             },
             label = "folderNav"
         ) { panePath ->
@@ -294,6 +293,8 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                             // the download action.
                             trailingContent = if (downloading || failed || entry.name in justDone) {
                                 {
+                                    val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                                    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
                                     AnimatedContent(
                                         targetState = when {
                                             downloading -> DownloadBadge.Progress
@@ -303,13 +304,8 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                                         contentAlignment = Alignment.Center,
                                         transitionSpec = {
                                             // The badge springs in; the ring just fades out.
-                                            (fadeIn(tween(150)) + scaleIn(
-                                                initialScale = 0.5f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
-                                            )) togetherWith fadeOut(tween(120)) using null
+                                            (fadeIn(fastEffects) + scaleIn(initialScale = 0.5f, animationSpec = spatial)) togetherWith
+                                                fadeOut(fastEffects) using null
                                         },
                                         label = "downloadTrailing"
                                     ) { badge ->

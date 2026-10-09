@@ -53,7 +53,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.airbridge.R
 
 
@@ -85,7 +84,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // No section title here; the logo starts where a first card would.
@@ -115,8 +114,6 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         Text(
             text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineSmallEmphasized,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-            letterSpacing = 1.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
 
