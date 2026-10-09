@@ -119,7 +119,7 @@ fun MainScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 16.dp)
     ) {
         // The first section title sits under the bar like any other title.
         Spacer(modifier = Modifier.height(topInset - 4.dp))

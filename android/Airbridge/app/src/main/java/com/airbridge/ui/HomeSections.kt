@@ -81,16 +81,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Section title used on every screen: text colour (not the accent), 16 sp
- * semibold, sitting close to its card.
+ * Section header above a group of cards: titleMedium, aligned with the card
+ * content (16 dp, the card's own content padding), 24 dp above, 8 dp below.
  */
 @Composable
 fun SectionTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 10.dp, top = 26.dp, bottom = 8.dp)
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
     )
 }
 
@@ -128,23 +128,20 @@ private fun QuickTile(
     enabled: Boolean = true
 ) {
     Card(
-        onClick = { if (enabled) onClick() },
-        modifier = modifier.alpha(if (enabled) 1f else 0.5f),
+        onClick = onClick,
+        enabled = enabled,
+        // Material disabled content alpha.
+        modifier = modifier.alpha(if (enabled) 1f else 0.38f),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
-            }
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.height(8.dp))
             Text(
                 label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

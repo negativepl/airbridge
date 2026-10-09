@@ -60,7 +60,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 StatColumn(
@@ -84,7 +84,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
                     stringResource(R.string.no_activity),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                 )
             } else {
                 transfers.forEachIndexed { index, item ->
