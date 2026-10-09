@@ -18,3 +18,13 @@ fun MutableList<NavKey>.replaceAllWith(vararg keys: NavKey) {
     clear()
     addAll(keys)
 }
+
+/** Pops [key] only if it is on top and not the root, so a repeated tap during the exit animation is a no-op. */
+fun MutableList<NavKey>.popIfTop(key: NavKey) {
+    if (size > 1 && lastOrNull() == key) removeAt(lastIndex)
+}
+
+/** Pushes [key] unless it is already on top, so a repeated tap during the enter animation is a no-op. */
+fun MutableList<NavKey>.pushIfAbsent(key: NavKey) {
+    if (lastOrNull() != key) add(key)
+}

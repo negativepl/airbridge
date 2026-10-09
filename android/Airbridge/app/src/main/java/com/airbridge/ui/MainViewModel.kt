@@ -9,9 +9,7 @@ import com.airbridge.protocol.ContentType
 import com.airbridge.service.ActivityItem
 import com.airbridge.service.AirbridgeService
 import com.airbridge.stats.Stats
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -43,9 +41,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Headphone handoff
     val macHeadphoneState = AirbridgeService.macHeadphoneState
     val headphoneHandoffPhase = AirbridgeService.headphoneHandoffPhase
-
-    private val _showQrScanner = MutableStateFlow(false)
-    val showQrScanner: StateFlow<Boolean> = _showQrScanner.asStateFlow()
 
     fun startService() {
         val intent = Intent(getApplication(), AirbridgeService::class.java).apply {
@@ -79,14 +74,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = AirbridgeService.ACTION_HEADPHONE_TAKEOVER
         }
         getApplication<Application>().startForegroundService(intent)
-    }
-
-    fun showQrScanner() {
-        _showQrScanner.value = true
-    }
-
-    fun hideQrScanner() {
-        _showQrScanner.value = false
     }
 
     fun disconnect() {

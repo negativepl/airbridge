@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,9 +157,9 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     // SAME gap above the FAB as the FAB leaves above the dock — by
     // construction, regardless of FAB size, insets or screen.
     val density = LocalDensity.current
-    var fabTopPx by remember { mutableFloatStateOf(0f) }
-    var fabBottomPx by remember { mutableFloatStateOf(0f) }
-    var dockTopPx by remember { mutableFloatStateOf(0f) }
+    var fabTopPx by rememberSaveable { mutableFloatStateOf(0f) }
+    var fabBottomPx by rememberSaveable { mutableFloatStateOf(0f) }
+    var dockTopPx by rememberSaveable { mutableFloatStateOf(0f) }
     val fabClearance = if (dockTopPx > 0f && fabTopPx > 0f) {
         with(density) {
             ((dockTopPx - fabTopPx) + (dockTopPx - fabBottomPx)).coerceAtLeast(0f).toDp()

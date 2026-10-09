@@ -72,28 +72,28 @@ fun AppNavHost(
             entry<AppRoute.Onboarding> {
                 OnboardingScreen(
                     onFinished = { finishOnboarding() },
-                    onScanQr = { backStack.add(AppRoute.QrScanner) },
+                    onScanQr = { backStack.pushIfAbsent(AppRoute.QrScanner) },
                     onSkipPairing = { finishOnboarding() },
                 )
             }
             entry<AppRoute.Tabs> {
                 TabsScreen(
                     viewModel = viewModel,
-                    onOpenSettings = { backStack.add(AppRoute.Settings) },
-                    onScanQr = { backStack.add(AppRoute.QrScanner) },
+                    onOpenSettings = { backStack.pushIfAbsent(AppRoute.Settings) },
+                    onScanQr = { backStack.pushIfAbsent(AppRoute.QrScanner) },
                 )
             }
             entry<AppRoute.Settings> {
                 SettingsScreen(
                     prefs = prefs,
                     onThemeChanged = onThemeChanged,
-                    onScanQr = { backStack.add(AppRoute.QrScanner) },
-                    onBack = { backStack.removeLastOrNull() },
-                    onOpenAbout = { backStack.add(AppRoute.About) },
+                    onScanQr = { backStack.pushIfAbsent(AppRoute.QrScanner) },
+                    onBack = { backStack.popIfTop(AppRoute.Settings) },
+                    onOpenAbout = { backStack.pushIfAbsent(AppRoute.About) },
                 )
             }
             entry<AppRoute.About> {
-                AboutScreen(onBack = { backStack.removeLastOrNull() })
+                AboutScreen(onBack = { backStack.popIfTop(AppRoute.About) })
             }
             entry<AppRoute.QrScanner> {
                 QrScannerScreen(
@@ -102,13 +102,13 @@ fun AppNavHost(
                         prefs.edit { putBoolean(ONBOARDING_DONE, true) }
                         backStack.replaceAllWith(AppRoute.Tabs, AppRoute.PairingSuccess("Mac"))
                     },
-                    onDismiss = { backStack.removeLastOrNull() },
+                    onDismiss = { backStack.popIfTop(AppRoute.QrScanner) },
                 )
             }
             entry<AppRoute.PairingSuccess> { key ->
                 PairingSuccessScreen(
                     deviceName = key.deviceName,
-                    onContinue = { backStack.removeLastOrNull() },
+                    onContinue = { backStack.popIfTop(key) },
                 )
             }
         },

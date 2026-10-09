@@ -92,7 +92,6 @@ fun OnboardingScreen(
     onSkipPairing: () -> Unit = onFinished
 ) {
     val pagerState = rememberPagerState(pageCount = { 4 })
-    val pageScrollSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -196,10 +195,7 @@ fun OnboardingScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(
-                                    pagerState.currentPage + 1,
-                                    animationSpec = pageScrollSpec
-                                )
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
                             }
                         },
                         modifier = Modifier

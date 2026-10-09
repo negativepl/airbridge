@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Browser for the Mac's home directory. Renders as plain content inside the
- * shared [MainActivity] Scaffold — it does NOT create its own Scaffold (that
+ * shared [TabsScreen] Scaffold — it does NOT create its own Scaffold (that
  * would double the insets and collide with the global FAB). The upload action
  * lives on the host's contextual FAB. [bottomClearance] keeps the list above
  * that FAB and the dock.
@@ -141,7 +141,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
         //
         // Keyed by PATH ONLY — deliberately not by (path, entries). The slide starts
         // the instant a folder is tapped (optimistic navigation), and the listing
-        // usually arrives from the Mac while those 330ms are still running; if the
+        // usually arrives from the Mac while the slide spring is still running; if the
         // entries were part of the key, that mid-flight refresh would retarget the
         // AnimatedContent and cut the slide short (the "animation sometimes doesn't
         // play" bug). With the path as the key, content fills in by plain
@@ -348,7 +348,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                                 containerColor = MaterialTheme.colorScheme.cardContainer
                             ),
                             modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .padding(horizontal = 16.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = entry.name,
@@ -381,9 +381,8 @@ private fun MacPathBar(path: String, onNavigate: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            // 6 dp here plus the first row's 2 dp of its own = the title's 8 dp.
-            // 18 dp = the 8 dp page gutter the other tabs have plus the title inset.
-            .padding(start = 18.dp, end = 8.dp, top = 26.dp, bottom = 6.dp),
+            // Same 16 dp screen margin as the list rows below.
+            .padding(start = 16.dp, end = 16.dp, top = 26.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PathSegment(
