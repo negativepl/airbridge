@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -53,7 +52,7 @@ import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.BrightnessAuto
-import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -247,33 +246,24 @@ private fun SettingsContent(
                         Triple("dark", stringResource(R.string.settings_theme_dark), Icons.Rounded.DarkMode)
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectableGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
+                    // Stock button group: the pressed button widens and its
+                    // neighbours give way, the checked one takes the primary colour.
+                    ButtonGroup(
+                        overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        themeOptions.forEachIndexed { index, option ->
-                            val (value, label, themeIcon) = option
-                            ToggleButton(
+                        themeOptions.forEach { (value, label, themeIcon) ->
+                            toggleableItem(
                                 checked = themeMode == value,
+                                label = label,
                                 onCheckedChange = {
                                     themeMode = value
                                     prefs.edit { putString("theme_mode", value) }
                                     onThemeChanged(value)
                                 },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .semantics { role = Role.RadioButton },
-                                shapes = when (index) {
-                                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                    themeOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                },
-                                icon = { Icon(themeIcon, contentDescription = null) }
-                            ) {
-                                Text(label, maxLines = 1)
-                            }
+                                icon = { Icon(themeIcon, contentDescription = null) },
+                                weight = 1f
+                            )
                         }
                     }
                 }
