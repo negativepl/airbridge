@@ -250,8 +250,8 @@ public final class MirrorService {
                 guard let self else { return }
                 self.frameCounter += 1
                 self.updateDecodedFPS()
-                if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 60) {
-                    Diag.log("Mirror", "decoded sample #\(self.frameCounter)")
+                if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 120) {
+                    Diag.log("Mirror", "decoded sample #\(self.frameCounter) fps=\(String(format: "%.1f", self.decodedFramesPerSecond)) Mbps=\(String(format: "%.2f", self.incomingBitrateMbps)) video=\(Int(self.videoWidth))x\(Int(self.videoHeight))")
                 }
                 for continuation in self.sampleSubscribers.values {
                     continuation.yield(box.value)

@@ -30,13 +30,20 @@ public final class VideoEncoder {
     /// Raw parameter sets: [SPS, PPS] for H.264, [VPS, SPS, PPS] for HEVC.
     private let onConfig: @Sendable ([Data]) -> Void
     private let onFrame: @Sendable (Data, UInt64) -> Void   // Annex-B access unit, ptsUs
+    /// Called for the first failed frame and then every 300th, with the
+    /// VideoToolbox status and the running count of failed frames.
+    private let onError: @Sendable (OSStatus, Int) -> Void
+    private let errorLock = NSLock()
+    private var failedFrames = 0
 
     public init(config: Config,
                 onConfig: @escaping @Sendable ([Data]) -> Void,
-                onFrame: @escaping @Sendable (Data, UInt64) -> Void) throws {
+                onFrame: @escaping @Sendable (Data, UInt64) -> Void,
+                onError: @escaping @Sendable (OSStatus, Int) -> Void = { _, _ in }) throws {
         self.config = config
         self.onConfig = onConfig
         self.onFrame = onFrame
+        self.onError = onError
         try createSession()
     }
 
@@ -106,11 +113,25 @@ public final class VideoEncoder {
         return s
     }
 
+    /// Frames handed to VideoToolbox that have not come back yet. Counted
+    /// separately from the latency map: a frame the encoder drops comes back
+    /// without a sample buffer, so its timestamp can never be matched.
+    public var inFlight: Int {
+        latencyLock.lock(); defer { latencyLock.unlock() }
+        return inFlightCount
+    }
+    private var inFlightCount = 0
+    /// Dropped frames leave their timestamps behind; forget them after this long.
+    private static let submittedTTLNs: UInt64 = 2_000_000_000
+
     public func encode(pixelBuffer: CVPixelBuffer, ptsUs: UInt64) {
         guard let session else { return }
         latencyLock.lock()
-        submitted[ptsUs] = DispatchTime.now().uptimeNanoseconds
-        if submitted.count > maxInFlight { maxInFlight = submitted.count }
+        let now = DispatchTime.now().uptimeNanoseconds
+        submitted[ptsUs] = now
+        submitted = submitted.filter { now - $0.value < Self.submittedTTLNs }
+        inFlightCount += 1
+        if inFlightCount > maxInFlight { maxInFlight = inFlightCount }
         latencyLock.unlock()
         let pts = CMTime(value: CMTimeValue(ptsUs), timescale: 1_000_000)
         VTCompressionSessionEncodeFrame(
@@ -131,6 +152,19 @@ public final class VideoEncoder {
     }
 
     private func handleEncoded(status: OSStatus, sampleBuffer: CMSampleBuffer?) {
+        latencyLock.lock()
+        inFlightCount = max(0, inFlightCount - 1)
+        latencyLock.unlock()
+        // A frame the rate control could not fit comes back with no error and
+        // no sample buffer; it is reported through the same channel so a
+        // bitrate too low for the content shows up in the log.
+        if status != noErr || sampleBuffer == nil {
+            errorLock.lock()
+            failedFrames += 1
+            let n = failedFrames
+            errorLock.unlock()
+            if n == 1 || n % 300 == 0 { onError(status, n) }
+        }
         guard status == noErr,
               let sampleBuffer,
               CMSampleBufferDataIsReady(sampleBuffer) else { return }

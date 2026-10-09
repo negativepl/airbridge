@@ -171,7 +171,12 @@ struct MirrorTabView: View {
                 Picker("", selection: fpsBinding(slot)) {
                     Text("30 FPS").tag(30)
                     Text("60 FPS").tag(60)
-                    Text("120 FPS").tag(120)
+                    // The Mac side captures at 60 Hz at most (the virtual
+                    // display runs at 60 Hz), so only the phone's screen can
+                    // be sent faster.
+                    if slot == .forward {
+                        Text("120 FPS").tag(120)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
@@ -179,7 +184,7 @@ struct MirrorTabView: View {
 
             if showResolution {
                 settingRow(L10n.isPL ? "Rozdzielczość" : "Resolution") {
-                    Picker("", selection: scaleBinding(slot)) {
+                    Picker("", selection: scaleBinding(slot, choices: [1.0, 0.75, 0.5])) {
                         Text(L10n.isPL ? "Pełna" : "Full").tag(1.0)
                         Text("75%").tag(0.75)
                         Text("50%").tag(0.5)
@@ -191,7 +196,7 @@ struct MirrorTabView: View {
 
             if showUIScale {
                 settingRow(L10n.isPL ? "Skala UI" : "UI scale") {
-                    Picker("", selection: scaleBinding(slot)) {
+                    Picker("", selection: scaleBinding(slot, choices: [0.8, 1.0, 1.4])) {
                         Text(L10n.isPL ? "Większe UI" : "Bigger UI").tag(0.8)
                         Text(L10n.isPL ? "Standard" : "Standard").tag(1.0)
                         Text(L10n.isPL ? "Więcej miejsca" : "More space").tag(1.4)
@@ -242,9 +247,15 @@ struct MirrorTabView: View {
             }
         )
     }
-    private func scaleBinding(_ slot: MirrorSlot) -> Binding<Double> {
+    /// Snaps the stored scale to the nearest picker value, so a value that was
+    /// not written by this picker (an older build, a hand-edited default)
+    /// still selects a segment.
+    private func scaleBinding(_ slot: MirrorSlot, choices: [Double]) -> Binding<Double> {
         Binding(
-            get: { mirrorService.quality(slot).resolutionScale },
+            get: {
+                let stored = mirrorService.quality(slot).resolutionScale
+                return choices.min { abs($0 - stored) < abs($1 - stored) } ?? stored
+            },
             set: { var q = mirrorService.quality(slot); q.resolutionScale = $0; mirrorService.setQuality(slot, q) }
         )
     }

@@ -6,9 +6,10 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.projection.MediaProjection
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import java.nio.ByteBuffer
 
@@ -37,6 +38,9 @@ class ScreenEncoder(
      * on an already-released codec (IllegalStateException / native crash).
      */
     @Volatile private var stopped = false
+    private var outputFrames = 0L
+    private var outputBytes = 0L
+    private var outputWindowStart = SystemClock.elapsedRealtime()
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             stop()
@@ -81,6 +85,15 @@ class ScreenEncoder(
                         extractParamSets(payload)
                         maybeEmitConfig()
                     } else if (info.size > 0) {
+                        outputFrames++
+                        outputBytes += info.size
+                        if (outputFrames % 120 == 0L) {
+                            val now = SystemClock.elapsedRealtime()
+                            val seconds = (now - outputWindowStart) / 1000.0
+                            Log.d(TAG, "output #$outputFrames fps=${"%.1f".format(120 / seconds)} Mbps=${"%.2f".format(outputBytes * 8 / seconds / 1e6)} target=${bitrateBps / 1e6} Mbps $mime ${width}x$height")
+                            outputWindowStart = now
+                            outputBytes = 0L
+                        }
                         onMessage(MirrorMessage.VideoFrame(
                             presentationTimestampUs = info.presentationTimeUs.toULong(),
                             naluBytes = payload

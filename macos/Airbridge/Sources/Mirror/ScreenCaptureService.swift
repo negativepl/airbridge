@@ -21,17 +21,21 @@ public final class ScreenCaptureService: NSObject, SCStreamOutput {
     private let targetDisplayID: CGDirectDisplayID?
     private let capLongEdge: Int?
     private let forcedOutputSize: (Int, Int)?
+    private let fps: Int
 
+    /// - fps: frames per second requested from ScreenCaptureKit.
     /// - targetDisplayID: capture this specific display (nil = main display).
     /// - capLongEdge: downscale so the long edge fits this (nil = native).
     /// - forcedOutputSize: capture at exactly this pixel size, ignoring the
     ///   display's point size. Used for a HiDPI virtual display so we grab full
     ///   backing pixels (sharp) rather than the halved logical size.
-    public init(targetDisplayID: CGDirectDisplayID? = nil,
+    public init(fps: Int = 60,
+                targetDisplayID: CGDirectDisplayID? = nil,
                 capLongEdge: Int? = ScreenCaptureService.defaultMaxLongEdge,
                 forcedOutputSize: (Int, Int)? = nil,
                 onConfigured: @escaping @Sendable (Int, Int) -> Void,
                 onFrame: @escaping @Sendable (CVPixelBuffer, UInt64) -> Void) {
+        self.fps = fps
         self.targetDisplayID = targetDisplayID
         self.capLongEdge = capLongEdge
         self.forcedOutputSize = forcedOutputSize
@@ -62,7 +66,7 @@ public final class ScreenCaptureService: NSObject, SCStreamOutput {
         let config = SCStreamConfiguration()
         config.width = outW
         config.height = outH
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 60)   // up to 60 fps
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         // Video range is the hardware encoder's native input; full range made VideoToolbox
         // convert every frame and encode times spiked to ~65 ms several times a second.
         config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange

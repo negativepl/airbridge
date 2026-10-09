@@ -15,6 +15,10 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     /// it — the phone becomes a perfectly-shaped second monitor. nil = mirror the
     /// Mac's main display (letterboxed on the phone).
     private let virtualSize: (Int, Int)?
+    /// The capture never exceeds the virtual display's 60 Hz, and asking the
+    /// encoder for more makes H.264 reject large frames (level limits), so
+    /// the requested rate is capped here.
+    private var effectiveFps: Int { min(fps, 60) }
     private let onPacket: @Sendable (Data) -> Void
     private let onLog: @Sendable (String) -> Void
     /// The CGDirectDisplayID being captured — for mapping reverse-control input.
@@ -28,6 +32,14 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     let captureGaps = GapStats()
     let encodeGaps = GapStats()
     private let encodedCount = Counter()
+    private let skippedCount = Counter()
+    /// Capture frames are dropped while this many are still in the encoder.
+    private static let maxFramesInFlight = 2
+    /// Longest edge of the encoded frame. The hardware encoder needs about
+    /// 14 ms per 2184x1968 frame and 24 ms per 3056x2754 frame (HEVC and
+    /// H.264 alike, measured 2026-10-09), so anything larger cannot reach
+    /// 60 fps; a bigger virtual display is captured scaled down to this.
+    private static let encodeLongEdgeCap = 2200
 
     public init(fps: Int, bitrate: Int, useHEVC: Bool = false,
                 virtualSize: (Int, Int)? = nil,
@@ -62,7 +74,7 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
             virtualDisplay = vd
             targetDisplayID = vd.displayID
             capLongEdge = nil
-            forcedOutputSize = (dw, dh)   // capture full backing pixels, not halved points
+            forcedOutputSize = Self.fit(dw, dh, cap: Self.encodeLongEdgeCap)   // backing pixels (not halved points), scaled down only above the encoder's limit
             onLog("virtual display created id=\(vd.displayID) \(dw)x\(dh) (HiDPI) mode=\(vd.selectedMode ?? "?")")
             onDisplayID(vd.displayID)
         } else {
@@ -70,6 +82,7 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
         }
 
         let capture = ScreenCaptureService(
+            fps: effectiveFps,
             targetDisplayID: targetDisplayID,
             capLongEdge: capLongEdge,
             forcedOutputSize: forcedOutputSize,
@@ -80,7 +93,7 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
                     let enc = try VideoEncoder(
                         config: VideoEncoder.Config(
                             width: Int32(w), height: Int32(h),
-                            fps: self.fps, bitrateBps: self.bitrate, keyframeIntervalSeconds: 5,
+                            fps: self.effectiveFps, bitrateBps: self.bitrate, keyframeIntervalSeconds: 5,
                             useHEVC: self.useHEVC
                         ),
                         onConfig: { sets in
@@ -97,6 +110,9 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
                             self.encodeGaps.record()
                             if n == 1 || n % 60 == 0 { self.onLog("reverse encoded frame #\(n) bytes=\(annexB.count) \(self.encodeGaps.flush()) \(self.currentEncoder()?.latencySummary() ?? "")") }
                             self.onPacket(MirrorMessage.videoFrame(presentationTimestampUs: pts, naluBytes: annexB).encode())
+                        },
+                        onError: { status, failed in
+                            self.onLog(status == noErr ? "reverse encoder dropped frame (\(failed) total, bitrate too low for the content)" : "reverse encode error \(status) (\(failed) frames failed)")
                         }
                     )
                     self.setEncoder(enc)
@@ -118,7 +134,16 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
                 } else if n % 60 == 0 {
                     self.onLog("reverse captured frame #\(n) \(self.captureGaps.flush())")
                 }
-                self.currentEncoder()?.encode(pixelBuffer: pixelBuffer, ptsUs: pts)
+                guard let encoder = self.currentEncoder() else { return }
+                // An encoder that cannot keep up must drop frames, not queue
+                // them: queued frames only add latency (377 frames in flight
+                // measured with H.264 at 3056x2754 before this guard).
+                if encoder.inFlight >= Self.maxFramesInFlight {
+                    let skipped = self.skippedCount.increment()
+                    if skipped == 1 || skipped % 60 == 0 { self.onLog("reverse capture skipped frame (\(skipped) total, encoder busy)") }
+                    return
+                }
+                encoder.encode(pixelBuffer: pixelBuffer, ptsUs: pts)
             }
         )
         self.capture = capture
