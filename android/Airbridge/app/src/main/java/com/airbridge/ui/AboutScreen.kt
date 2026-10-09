@@ -60,7 +60,7 @@ import com.airbridge.R
 @Composable
 fun AboutScreen(onBack: () -> Unit = {}) {
     BackHandler { onBack() }
-    GlassTopBarScreen(
+    TopBarScreen(
         title = stringResource(R.string.nav_about),
         navigationIcon = {
             IconButton(onClick = onBack) {

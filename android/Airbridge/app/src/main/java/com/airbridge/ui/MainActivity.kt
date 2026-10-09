@@ -32,9 +32,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.AnimatedContent
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
-import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -85,7 +85,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -217,7 +216,18 @@ class MainActivity : ComponentActivity() {
                     )
 
                     val pagerState = rememberPagerState(pageCount = { 3 })
-                    val hazeState = rememberHazeState()
+                    // One top bar state per pager page: the bar shows the scrolled
+                    // colour for the page on screen, not for whatever page scrolled last.
+                    val topBarStates = listOf(
+                        rememberTopAppBarState(),
+                        rememberTopAppBarState(),
+                        rememberTopAppBarState(),
+                    )
+                    val topBarBehaviors = listOf(
+                        TopAppBarDefaults.pinnedScrollBehavior(topBarStates[0]),
+                        TopAppBarDefaults.pinnedScrollBehavior(topBarStates[1]),
+                        TopAppBarDefaults.pinnedScrollBehavior(topBarStates[2]),
+                    )
                     val coroutineScope = rememberCoroutineScope()
                     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(this@MainActivity) }
                     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
@@ -311,19 +321,12 @@ class MainActivity : ComponentActivity() {
                     // No shared top bar: each pager page carries its own static one
                     // (see the pager below), so the title moves with the page.
                     Scaffold(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         bottomBar = {
-                            // Stock Material 3 navigation bar as a glass dock: the cards'
-                            // surface as its tint over the blurred content passing beneath,
-                            // with the cards' edge light on top.
+                            // Stock Material 3 navigation bar: opaque surfaceContainer, no line.
                             NavigationBar(
-                                containerColor = Color.Transparent,
-                                modifier = Modifier
-                                    .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainerLowest)
-                                    .topEdgeLight()
-                                    .onGloballyPositioned {
-                                        dockTopPx = it.boundsInWindow().top
-                                    }
+                                modifier = Modifier.onGloballyPositioned {
+                                    dockTopPx = it.boundsInWindow().top
+                                }
                             ) {
                                 navItems.forEachIndexed { index, item ->
                                     NavigationBarItem(
@@ -417,18 +420,21 @@ class MainActivity : ComponentActivity() {
                         // snapping to the target page's name mid-gesture.
                         // Pages run under both bars (no Scaffold padding); each page
                         // reserves the top bar height and the dock height plus the FAB
-                        // clearance itself, and the bars blur what scrolls beneath them.
+                        // clearance itself, and the bars are opaque.
                         val pageBottomClearance = fabClearance + innerPadding.calculateBottomPadding()
-                        val topInset = androidx.compose.material3.TopAppBarDefaults.TopAppBarExpandedHeight +
+                        val topInset = TopAppBarDefaults.TopAppBarExpandedHeight +
                             WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                         Box(modifier = Modifier.fillMaxSize()) {
                             HorizontalPager(
                                 state = pagerState,
                                 beyondViewportPageCount = 1,
                             ) { page ->
-                                // Each page's content is a haze source: the top bar and the
-                                // dock (siblings of the pager) blur what passes under them.
-                                Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
+                                // Each page reports its scroll to its own top bar state.
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .nestedScroll(topBarBehaviors[page].nestedScrollConnection)
+                                ) {
                                     when (page) {
                                         0 -> MainScreen(
                                             viewModel = viewModel,
@@ -449,32 +455,26 @@ class MainActivity : ComponentActivity() {
                             val titleFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                             val titleSlide = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
                             val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                            key(MaterialTheme.colorScheme.surfaceContainer) {
-                                TopAppBar(
-                                    title = {
-                                        AnimatedContent(
-                                            targetState = pagerState.targetPage.coerceIn(0, pageTitles.lastIndex),
-                                            transitionSpec = {
-                                                val forward = targetState > initialState
-                                                (fadeIn(titleFade) + slideInVertically(titleSlide) { if (forward) it / 2 else -it / 2 }) togetherWith
-                                                    (fadeOut(titleExit) + slideOutVertically(titleSlide) { if (forward) -it / 2 else it / 2 })
-                                            },
-                                            label = "pageTitle"
-                                        ) { page -> Text(stringResource(pageTitles[page])) }
-                                    },
-                                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                                        containerColor = Color.Transparent
-                                    ),
-                                    actions = {
-                                        IconButton(onClick = { showSettings = true }) {
-                                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .glassBar(hazeState, MaterialTheme.colorScheme.surfaceContainer)
-                                )
-                            }
+                            TopAppBar(
+                                title = {
+                                    AnimatedContent(
+                                        targetState = pagerState.targetPage.coerceIn(0, pageTitles.lastIndex),
+                                        transitionSpec = {
+                                            val forward = targetState > initialState
+                                            (fadeIn(titleFade) + slideInVertically(titleSlide) { if (forward) it / 2 else -it / 2 }) togetherWith
+                                                (fadeOut(titleExit) + slideOutVertically(titleSlide) { if (forward) -it / 2 else it / 2 })
+                                        },
+                                        label = "pageTitle"
+                                    ) { page -> Text(stringResource(pageTitles[page])) }
+                                },
+                                actions = {
+                                    IconButton(onClick = { showSettings = true }) {
+                                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
+                                    }
+                                },
+                                scrollBehavior = topBarBehaviors[pagerState.currentPage],
+                                modifier = Modifier.align(Alignment.TopCenter)
+                            )
                         }
                     }
 

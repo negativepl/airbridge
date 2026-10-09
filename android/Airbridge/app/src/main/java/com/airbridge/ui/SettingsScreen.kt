@@ -96,7 +96,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {}
 ) {
     BackHandler { onBack() }
-    GlassTopBarScreen(
+    TopBarScreen(
         title = stringResource(R.string.nav_settings),
         navigationIcon = {
             IconButton(onClick = onBack) {

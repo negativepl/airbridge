@@ -73,9 +73,6 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     // Launch splash held until the Mac is connected and its info has arrived.
     implementation("androidx.core:core-splashscreen:1.2.0")
-    // Glass bars: the top bar and the dock blur the content passing under them.
-    implementation("dev.chrisbanes.haze:haze:2.0.0")
-    implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
