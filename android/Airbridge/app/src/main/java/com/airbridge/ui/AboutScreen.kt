@@ -2,7 +2,6 @@ package com.airbridge.ui
 
 import android.content.Intent
 import androidx.core.net.toUri
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,7 +60,6 @@ import com.airbridge.R
 
 @Composable
 fun AboutScreen(onBack: () -> Unit = {}) {
-    BackHandler { onBack() }
     TopBarScreen(
         title = stringResource(R.string.nav_about),
         navigationIcon = {

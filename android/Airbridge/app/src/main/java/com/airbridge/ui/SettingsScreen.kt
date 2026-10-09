@@ -67,7 +67,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -95,7 +94,6 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
-    BackHandler { onBack() }
     TopBarScreen(
         title = stringResource(R.string.nav_settings),
         navigationIcon = {
