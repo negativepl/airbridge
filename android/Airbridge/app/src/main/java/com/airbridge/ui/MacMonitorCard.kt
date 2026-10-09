@@ -71,7 +71,6 @@ fun MacDeviceCard(
     val mismatch = isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)
 
     Column(modifier = modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.home_section_connected_device))
         Card(modifier = Modifier.fillMaxWidth()) {
             // Media: same size with or without a wallpaper, so the card does
             // not jump when the picture arrives.
@@ -97,6 +96,12 @@ fun MacDeviceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    // Overline: the card's role, above the headline.
+                    Text(
+                        text = stringResource(R.string.home_section_connected_device),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text(
                         text = info.name,
                         style = MaterialTheme.typography.titleMedium,
@@ -194,7 +199,8 @@ private fun versionBase(version: String): String = version.substringBefore("-")
  */
 @Composable
 fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
+        CardHeader(stringResource(R.string.home_monitor_title))
         Row(
             modifier = Modifier
                 .fillMaxWidth()

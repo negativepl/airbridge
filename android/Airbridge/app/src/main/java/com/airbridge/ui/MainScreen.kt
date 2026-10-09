@@ -120,8 +120,8 @@ fun MainScreen(
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp)
     ) {
-        // The first section title sits under the bar like any other title.
-        Spacer(modifier = Modifier.height(topInset - 4.dp))
+        // The device card starts one card gap below the bar.
+        Spacer(modifier = Modifier.height(topInset + 16.dp))
 
         // ── Re-pair guidance first: if the Mac dropped us, nothing below is live ──
         // ── Re-pair guidance (TLS pin missing or Mac certificate changed) ──
@@ -244,7 +244,6 @@ fun MainScreen(
         ClipboardCard(items = activity, onSendClipboard = onSendClipboard, enabled = macReady, modifier = Modifier.alpha(if (macReady) 1f else 0.5f))
         HeadphonesCard(viewModel = viewModel)
 
-        SectionTitle(stringResource(R.string.home_monitor_title))
         // Never show numbers from a session that is over: empty rings, dimmed.
         MacMonitorRings(info = if (macReady) mac else null, modifier = Modifier.alpha(if (macReady) 1f else 0.5f))
 
@@ -538,7 +537,7 @@ private fun DeviceCard(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        androidx.compose.material3.FilledTonalButton(onClick = onDisconnect) {
+                        Button(onClick = onDisconnect) {
                             Icon(
                                 Icons.Rounded.LinkOff,
                                 contentDescription = null,
@@ -619,7 +618,7 @@ private fun DeviceCard(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        androidx.compose.material3.FilledTonalButton(
+                        Button(
                             onClick = onReconnect,
                             modifier = Modifier
                                 .fillMaxWidth()

@@ -28,7 +28,8 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -91,6 +92,20 @@ fun SectionTitle(text: String) {
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+    )
+}
+
+/**
+ * Header block of a card that is its whole section: titleMedium on the card's
+ * own content inset, so the title belongs to the card rather than the page.
+ */
+@Composable
+fun CardHeader(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
     )
 }
 
@@ -161,9 +176,9 @@ private fun QuickTile(
 fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val last = remember(items) { items.firstOrNull { it.type == "clipboard_sent" || it.type == "clipboard_received" } }
     val now = System.currentTimeMillis()
-    Column(modifier = modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.home_section_clipboard))
+    Column(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         Card(modifier = Modifier.fillMaxWidth()) {
+            CardHeader(stringResource(R.string.home_section_clipboard))
             ListItem(
                 leadingContent = {
                     Box(
@@ -184,7 +199,7 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
                 },
                 supportingContent = last?.let { { Text(formatTimeAgo(it.timestamp, now)) } },
                 trailingContent = {
-                    FilledTonalButton(onClick = onSendClipboard, enabled = enabled) {
+                    Button(onClick = onSendClipboard, enabled = enabled) {
                         Text(stringResource(R.string.clipboard_send_now))
                     }
                 },
@@ -236,9 +251,9 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         exit = fadeOut(exitFade) + shrinkVertically(enterSize),
         modifier = modifier
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            SectionTitle(stringResource(R.string.home_section_headphones))
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
             Card(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.home_section_headphones))
                 // Sound playing on the Mac: the headphone glyph gives way to a live
                 // wave; back to the glyph when it goes quiet.
                 val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE
@@ -292,7 +307,7 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         }
                     }
                     Spacer(Modifier.width(16.dp))
-                    FilledTonalButton(
+                    Button(
                         onClick = { viewModel.takeoverHeadphones() },
                         enabled = state == TakeoverState.IDLE
                     ) {
@@ -305,7 +320,7 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         ) { s ->
                             when (s) {
                                 TakeoverState.SUCCESS -> Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(18.dp))
+                                TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(18.dp), color = LocalContentColor.current)
                                 TakeoverState.IDLE -> Text(stringResource(R.string.headphones_switch_here))
                             }
                         }

@@ -54,9 +54,9 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
     val transfers = remember(items) {
         items.filter { it.type == "file_sent" || it.type == "file_received" }.take(FEED_LIMIT)
     }
-    Column(modifier = modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.home_section_activity))
+    Column(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         Card(modifier = Modifier.fillMaxWidth()) {
+            CardHeader(stringResource(R.string.home_section_activity))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
