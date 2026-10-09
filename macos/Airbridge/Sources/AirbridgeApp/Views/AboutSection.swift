@@ -341,9 +341,9 @@ enum ClaudeTeam {
                    role: L10n.isPL ? "Menadżer projektu" : "Project manager"),
             Member(name: "Claude Opus 5.5",
                    role: L10n.isPL ? "Brygadzista" : "Foreman"),
-            Member(name: "Claude Sonnet 5",
+            Member(name: "Claude Sonnet 5.5",
                    role: L10n.isPL ? "Programista" : "Software engineer"),
-            Member(name: "Claude Haiku 4.5",
+            Member(name: "Claude Haiku 5.5",
                    role: L10n.isPL ? "Stażysta" : "Intern")
         ]
     }

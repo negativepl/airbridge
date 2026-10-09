@@ -168,8 +168,8 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
                 val team = listOf(
                     Triple("Claude Fable 5.1", R.string.about_role_manager, null),
                     Triple("Claude Opus 5.5", R.string.about_role_foreman, null),
-                    Triple("Claude Sonnet 5", R.string.about_role_engineer, null),
-                    Triple("Claude Haiku 4.5", R.string.about_role_intern, null)
+                    Triple("Claude Sonnet 5.5", R.string.about_role_engineer, null),
+                    Triple("Claude Haiku 5.5", R.string.about_role_intern, null)
                 )
                 team.forEach { (name, roleRes, noteRes) ->
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

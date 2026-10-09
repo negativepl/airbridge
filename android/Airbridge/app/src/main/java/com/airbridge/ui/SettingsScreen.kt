@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -146,11 +147,10 @@ private fun SettingsContent(
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp)
     ) {
-        // Same distance under the bar as the first section on Home.
-        Spacer(modifier = Modifier.height(topInset - 4.dp))
+        // Same distance under the bar as the first card on Home.
+        Spacer(modifier = Modifier.height(topInset + 16.dp))
 
-        // Paired Devices section
-        SectionHeader(text = stringResource(R.string.pairing_paired_devices))
+        // Paired devices: the device card carries its own title, so no header.
 
         val context = LocalContext.current
         val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
@@ -224,9 +224,10 @@ private fun SettingsContent(
         }
 
         // Appearance section
-            SectionHeader(text = stringResource(R.string.settings_appearance))
+            Spacer(modifier = Modifier.height(16.dp))
             PageCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                CardHeader(stringResource(R.string.settings_appearance))
+                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
                     // Jasny | Systemowy | Ciemny — systemowy w środku jako
                     // punkt neutralny między dwoma jawnymi motywami.
                     val themeOptions = listOf(
@@ -260,7 +261,7 @@ private fun SettingsContent(
 
 
             // Download folder section
-            SectionHeader(text = stringResource(R.string.settings_download_folder))
+            Spacer(modifier = Modifier.height(16.dp))
             run {
                 val defaultFolder = android.os.Environment.getExternalStoragePublicDirectory(
                     android.os.Environment.DIRECTORY_DOWNLOADS
@@ -281,6 +282,7 @@ private fun SettingsContent(
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    CardHeader(stringResource(R.string.settings_download_folder))
                     ListItem(
                         verticalAlignment = Alignment.CenterVertically,
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -307,8 +309,9 @@ private fun SettingsContent(
 
 
             // Notifications section
-            SectionHeader(text = stringResource(R.string.settings_notifications))
+            Spacer(modifier = Modifier.height(16.dp))
             PageCard(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.settings_notifications))
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -355,8 +358,9 @@ private fun SettingsContent(
 
 
             // Connection section
-            SectionHeader(text = stringResource(R.string.settings_connection))
+            Spacer(modifier = Modifier.height(16.dp))
             PageCard(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.settings_connection))
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -376,8 +380,9 @@ private fun SettingsContent(
                 )
             }
 
-            SectionHeader(text = stringResource(R.string.settings_headphones))
+            Spacer(modifier = Modifier.height(16.dp))
             PageCard(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.settings_headphones))
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -493,7 +498,7 @@ private fun SettingsContent(
             // Diagnostics section — builds the report off the main thread and
             // hands the file to the system share sheet; nothing is uploaded.
             if (diagnosticsUnlocked) {
-            SectionHeader(text = stringResource(R.string.settings_diagnostics))
+            Spacer(modifier = Modifier.height(16.dp))
             val exportScope = rememberCoroutineScope()
             val exportFailedMessage = stringResource(R.string.settings_export_diagnostics_failed)
             val exportReport: () -> Unit = {
@@ -512,6 +517,7 @@ private fun SettingsContent(
                         }
                     }
             PageCard(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.settings_diagnostics))
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -541,15 +547,20 @@ private fun SettingsContent(
             }
 
             // About: update check and the About screen in one card.
-            SectionHeader(text = stringResource(R.string.nav_about))
+            Spacer(modifier = Modifier.height(16.dp))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             PageCard(modifier = Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.nav_about))
                 // Manual check only, never on a schedule.
+                val updatesAvailable = com.airbridge.update.UpdateChecker.IS_AVAILABLE
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { checkUpdateTrigger = true },
+                    modifier = if (updatesAvailable) Modifier.clickable { checkUpdateTrigger = true } else Modifier.alpha(0.38f),
                     content = { Text(stringResource(R.string.update_check)) },
+                    supportingContent = if (updatesAvailable) null else {
+                        { Text(stringResource(R.string.update_unavailable)) }
+                    },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -691,6 +702,3 @@ private fun PairMacRow(modifier: Modifier = Modifier) {
 }
 
 const val DIAGNOSTICS_UNLOCKED_KEY = "diagnostics_unlocked"
-
-@Composable
-private fun SectionHeader(text: String) = SectionTitle(text)
