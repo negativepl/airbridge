@@ -11,10 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
@@ -43,6 +39,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -51,14 +48,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
@@ -69,10 +65,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,19 +86,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.airbridge.R
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 /**
- * The main tabs: Home, Screen sharing and Mac Files in a pager under one shared
+ * The main tabs: Home, Screen sharing and Mac Files, switched with a fade-through under one shared
  * top bar, with the bottom navigation bar, the send FAB menu and the send
  * confirmation sheet. Settings and the QR scanner are pushed by the caller.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: () -> Unit) {
     data class NavItem(
@@ -116,16 +111,17 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         NavItem(R.string.nav_screen_sharing, Icons.AutoMirrored.Rounded.ScreenShare),
         NavItem(R.string.nav_mac_files, Icons.Rounded.Folder)
     )
-    // Tytuł w górnym pasku = nazwa bieżącej strony pagera (3 strony).
+    // Tytuł w górnym pasku = nazwa bieżącej zakładki (3 zakładki).
     val pageTitles = listOf(
         R.string.app_name,
         R.string.nav_screen_sharing,
         R.string.nav_mac_files
     )
 
-    val pagerState = rememberPagerState(pageCount = { 3 })
-    // One top bar state per pager page: the bar shows the scrolled
-    // colour for the page on screen, not for whatever page scrolled last.
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val tabStateHolder = rememberSaveableStateHolder()
+    // One top bar state per tab: the bar shows the scrolled
+    // colour for the tab on screen, not for whatever tab scrolled last.
     val topBarStates = listOf(
         rememberTopAppBarState(),
         rememberTopAppBarState(),
@@ -136,7 +132,6 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         TopAppBarDefaults.pinnedScrollBehavior(topBarStates[1]),
         TopAppBarDefaults.pinnedScrollBehavior(topBarStates[2]),
     )
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val pairedDeviceStore = remember { com.airbridge.security.PairedDeviceStore(context) }
     val pairedDevicesRevision by com.airbridge.security.PairedDeviceStore.revision.collectAsState()
@@ -168,7 +163,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
 
     val macFilesPath by viewModel.macFilesPath.collectAsState()
     // Each folder pane in Mac Files starts a fresh list at the top, so
-    // the page's top bar state must forget the previous folder's offset.
+    // the tab's top bar state must forget the previous folder's offset.
     LaunchedEffect(macFilesPath) { topBarStates[2].contentOffset = 0f }
     // Pickers. On the Files tab a chosen file/photo uploads straight into the
     // folder currently open on the Mac; elsewhere it goes through the
@@ -178,7 +173,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            if (pagerState.currentPage == 2) {
+            if (selectedTab == 2) {
                 viewModel.uploadToMac(it, macFilesPath)
             } else {
                 pendingFileUri = it
@@ -190,7 +185,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let {
-            if (pagerState.currentPage == 2) {
+            if (selectedTab == 2) {
                 viewModel.uploadToMac(it, macFilesPath)
             } else {
                 pendingFileUri = it
@@ -201,7 +196,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     // On the Files tab, Back walks up the Mac folder tree instead of
     // leaving the app. Gated on the tab being current AND being in a
     // subfolder, so it never hijacks Back on other screens or at root.
-    BackHandler(enabled = pagerState.currentPage == 2 && macFilesPath.isNotEmpty()) {
+    BackHandler(enabled = selectedTab == 2 && macFilesPath.isNotEmpty()) {
         viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', ""))
     }
 
@@ -227,24 +222,23 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         }
     }
 
-    // One shared top bar above the pager; each page owns the scroll state that colours it.
+    // One shared top bar above the tabs; each tab owns the scroll state that colours it.
     Scaffold(
         containerColor = MaterialTheme.colorScheme.pageBackground,
         bottomBar = {
-            // Stock Material 3 navigation bar: opaque surfaceContainer, no line.
-            NavigationBar(
+            // Short Material 3 Expressive navigation bar, one container step off the page.
+            ShortNavigationBar(
+                containerColor = MaterialTheme.colorScheme.dockContainer,
                 modifier = Modifier.onGloballyPositioned {
                     dockTopPx = it.boundsInWindow().top
                 }
             ) {
                 navItems.forEachIndexed { index, item ->
-                    NavigationBarItem(
-                        selected = pagerState.targetPage == index,
+                    ShortNavigationBarItem(
+                        selected = selectedTab == index,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
+                            selectedTab = index
                         },
                         icon = {
                             Icon(
@@ -294,7 +288,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     // Identical FAB on every tab — same three actions. The send
                     // destination (current Mac folder vs default) is decided in
                     // the picker callbacks above, so the menu never swaps items
-                    // between tabs and the swipe stays smooth.
+                    // between tabs and the tab switch stays smooth.
                     FloatingActionButtonMenuItem(
                         onClick = {
                             fabMenuExpanded = false
@@ -324,57 +318,65 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         },
         floatingActionButtonPosition = FabPosition.End
     ) { innerPadding ->
-        // The bar sits above the pager (not in the Scaffold) so the pages can
+        // The bar sits above the tabs (not in the Scaffold) so the tabs can
         // reserve its height themselves and report their scroll to their own
         // top bar state.
-        // Pages run under both bars (no Scaffold padding); each page
+        // Tabs run under both bars (no Scaffold padding); each tab
         // reserves the top bar height and the dock height plus the FAB
         // clearance itself, and the bars are opaque.
         val pageBottomClearance = fabClearance + innerPadding.calculateBottomPadding()
         val topInset = TopAppBarDefaults.TopAppBarExpandedHeight +
             WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         Box(modifier = Modifier.fillMaxSize()) {
-            HorizontalPager(
-                state = pagerState,
-                beyondViewportPageCount = 1,
-            ) { page ->
-                // Each page reports its scroll to its own top bar state.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(topBarBehaviors[page].nestedScrollConnection)
-                ) {
-                    when (page) {
-                        0 -> MainScreen(
-                            viewModel = viewModel,
-                            onScanQr = onScanQr,
-                            bottomClearance = pageBottomClearance,
-                            topInset = topInset,
-                            onSendFile = sendFileAction,
-                            onSendPhoto = sendPhotoAction,
-                            onSendClipboard = sendClipboardAction
-                        )
-                        1 -> ScreenShareScreen(bottomClearance = pageBottomClearance, topInset = topInset)
-                        2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = pageBottomClearance, topInset = topInset)
+            val tabEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            val tabEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+            val tabExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    // Fade through: the old tab fades out, the new one fades in while
+                    // settling from 92 % to full size.
+                    (fadeIn(tabEnterFade) + scaleIn(initialScale = 0.92f, animationSpec = tabEnterScale)) togetherWith
+                        fadeOut(tabExitFade)
+                },
+                contentAlignment = Alignment.Center,
+                label = "tab"
+            ) { tab ->
+                // Saves each tab's scroll position while it is off screen so it matches the tab's top bar state on return.
+                tabStateHolder.SaveableStateProvider(tab) {
+                    // Each tab reports its scroll to its own top bar state.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(topBarBehaviors[tab].nestedScrollConnection)
+                    ) {
+                        when (tab) {
+                            0 -> MainScreen(
+                                viewModel = viewModel,
+                                onScanQr = onScanQr,
+                                bottomClearance = pageBottomClearance,
+                                topInset = topInset,
+                                onSendFile = sendFileAction,
+                                onSendPhoto = sendPhotoAction,
+                                onSendClipboard = sendClipboardAction
+                            )
+                            1 -> ScreenShareScreen(bottomClearance = pageBottomClearance, topInset = topInset)
+                            2 -> MacFilesScreen(viewModel = viewModel, bottomClearance = pageBottomClearance, topInset = topInset)
+                        }
                     }
                 }
             }
-            // One fixed bar over the pager: the settings action stays put and
-            // only the title changes, fading and sliding with the page.
+            // One fixed centred bar over the tabs: the settings action stays put
+            // and only the title changes, fading with the tab.
             val titleFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            val titleSlide = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
             val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     AnimatedContent(
-                        targetState = pagerState.targetPage.coerceIn(0, pageTitles.lastIndex),
-                        transitionSpec = {
-                            val forward = targetState > initialState
-                            (fadeIn(titleFade) + slideInVertically(titleSlide) { if (forward) it / 2 else -it / 2 }) togetherWith
-                                (fadeOut(titleExit) + slideOutVertically(titleSlide) { if (forward) -it / 2 else it / 2 })
-                        },
+                        targetState = selectedTab,
+                        transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
                         label = "pageTitle"
-                    ) { page -> Text(stringResource(pageTitles[page])) }
+                    ) { tab -> Text(stringResource(pageTitles[tab])) }
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
@@ -382,7 +384,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     }
                 },
                 colors = pageTopAppBarColors(),
-                scrollBehavior = topBarBehaviors[pagerState.currentPage],
+                scrollBehavior = topBarBehaviors[selectedTab],
                 modifier = Modifier.align(Alignment.TopCenter)
             )
         }

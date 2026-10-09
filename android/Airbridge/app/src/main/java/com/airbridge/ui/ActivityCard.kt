@@ -16,7 +16,6 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -55,7 +54,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
         items.filter { it.type == "file_sent" || it.type == "file_received" }.take(FEED_LIMIT)
     }
     Column(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
-        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+        PageCard(modifier = Modifier.fillMaxWidth()) {
             CardHeader(stringResource(R.string.home_section_activity))
             Row(
                 modifier = Modifier

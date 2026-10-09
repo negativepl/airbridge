@@ -135,6 +135,7 @@ fun MainScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
@@ -262,6 +263,7 @@ fun MainScreen(
             Card(
                 onClick = { transferExpanded = !transferExpanded },
                 modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -404,7 +406,7 @@ fun MainScreen(
 
 @Composable
 private fun ConnectingCard(deviceName: String?) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+    PageCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -463,7 +465,7 @@ private fun DeviceCard(
         else -> 0
     }
 
-    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+    PageCard(modifier = Modifier.fillMaxWidth()) {
         val cardEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val cardEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
         val cardExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()

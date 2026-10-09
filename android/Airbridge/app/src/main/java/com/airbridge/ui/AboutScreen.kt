@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -130,7 +129,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         Spacer(modifier = Modifier.height(28.dp))
 
         // Credits card
-        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+        PageCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 // Author — clickable to GitHub profile
                 ListItem(
@@ -197,7 +196,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         var checkUpdateTrigger by remember { mutableStateOf(false) }
 
         // Links card
-        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+        PageCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 // Check for updates — opens the changelog/download sheet.
                 ListItem(

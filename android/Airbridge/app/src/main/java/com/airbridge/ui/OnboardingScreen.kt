@@ -29,7 +29,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material.icons.Icons
@@ -571,7 +570,7 @@ private fun PermissionRow(
     granted: Boolean,
     onRequest: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+    PageCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(

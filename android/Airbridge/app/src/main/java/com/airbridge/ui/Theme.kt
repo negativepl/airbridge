@@ -86,6 +86,10 @@ val ColorScheme.pageBackground: Color
 val ColorScheme.cardContainer: Color
     get() = if (isDark) surfaceContainerHighest else surfaceContainerLowest
 
+/** Navigation bar container: one container step off [pageBackground] so the dock reads as its own surface. */
+val ColorScheme.dockContainer: Color
+    get() = if (isDark) surfaceContainer else surfaceContainerHigh
+
 /** Stock card colours with [cardContainer] as the container. */
 @Composable
 fun pageCardColors(): CardColors =

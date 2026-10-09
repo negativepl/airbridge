@@ -20,7 +20,6 @@ import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,7 +70,7 @@ fun MacDeviceCard(
     val mismatch = isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+        PageCard(modifier = Modifier.fillMaxWidth()) {
             // Media: same size with or without a wallpaper, so the card does
             // not jump when the picture arrives.
             if (bitmap != null) {
@@ -199,7 +198,7 @@ private fun versionBase(version: String): String = version.substringBefore("-")
  */
 @Composable
 fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth().padding(top = 16.dp), colors = pageCardColors()) {
+    PageCard(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         CardHeader(stringResource(R.string.home_monitor_title))
         Row(
             modifier = Modifier

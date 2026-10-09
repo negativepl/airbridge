@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
@@ -218,8 +217,7 @@ private fun SettingsContent(
         }
 
         if (pairedDevices.isEmpty()) {
-            Card(
-                colors = pageCardColors(),
+            PageCard(
                 onClick = { onScanQr() },
                 modifier = Modifier.fillMaxWidth(),
             ) { PairMacRow() }
@@ -227,7 +225,7 @@ private fun SettingsContent(
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Jasny | Systemowy | Ciemny — systemowy w środku jako
                     // punkt neutralny między dwoma jawnymi motywami.
@@ -279,8 +277,7 @@ private fun SettingsContent(
                         prefs.edit { putString("download_folder", path) }
                     }
                 }
-                Card(
-                    colors = pageCardColors(),
+                PageCard(
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -310,7 +307,7 @@ private fun SettingsContent(
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
@@ -356,7 +353,7 @@ private fun SettingsContent(
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
@@ -376,7 +373,7 @@ private fun SettingsContent(
             }
 
             SectionHeader(text = stringResource(R.string.settings_headphones))
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
@@ -506,7 +503,7 @@ private fun SettingsContent(
                             }
                         }
                     }
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { exportReport() },
@@ -536,7 +533,7 @@ private fun SettingsContent(
             // About: update check and the About screen in one card.
             SectionHeader(text = stringResource(R.string.nav_about))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 // Manual check only, never on a schedule.
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -586,7 +583,7 @@ private fun PairedDeviceCard(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+    PageCard(modifier = Modifier.fillMaxWidth()) {
         if (wallpaper != null) {
             Image(
                 bitmap = wallpaper,

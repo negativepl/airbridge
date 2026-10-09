@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.PhoneIphone
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -93,8 +92,7 @@ private fun ShareTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        colors = pageCardColors(),
+    PageCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
     ) {

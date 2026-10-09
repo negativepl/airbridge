@@ -27,7 +27,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
-import androidx.compose.material3.Card
 import androidx.compose.material3.Button
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
@@ -142,8 +141,7 @@ private fun QuickTile(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    Card(
-        colors = pageCardColors(),
+    PageCard(
         onClick = onClick,
         enabled = enabled,
         // Material disabled content alpha.
@@ -178,7 +176,7 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
     val last = remember(items) { items.firstOrNull { it.type == "clipboard_sent" || it.type == "clipboard_received" } }
     val now = System.currentTimeMillis()
     Column(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
-        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+        PageCard(modifier = Modifier.fillMaxWidth()) {
             CardHeader(stringResource(R.string.home_section_clipboard))
             ListItem(
                 leadingContent = {
@@ -253,7 +251,7 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
+            PageCard(modifier = Modifier.fillMaxWidth()) {
                 CardHeader(stringResource(R.string.home_section_headphones))
                 // Sound playing on the Mac: the headphone glyph gives way to a live
                 // wave; back to the glyph when it goes quiet.
