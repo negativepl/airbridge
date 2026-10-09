@@ -93,10 +93,8 @@ private fun ModeCard(icon: ImageVector, title: String, subtitle: String, onClick
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.size(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onClick, shapes = ButtonDefaults.shapes()) {
-                    Text(stringResource(R.string.screen_sharing_start))
-                }
+            Button(onClick = onClick, shapes = ButtonDefaults.shapes(), modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.screen_sharing_start))
             }
         }
     }
