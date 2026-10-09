@@ -282,6 +282,7 @@ private fun SettingsContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     ListItem(
+                        verticalAlignment = Alignment.CenterVertically,
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = {
                             Text(
@@ -309,6 +310,7 @@ private fun SettingsContent(
             SectionHeader(text = stringResource(R.string.settings_notifications))
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
@@ -333,6 +335,7 @@ private fun SettingsContent(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
@@ -355,6 +358,7 @@ private fun SettingsContent(
             SectionHeader(text = stringResource(R.string.settings_connection))
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
                     supportingContent = { Text(stringResource(R.string.settings_auto_connect_desc)) },
@@ -375,6 +379,7 @@ private fun SettingsContent(
             SectionHeader(text = stringResource(R.string.settings_headphones))
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
                     supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
@@ -398,6 +403,7 @@ private fun SettingsContent(
                 if (headphoneHandoff) {
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        verticalAlignment = Alignment.CenterVertically,
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
@@ -417,6 +423,7 @@ private fun SettingsContent(
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
+                        verticalAlignment = Alignment.CenterVertically,
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
@@ -452,6 +459,7 @@ private fun SettingsContent(
                             Column {
                                 devices.forEach { device ->
                                     ListItem(
+                                        verticalAlignment = Alignment.CenterVertically,
                                         content = { Text(device.name) },
                                         supportingContent = { Text(device.address) },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -505,6 +513,7 @@ private fun SettingsContent(
                     }
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { exportReport() },
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
@@ -519,6 +528,7 @@ private fun SettingsContent(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, false) }
@@ -536,6 +546,7 @@ private fun SettingsContent(
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 // Manual check only, never on a schedule.
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { checkUpdateTrigger = true },
                     content = { Text(stringResource(R.string.update_check)) },
@@ -549,6 +560,7 @@ private fun SettingsContent(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ListItem(
+                    verticalAlignment = Alignment.CenterVertically,
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { onOpenAbout() },
                     content = { Text(stringResource(R.string.about_row_title)) },
@@ -664,6 +676,7 @@ private fun PairedDeviceCard(
 @Composable
 private fun PairMacRow(modifier: Modifier = Modifier) {
     ListItem(
+        verticalAlignment = Alignment.CenterVertically,
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = modifier,
         content = { Text(stringResource(R.string.pairing_add_mac)) },

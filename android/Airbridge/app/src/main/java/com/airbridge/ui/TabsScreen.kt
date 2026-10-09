@@ -66,7 +66,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,10 +80,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -149,19 +145,10 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     val sentToMacMsg = stringResource(R.string.sent_to_mac)
     val clipboardEmptyMsg = stringResource(R.string.clipboard_empty)
 
-    // Measure the FAB and the nav dock in window coordinates so the
-    // home content can reserve a bottom clearance that leaves the
-    // SAME gap above the FAB as the FAB leaves above the dock — by
-    // construction, regardless of FAB size, insets or screen.
-    val density = LocalDensity.current
-    var fabTopPx by rememberSaveable { mutableFloatStateOf(0f) }
-    var fabBottomPx by rememberSaveable { mutableFloatStateOf(0f) }
-    var dockTopPx by rememberSaveable { mutableFloatStateOf(0f) }
-    val fabClearance = if (dockTopPx > 0f && fabTopPx > 0f) {
-        with(density) {
-            ((dockTopPx - fabTopPx) + (dockTopPx - fabBottomPx)).coerceAtLeast(0f).toDp()
-        }
-    } else 88.dp
+    // Bottom clearance for the tab content: the FAB (56 dp) plus its 16 dp
+    // margin above the dock plus the same 16 dp gap above the FAB, so the
+    // last row sits as far above the FAB as the FAB sits above the dock.
+    val fabClearance = 88.dp
 
     val macFilesPath by viewModel.macFilesPath.collectAsState()
     // Each folder pane in Mac Files starts a fresh list at the top, so
@@ -231,9 +218,6 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
             // Short Material 3 Expressive navigation bar, one container step off the page.
             ShortNavigationBar(
                 containerColor = MaterialTheme.colorScheme.dockContainer,
-                modifier = Modifier.onGloballyPositioned {
-                    dockTopPx = it.boundsInWindow().top
-                }
             ) {
                 navItems.forEachIndexed { index, item ->
                     ShortNavigationBarItem(
@@ -263,15 +247,6 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                         ToggleFloatingActionButton(
                             checked = fabMenuExpanded,
                             onCheckedChange = { fabMenuExpanded = it },
-                            modifier = Modifier.onGloballyPositioned {
-                                val b = it.boundsInWindow()
-                                // Only trust the collapsed bounds; the FAB grows
-                                // while the menu is open.
-                                if (!fabMenuExpanded) {
-                                    fabTopPx = b.top
-                                    fabBottomPx = b.bottom
-                                }
-                            }
                         ) {
                             val showingClose by remember {
                                 derivedStateOf { checkedProgress > 0.5f }
