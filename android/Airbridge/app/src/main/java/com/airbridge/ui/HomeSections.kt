@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,8 +29,7 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -124,49 +124,41 @@ fun QuickActionsRow(
     /** False while there is no Mac to send to: the actions stay in place, disabled. */
     enabled: Boolean = true
 ) {
-    val fileLabel = stringResource(R.string.quick_file)
-    val photoLabel = stringResource(R.string.quick_photo)
-    val clipboardLabel = stringResource(R.string.quick_clipboard)
-    val macScreenLabel = stringResource(R.string.quick_mac_screen)
     // One card like "Appearance" in Settings: the title at the top, the four
-    // actions as a stock button group underneath (the pressed button widens,
-    // its neighbours give way; actions that do not fit move to the overflow menu).
+    // actions as tonal buttons underneath. Icon above label, so the labels
+    // stay whole on the cover screen (a single-row button group clipped them).
     PageCard(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         CardHeader(stringResource(R.string.home_section_quick_actions))
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
-            ButtonGroup(
-                overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                clickableItem(
-                    onClick = onSendFile,
-                    label = fileLabel,
-                    enabled = enabled,
-                    icon = { Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, contentDescription = null) },
-                    weight = 1f
-                )
-                clickableItem(
-                    onClick = onSendPhoto,
-                    label = photoLabel,
-                    enabled = enabled,
-                    icon = { Icon(Icons.Rounded.Photo, contentDescription = null) },
-                    weight = 1f
-                )
-                clickableItem(
-                    onClick = onSendClipboard,
-                    label = clipboardLabel,
-                    enabled = enabled,
-                    icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                    weight = 1f
-                )
-                clickableItem(
-                    onClick = onMacScreen,
-                    label = macScreenLabel,
-                    enabled = enabled && macScreenEnabled,
-                    icon = { Icon(Icons.AutoMirrored.Rounded.ScreenShare, contentDescription = null) },
-                    weight = 1f
-                )
-            }
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            QuickAction(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickAction(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickAction(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled, modifier = Modifier.weight(1f))
+            QuickAction(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun QuickAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
