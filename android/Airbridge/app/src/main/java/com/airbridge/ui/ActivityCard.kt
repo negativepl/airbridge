@@ -16,7 +16,8 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -55,11 +56,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
     }
     Column(modifier = modifier.fillMaxWidth()) {
         SectionTitle(stringResource(R.string.home_section_activity))
-        AirbridgeCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -81,7 +78,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
                     modifier = Modifier.weight(1f)
                 )
             }
-            DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             if (transfers.isEmpty()) {
                 Text(
                     stringResource(R.string.no_activity),
@@ -92,7 +89,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
             } else {
                 transfers.forEachIndexed { index, item ->
                     if (index > 0) {
-                        DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     }
                     TransferRow(item)
                 }

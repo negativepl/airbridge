@@ -345,11 +345,10 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                             enabled = entry.isDirectory || !downloading,
                             shapes = ListItemDefaults.shapes(shape = shape),
                             colors = ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                             ),
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .edgeLight(shape)
                         ) {
                             Text(
                                 text = entry.name,

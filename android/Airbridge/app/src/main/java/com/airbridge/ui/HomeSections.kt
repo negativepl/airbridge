@@ -27,7 +27,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -127,11 +127,9 @@ private fun QuickTile(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    AirbridgeCard(
+    Card(
         onClick = { if (enabled) onClick() },
         modifier = modifier.alpha(if (enabled) 1f else 0.5f),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 4.dp),
@@ -168,11 +166,7 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
     val now = System.currentTimeMillis()
     Column(modifier = modifier.fillMaxWidth()) {
         SectionTitle(stringResource(R.string.home_section_clipboard))
-        AirbridgeCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             ListItem(
                 leadingContent = {
                     Box(
@@ -247,11 +241,7 @@ fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             SectionTitle(stringResource(R.string.home_section_headphones))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 // Sound playing on the Mac: the headphone glyph gives way to a live
                 // wave; back to the glyph when it goes quiet.
                 val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE

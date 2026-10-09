@@ -26,7 +26,8 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.SystemUpdate
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -133,13 +134,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(28.dp))
 
         // Credits card
-        AirbridgeCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-            )
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Column {
                 // Author — clickable to GitHub profile
                 ListItem(
@@ -180,7 +175,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
                     Triple("Claude Haiku 4.5", R.string.about_role_intern, null)
                 )
                 team.forEach { (name, roleRes, noteRes) ->
-                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     ListItem(
                         leadingContent = {
                             Image(
@@ -206,13 +201,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
         var checkUpdateTrigger by remember { mutableStateOf(false) }
 
         // Links card
-        AirbridgeCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-            )
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Column {
                 // Check for updates — opens the changelog/download sheet.
                 ListItem(
@@ -237,7 +226,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
                     modifier = Modifier.clickable { checkUpdateTrigger = true }
                 )
 
-                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 // Source code
                 ListItem(
                     leadingContent = {
@@ -265,7 +254,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
                     }
                 )
 
-                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 // Report issue
                 ListItem(
                     leadingContent = {

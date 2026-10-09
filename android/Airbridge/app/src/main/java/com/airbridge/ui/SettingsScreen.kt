@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.foundation.layout.width
@@ -36,7 +38,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
@@ -228,25 +229,15 @@ private fun SettingsContent(
         }
 
         if (pairedDevices.isEmpty()) {
-            AirbridgeCard(
+            Card(
                 onClick = { onScanQr() },
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
             ) { PairMacRow() }
         }
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Jasny | Systemowy | Ciemny — systemowy w środku jako
                     // punkt neutralny między dwoma jawnymi motywami.
@@ -307,13 +298,9 @@ private fun SettingsContent(
                         prefs.edit { putString("download_folder", path) }
                     }
                 }
-                AirbridgeCard(
+                Card(
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                    )
                 ) {
                     SettingsRow(
                         content = {
@@ -340,13 +327,7 @@ private fun SettingsContent(
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
                     modifier = Modifier.clickable {
                         val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
@@ -369,7 +350,7 @@ private fun SettingsContent(
                         )
                     },
                 )
-                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRow(
                     content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
@@ -390,13 +371,7 @@ private fun SettingsContent(
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
                     supportingContent = { Text(stringResource(R.string.settings_auto_connect_desc)) },
@@ -415,13 +390,7 @@ private fun SettingsContent(
             }
 
             SectionHeader(text = stringResource(R.string.settings_headphones))
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
                     supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
@@ -443,7 +412,7 @@ private fun SettingsContent(
                     )
                 )
                 if (headphoneHandoff) {
-                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsRow(
                         content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
@@ -461,7 +430,7 @@ private fun SettingsContent(
                             }
                         }
                     )
-                    DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsRow(
                         content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
@@ -548,13 +517,7 @@ private fun SettingsContent(
                             }
                         }
                     }
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 SettingsRow(
                     modifier = Modifier.clickable { exportReport() },
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
@@ -567,7 +530,7 @@ private fun SettingsContent(
                         )
                     },
                 )
-                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRow(
                     modifier = Modifier.clickable {
                         prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, false) }
@@ -582,13 +545,7 @@ private fun SettingsContent(
             // About: update check and the About screen in one card.
             SectionHeader(text = stringResource(R.string.nav_about))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
-            AirbridgeCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-                )
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 // Manual check only, never on a schedule.
                 SettingsRow(
                     modifier = Modifier.clickable { checkUpdateTrigger = true },
@@ -601,7 +558,7 @@ private fun SettingsContent(
                         )
                     },
                 )
-                DashedDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRow(
                     modifier = Modifier.clickable { onOpenAbout() },
                     content = { Text(stringResource(R.string.about_row_title)) },
@@ -636,12 +593,7 @@ private fun PairedDeviceCard(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    AirbridgeCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-        highlight = false
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
             if (wallpaper != null) {
                 Image(

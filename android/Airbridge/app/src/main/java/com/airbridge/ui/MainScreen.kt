@@ -34,14 +34,13 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -135,9 +134,8 @@ fun MainScreen(
         ) {
             Column {
                 Spacer(modifier = Modifier.height(4.dp))
-                AirbridgeCard(
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
@@ -263,10 +261,9 @@ fun MainScreen(
             // Section rhythm on Home: 16dp above, same as the section headers.
             Spacer(modifier = Modifier.height(16.dp))
 
-            AirbridgeCard(
+            Card(
                 onClick = { transferExpanded = !transferExpanded },
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -409,12 +406,7 @@ fun MainScreen(
 
 @Composable
 private fun ConnectingCard(deviceName: String?) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -473,12 +465,7 @@ private fun DeviceCard(
         else -> 0
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         val cardEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val cardEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
         val cardExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()

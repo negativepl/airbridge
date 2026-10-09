@@ -21,7 +21,7 @@ import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -117,11 +117,7 @@ fun MacDeviceCard(
     // The card is a frame: the picture sits inside it with a margin, and the
     // wallpaper's blurred light spreads over the card surface around the
     // picture, ending at the card's own edge. Nothing leaks into the page.
-    AirbridgeCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
     Box(modifier = Modifier.fillMaxWidth().padding(FRAME_MARGIN)) {
         // Below API 31 there is no RenderEffect; a colour glow stands in.
         if (bitmap != null && blurSupported && cardHeightPx > 0) {
@@ -134,7 +130,6 @@ fun MacDeviceCard(
                 .wallpaperGlow(glowColors, alpha = if (dark) 0.45f else 0.30f)
                 // The picture gets the same edge light as a card: a hairline and
                 // a line of light on its top edge, so it reads as an inset pane.
-                .edgeLight(MaterialTheme.shapes.large)
                 .clip(MaterialTheme.shapes.large)
         ) {
 
@@ -270,11 +265,7 @@ private fun versionBase(version: String): String = version.substringBefore("-")
 /** [info] null (not connected yet): the three rings sit empty with "–" in place of numbers. */
 @Composable
 fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
-    AirbridgeCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-    ) {
+    Card(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
