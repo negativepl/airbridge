@@ -39,8 +39,6 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.automirrored.rounded.MenuOpen
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
@@ -55,10 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -224,16 +219,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     // wide navigation rail on the left once the Fold is open (medium width),
     // the way Google's apps lay out on foldables. The suite owns the dock; the
     // Scaffold inside keeps the FAB menu, the top bar and the tab content.
-    // Window-driven navigation: the suite picks the short bar on a phone and the
-    // wide rail once the Fold is open. The rail starts collapsed (icons only);
-    // its menu button expands it, and picking a destination collapses it again.
-    val baseSuiteType = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfo())
-    val isRail = baseSuiteType == NavigationSuiteType.WideNavigationRailCollapsed ||
-        baseSuiteType == NavigationSuiteType.WideNavigationRailExpanded
-    var railExpanded by rememberSaveable { mutableStateOf(false) }
-    val suiteType = if (isRail && railExpanded) NavigationSuiteType.WideNavigationRailExpanded else baseSuiteType
     NavigationSuiteScaffold(
-        navigationSuiteType = suiteType,
         navigationItems = {
             navItems.forEachIndexed { index, item ->
                 NavigationSuiteItem(
@@ -241,7 +227,6 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         selectedTab = index
-                        railExpanded = false
                     },
                     icon = {
                         Icon(
@@ -253,19 +238,8 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                 )
             }
         },
-        navigationItemVerticalArrangement = Arrangement.Top,
-        // Rail header: the menu button that expands the rail. Nothing on the
-        // phone, where the suite would float this content over the tab.
-        primaryActionContent = {
-            if (isRail) {
-                IconButton(onClick = { railExpanded = !railExpanded }) {
-                    Icon(
-                        if (railExpanded) Icons.AutoMirrored.Rounded.MenuOpen else Icons.Rounded.Menu,
-                        contentDescription = stringResource(R.string.nav_menu)
-                    )
-                }
-            }
-        },
+        // Rail items sit in the middle of the rail, as in Google's apps.
+        navigationItemVerticalArrangement = Arrangement.Center,
         navigationSuiteColors = NavigationSuiteDefaults.colors(
             shortNavigationBarContainerColor = MaterialTheme.colorScheme.dockContainer,
             wideNavigationRailColors = WideNavigationRailDefaults.colors(
@@ -427,7 +401,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     }
                 },
                 titleHorizontalAlignment = Alignment.CenterHorizontally,
-                colors = pageTopAppBarColors(tintWhenScrolled = !isRail),
+                colors = pageTopAppBarColors(),
                 scrollBehavior = topBarBehaviors[selectedTab],
                 modifier = Modifier.align(Alignment.TopCenter)
             )
