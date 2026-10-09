@@ -124,9 +124,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
     }
     val effectiveEntries = if (entries.isNotEmpty()) entries else folderCache[path] ?: emptyList()
 
-    // Same opening as the other tabs: the first row sits 16 dp under the bar
-    // (14 dp here plus the row's own 2 dp vertical padding).
-    Column(modifier = Modifier.fillMaxSize().padding(top = topInset + 14.dp)) {
+    // The pane starts right under the bar, so scrolled rows are clipped by
+    // the bar's edge; the list's own content padding opens the 16 dp gap.
+    Column(modifier = Modifier.fillMaxSize().padding(top = topInset)) {
         // Directional folder navigation: entering a folder pushes the new listing in
         // from the right, going up slides it back from the left (by path depth).
         //
@@ -221,7 +221,8 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                     modifier = Modifier.fillMaxSize(),
                     // Rows carry 2 dp of their own vertical padding; take it off the
                     // clearance so the last row ends at the same height as the other tabs.
-                    contentPadding = PaddingValues(bottom = (bottomClearance - 2.dp).coerceAtLeast(0.dp))
+                    // 14 dp plus the row's own 2 dp = the 16 dp opening the other tabs use.
+                    contentPadding = PaddingValues(top = 14.dp, bottom = (bottomClearance - 2.dp).coerceAtLeast(0.dp))
                 ) {
                     itemsIndexed(paneEntries, key = { _, it -> it.relativePath }) { index, entry ->
                         val thumb = thumbs[entry.relativePath]
