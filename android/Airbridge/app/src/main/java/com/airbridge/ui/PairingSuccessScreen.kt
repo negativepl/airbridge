@@ -37,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
@@ -95,10 +94,9 @@ fun PairingSuccessScreen(
 
                 Text(
                     text = stringResource(R.string.pairing_in_progress),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -131,10 +129,9 @@ fun PairingSuccessScreen(
 
                 Text(
                     text = stringResource(R.string.pairing_success_title),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))

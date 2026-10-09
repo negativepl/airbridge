@@ -49,7 +49,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import android.widget.Toast
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -115,8 +114,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
 
         Text(
             text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
             letterSpacing = 1.sp,
             color = MaterialTheme.colorScheme.onSurface

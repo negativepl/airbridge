@@ -57,7 +57,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
@@ -359,8 +358,7 @@ fun MainScreen(
                             ) {
                                 Text(
                                     text = speedText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyMediumEmphasized,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
@@ -430,7 +428,6 @@ private fun ConnectingCard(deviceName: String?) {
             Text(
                 text = stringResource(R.string.connecting),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (deviceName != null) {
@@ -532,7 +529,6 @@ private fun DeviceCard(
                         Text(
                             text = name,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
@@ -589,7 +585,6 @@ private fun DeviceCard(
                             else
                                 stringResource(R.string.disconnecting),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
@@ -623,7 +618,6 @@ private fun DeviceCard(
                         Text(
                             text = stringResource(R.string.not_connected),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )

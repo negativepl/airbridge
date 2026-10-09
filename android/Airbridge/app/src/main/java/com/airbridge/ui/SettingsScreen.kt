@@ -78,7 +78,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
@@ -694,7 +693,7 @@ private fun PairedDeviceCard(
                 )
             }
             Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                Text(deviceName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(deviceName, style = MaterialTheme.typography.titleLargeEmphasized, color = Color.White)
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,

@@ -280,10 +280,9 @@ private fun WelcomePage() {
 
         Text(
             text = stringResource(R.string.onboarding_welcome_title),
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -327,10 +326,9 @@ private fun HowItWorksPage() {
 
         Text(
             text = stringResource(R.string.onboarding_connect_title),
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -445,10 +443,9 @@ private fun PermissionsPage() {
 
         Text(
             text = stringResource(R.string.onboarding_permissions_title),
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -684,10 +681,9 @@ private fun ScanPage() {
 
         Text(
             text = stringResource(R.string.pairing_scan_title),
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.displaySmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -745,9 +741,8 @@ private fun NumberedRow(number: String, text: String, shape: RoundedPolygon) {
         ) {
             Text(
                 text = number,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMediumEmphasized,
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
