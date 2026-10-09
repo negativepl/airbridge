@@ -118,8 +118,8 @@ private fun SettingsContent(
     onThemeChanged: (String) -> Unit,
     onScanQr: () -> Unit,
     onOpenAbout: () -> Unit,
-    topInset: Dp = 0.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    topInset: Dp = 0.dp
 ) {
     var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
     var autoConnect by remember { mutableStateOf(prefs.getBoolean("auto_connect", true)) }

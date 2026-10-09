@@ -163,7 +163,6 @@ fun MacDeviceCard(
     }
 }
 
-
 /** Jedna linia o baterii Maca: "%", a przy ładowaniu czas do pełna gdy znany. */
 @Composable
 private fun batteryLine(info: MacInfo): String {

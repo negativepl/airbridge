@@ -49,6 +49,7 @@ import androidx.core.content.edit
 import androidx.compose.runtime.mutableIntStateOf
 import android.widget.Toast
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -77,7 +78,7 @@ fun AboutScreen(onBack: () -> Unit = {}) {
 }
 
 @Composable
-private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
+private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
     val context = LocalContext.current
 
     val scrollState = rememberScrollState()
@@ -311,7 +312,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
         var versionTaps by remember { mutableIntStateOf(0) }
         val alreadyUnlockedMsg = stringResource(R.string.diagnostics_already_unlocked)
         val unlockedMsg = stringResource(R.string.diagnostics_unlocked)
-        val resources = context.resources
+        val tapsToGoMsgs = (1..3).associateWith { pluralStringResource(R.plurals.diagnostics_taps_to_go, it, it) }
         // One toast at a time: cancel the previous before showing the next, or the
         // countdown queues up and lags behind the taps.
         var tapToast by remember { mutableStateOf<Toast?>(null) }
@@ -338,7 +339,7 @@ private fun AboutContent(topInset: Dp = 0.dp, modifier: Modifier = Modifier) {
                             versionTaps = 0
                             showToast(unlockedMsg)
                         }
-                        left <= 3 -> showToast(resources.getQuantityString(R.plurals.diagnostics_taps_to_go, left, left))
+                        left <= 3 -> showToast(tapsToGoMsgs.getValue(left))
                     }
                 }
                 .padding(bottom = 16.dp),

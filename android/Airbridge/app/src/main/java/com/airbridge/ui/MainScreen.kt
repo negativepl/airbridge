@@ -68,10 +68,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
+    modifier: Modifier = Modifier,
     onScanQr: () -> Unit = {},
     bottomClearance: Dp = 88.dp,
     topInset: Dp = 0.dp,
-    modifier: Modifier = Modifier,
     onSendFile: () -> Unit = {},
     onSendPhoto: () -> Unit = {},
     onSendClipboard: () -> Unit = {}
