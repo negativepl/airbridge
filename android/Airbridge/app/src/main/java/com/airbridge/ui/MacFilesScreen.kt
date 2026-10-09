@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,10 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.CircularProgressIndicator
@@ -267,66 +269,68 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                                     )
                                 }
                             } else null,
+                            // The download lives in the leading tile: the icon gives
+                            // way to a progress ring, the ring to a check (or an error
+                            // badge until the row is tapped again), then the icon returns.
+                            // The name keeps the row's full width throughout.
                             leadingContent = {
-                                if (thumb != null) {
-                                    ThumbImage(base64 = thumb)
-                                } else {
-                                    Icon(
-                                        imageVector = if (entry.isDirectory) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
-                                        contentDescription = null,
-                                        tint = if (entry.isDirectory)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                }
-                            },
-                            // A small progress ring appears while the file transfers, then
-                            // pops into a check for a moment on completion; a failed download
-                            // leaves an error badge until the row is tapped again (retry).
-                            // Otherwise the row has no trailing control — tapping the row is
-                            // the download action.
-                            trailingContent = if (downloading || failed || entry.name in justDone) {
-                                {
-                                    val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                                    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-                                    AnimatedContent(
-                                        targetState = when {
-                                            downloading -> DownloadBadge.Progress
-                                            failed -> DownloadBadge.Failed
-                                            else -> DownloadBadge.Done
-                                        },
-                                        contentAlignment = Alignment.Center,
-                                        transitionSpec = {
-                                            // The badge scales in on the motion scheme's spatial spec; the ring just fades out.
-                                            (fadeIn(fastEffects) + scaleIn(initialScale = 0.5f, animationSpec = spatial)) togetherWith
-                                                fadeOut(fastEffects) using null
-                                        },
-                                        label = "downloadTrailing"
-                                    ) { badge ->
-                                        when (badge) {
-                                            DownloadBadge.Progress -> CircularProgressIndicator(
-                                                progress = { (downloadProgress[entry.name] ?: 0f).coerceIn(0f, 1f) },
-                                                modifier = Modifier.size(22.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            DownloadBadge.Done -> Icon(
-                                                imageVector = Icons.Rounded.CheckCircle,
+                                val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                                val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+                                AnimatedContent(
+                                    targetState = when {
+                                        downloading -> DownloadBadge.Progress
+                                        failed -> DownloadBadge.Failed
+                                        entry.name in justDone -> DownloadBadge.Done
+                                        else -> DownloadBadge.Idle
+                                    },
+                                    contentAlignment = Alignment.Center,
+                                    transitionSpec = {
+                                        (fadeIn(fastEffects) + scaleIn(initialScale = 0.5f, animationSpec = spatial)) togetherWith
+                                            fadeOut(fastEffects) using null
+                                    },
+                                    label = "downloadLeading"
+                                ) { badge ->
+                                    when (badge) {
+                                        DownloadBadge.Idle -> if (thumb != null) {
+                                            ThumbImage(base64 = thumb)
+                                        } else {
+                                            Icon(
+                                                imageVector = if (entry.isDirectory) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(24.dp)
+                                                tint = if (entry.isDirectory)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(40.dp)
                                             )
-                                            DownloadBadge.Failed -> Icon(
-                                                imageVector = Icons.Rounded.ErrorOutline,
-                                                contentDescription = stringResource(R.string.mac_files_download_failed),
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(24.dp)
+                                        }
+                                        DownloadBadge.Progress -> Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Rounded.InsertDriveFile,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
                                             )
+                                            CircularProgressIndicator(
+                                                progress = { (downloadProgress[entry.name] ?: 0f).coerceIn(0f, 1f) },
+                                                modifier = Modifier.size(40.dp)
+                                            )
+                                        }
+                                        DownloadBadge.Done -> Box(
+                                            modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                                        }
+                                        DownloadBadge.Failed -> Box(
+                                            modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.errorContainer, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Rounded.ErrorOutline, contentDescription = stringResource(R.string.mac_files_download_failed), tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(24.dp))
                                         }
                                     }
                                 }
-                            } else null,
+                            },
                             // Tap a folder to open it; tap a file to download it. A file
                             // already transferring is not re-tappable. The shape morphs on
                             // press (native ListItem shapes).
@@ -391,8 +395,8 @@ private fun ThumbImage(base64: String) {
     }
 }
 
-/** Trailing badge of a file row: transfer in progress, done, or failed. */
-private enum class DownloadBadge { Progress, Done, Failed }
+/** State of a file row's leading tile: plain, transfer in progress, just done, or failed. */
+private enum class DownloadBadge { Idle, Progress, Done, Failed }
 
 private fun formatFileSize(bytes: Long): String = when {
     bytes < 1024L -> "$bytes B"
