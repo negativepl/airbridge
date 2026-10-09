@@ -1,6 +1,8 @@
 package com.airbridge.ui.navigation
 
 import android.content.SharedPreferences
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -8,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -48,6 +51,9 @@ fun AppNavHost(
 
     NavDisplay(
         backStack = backStack,
+        // Entries slide a quarter width while cross-fading, so the host must
+        // carry the surface colour itself or the window background shows at the edges.
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
         onBack = { backStack.removeLastOrNull() },
         entryDecorators = listOf(
             rememberSaveableStateHolderNavEntryDecorator(),
