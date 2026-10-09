@@ -82,6 +82,8 @@ class AirbridgeService : Service() {
         const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
         private const val RING_NOTIFICATION_ID = 7
         private const val TRANSFER_NOTIFICATION_ID = 2
+        /** Files-tab downloads: one notification per file, ids above every other notification. */
+        private const val MAC_DOWNLOAD_NOTIFICATION_BASE = 200000
         // How long a Files-browser download waits for the Mac's
         // MacFileDownloadReady before the row is marked as failed.
         private const val MAC_DOWNLOAD_READY_TIMEOUT_MS = 30_000L
@@ -1902,10 +1904,14 @@ class AirbridgeService : Service() {
                     // file waits here until the current one finishes.
                     macDownloadProgress.update { it + (name to 0f) }
                     downloadMutex.withLock {
-                        // Files-browser downloads show progress with the row's in-app progress
-                        // ring, so they do NOT post the ongoing "Receiving file" notification or
-                        // touch the global transfer state — but the completion "File received"
-                        // notification (below) still fires.
+                        // Files-browser downloads keep the global transfer state out of it
+                        // (the row and the Home feed show the ring), but they do post an
+                        // ongoing progress notification: the download carries on after the
+                        // user leaves the app. The completion "File received" notification
+                        // (below) still fires.
+                        val notifId = MAC_DOWNLOAD_NOTIFICATION_BASE + (name.hashCode() and 0x7FFFFFFF) % 1000
+                        var lastPercent = -1
+                        postMacDownloadNotification(notifId, name, 0)
                         val tempFile = httpFileDownloader.download(
                             host = host,
                             port = httpPort.value,
@@ -1915,7 +1921,13 @@ class AirbridgeService : Service() {
                         ) { bytesReceived, totalBytes ->
                             val p = if (totalBytes > 0) bytesReceived.toFloat() / totalBytes else 0f
                             macDownloadProgress.update { it + (name to p) }
+                            val percent = (p * 100).toInt()
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                postMacDownloadNotification(notifId, name, percent)
+                            }
                         }
+                        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(notifId)
                         if (tempFile != null) {
                             finalizeReceivedFile(name, tempFile)
                             macDownloadedNames.update { it + name }
@@ -2426,6 +2438,38 @@ class AirbridgeService : Service() {
             },
             android.app.PendingIntent.FLAG_IMMUTABLE
         )
+
+    /** Ongoing progress notification for one file fetched from the Files tab. */
+    private fun postMacDownloadNotification(notifId: Int, name: String, percent: Int) {
+        val openIntent = android.app.PendingIntent.getActivity(
+            this, 0,
+            android.content.Intent(this, com.airbridge.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = Notification.Builder(this, CHANNEL_FILES_ID)
+            .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, connectedDeviceName.value ?: "Mac"))
+            .setContentText("$name · $percent%")
+            .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            val accentColor = "#4285F4".toColorInt()
+            val grayColor = "#444444".toColorInt()
+            builder.style = Notification.ProgressStyle().apply {
+                this.progress = percent
+                this.progressSegments = listOf(
+                    Notification.ProgressStyle.Segment(maxOf(percent, 1)).setColor(accentColor),
+                    Notification.ProgressStyle.Segment(maxOf(100 - percent, 1)).setColor(grayColor)
+                )
+            }
+        } else {
+            builder.setProgress(100, percent, false)
+        }
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notifId, builder.build())
+    }
 
     private fun buildNotification(title: String, text: String): Notification =
         Notification.Builder(this, CHANNEL_ID)
