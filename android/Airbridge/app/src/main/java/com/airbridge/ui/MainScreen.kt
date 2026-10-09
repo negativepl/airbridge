@@ -389,7 +389,8 @@ fun MainScreen(
             }
         }
 
-        ActivityCard(stats, activity)
+        val activeDownloads by viewModel.macDownloadProgress.collectAsState()
+        ActivityCard(stats, activity, activeDownloads = activeDownloads)
 
         // The FAB floats over the scroll content (Scaffold's innerPadding only
         // reserves the nav bar, not the FAB). The clearance is measured from the

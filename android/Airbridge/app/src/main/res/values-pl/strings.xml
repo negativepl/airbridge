@@ -251,6 +251,7 @@
     <string name="settings_export_diagnostics_desc">Tworzy plik tekstowy z wersją aplikacji, informacjami o urządzeniu, stanem połączenia i ostatnimi logami. Nic nie jest wysyłane bez Twojego działania.</string>
     <string name="settings_export_diagnostics_failed">Nie udało się utworzyć raportu diagnostycznego</string>
     <string name="home_section_activity">Aktywność</string>
+    <string name="activity_downloading">Pobieranie z Maca, %1$d%%</string>
     <plurals name="activity_file_count">
         <item quantity="one">%d plik</item>
         <item quantity="few">%d pliki</item>

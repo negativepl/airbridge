@@ -246,6 +246,7 @@
     <string name="settings_export_diagnostics_desc">Creates a text file with the app version, device information, connection state and recent logs. Nothing is sent without your action.</string>
     <string name="settings_export_diagnostics_failed">Could not create the diagnostic report</string>
     <string name="home_section_activity">Activity</string>
+    <string name="activity_downloading">Downloading from Mac, %1$d%%</string>
     <plurals name="activity_file_count">
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>

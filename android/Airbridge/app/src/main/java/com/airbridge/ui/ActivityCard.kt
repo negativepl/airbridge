@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -48,7 +49,12 @@ private const val FEED_LIMIT = 8
  * syncs fire on every copy and would bury the list, so they are not shown.
  */
 @Composable
-fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = Modifier) {
+/**
+ * [activeDownloads] are Mac files still arriving (name to 0..1): they head
+ * the feed with a progress ring, since the download keeps going when the
+ * user leaves the Files tab.
+ */
+fun ActivityCard(stats: Stats, items: List<ActivityItem>, activeDownloads: Map<String, Float> = emptyMap(), modifier: Modifier = Modifier) {
     val c = stats.total
     val transfers = remember(items) {
         items.filter { it.type == "file_sent" || it.type == "file_received" }.take(FEED_LIMIT)
@@ -78,7 +84,13 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            if (transfers.isEmpty()) {
+            activeDownloads.entries.forEachIndexed { index, (name, progress) ->
+                if (index > 0) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+                ActiveDownloadRow(name = name, progress = progress)
+            }
+            if (transfers.isEmpty() && activeDownloads.isEmpty()) {
                 Text(
                     stringResource(R.string.no_activity),
                     style = MaterialTheme.typography.bodyMedium,
@@ -87,7 +99,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
                 )
             } else {
                 transfers.forEachIndexed { index, item ->
-                    if (index > 0) {
+                    if (index > 0 || activeDownloads.isNotEmpty()) {
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     }
                     TransferRow(item)
@@ -117,6 +129,32 @@ private fun StatColumn(icon: ImageVector, value: String, label: String, caption:
             Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/** A Mac file still downloading: the progress ring sits where the finished row's tile will be. */
+@Composable
+private fun ActiveDownloadRow(name: String, progress: Float) {
+    ListItem(
+        content = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            Text(stringResource(R.string.activity_downloading, (progress.coerceIn(0f, 1f) * 100).toInt()))
+        },
+        leadingContent = {
+            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                CircularProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @Composable
