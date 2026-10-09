@@ -142,7 +142,10 @@
     // Target the standard 2× Retina mode: backing = the largest available
     // (sharpest), logical "looks like" = half of it (comfortable, big UI).
     // That is the mode where pixelWidth == maxBacking and width == pixelWidth/2.
-    CFArrayRef modes = CGDisplayCopyAllDisplayModes(displayID, NULL);
+    // Without this option CoreGraphics hides the HiDPI ("looks like") modes,
+    // so the Retina mode would never be found and the display would stay 1x.
+    CFDictionaryRef opts = (__bridge CFDictionaryRef)@{ (__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes: @YES };
+    CFArrayRef modes = CGDisplayCopyAllDisplayModes(displayID, opts);
     size_t maxBacking = 0;
     if (modes) {
         for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
@@ -174,12 +177,24 @@
         }
     }
 
+    // Every mode the display offers, as "points@pixels", for the diagnostics log.
+    NSMutableArray<NSString *> *offered = [NSMutableArray array];
+    if (modes) {
+        for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
+            CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
+            [offered addObject:[NSString stringWithFormat:@"%zux%zu@%zux%zu",
+                                (size_t)CGDisplayModeGetWidth(m), (size_t)CGDisplayModeGetHeight(m),
+                                (size_t)CGDisplayModeGetPixelWidth(m), (size_t)CGDisplayModeGetPixelHeight(m)]];
+        }
+    }
     if (best) {
-        _selectedMode = [NSString stringWithFormat:@"looksLike %zux%zu @ %zux%zu px",
+        _selectedMode = [NSString stringWithFormat:@"looksLike %zux%zu @ %zux%zu px; offered %@",
                          (size_t)CGDisplayModeGetWidth(best), (size_t)CGDisplayModeGetHeight(best),
-                         (size_t)CGDisplayModeGetPixelWidth(best), (size_t)CGDisplayModeGetPixelHeight(best)];
+                         (size_t)CGDisplayModeGetPixelWidth(best), (size_t)CGDisplayModeGetPixelHeight(best),
+                         [offered componentsJoinedByString:@","]];
     } else {
-        _selectedMode = @"no HiDPI mode found";
+        _selectedMode = [NSString stringWithFormat:@"no HiDPI mode found; offered %@",
+                         [offered componentsJoinedByString:@","]];
     }
 
     CGDisplayConfigRef cfg = NULL;
@@ -189,6 +204,10 @@
         CGCompleteDisplayConfiguration(cfg, kCGConfigurePermanently);
     }
     if (modes) CFRelease(modes);
+    // What the WindowServer settled on, points vs pixels, after the configuration.
+    CGRect bounds = CGDisplayBounds(displayID);
+    _selectedMode = [NSString stringWithFormat:@"%@; now %.0fx%.0f pt @ %zux%zu px", _selectedMode,
+                     bounds.size.width, bounds.size.height, CGDisplayPixelsWide(displayID), CGDisplayPixelsHigh(displayID)];
 }
 
 @end
