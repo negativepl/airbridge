@@ -25,6 +25,7 @@ import com.airbridge.ui.OnboardingScreen
 import com.airbridge.ui.PairingSuccessScreen
 import com.airbridge.ui.SettingsScreen
 import com.airbridge.ui.TabsScreen
+import com.airbridge.ui.pageBackground
 
 private const val ONBOARDING_DONE = "onboarding_completed"
 
@@ -53,7 +54,7 @@ fun AppNavHost(
         backStack = backStack,
         // Entries slide a quarter width while cross-fading, so the host must
         // carry the surface colour itself or the window background shows at the edges.
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.pageBackground),
         // NavDisplay only handles back while the stack has more than one entry, so the tabs' own BackHandlers win at the root and the stack never empties.
         onBack = { backStack.removeLastOrNull() },
         entryDecorators = listOf(

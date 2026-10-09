@@ -72,23 +72,22 @@ fun AirbridgeTheme(
 val ColorScheme.success: Color
     get() = if (surface.luminance() < 0.5f) Color(0xFF81C784) else Color(0xFF2E7D32)
 
-private val ColorScheme.isDark: Boolean get() = surface.luminance() < 0.5f
-
 /**
- * Surfaces are layered the way Google's apps do it. Light: a tinted page
- * (surfaceContainer) with white cards (surfaceContainerLowest). Dark: the
- * plain surface as the page with cards one step lighter.
+ * Surfaces are layered the way Google's apps do it, in both modes: a tinted
+ * page (surfaceContainer) with cards on the lowest container, which is white
+ * in light and near-black in dark (Google One dark: black cards on a
+ * dark-green page).
  */
 val ColorScheme.pageBackground: Color
-    get() = if (isDark) surface else surfaceContainer
+    get() = surfaceContainer
 
 /** Card container that lifts off [pageBackground] in both modes. */
 val ColorScheme.cardContainer: Color
-    get() = if (isDark) surfaceContainerHighest else surfaceContainerLowest
+    get() = surfaceContainerLowest
 
 /** Navigation bar container: one container step off [pageBackground] so the dock reads as its own surface. */
 val ColorScheme.dockContainer: Color
-    get() = if (isDark) surfaceContainer else surfaceContainerHigh
+    get() = surfaceContainerHigh
 
 /** Stock card colours with [cardContainer] as the container. */
 @Composable
@@ -104,8 +103,5 @@ fun pageCardColors(): CardColors =
 @Composable
 fun pageTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
     containerColor = MaterialTheme.colorScheme.pageBackground,
-    scrolledContainerColor = if (MaterialTheme.colorScheme.isDark)
-        MaterialTheme.colorScheme.surfaceContainer
-    else
-        MaterialTheme.colorScheme.surfaceContainerHigh,
+    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
 )
