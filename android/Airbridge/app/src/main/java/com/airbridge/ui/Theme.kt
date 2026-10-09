@@ -102,10 +102,13 @@ fun pageCardColors(): CardColors =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun pageTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
+fun pageTopAppBarColors(tintWhenScrolled: Boolean = true): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
     containerColor = MaterialTheme.colorScheme.pageBackground,
-    scrolledContainerColor = if (MaterialTheme.colorScheme.isDark)
-        MaterialTheme.colorScheme.surfaceContainer
-    else
-        MaterialTheme.colorScheme.surfaceContainerHigh,
+    scrolledContainerColor = when {
+        // Beside a navigation rail the bar stays the page colour, or the rail
+        // and the scrolled bar would read as one inverted L around the content.
+        !tintWhenScrolled -> MaterialTheme.colorScheme.pageBackground
+        MaterialTheme.colorScheme.isDark -> MaterialTheme.colorScheme.surfaceContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    },
 )
