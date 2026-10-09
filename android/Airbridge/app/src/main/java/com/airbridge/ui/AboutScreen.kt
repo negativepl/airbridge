@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbridge.R
+import com.airbridge.update.UpdateChecker
 
 
 
@@ -199,6 +201,8 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         PageCard(modifier = Modifier.fillMaxWidth()) {
             Column {
                 // Check for updates — opens the changelog/download sheet.
+                val updatesAvailable = UpdateChecker.IS_AVAILABLE
+                val disabledAlpha = 0.38f
                 ListItem(
                     leadingContent = {
                         Icon(
@@ -209,6 +213,9 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
                         )
                     },
                     content = { Text(stringResource(R.string.update_check)) },
+                    supportingContent = if (updatesAvailable) null else {
+                        { Text(stringResource(R.string.update_unavailable)) }
+                    },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -218,7 +225,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { checkUpdateTrigger = true }
+                    modifier = if (updatesAvailable) Modifier.clickable { checkUpdateTrigger = true } else Modifier.alpha(disabledAlpha)
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

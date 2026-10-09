@@ -50,6 +50,12 @@ class UpdateChecker(
         }
 
     companion object {
+        /**
+         * The update server is being moved to a new domain (2026-10-10). Until
+         * the manifest is reachable there, the check is shown disabled instead
+         * of failing on every tap. Set to true once the manifest is live again.
+         */
+        const val IS_AVAILABLE = false
         const val DEFAULT_MANIFEST_URL = "https://updates.vintrhall.com/airbridge/manifest.json"
         const val UPDATE_PUBLIC_KEY_B64 = "842aa+wK7BUs8CVyg/d2cgyKYC6IGQ2kiYgeyR9YxTo="
     }

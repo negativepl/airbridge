@@ -22,6 +22,10 @@ final class UpdateService {
         }
     }
 
+    /// The update server is being moved to a new domain (2026-10-10). Until
+    /// the manifest is reachable there, the check is shown disabled rather
+    /// than failing on every tap. Set to true once `manifestURL` is live again.
+    static let isAvailable = false
     static let manifestURL = URL(string: "https://updates.vintrhall.com/airbridge/manifest.json")!
     static let publicKeyB64 = "842aa+wK7BUs8CVyg/d2cgyKYC6IGQ2kiYgeyR9YxTo="
 

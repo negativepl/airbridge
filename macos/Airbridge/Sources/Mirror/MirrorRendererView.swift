@@ -12,7 +12,7 @@ private enum MirrorRendererDebugLog {
         let data = Data(line.utf8)
         if FileManager.default.fileExists(atPath: url.path) {
             if let handle = try? FileHandle(forWritingTo: url) {
-                try? handle.seekToEnd()
+                _ = try? handle.seekToEnd()
                 try? handle.write(contentsOf: data)
                 try? handle.close()
             }
@@ -79,14 +79,15 @@ public final class MirrorRendererLayerView: NSView {
     public func enqueue(_ sampleBuffer: CMSampleBuffer) {
         let layers = ambientEnabled ? [ambientLayer, displayLayer] : [displayLayer]
         for layer in layers {
-            if layer.status == .failed {
-                layer.flushAndRemoveImage()
+            let renderer = layer.sampleBufferRenderer
+            if renderer.status == .failed {
+                renderer.flush(removingDisplayedImage: true, completionHandler: nil)
             }
-            if layer.isReadyForMoreMediaData {
-                layer.enqueue(sampleBuffer)
+            if renderer.isReadyForMoreMediaData {
+                renderer.enqueue(sampleBuffer)
             } else if layer === displayLayer {
                 droppedCount += 1
-                if droppedCount.isMultiple(of: 5) { layer.flush() }
+                if droppedCount.isMultiple(of: 5) { renderer.flush() }
             }
         }
     }

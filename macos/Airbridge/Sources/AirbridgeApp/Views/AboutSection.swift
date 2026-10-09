@@ -87,10 +87,23 @@ struct AboutSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!UpdateService.isAvailable)
+        .opacity(UpdateService.isAvailable ? 1 : 0.45)
     }
 
     @ViewBuilder
     private var updateRowTrailing: some View {
+        if !UpdateService.isAvailable {
+            Text(L10n.isPL ? "Tymczasowo niedostępne" : "Temporarily unavailable")
+                .font(.ab(.caption, weight: .semibold))
+                .foregroundStyle(.secondary)
+        } else {
+            updatePhaseTrailing
+        }
+    }
+
+    @ViewBuilder
+    private var updatePhaseTrailing: some View {
         switch updateService.phase {
         case .idle:
             // An action, not a link: no external-link arrow here.

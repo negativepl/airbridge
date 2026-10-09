@@ -135,6 +135,8 @@ struct MenuBarView: View {
                     break
                 }
             }
+            .disabled(!UpdateService.isAvailable)
+            .opacity(UpdateService.isAvailable ? 1 : 0.45)
             .onChange(of: updateService.phase) { _, new in
                 // "Up to date" replaces the row text for a beat, then the row
                 // returns to its idle label — same in-place pattern as the

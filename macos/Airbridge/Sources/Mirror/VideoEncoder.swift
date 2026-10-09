@@ -10,7 +10,10 @@ public enum VideoEncoderError: Error, Sendable {
 /// Hardware H.264 encoder (VideoToolbox) for the reverse mirror: Mac screen ->
 /// phone. Mirror of `VideoDecoder`. Emits raw SPS/PPS (on each keyframe) and
 /// Annex-B frame data, matching the wire format the phone decoder expects.
-public final class VideoEncoder {
+/// Unchecked: every piece of mutable state is guarded by `latencyLock` or
+/// `errorLock`, and the session is created once in `init`. VideoToolbox calls
+/// back on its own thread, so the class has to cross isolation boundaries.
+public final class VideoEncoder: @unchecked Sendable {
     public struct Config: Sendable {
         public let width: Int32
         public let height: Int32
