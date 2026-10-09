@@ -24,12 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.ScreenShare
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
@@ -195,9 +197,15 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
                 },
                 supportingContent = last?.let { { Text(formatTimeAgo(it.timestamp, now)) } },
                 trailingContent = {
-                    // Stock shape morph: the button squares off while pressed.
-                    Button(onClick = onSendClipboard, enabled = enabled, shapes = ButtonDefaults.shapes()) {
-                        Text(stringResource(R.string.clipboard_send_now))
+                    // An icon instead of a label, so the row never fights the
+                    // button for width; the label stays as the description.
+                    FilledIconButton(
+                        onClick = onSendClipboard,
+                        enabled = enabled,
+                        modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
+                        shapes = IconButtonDefaults.shapes()
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = stringResource(R.string.clipboard_send_now), modifier = Modifier.size(IconButtonDefaults.mediumIconSize))
                     }
                 },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
