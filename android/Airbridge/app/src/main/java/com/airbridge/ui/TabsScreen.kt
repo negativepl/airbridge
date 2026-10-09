@@ -362,11 +362,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                         targetState = barTitle,
                         transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
                         label = "pageTitle"
-                    ) { title ->
-                        // The app name sits in the bar like a product logo in
-                        // Google's apps: one step smaller than a page title.
-                        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    ) { title -> Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 },
                 subtitle = {
                     AnimatedContent(
@@ -391,7 +387,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                         Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }
                 },
-                titleHorizontalAlignment = Alignment.CenterHorizontally,
+                titleHorizontalAlignment = Alignment.Start,
                 colors = pageTopAppBarColors(),
                 scrollBehavior = topBarBehaviors[selectedTab],
                 modifier = Modifier.align(Alignment.TopCenter)
