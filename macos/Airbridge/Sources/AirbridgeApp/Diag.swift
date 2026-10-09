@@ -32,9 +32,18 @@ enum Diag {
     private static let checkEvery = 200
     nonisolated(unsafe) private static var writesSinceCheck = 0
 
+    /// Serial background queue: callers (capture and encoder callbacks among
+    /// them) must never wait on the disk.
+    private static let queue = DispatchQueue(label: "airbridge.diag", qos: .utility)
+
     static func log(_ category: String, _ message: String) {
+        let stamp = Date()
+        queue.async { write(category, message, at: stamp) }
+    }
+
+    private static func write(_ category: String, _ message: String, at stamp: Date) {
         lock.lock(); defer { lock.unlock() }
-        let line = "\(formatter.string(from: Date())) [\(category)] \(message)\n"
+        let line = "\(formatter.string(from: stamp)) [\(category)] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         if let handle = try? FileHandle(forWritingTo: fileURL) {
             defer { try? handle.close() }

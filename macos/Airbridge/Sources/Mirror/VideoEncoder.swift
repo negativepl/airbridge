@@ -47,14 +47,36 @@ public final class VideoEncoder {
         }
     }
 
+    /// Temporary experiment toggles (UserDefaults, domain of the app) so the
+    /// encoder can be reconfigured with an app restart instead of a rebuild.
+    private struct Tuning {
+        let realTime: Bool, lowLatency: Bool, completeFrames: Bool, cbr: Bool, baseline: Bool
+        static func load() -> Tuning {
+            let d = UserDefaults.standard
+            func flag(_ k: String, _ def: Bool) -> Bool { d.object(forKey: k) == nil ? def : d.bool(forKey: k) }
+            return Tuning(realTime: flag("mirrorExp.realtime", true), lowLatency: flag("mirrorExp.lowLatency", true),
+                          completeFrames: flag("mirrorExp.completeFrames", true), cbr: flag("mirrorExp.cbr", false),
+                          baseline: flag("mirrorExp.baseline", false))
+        }
+        var description: String { "realtime=\(realTime) lowLatency=\(lowLatency) completeFrames=\(completeFrames) cbr=\(cbr) baseline=\(baseline)" }
+    }
+    private let tuning = Tuning.load()
+    public var tuningDescription: String { tuning.description }
+
     private func createSession() throws {
         var session: VTCompressionSession?
+        // Low-latency rate control is a session-creation option, not a property:
+        // the hardware encoder then emits every frame as soon as it is coded
+        // instead of holding a pipeline of several frames (measured 2026-10-09:
+        // up to 13 frames and 380 ms in flight without it).
+        var spec: [CFString: Any] = [kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: true]
+        if tuning.lowLatency { spec[kVTVideoEncoderSpecification_EnableLowLatencyRateControl] = true }
         let status = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,
             width: config.width,
             height: config.height,
             codecType: config.useHEVC ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264,
-            encoderSpecification: nil,
+            encoderSpecification: spec as CFDictionary,
             imageBufferAttributes: nil,
             compressedDataAllocator: nil,
             outputCallback: nil,
@@ -67,23 +89,48 @@ public final class VideoEncoder {
         func set(_ key: CFString, _ value: CFTypeRef) {
             VTSessionSetProperty(session, key: key, value: value)
         }
-        set(kVTCompressionPropertyKey_RealTime, kCFBooleanTrue)
+        if tuning.realTime { set(kVTCompressionPropertyKey_RealTime, kCFBooleanTrue) }
         set(kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse)
         set(kVTCompressionPropertyKey_ProfileLevel,
-            config.useHEVC ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel)
-        set(kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrateBps))
+            config.useHEVC ? kVTProfileLevel_HEVC_Main_AutoLevel
+                : (tuning.baseline ? kVTProfileLevel_H264_Baseline_AutoLevel : kVTProfileLevel_H264_High_AutoLevel))
+        if tuning.cbr {
+            set(kVTCompressionPropertyKey_ConstantBitRate, NSNumber(value: config.bitrateBps))
+        } else {
+            set(kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrateBps))
+        }
         set(kVTCompressionPropertyKey_ExpectedFrameRate, NSNumber(value: config.fps))
         set(kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, NSNumber(value: config.keyframeIntervalSeconds))
-        // Hand each frame out as soon as it is encoded: no look-ahead queue, and
-        // speed over compression efficiency (a mirror is latency-bound, not size-bound).
-        set(kVTCompressionPropertyKey_MaxFrameDelayCount, NSNumber(value: 0))
-        set(kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality, kCFBooleanTrue)
+        // Measured 2026-10-09: MaxFrameDelayCount = 0 and PrioritizeEncodingSpeedOverQuality
+        // made the hardware HEVC encoder stall ~108 ms two to three times a second, so
+        // only the power-efficiency hint stays off.
         set(kVTCompressionPropertyKey_MaximizePowerEfficiency, kCFBooleanFalse)
         VTCompressionSessionPrepareToEncodeFrames(session)
     }
 
+    /// Encode latency per frame (submit to output), for the diagnostics log.
+    private let latencyLock = NSLock()
+    private var submitted: [UInt64: UInt64] = [:]   // ptsUs -> uptime ns
+    private var maxLatencyMs: Double = 0
+    private var maxInFlight = 0
+    private var latencySamples = 0
+    private var over20 = 0
+    private var over40 = 0
+
+    /// Returns the window's encode-latency summary and starts a new window.
+    public func latencySummary() -> String {
+        latencyLock.lock(); defer { latencyLock.unlock() }
+        let s = String(format: "encLatency max=%.0fms >20ms=%d >40ms=%d inFlight max=%d n=%d", maxLatencyMs, over20, over40, maxInFlight, latencySamples)
+        maxLatencyMs = 0; maxInFlight = 0; latencySamples = 0; over20 = 0; over40 = 0
+        return s
+    }
+
     public func encode(pixelBuffer: CVPixelBuffer, ptsUs: UInt64) {
         guard let session else { return }
+        latencyLock.lock()
+        submitted[ptsUs] = DispatchTime.now().uptimeNanoseconds
+        if submitted.count > maxInFlight { maxInFlight = submitted.count }
+        latencyLock.unlock()
         let pts = CMTime(value: CMTimeValue(ptsUs), timescale: 1_000_000)
         VTCompressionSessionEncodeFrame(
             session,
@@ -95,6 +142,11 @@ public final class VideoEncoder {
         ) { [weak self] status, _, sampleBuffer in
             self?.handleEncoded(status: status, sampleBuffer: sampleBuffer)
         }
+        // Flush this frame out of the encoder before the next one arrives. The
+        // hardware encoder otherwise keeps a small pipeline (measured 4-5 frames,
+        // 60-220 ms) even with low-latency rate control; a mirror wants each
+        // frame on the wire within one frame interval.
+        if tuning.completeFrames { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: pts) }
     }
 
     private func handleEncoded(status: OSStatus, sampleBuffer: CMSampleBuffer?) {
@@ -120,6 +172,15 @@ public final class VideoEncoder {
 
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let ptsUs = pts.isValid ? UInt64(max(0, CMTimeGetSeconds(pts) * 1_000_000)) : 0
+        latencyLock.lock()
+        if let t0 = submitted.removeValue(forKey: ptsUs) {
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000
+            if ms > maxLatencyMs { maxLatencyMs = ms }
+            if ms > 20 { over20 += 1 }
+            if ms > 40 { over40 += 1 }
+            latencySamples += 1
+        }
+        latencyLock.unlock()
         onFrame(annexB, ptsUs)
     }
 

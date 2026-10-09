@@ -271,6 +271,41 @@ public actor WebSocketServer {
         }
     }
 
+    /// Hands a binary frame to every connection without waiting for the stack
+    /// to process it. For a live video stream the caller must never block on
+    /// delivery: waiting per frame serialises sends behind TCP flow control
+    /// and turns a steady 60 fps into bursts. Network.framework queues the data.
+    public func broadcastBinaryNoWait(_ data: Data) {
+        let metadata = NWProtocolWebSocket.Metadata(opcode: .binary)
+        let context = NWConnection.ContentContext(identifier: "binary", metadata: [metadata])
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        for (_, conn) in connections {
+            conn.send(content: data, contentContext: context, isComplete: true,
+                      completion: .contentProcessed { [weak self] _ in
+                          let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000
+                          Task { await self?.recordSendLatency(ms) }
+                      })
+        }
+    }
+
+    // Send-side diagnostics: how long the stack takes to accept each frame.
+    private var sendLatencyMaxMs: Double = 0
+    private var sendLatencySlow = 0
+    private var sendLatencyCount = 0
+
+    private func recordSendLatency(_ ms: Double) {
+        sendLatencyCount += 1
+        if ms > sendLatencyMaxMs { sendLatencyMaxMs = ms }
+        if ms > 50 { sendLatencySlow += 1 }
+    }
+
+    /// Returns the window's send-latency summary and starts a new window.
+    public func sendLatencySummary() -> String {
+        let s = String(format: "sendLatency max=%.0fms slow>50ms=%d n=%d", sendLatencyMaxMs, sendLatencySlow, sendLatencyCount)
+        sendLatencyMaxMs = 0; sendLatencySlow = 0; sendLatencyCount = 0
+        return s
+    }
+
     /// Sends raw binary data to a single connected client as a WebSocket binary frame.
     public func sendBinary(_ data: Data, connectionId: String) async throws {
         guard let conn = connections[connectionId] else { return }

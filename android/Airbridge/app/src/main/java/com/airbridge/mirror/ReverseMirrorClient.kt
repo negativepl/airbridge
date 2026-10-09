@@ -39,6 +39,7 @@ class ReverseMirrorClient(
         certFingerprint
     ).build()
     private var webSocket: WebSocket? = null
+    private val arrivalGaps = GapStats("ReverseMirror", "arrival")
 
     fun connect() {
         val req = Request.Builder().url("wss://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/").build()
@@ -52,7 +53,7 @@ class ReverseMirrorClient(
                         when (msg) {
                             is MirrorMessage.VideoConfig -> onConfig(msg.sps, msg.pps)
                             is MirrorMessage.VideoConfigHEVC -> onConfigHEVC(msg.vps, msg.sps, msg.pps)
-                            is MirrorMessage.VideoFrame -> onFrame(msg.naluBytes, msg.presentationTimestampUs.toLong())
+                            is MirrorMessage.VideoFrame -> { arrivalGaps.record(); onFrame(msg.naluBytes, msg.presentationTimestampUs.toLong()) }
                             else -> Unit
                         }
                     }
@@ -106,4 +107,31 @@ private object NoDelaySocketFactory : SocketFactory() {
     override fun createSocket(host: InetAddress, port: Int): Socket = delegate.createSocket(host, port).noDelay()
     override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket =
         delegate.createSocket(address, port, localAddress, localPort).noDelay()
+}
+
+/**
+ * Inter-arrival statistics for one stage of the pipeline, logged every 300
+ * events: the largest gap and how many gaps exceeded 50 ms (a stall at 60 fps).
+ */
+internal class GapStats(private val tag: String, private val stage: String) {
+    private var last = 0L
+    private var maxGapMs = 0.0
+    private var stalls = 0
+    private var count = 0
+
+    @Synchronized
+    fun record() {
+        val now = System.nanoTime()
+        if (last != 0L) {
+            val gap = (now - last) / 1_000_000.0
+            count++
+            if (gap > maxGapMs) maxGapMs = gap
+            if (gap > 50) stalls++
+            if (count == 300) {
+                android.util.Log.d(tag, "$stage: gaps=$count maxGap=${"%.0f".format(maxGapMs)}ms stalls>50ms=$stalls")
+                count = 0; maxGapMs = 0.0; stalls = 0
+            }
+        }
+        last = now
+    }
 }

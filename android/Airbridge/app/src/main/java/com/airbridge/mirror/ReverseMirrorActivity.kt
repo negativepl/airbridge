@@ -3,6 +3,7 @@ package com.airbridge.mirror
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
@@ -54,6 +55,12 @@ import com.airbridge.ui.AirbridgeTheme
 class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private var client: ReverseMirrorClient? = null
+    /**
+     * Keeps the Wi-Fi radio out of power save while the stream runs. Measured
+     * 2026-10-09: without it inbound frames arrive in bursts separated by ~107 ms
+     * (one beacon interval) although the Mac hands them to the network every 16 ms.
+     */
+    private var wifiLock: WifiManager.WifiLock? = null
     private var decoder: ScreenDecoder? = null
 
     private lateinit var container: FrameLayout
@@ -697,6 +704,20 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) { updateVideoOffset() }
     override fun surfaceDestroyed(holder: SurfaceHolder) { teardown() }
+
+    override fun onStart() {
+        super.onStart()
+        if (wifiLock == null) {
+            val wifi = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "AirBridge:mirror")
+        }
+        wifiLock?.takeIf { !it.isHeld }?.acquire()
+    }
+
+    override fun onStop() {
+        wifiLock?.takeIf { it.isHeld }?.release()
+        super.onStop()
+    }
 
     override fun onDestroy() { teardown(); super.onDestroy() }
 

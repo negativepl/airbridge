@@ -412,9 +412,16 @@ public final class MirrorService {
         let (stream, cont) = AsyncStream<Data>.makeStream(bufferingPolicy: .unbounded)
         reverseSendCont = cont
         let server = self.server
-        Task {
+        // Off the main actor: the sender must not share the UI thread, and it
+        // never waits for a frame to be processed before handing over the next.
+        let sendGaps = GapStats()
+        Task.detached(priority: .userInitiated) {
+            var sent = 0
             for await packet in stream {
-                try? await server.broadcastBinary(packet)
+                sendGaps.record()
+                await server.broadcastBinaryNoWait(packet)
+                sent += 1
+                if sent % 60 == 0 { Diag.log("Mirror", "reverse sent #\(sent) \(sendGaps.flush()) \(await server.sendLatencySummary())") }
             }
         }
         let slot: MirrorSlot = (mode == 1) ? .reverseVirtual : .reverseMirror

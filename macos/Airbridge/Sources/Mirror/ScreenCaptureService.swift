@@ -63,9 +63,12 @@ public final class ScreenCaptureService: NSObject, SCStreamOutput {
         config.width = outW
         config.height = outH
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)   // up to 60 fps
-        config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-        // Apple's recommended minimum; a deeper queue only adds frames of latency under load.
-        config.queueDepth = 3
+        // Video range is the hardware encoder's native input; full range made VideoToolbox
+        // convert every frame and encode times spiked to ~65 ms several times a second.
+        config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        // Enough surfaces in flight that the compositor never waits for one the
+        // encoder still holds (a depth of 3 stalled capture while a frame encoded).
+        config.queueDepth = 8
         config.showsCursor = true
 
         let stream = SCStream(filter: filter, configuration: config, delegate: nil)

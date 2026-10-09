@@ -25,6 +25,8 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     private var virtualDisplay: ABVirtualDisplay?
     private let lock = NSLock()
     private let frameCount = Counter()
+    let captureGaps = GapStats()
+    let encodeGaps = GapStats()
     private let encodedCount = Counter()
 
     public init(fps: Int, bitrate: Int, useHEVC: Bool = false,
@@ -92,12 +94,13 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
                         },
                         onFrame: { annexB, pts in
                             let n = self.encodedCount.increment()
-                            if n == 1 || n % 60 == 0 { self.onLog("reverse encoded frame #\(n) bytes=\(annexB.count)") }
+                            self.encodeGaps.record()
+                            if n == 1 || n % 60 == 0 { self.onLog("reverse encoded frame #\(n) bytes=\(annexB.count) \(self.encodeGaps.flush()) \(self.currentEncoder()?.latencySummary() ?? "")") }
                             self.onPacket(MirrorMessage.videoFrame(presentationTimestampUs: pts, naluBytes: annexB).encode())
                         }
                     )
                     self.setEncoder(enc)
-                    self.onLog("reverse encoder created")
+                    self.onLog("reverse encoder created \(self.currentEncoder()?.tuningDescription ?? "")")
                 } catch {
                     self.onLog("reverse encoder init FAILED: \(error)")
                 }
@@ -105,9 +108,15 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
             onFrame: { [weak self] pixelBuffer, pts in
                 guard let self else { return }
                 let n = self.frameCount.increment()
-                if n <= 3 || n % 60 == 0 {
+                self.captureGaps.record()
+                // The luma probe walks the whole frame on the capture thread, so it
+                // runs only for the first frames ("is the capture black?"); the
+                // periodic line reports cadence only.
+                if n <= 3 {
                     let (luma, w, h) = Self.avgLuma(pixelBuffer)
                     self.onLog("reverse captured frame #\(n) \(w)x\(h) avgLuma=\(luma)")
+                } else if n % 60 == 0 {
+                    self.onLog("reverse captured frame #\(n) \(self.captureGaps.flush())")
                 }
                 self.currentEncoder()?.encode(pixelBuffer: pixelBuffer, ptsUs: pts)
             }
@@ -176,4 +185,36 @@ private final class Counter: @unchecked Sendable {
     private var value = 0
     private let lock = NSLock()
     func increment() -> Int { lock.lock(); defer { lock.unlock() }; value += 1; return value }
+}
+
+/// Inter-arrival statistics for one stage of the pipeline, reported per log
+/// window: the largest gap and how many gaps exceeded 50 ms (a stall at 60 fps).
+public final class GapStats: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last: UInt64 = 0
+    private var maxGapMs: Double = 0
+    private var stalls = 0
+    private var count = 0
+
+    public init() {}
+
+    public func record() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        lock.lock(); defer { lock.unlock() }
+        if last != 0 {
+            let gap = Double(now - last) / 1_000_000
+            count += 1
+            if gap > maxGapMs { maxGapMs = gap }
+            if gap > 50 { stalls += 1 }
+        }
+        last = now
+    }
+
+    /// Returns the window's summary and starts a new window.
+    public func flush() -> String {
+        lock.lock(); defer { lock.unlock() }
+        let s = String(format: "gaps=%d maxGap=%.0fms stalls>50ms=%d", count, maxGapMs, stalls)
+        count = 0; maxGapMs = 0; stalls = 0
+        return s
+    }
 }
