@@ -83,6 +83,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -362,7 +363,15 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                         targetState = barTitle,
                         transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
                         label = "pageTitle"
-                    ) { title -> Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    ) { title ->
+                        Text(
+                            title,
+                            color = MaterialTheme.colorScheme.tabTitleColor,
+                            fontWeight = FontWeight(450),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 },
                 subtitle = {
                     AnimatedContent(
@@ -388,7 +397,8 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     }
                 },
                 titleHorizontalAlignment = Alignment.Start,
-                colors = pageTopAppBarColors(),
+                // The bar stays the page colour under scrolled content, as in Google One.
+                colors = pageTopAppBarColors(tintWhenScrolled = false),
                 scrollBehavior = topBarBehaviors[selectedTab],
                 modifier = Modifier.align(Alignment.TopCenter)
             )

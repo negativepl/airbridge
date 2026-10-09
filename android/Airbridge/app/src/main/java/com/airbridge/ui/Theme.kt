@@ -101,7 +101,14 @@ fun pageCardColors(): CardColors =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun pageTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
+fun pageTopAppBarColors(tintWhenScrolled: Boolean = true): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
     containerColor = MaterialTheme.colorScheme.pageBackground,
-    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    scrolledContainerColor = if (tintWhenScrolled) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.pageBackground,
 )
+
+/**
+ * Pure black or white for the tab titles: the tonal onSurface reads as
+ * slightly coloured next to the page tint, which Marcin did not want there.
+ */
+val ColorScheme.tabTitleColor: Color
+    get() = if (surface.luminance() < 0.5f) Color.White else Color.Black
