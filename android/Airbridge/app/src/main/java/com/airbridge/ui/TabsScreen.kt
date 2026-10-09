@@ -50,8 +50,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.WideNavigationRailDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -212,31 +213,39 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     }
 
     // One shared top bar above the tabs; each tab owns the scroll state that colours it.
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.pageBackground,
-        bottomBar = {
-            // Short Material 3 Expressive navigation bar, one container step off the page.
-            ShortNavigationBar(
-                containerColor = MaterialTheme.colorScheme.dockContainer,
-            ) {
-                navItems.forEachIndexed { index, item ->
-                    ShortNavigationBarItem(
-                        selected = selectedTab == index,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedTab = index
-                        },
-                        icon = {
-                            Icon(
-                                item.icon,
-                                contentDescription = stringResource(item.labelRes)
-                            )
-                        },
-                        label = { Text(stringResource(item.labelRes)) }
-                    )
-                }
+    // Navigation adapts to the window: a short navigation bar on a phone, a
+    // wide navigation rail on the left once the Fold is open (medium width),
+    // the way Google's apps lay out on foldables. The suite owns the dock; the
+    // Scaffold inside keeps the FAB menu, the top bar and the tab content.
+    NavigationSuiteScaffold(
+        navigationSuiteItems = {
+            navItems.forEachIndexed { index, item ->
+                item(
+                    selected = selectedTab == index,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        selectedTab = index
+                    },
+                    icon = {
+                        Icon(
+                            item.icon,
+                            contentDescription = stringResource(item.labelRes)
+                        )
+                    },
+                    label = { Text(stringResource(item.labelRes)) }
+                )
             }
         },
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            shortNavigationBarContainerColor = MaterialTheme.colorScheme.dockContainer,
+            wideNavigationRailColors = WideNavigationRailDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.dockContainer
+            ),
+        ),
+        containerColor = MaterialTheme.colorScheme.pageBackground,
+    ) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.pageBackground,
         floatingActionButton = {
             if (hasPairedDevices) {
                 BackHandler(fabMenuExpanded) { fabMenuExpanded = false }
@@ -393,6 +402,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                 modifier = Modifier.align(Alignment.TopCenter)
             )
         }
+    }
     }
 
     // File/photo confirmation sheet
