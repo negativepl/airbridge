@@ -130,7 +130,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         Spacer(modifier = Modifier.height(28.dp))
 
         // Credits card
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
             Column {
                 // Author — clickable to GitHub profile
                 ListItem(
@@ -197,7 +197,7 @@ private fun AboutContent(modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
         var checkUpdateTrigger by remember { mutableStateOf(false) }
 
         // Links card
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
             Column {
                 // Check for updates — opens the changelog/download sheet.
                 ListItem(

@@ -219,6 +219,7 @@ private fun SettingsContent(
 
         if (pairedDevices.isEmpty()) {
             Card(
+                colors = pageCardColors(),
                 onClick = { onScanQr() },
                 modifier = Modifier.fillMaxWidth(),
             ) { PairMacRow() }
@@ -226,7 +227,7 @@ private fun SettingsContent(
 
         // Appearance section
             SectionHeader(text = stringResource(R.string.settings_appearance))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Jasny | Systemowy | Ciemny — systemowy w środku jako
                     // punkt neutralny między dwoma jawnymi motywami.
@@ -279,6 +280,7 @@ private fun SettingsContent(
                     }
                 }
                 Card(
+                    colors = pageCardColors(),
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -308,7 +310,7 @@ private fun SettingsContent(
 
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
@@ -354,7 +356,7 @@ private fun SettingsContent(
 
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
@@ -374,7 +376,7 @@ private fun SettingsContent(
             }
 
             SectionHeader(text = stringResource(R.string.settings_headphones))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
@@ -504,7 +506,7 @@ private fun SettingsContent(
                             }
                         }
                     }
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { exportReport() },
@@ -534,7 +536,7 @@ private fun SettingsContent(
             // About: update check and the About screen in one card.
             SectionHeader(text = stringResource(R.string.nav_about))
             var checkUpdateTrigger by remember { mutableStateOf(false) }
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
                 // Manual check only, never on a schedule.
                 ListItem(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -584,7 +586,7 @@ private fun PairedDeviceCard(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
         if (wallpaper != null) {
             Image(
                 bitmap = wallpaper,

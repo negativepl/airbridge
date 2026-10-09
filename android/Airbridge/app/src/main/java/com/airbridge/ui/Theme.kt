@@ -3,7 +3,13 @@ package com.airbridge.ui
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.CardColors
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TopAppBarColors
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -65,3 +71,37 @@ fun AirbridgeTheme(
 // Semantyczny kolor "sukcesu" (np. przyznane uprawnienia) — M3 nie ma go w ColorScheme.
 val ColorScheme.success: Color
     get() = if (surface.luminance() < 0.5f) Color(0xFF81C784) else Color(0xFF2E7D32)
+
+private val ColorScheme.isDark: Boolean get() = surface.luminance() < 0.5f
+
+/**
+ * Surfaces are layered the way Google's apps do it. Light: a tinted page
+ * (surfaceContainer) with white cards (surfaceContainerLowest). Dark: the
+ * plain surface as the page with cards one step lighter.
+ */
+val ColorScheme.pageBackground: Color
+    get() = if (isDark) surface else surfaceContainer
+
+/** Card container that lifts off [pageBackground] in both modes. */
+val ColorScheme.cardContainer: Color
+    get() = if (isDark) surfaceContainerHighest else surfaceContainerLowest
+
+/** Stock card colours with [cardContainer] as the container. */
+@Composable
+fun pageCardColors(): CardColors =
+    CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.cardContainer)
+
+/**
+ * Top app bar colours that sit on [pageBackground], so the bar and the page
+ * are one colour at rest and the bar steps up one container level once
+ * content scrolls under it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun pageTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
+    containerColor = MaterialTheme.colorScheme.pageBackground,
+    scrolledContainerColor = if (MaterialTheme.colorScheme.isDark)
+        MaterialTheme.colorScheme.surfaceContainer
+    else
+        MaterialTheme.colorScheme.surfaceContainerHigh,
+)

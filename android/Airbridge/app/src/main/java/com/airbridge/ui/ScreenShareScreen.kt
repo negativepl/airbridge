@@ -94,6 +94,7 @@ private fun ShareTile(
     modifier: Modifier = Modifier,
 ) {
     Card(
+        colors = pageCardColors(),
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
     ) {

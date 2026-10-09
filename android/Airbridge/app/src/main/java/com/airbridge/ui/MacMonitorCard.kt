@@ -71,7 +71,7 @@ fun MacDeviceCard(
     val mismatch = isVersionMismatch(info.appVersion, BuildConfig.VERSION_NAME)
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
             // Media: same size with or without a wallpaper, so the card does
             // not jump when the picture arrives.
             if (bitmap != null) {
@@ -199,7 +199,7 @@ private fun versionBase(version: String): String = version.substringBefore("-")
  */
 @Composable
 fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
+    Card(modifier = modifier.fillMaxWidth().padding(top = 16.dp), colors = pageCardColors()) {
         CardHeader(stringResource(R.string.home_monitor_title))
         Row(
             modifier = Modifier

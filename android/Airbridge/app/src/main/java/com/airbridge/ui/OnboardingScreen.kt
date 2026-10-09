@@ -96,7 +96,7 @@ fun OnboardingScreen(
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.pageBackground,
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -575,7 +575,7 @@ private fun PermissionRow(
     granted: Boolean,
     onRequest: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(

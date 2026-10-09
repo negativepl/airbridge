@@ -65,7 +65,7 @@ fun PairingSuccessScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.pageBackground,
     ) { innerPadding ->
         Column(
             modifier = Modifier

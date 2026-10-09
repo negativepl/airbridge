@@ -55,7 +55,7 @@ fun ActivityCard(stats: Stats, items: List<ActivityItem>, modifier: Modifier = M
         items.filter { it.type == "file_sent" || it.type == "file_received" }.take(FEED_LIMIT)
     }
     Column(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
             CardHeader(stringResource(R.string.home_section_activity))
             Row(
                 modifier = Modifier

@@ -404,7 +404,7 @@ fun MainScreen(
 
 @Composable
 private fun ConnectingCard(deviceName: String?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -463,7 +463,7 @@ private fun DeviceCard(
         else -> 0
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = pageCardColors()) {
         val cardEnterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val cardEnterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
         val cardExitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()

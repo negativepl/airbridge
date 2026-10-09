@@ -228,6 +228,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
 
     // One shared top bar above the pager; each page owns the scroll state that colours it.
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.pageBackground,
         bottomBar = {
             // Stock Material 3 navigation bar: opaque surfaceContainer, no line.
             NavigationBar(
@@ -379,6 +380,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                         Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                     }
                 },
+                colors = pageTopAppBarColors(),
                 scrollBehavior = topBarBehaviors[pagerState.currentPage],
                 modifier = Modifier.align(Alignment.TopCenter)
             )
