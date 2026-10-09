@@ -206,6 +206,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
         container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             val w = right - left; val h = bottom - top
             val ow = oldRight - oldLeft; val oh = oldBottom - oldTop
+            android.util.Log.d("ReverseMirror", "container layout ${ow}x$oh -> ${w}x$h (container.width=${container.width} video=${videoW}x$videoH)")
             if (w == ow && h == oh) return@addOnLayoutChangeListener   // no size change
             // Mode 1 rebuilds the virtual display when the screen's aspect ratio
             // changes meaningfully (rotation OR fold/unfold); mode 0 and minor
@@ -215,7 +216,11 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
                 pendingRotationFade = false   // the new stream lifts the overlay
                 restartStreamForRotation()
             } else {
-                applyAspect()
+                // Inside the container's own layout pass a layoutParams change
+                // on the child can be dropped (the fit was computed, the view
+                // kept its old frame after rotation), so apply it once this
+                // pass has finished and force the frame to follow.
+                container.post { updateVideoOffset(force = true) }
                 if (pendingRotationFade) {
                     // Mode 0 keeps its stream: the video is only re-fitted, so lift
                     // the overlay once the next frames have landed in the new place.
@@ -406,7 +411,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
      *  aspect letterbox, shrunk only if it would not fit above the panel, centred
      *  horizontally and on the free area's vertical centre. No-op until both the
      *  container and the video size are known. */
-    private fun updateVideoOffset() {
+    private fun updateVideoOffset(force: Boolean = false) {
         val dispH = baseVideoHeight()
         if (dispH <= 0f) return
         val w = container.width; val h = container.height
@@ -418,11 +423,18 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
         val left = Math.round((w - vw) / 2f)
         val top = Math.round(usableCenterY() - vh / 2f)
         val lp = surfaceView.layoutParams as FrameLayout.LayoutParams
-        if (lp.width == vw && lp.height == vh && lp.leftMargin == left && lp.topMargin == top &&
-            lp.gravity == (Gravity.TOP or Gravity.START)) return
+        val unchanged = lp.width == vw && lp.height == vh && lp.leftMargin == left && lp.topMargin == top &&
+            lp.gravity == (Gravity.TOP or Gravity.START)
+        if (unchanged && !force) return
+        if (unchanged) {
+            // Params already right but the frame may not be: lay the view out again.
+            if (surfaceView.width != vw || surfaceView.height != vh) surfaceView.requestLayout()
+            return
+        }
         lp.width = vw; lp.height = vh
         lp.leftMargin = left; lp.topMargin = top
         lp.gravity = Gravity.TOP or Gravity.START
+        android.util.Log.d("ReverseMirror", "video fit ${vw}x$vh at $left,$top in ${w}x$h (fitScale=$fitScale inset=${bottomInset()})")
         surfaceView.layoutParams = lp
     }
 
