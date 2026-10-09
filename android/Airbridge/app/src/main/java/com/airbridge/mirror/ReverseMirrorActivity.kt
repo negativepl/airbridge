@@ -2,6 +2,7 @@ package com.airbridge.mirror
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -201,6 +202,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
         // window resize). Doing it here — not in onConfigurationChanged — guarantees
         // we read the NEW dimensions; posting after a config change races the relayout
         // and re-fits against the stale (pre-rotation) size, leaving the image cropped.
+        lastOrientation = resources.configuration.orientation
         container.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             val w = right - left; val h = bottom - top
             val ow = oldRight - oldLeft; val oh = oldBottom - oldTop
@@ -210,9 +212,16 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
             // resizes just re-fit the existing video. ow/oh == 0 on first layout.
             if (mode == 1 && ow > 0 && oh > 0 &&
                 kotlin.math.abs(w.toFloat() / h - ow.toFloat() / oh) > 0.1f) {
+                pendingRotationFade = false   // the new stream lifts the overlay
                 restartStreamForRotation()
             } else {
                 applyAspect()
+                if (pendingRotationFade) {
+                    // Mode 0 keeps its stream: the video is only re-fitted, so lift
+                    // the overlay once the next frames have landed in the new place.
+                    pendingRotationFade = false
+                    fadeOverlay.animate().alpha(0f).setStartDelay(200).setDuration(280).start()
+                }
             }
         }
         // Track the soft keyboard height. CRUCIAL: while the IME is animating we do
@@ -321,6 +330,24 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
             onDisconnect = { runOnUiThread { onClientGone(gen) } }
         ).also { it.connect() }
     }
+
+    /**
+     * Rotation: cover the video at once. The last decoded frame would otherwise
+     * sit stretched across the rotated surface until the layout re-fits it, which
+     * read as a glitch. Mode 0 lifts the cover after the re-fit (layout listener),
+     * mode 1 when the rebuilt stream delivers its first frame.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (newConfig.orientation != lastOrientation) {
+            lastOrientation = newConfig.orientation
+            fadeOverlay.animate().cancel()
+            fadeOverlay.alpha = 1f
+            pendingRotationFade = true
+        }
+    }
+    private var lastOrientation = Configuration.ORIENTATION_UNDEFINED
+    private var pendingRotationFade = false
 
     private fun onClientGone(gen: Int) {
         if (gen != streamGen) return            // superseded client (rotation restart) — ignore
