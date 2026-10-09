@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -23,25 +25,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.ButtonGroupDefaults
@@ -153,7 +147,7 @@ private fun SettingsContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 16.dp)
     ) {
         // Same distance under the bar as the first section on Home.
         Spacer(modifier = Modifier.height(topInset - 4.dp))
@@ -201,7 +195,7 @@ private fun SettingsContent(
                 PairedDeviceCard(
                     deviceName = device.deviceName,
                     subtitle = if (isLive && macInfo != null) {
-                        "${macInfo!!.model} · ${macInfo!!.chip}"
+                        "${macInfo!!.model}, ${macInfo!!.chip}"
                     } else {
                         stringResource(
                             R.string.pairing_paired_on,
@@ -290,7 +284,8 @@ private fun SettingsContent(
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    SettingsRow(
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = {
                             Text(
                                 text = downloadFolder,
@@ -316,7 +311,8 @@ private fun SettingsContent(
             // Notifications section
             SectionHeader(text = stringResource(R.string.settings_notifications))
             Card(modifier = Modifier.fillMaxWidth()) {
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         val intent = android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
                             putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -339,7 +335,8 @@ private fun SettingsContent(
                     },
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_vibrate)) },
                     supportingContent = { Text(stringResource(R.string.settings_vibrate_desc)) },
                     trailingContent = {
@@ -360,7 +357,8 @@ private fun SettingsContent(
             // Connection section
             SectionHeader(text = stringResource(R.string.settings_connection))
             Card(modifier = Modifier.fillMaxWidth()) {
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_auto_connect)) },
                     supportingContent = { Text(stringResource(R.string.settings_auto_connect_desc)) },
                     trailingContent = {
@@ -379,7 +377,8 @@ private fun SettingsContent(
 
             SectionHeader(text = stringResource(R.string.settings_headphones))
             Card(modifier = Modifier.fillMaxWidth()) {
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     content = { Text(stringResource(R.string.settings_headphone_handoff)) },
                     supportingContent = { Text(stringResource(R.string.settings_headphone_handoff_desc)) },
                     trailingContent = {
@@ -401,7 +400,8 @@ private fun SettingsContent(
                 )
                 if (headphoneHandoff) {
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsRow(
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = { Text(stringResource(R.string.settings_headphone_device)) },
                         supportingContent = {
                             Text(headphoneName ?: stringResource(R.string.settings_headphone_device_none))
@@ -419,7 +419,8 @@ private fun SettingsContent(
                         }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SettingsRow(
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = { Text(stringResource(R.string.settings_headphone_auto)) },
                         supportingContent = { Text(stringResource(R.string.settings_headphone_auto_desc)) },
                         trailingContent = {
@@ -506,7 +507,8 @@ private fun SettingsContent(
                         }
                     }
             Card(modifier = Modifier.fillMaxWidth()) {
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { exportReport() },
                     content = { Text(stringResource(R.string.settings_export_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_export_diagnostics_desc)) },
@@ -519,7 +521,8 @@ private fun SettingsContent(
                     },
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable {
                         prefs.edit { putBoolean(DIAGNOSTICS_UNLOCKED_KEY, false) }
                     },
@@ -535,7 +538,8 @@ private fun SettingsContent(
             var checkUpdateTrigger by remember { mutableStateOf(false) }
             Card(modifier = Modifier.fillMaxWidth()) {
                 // Manual check only, never on a schedule.
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { checkUpdateTrigger = true },
                     content = { Text(stringResource(R.string.update_check)) },
                     trailingContent = {
@@ -547,7 +551,8 @@ private fun SettingsContent(
                     },
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SettingsRow(
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { onOpenAbout() },
                     content = { Text(stringResource(R.string.about_row_title)) },
                     supportingContent = { Text(stringResource(R.string.about_open_source)) },
@@ -582,66 +587,56 @@ private fun PairedDeviceCard(
     var showConfirm by remember { mutableStateOf(false) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-            if (wallpaper != null) {
-                Image(
-                    bitmap = wallpaper,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(160.dp)
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxWidth().height(160.dp).background(MaterialTheme.colorScheme.primaryContainer))
-            }
-            Box(
-                modifier = Modifier.fillMaxWidth().height(160.dp).background(
-                    Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))
-                )
+        if (wallpaper != null) {
+            Image(
+                bitmap = wallpaper,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
             )
-            // Status pill — "Connected" while the session is up, "Paired" otherwise.
-            run {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.35f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        stringResource(if (isConnected) R.string.pairing_connected else R.string.pairing_status_paired),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White
-                    )
-                }
-            }
-            // Remove — top-right, woven into the image instead of a separate bar.
+        } else {
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable { showConfirm = true }
-                    .padding(8.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.DeleteOutline,
-                    contentDescription = stringResource(R.string.pairing_remove),
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(if (isConnected) R.string.pairing_connected else R.string.pairing_status_paired),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                Text(deviceName, style = MaterialTheme.typography.titleLargeEmphasized, color = Color.White)
+                Text(
+                    text = deviceName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { showConfirm = true }) {
+                Icon(Icons.Rounded.DeleteOutline, contentDescription = stringResource(R.string.pairing_remove))
+            }
         }
-        footer?.invoke(this)
+        if (footer != null) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            footer()
+        }
     }
 
     if (showConfirm) {
@@ -671,7 +666,8 @@ private fun PairedDeviceCard(
 
 @Composable
 private fun PairMacRow(modifier: Modifier = Modifier) {
-    SettingsRow(
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = modifier,
         content = { Text(stringResource(R.string.pairing_add_mac)) },
         trailingContent = {
@@ -688,37 +684,3 @@ const val DIAGNOSTICS_UNLOCKED_KEY = "diagnostics_unlocked"
 
 @Composable
 private fun SectionHeader(text: String) = SectionTitle(text)
-
-/**
- * A settings row: headline and supporting text on the left, the control on
- * the right, vertically centred whatever the text height. (ListItem would
- * top-align the control once the supporting text wraps to two lines.)
- */
-@Composable
-fun SettingsRow(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-    supportingContent: (@Composable () -> Unit)? = null,
-    trailingContent: (@Composable () -> Unit)? = null,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            ProvideTextStyle(MaterialTheme.typography.bodyLarge) { content() }
-            if (supportingContent != null) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                    ProvideTextStyle(MaterialTheme.typography.bodyMedium) { supportingContent() }
-                }
-            }
-        }
-        if (trailingContent != null) {
-            Spacer(modifier = Modifier.width(16.dp))
-            trailingContent()
-        }
-    }
-}
