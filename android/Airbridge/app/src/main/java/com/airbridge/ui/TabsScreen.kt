@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -218,9 +220,9 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
     // the way Google's apps lay out on foldables. The suite owns the dock; the
     // Scaffold inside keeps the FAB menu, the top bar and the tab content.
     NavigationSuiteScaffold(
-        navigationSuiteItems = {
+        navigationItems = {
             navItems.forEachIndexed { index, item ->
-                item(
+                NavigationSuiteItem(
                     selected = selectedTab == index,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -236,6 +238,8 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                 )
             }
         },
+        // Rail items sit in the middle of the rail, as in Google's apps.
+        navigationItemVerticalArrangement = Arrangement.Center,
         navigationSuiteColors = NavigationSuiteDefaults.colors(
             shortNavigationBarContainerColor = MaterialTheme.colorScheme.dockContainer,
             wideNavigationRailColors = WideNavigationRailDefaults.colors(
