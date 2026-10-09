@@ -2,12 +2,11 @@ package com.airbridge.ui
 
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * The stock [Card] as it sits on a page in this app: extraLarge corners and
+ * The stock [Card] as it sits on a page in this app: the stock shape and
  * the page's card colour (see [pageCardColors]). A pass-through of two theme
  * tokens, nothing more; everything else is the Material card.
  */
@@ -15,7 +14,6 @@ import androidx.compose.ui.Modifier
 fun PageCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraLarge,
         colors = pageCardColors(),
         content = content,
     )
@@ -33,7 +31,6 @@ fun PageCard(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        shape = MaterialTheme.shapes.extraLarge,
         colors = pageCardColors(),
         content = content,
     )

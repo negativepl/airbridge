@@ -135,7 +135,6 @@ fun MainScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
@@ -263,7 +262,6 @@ fun MainScreen(
             Card(
                 onClick = { transferExpanded = !transferExpanded },
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
