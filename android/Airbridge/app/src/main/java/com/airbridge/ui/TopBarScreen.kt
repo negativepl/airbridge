@@ -11,6 +11,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 
 /**
@@ -32,7 +33,7 @@ fun TopBarScreen(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(title, color = MaterialTheme.colorScheme.pageTitleColor, fontWeight = FontWeight(450)) },
                 navigationIcon = navigationIcon,
                 actions = actions,
                 colors = pageTopAppBarColors(),

@@ -107,8 +107,8 @@ fun pageTopAppBarColors(tintWhenScrolled: Boolean = true): TopAppBarColors = Top
 )
 
 /**
- * Pure black or white for the tab titles: the tonal onSurface reads as
+ * Pure black or white for top bar titles: the tonal onSurface reads as
  * slightly coloured next to the page tint, which Marcin did not want there.
  */
-val ColorScheme.tabTitleColor: Color
+val ColorScheme.pageTitleColor: Color
     get() = if (surface.luminance() < 0.5f) Color.White else Color.Black

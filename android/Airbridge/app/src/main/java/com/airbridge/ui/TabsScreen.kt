@@ -110,11 +110,11 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
         NavItem(R.string.nav_screen_sharing, Icons.AutoMirrored.Rounded.ScreenShare),
         NavItem(R.string.nav_mac_files, Icons.Rounded.Folder)
     )
-    // Tytuł w górnym pasku = nazwa bieżącej zakładki (3 zakładki).
+    // Tytuł w górnym pasku: pełna nazwa miejsca, dok ma krótsze etykiety.
     val pageTitles = listOf(
         R.string.app_name,
-        R.string.nav_screen_sharing,
-        R.string.nav_mac_files
+        R.string.page_screen_sharing,
+        R.string.page_mac_files
     )
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -366,7 +366,7 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
                     ) { title ->
                         Text(
                             title,
-                            color = MaterialTheme.colorScheme.tabTitleColor,
+                            color = MaterialTheme.colorScheme.pageTitleColor,
                             fontWeight = FontWeight(450),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
