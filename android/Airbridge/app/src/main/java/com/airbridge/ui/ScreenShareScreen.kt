@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -35,13 +37,13 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     val ready = mirror.ready
     fun launch(mode: Int) = mirror.launch(mode)
 
-    // Two modes, one card each: icon and title on one line, the detail below.
+    // Two modes, one feature card each: icon tile, title, detail, Start.
     // bottomClearance keeps the content clear of the floating FAB.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(start = 16.dp, end = 16.dp, top = topInset + 16.dp, bottom = bottomClearance),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (ready) {
             ModeCard(
@@ -62,26 +64,40 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     }
 }
 
-/** One display mode as a card: the icon and a large title share a line, the detail sits under them. */
+/**
+ * One display mode as a feature card: a tonal icon tile, the title, the
+ * detail and a Start button. The whole card opens the mode as well.
+ */
 @Composable
 private fun ModeCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     PageCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.size(12.dp))
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(28.dp))
             }
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(16.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.size(4.dp))
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.size(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onClick, shapes = ButtonDefaults.shapes()) {
+                    Text(stringResource(R.string.screen_sharing_start))
+                }
+            }
         }
     }
 }
