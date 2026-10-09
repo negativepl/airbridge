@@ -9,14 +9,12 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.TypedValue
-import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
-import android.graphics.SurfaceTexture
-import android.view.ScaleGestureDetector
 import android.view.Surface
-import android.view.TextureView
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
@@ -48,18 +46,21 @@ import com.airbridge.ui.AirbridgeTheme
 /**
  * Reverse mirror viewer: shows the Mac's screen on the phone. Display-only for
  * now — connects to the Mac mirror server, sends ReverseHello, decodes the
- * incoming H.264 onto a [TextureView] that is letterboxed to the Mac's aspect
- * ratio (the Mac screen and the phone screen have different shapes).
+ * incoming stream onto a [SurfaceView] that is sized and placed (letterboxed to
+ * the Mac's aspect ratio, fitted above the keyboard/trackpad panel) by layout.
+ * The video view is display-only: there is no magnifier, and the trackpad panel
+ * carries the input.
  */
-class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureListener {
+class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private var client: ReverseMirrorClient? = null
     private var decoder: ScreenDecoder? = null
 
     private lateinit var container: FrameLayout
-    // TextureView (not SurfaceView) so the magnifier zoom/pan scales the video
-    // smoothly in the view hierarchy without the SurfaceView compositor smear.
-    private lateinit var textureView: TextureView
+    // SurfaceView: SurfaceFlinger composes it directly (no app-side redraw), so each
+    // decoded frame is presented on the vsync its presentation timestamp asks for.
+    // No magnifier — the video is only letterboxed and fitted above the panel.
+    private lateinit var surfaceView: SurfaceView
     private var videoSurface: Surface? = null
     private lateinit var fadeOverlay: View
 
@@ -96,17 +97,10 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
     private val trackpadActive = androidx.compose.runtime.mutableStateOf(false)
     private val keyboardActive = androidx.compose.runtime.mutableStateOf(false)
 
-    // MARK: - Screen-layer zoom (local magnifier; sends nothing to the Mac)
-    private var zoomScale = 1f
-    private var zoomPanX = 0f
-    private var zoomPanY = 0f
+    // MARK: - Video placement
     private var fitScale = 1f           // extra downscale so the video fits above a panel
-    private var fitPanY = 0f            // vertical pan to centre it in the free area
-    private var zoomReveal: ValueAnimator? = null
+    private var videoReveal: ValueAnimator? = null
     private var videoRevealed = false   // reveal animation runs once per stream, not per frame
-    private val zoomPanGain = 2.6f      // one-finger pan speed over the magnified image
-    private lateinit var scaleDetector: ScaleGestureDetector
-    private lateinit var gestureDetector: GestureDetector
     /// Last observed soft-keyboard height, so the trackpad panel can match it exactly.
     private var lastImeHeight = 0
     private var panelTarget = 0                            // trackpad panel full height
@@ -137,15 +131,13 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // The container is black (letterbox bars); the TextureView renders the video.
+        // The container is black (letterbox bars); the SurfaceView renders the video.
         container = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        textureView = TextureView(this).apply {
-            isOpaque = true   // the view is sized to the video rect; opaque avoids stale-buffer ghosting
-            surfaceTextureListener = this@ReverseMirrorActivity
+        surfaceView = SurfaceView(this).apply {
+            holder.addCallback(this@ReverseMirrorActivity)
         }
-        attachZoomControl(textureView)
         container.addView(
-            textureView,
+            surfaceView,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -267,8 +259,8 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
         }
     }
 
-    override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
-        videoSurface = Surface(st).also { surface ->
+    override fun surfaceCreated(holder: SurfaceHolder) {
+        videoSurface = holder.surface.also { surface ->
             // The Mac sends 60 fps; let the panel settle on a matching refresh
             // rate so each frame lands on a whole number of vsyncs.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -281,6 +273,8 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
     private fun startStream() {
         val gen = ++streamGen
         videoRevealed = false   // a fresh stream (incl. rotation restart) re-reveals
+        videoReveal?.cancel()
+        surfaceView.scaleX = 1f; surfaceView.scaleY = 1f
         val dec = ScreenDecoder(
             surface = videoSurface ?: return,
             onVideoSize = { w, h ->
@@ -289,15 +283,19 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
                     videoW = w; videoH = h
                     if (changed) applyAspect()
                     // Reveal from the centre ONCE per stream (onVideoSize may fire again
-                    // on format changes — re-running the scale would flicker and fight a
-                    // user zoom). The start delay lets the first frame land first.
+                    // on format changes — re-running the scale would flicker). The start
+                    // delay lets the first frame land first. View scale pivots on the
+                    // view's centre, i.e. the centre of the placed video.
                     if (!videoRevealed) {
                         videoRevealed = true
-                        zoomScale = 0.92f; zoomPanX = 0f; zoomPanY = 0f; applyVideoTransform()
-                        zoomReveal?.cancel()
-                        zoomReveal = ValueAnimator.ofFloat(0.92f, 1f).apply {
+                        videoReveal?.cancel()
+                        surfaceView.scaleX = 0.92f; surfaceView.scaleY = 0.92f
+                        videoReveal = ValueAnimator.ofFloat(0.92f, 1f).apply {
                             startDelay = 90; duration = 320; interpolator = DecelerateInterpolator()
-                            addUpdateListener { zoomScale = it.animatedValue as Float; applyVideoTransform() }
+                            addUpdateListener {
+                                val s = it.animatedValue as Float
+                                surfaceView.scaleX = s; surfaceView.scaleY = s
+                            }
                             start()
                         }
                         fadeOverlay.animate().alpha(0f).setStartDelay(90).setDuration(280).start()
@@ -358,9 +356,8 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
         if (hidePanelAfterKeyboard) panelReserved.toInt()
         else maxOf(imeHeight, panelReserved.toInt())
 
-    /** The TextureView fills the container; the video is placed entirely via a
-     *  [setTransform] matrix (letterbox + keyboard-fit + magnifier zoom), which
-     *  transforms the texture on the GPU cleanly — no view-hierarchy scale ghosting. */
+    /** The video is placed by layout: [updateVideoOffset] sizes and positions the
+     *  SurfaceView to the letterboxed, keyboard-fitted video rect. */
     private fun applyAspect() { updateVideoOffset() }
 
     /** Base letterbox height (px) of the video inside the full container. */
@@ -371,50 +368,32 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
         return videoH * base
     }
 
-    /** Recompute the keyboard/trackpad fit, then re-apply the transform. */
+    /** Recompute the keyboard/trackpad fit, then size and place the video view:
+     *  aspect letterbox, shrunk only if it would not fit above the panel, centred
+     *  horizontally and on the free area's vertical centre. No-op until both the
+     *  container and the video size are known. */
     private fun updateVideoOffset() {
         val dispH = baseVideoHeight()
         if (dispH <= 0f) return
-        val usableH = (container.height - bottomInset()).coerceAtLeast(1)
+        val w = container.width; val h = container.height
+        val usableH = (h - bottomInset()).coerceAtLeast(1)
         fitScale = if (dispH > usableH) usableH / dispH else 1f   // shrink only if it wouldn't fit
-        fitPanY = -bottomInset() / 2f                              // centre in the free area
-        applyVideoTransform()
+        val base = minOf(w.toFloat() / videoW, h.toFloat() / videoH)
+        val vw = Math.round(videoW * base * fitScale)
+        val vh = Math.round(videoH * base * fitScale)
+        val left = Math.round((w - vw) / 2f)
+        val top = Math.round(usableCenterY() - vh / 2f)
+        val lp = surfaceView.layoutParams as FrameLayout.LayoutParams
+        if (lp.width == vw && lp.height == vh && lp.leftMargin == left && lp.topMargin == top &&
+            lp.gravity == (Gravity.TOP or Gravity.START)) return
+        lp.width = vw; lp.height = vh
+        lp.leftMargin = left; lp.topMargin = top
+        lp.gravity = Gravity.TOP or Gravity.START
+        surfaceView.layoutParams = lp
     }
 
     /** Vertical centre of the visible area — the screen ABOVE the keyboard/trackpad. */
     private fun usableCenterY() = (container.height - bottomInset()) / 2f
-
-    /** Build and apply the video matrix: aspect letterbox · fit-to-usable · zoom · pan.
-     *  The magnifier works entirely within the area above the panel, so zooming to a
-     *  low point keeps it above the panel instead of hiding it underneath. */
-    private fun applyVideoTransform() {
-        val w = container.width; val h = container.height
-        if (w <= 0 || h <= 0 || videoW <= 0 || videoH <= 0) return
-        val base = minOf(w.toFloat() / videoW, h.toFloat() / videoH)
-        val cx = w / 2f; val cyU = usableCenterY()
-        val m = android.graphics.Matrix()
-        m.setScale((videoW * base) / w, (videoH * base) / h, cx, h / 2f)  // aspect letterbox
-        m.postScale(fitScale, fitScale, cx, h / 2f)            // shrink to fit above the panel
-        m.postTranslate(0f, fitPanY)                           // slide it into the usable area
-        m.postScale(zoomScale, zoomScale, cx, cyU)             // magnify about the usable centre
-        m.postTranslate(zoomPanX, zoomPanY)                    // pan
-        textureView.setTransform(m)
-        textureView.invalidate()
-    }
-
-    /** Clamp the pan to the usable viewport (above the panel) — reach every edge, no further. */
-    private fun clampZoomPan() {
-        val w = container.width; val h = container.height
-        if (w <= 0 || h <= 0 || videoW <= 0 || videoH <= 0) return
-        val base = minOf(w.toFloat() / videoW, h.toFloat() / videoH)
-        val usableH = (h - bottomInset()).coerceAtLeast(1)
-        val dw = videoW * base * fitScale * zoomScale
-        val dh = videoH * base * fitScale * zoomScale
-        val maxX = ((dw - w) / 2f).coerceAtLeast(0f)
-        val maxY = ((dh - usableH) / 2f).coerceAtLeast(0f)
-        zoomPanX = zoomPanX.coerceIn(-maxX, maxX)
-        zoomPanY = zoomPanY.coerceIn(-maxY, maxY)
-    }
 
     /** Keep the toggle cluster just above whichever bottom panel is open. */
     private fun updateControlsOffset() {
@@ -637,76 +616,6 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
     }
 
     /**
-     * The screen layer is a passive magnifier — it does NOT control the Mac
-     * (that is the trackpad's job). Pinch to zoom, drag (while zoomed) or two
-     * fingers to pan, double-tap to toggle zoom. All transforms are local view
-     * scale/translation; nothing is sent to the Mac.
-     */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun attachZoomControl(view: TextureView) {
-        var prevFocusX = 0f; var prevFocusY = 0f
-        scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScaleBegin(d: ScaleGestureDetector): Boolean {
-                prevFocusX = d.focusX; prevFocusY = d.focusY; return true
-            }
-            override fun onScale(d: ScaleGestureDetector): Boolean {
-                val s0 = zoomScale
-                val s1 = (s0 * d.scaleFactor).coerceIn(1f, 4f)
-                // Anchor the zoom to the pinch focus (scale pivot is the view centre,
-                // so the pan must compensate) — otherwise the image lurches to an edge
-                // and snaps back, leaving a ghost.
-                val ax = d.focusX - textureView.width / 2f
-                val ay = d.focusY - usableCenterY()
-                zoomPanX = ax - (ax - zoomPanX) * (s1 / s0)
-                zoomPanY = ay - (ay - zoomPanY) * (s1 / s0)
-                // plus the focus's own movement, so two fingers also drag the image
-                zoomPanX += d.focusX - prevFocusX
-                zoomPanY += d.focusY - prevFocusY
-                zoomScale = s1
-                prevFocusX = d.focusX; prevFocusY = d.focusY
-                clampZoomPan(); applyVideoTransform(); return true
-            }
-        })
-        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent): Boolean { toggleZoom(e.x, e.y); return true }
-            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-                if (zoomScale > 1.01f && e2.pointerCount == 1) {   // one-finger pan only when zoomed
-                    zoomPanX -= dx * zoomPanGain; zoomPanY -= dy * zoomPanGain
-                    clampZoomPan(); applyVideoTransform(); return true
-                }
-                return false
-            }
-        })
-        view.setOnTouchListener { _, e ->
-            scaleDetector.onTouchEvent(e)
-            gestureDetector.onTouchEvent(e)
-            true
-        }
-    }
-
-    /** Double-tap toggles between fit (1×) and 2.5×, zooming toward the tapped point. */
-    private fun toggleZoom(tapX: Float, tapY: Float) {
-        val target = if (zoomScale > 1.01f) 1f else 2.5f
-        val fromScale = zoomScale
-        val fromPanX = zoomPanX; val fromPanY = zoomPanY
-        // Pan so the tapped point ends up centred in the usable area (above the panel).
-        val cx = textureView.width / 2f; val cy = usableCenterY()
-        val toPanX = if (target == 1f) 0f else -(tapX - cx) * target
-        val toPanY = if (target == 1f) 0f else -(tapY - cy) * target
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 240; interpolator = DecelerateInterpolator()
-            addUpdateListener {
-                val t = it.animatedValue as Float
-                zoomScale = fromScale + (target - fromScale) * t
-                zoomPanX = fromPanX + (toPanX - fromPanX) * t
-                zoomPanY = fromPanY + (toPanY - fromPanY) * t
-                clampZoomPan(); applyVideoTransform()
-            }
-            start()
-        }
-    }
-
-    /**
      * Relative trackpad control. One finger moves a virtual cursor by finger
      * deltas (with acceleration) via `move` — never drags. A one-finger tap
      * left-clicks; a two-finger tap right-clicks; a two-finger move scrolls.
@@ -786,19 +695,15 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
         }
     }
 
-    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) { updateVideoOffset() }
-    override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
-    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-        teardown()
-        return true
-    }
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) { updateVideoOffset() }
+    override fun surfaceDestroyed(holder: SurfaceHolder) { teardown() }
 
     override fun onDestroy() { teardown(); super.onDestroy() }
 
     private fun teardown() {
         client?.close(); client = null
         decoder?.stop(); decoder = null
-        videoSurface?.release(); videoSurface = null
+        videoSurface = null   // the holder's surface is owned by the SurfaceView; never release it here
     }
 
     companion object {
