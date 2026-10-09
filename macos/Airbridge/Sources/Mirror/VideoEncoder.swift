@@ -47,30 +47,16 @@ public final class VideoEncoder {
         }
     }
 
-    /// Temporary experiment toggles (UserDefaults, domain of the app) so the
-    /// encoder can be reconfigured with an app restart instead of a rebuild.
-    private struct Tuning {
-        let realTime: Bool, lowLatency: Bool, completeFrames: Bool, cbr: Bool, baseline: Bool
-        static func load() -> Tuning {
-            let d = UserDefaults.standard
-            func flag(_ k: String, _ def: Bool) -> Bool { d.object(forKey: k) == nil ? def : d.bool(forKey: k) }
-            return Tuning(realTime: flag("mirrorExp.realtime", true), lowLatency: flag("mirrorExp.lowLatency", true),
-                          completeFrames: flag("mirrorExp.completeFrames", true), cbr: flag("mirrorExp.cbr", false),
-                          baseline: flag("mirrorExp.baseline", false))
-        }
-        var description: String { "realtime=\(realTime) lowLatency=\(lowLatency) completeFrames=\(completeFrames) cbr=\(cbr) baseline=\(baseline)" }
-    }
-    private let tuning = Tuning.load()
-    public var tuningDescription: String { tuning.description }
-
     private func createSession() throws {
         var session: VTCompressionSession?
         // Low-latency rate control is a session-creation option, not a property:
         // the hardware encoder then emits every frame as soon as it is coded
         // instead of holding a pipeline of several frames (measured 2026-10-09:
         // up to 13 frames and 380 ms in flight without it).
-        var spec: [CFString: Any] = [kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: true]
-        if tuning.lowLatency { spec[kVTVideoEncoderSpecification_EnableLowLatencyRateControl] = true }
+        let spec: [CFString: Any] = [
+            kVTVideoEncoderSpecification_EnableLowLatencyRateControl: true,
+            kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: true,
+        ]
         let status = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,
             width: config.width,
@@ -89,16 +75,11 @@ public final class VideoEncoder {
         func set(_ key: CFString, _ value: CFTypeRef) {
             VTSessionSetProperty(session, key: key, value: value)
         }
-        if tuning.realTime { set(kVTCompressionPropertyKey_RealTime, kCFBooleanTrue) }
+        set(kVTCompressionPropertyKey_RealTime, kCFBooleanTrue)
         set(kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse)
         set(kVTCompressionPropertyKey_ProfileLevel,
-            config.useHEVC ? kVTProfileLevel_HEVC_Main_AutoLevel
-                : (tuning.baseline ? kVTProfileLevel_H264_Baseline_AutoLevel : kVTProfileLevel_H264_High_AutoLevel))
-        if tuning.cbr {
-            set(kVTCompressionPropertyKey_ConstantBitRate, NSNumber(value: config.bitrateBps))
-        } else {
-            set(kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrateBps))
-        }
+            config.useHEVC ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel)
+        set(kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrateBps))
         set(kVTCompressionPropertyKey_ExpectedFrameRate, NSNumber(value: config.fps))
         set(kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, NSNumber(value: config.keyframeIntervalSeconds))
         // Measured 2026-10-09: MaxFrameDelayCount = 0 and PrioritizeEncodingSpeedOverQuality
@@ -146,7 +127,7 @@ public final class VideoEncoder {
         // hardware encoder otherwise keeps a small pipeline (measured 4-5 frames,
         // 60-220 ms) even with low-latency rate control; a mirror wants each
         // frame on the wire within one frame interval.
-        if tuning.completeFrames { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: pts) }
+        VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: pts)
     }
 
     private func handleEncoded(status: OSStatus, sampleBuffer: CMSampleBuffer?) {

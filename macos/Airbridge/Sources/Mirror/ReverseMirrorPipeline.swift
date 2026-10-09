@@ -100,7 +100,7 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
                         }
                     )
                     self.setEncoder(enc)
-                    self.onLog("reverse encoder created \(self.currentEncoder()?.tuningDescription ?? "")")
+                    self.onLog("reverse encoder created")
                 } catch {
                     self.onLog("reverse encoder init FAILED: \(error)")
                 }
