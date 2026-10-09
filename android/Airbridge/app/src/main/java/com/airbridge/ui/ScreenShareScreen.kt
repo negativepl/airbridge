@@ -1,23 +1,19 @@
 package com.airbridge.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -40,52 +35,55 @@ fun ScreenShareScreen(bottomClearance: Dp = 88.dp, topInset: Dp = 0.dp) {
     val ready = mirror.ready
     fun launch(mode: Int) = mirror.launch(mode)
 
-    // Two modes as two rows of one card: icon, title, one line of detail.
+    // Two modes, one card each: icon and title on one line, the detail below.
     // bottomClearance keeps the content clear of the floating FAB.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = topInset + 16.dp, bottom = bottomClearance)
+            .padding(start = 16.dp, end = 16.dp, top = topInset + 16.dp, bottom = bottomClearance),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (ready) {
-            PageCard(modifier = Modifier.fillMaxWidth()) {
-                ModeRow(
-                    icon = Icons.Rounded.DesktopWindows,
-                    title = stringResource(R.string.screen_sharing_show_mac),
-                    subtitle = stringResource(R.string.screen_sharing_show_mac_desc),
-                    onClick = { launch(0) }
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                ModeRow(
-                    icon = Icons.Rounded.PhoneAndroid,
-                    title = stringResource(R.string.screen_sharing_second_display),
-                    subtitle = stringResource(R.string.screen_sharing_second_display_desc),
-                    onClick = { launch(1) }
-                )
-            }
+            ModeCard(
+                icon = Icons.Rounded.DesktopWindows,
+                title = stringResource(R.string.screen_sharing_show_mac),
+                subtitle = stringResource(R.string.screen_sharing_show_mac_desc),
+                onClick = { launch(0) }
+            )
+            ModeCard(
+                icon = Icons.Rounded.PhoneAndroid,
+                title = stringResource(R.string.screen_sharing_second_display),
+                subtitle = stringResource(R.string.screen_sharing_second_display_desc),
+                onClick = { launch(1) }
+            )
         } else {
             NotConnected(modifier = Modifier.weight(1f))
         }
     }
 }
 
-/** One display mode: stock list item with the icon in a tonal circle, as on the Home cards. */
+/** One display mode as a card: the icon and a large title share a line, the detail sits under them. */
 @Composable
-private fun ModeRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    ListItem(
-        leadingContent = {
-            Box(
-                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+private fun ModeCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    PageCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
-        },
-        content = { Text(title) },
-        supportingContent = { Text(subtitle) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable(onClick = onClick)
-    )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
