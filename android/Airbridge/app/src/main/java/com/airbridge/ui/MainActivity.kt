@@ -80,6 +80,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -261,6 +262,9 @@ class MainActivity : ComponentActivity() {
                     } else 88.dp
 
                     val macFilesPath by viewModel.macFilesPath.collectAsState()
+                    // Each folder pane in Mac Files starts a fresh list at the top, so
+                    // the page's top bar state must forget the previous folder's offset.
+                    LaunchedEffect(macFilesPath) { topBarStates[2].contentOffset = 0f }
                     // Pickers. On the Files tab a chosen file/photo uploads straight into the
                     // folder currently open on the Mac; elsewhere it goes through the
                     // confirmation flow (pendingFileUri) to the Mac's default location. Same
@@ -318,8 +322,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // No shared top bar: each pager page carries its own static one
-                    // (see the pager below), so the title moves with the page.
+                    // One shared top bar above the pager; each page owns the scroll state that colours it.
                     Scaffold(
                         bottomBar = {
                             // Stock Material 3 navigation bar: opaque surfaceContainer, no line.
@@ -415,9 +418,9 @@ class MainActivity : ComponentActivity() {
                         },
                         floatingActionButtonPosition = FabPosition.End
                     ) { innerPadding ->
-                        // The top bar lives inside each page (not in the Scaffold) so the
-                        // title travels with its content during a swipe instead of
-                        // snapping to the target page's name mid-gesture.
+                        // The bar sits above the pager (not in the Scaffold) so the pages can
+                        // reserve its height themselves and report their scroll to their own
+                        // top bar state.
                         // Pages run under both bars (no Scaffold padding); each page
                         // reserves the top bar height and the dock height plus the FAB
                         // clearance itself, and the bars are opaque.

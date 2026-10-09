@@ -113,8 +113,7 @@ fun MainScreen(
 
     val scrollState = rememberScrollState()
     ScrollLimitHaptics(scrollState)
-    // topInset: the page runs under the (transparent) top bar, so the content
-    // starts below it but the scroll area, and the wallpaper light, reach up.
+    // topInset: the page runs under the opaque top bar and reserves its height itself.
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -258,8 +257,8 @@ fun MainScreen(
             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
             Column {
-            // Section rhythm on Home: 16dp above, same as the section headers.
-            Spacer(modifier = Modifier.height(16.dp))
+            // Section rhythm on Home: same gap as above a section header.
+            Spacer(modifier = Modifier.height(24.dp))
 
             Card(
                 onClick = { transferExpanded = !transferExpanded },

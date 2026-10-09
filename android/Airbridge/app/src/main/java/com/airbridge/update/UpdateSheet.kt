@@ -196,8 +196,7 @@ private fun UpdateAvailableSheet(
     ) {
         Text(
             text = stringResource(R.string.update_available_title, manifest.version),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLargeEmphasized,
             color = MaterialTheme.colorScheme.onSurface
         )
 

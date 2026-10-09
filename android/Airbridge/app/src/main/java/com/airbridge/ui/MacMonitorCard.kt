@@ -92,7 +92,8 @@ fun MacDeviceCard(
             }
             // Header block: headline, supporting text, trailing action.
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -187,8 +188,10 @@ internal fun isVersionMismatch(remoteVersion: String, localVersion: String): Boo
 
 private fun versionBase(version: String): String = version.substringBefore("-")
 
-/** Live CPU/RAM/disk rings for the connected Mac. */
-/** [info] null (not connected yet): the three rings sit empty with "–" in place of numbers. */
+/**
+ * Live CPU/RAM/disk rings for the connected Mac. [info] null (not connected yet): the three
+ * rings sit empty with "–" in place of numbers.
+ */
 @Composable
 fun MacMonitorRings(info: MacInfo?, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth()) {

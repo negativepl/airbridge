@@ -344,6 +344,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                             },
                             enabled = entry.isDirectory || !downloading,
                             shapes = ListItemDefaults.shapes(shape = shape),
+                            // Stock ListItem is surface-coloured and would vanish on the surface background; the cards' colour keeps the grouped rows visible.
                             colors = ListItemDefaults.colors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                             ),
