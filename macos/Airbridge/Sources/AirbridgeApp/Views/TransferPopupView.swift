@@ -385,8 +385,9 @@ struct TransferPopupView: View {
         // Glass renders mirrored artefacts when rotated, and a tilt pushed
         // the shell past the panel's edge where it got clipped. The swing is
         // sized to stay inside the panel's side padding.
-        .keyframeAnimator(initialValue: CGFloat(0), trigger: shakeTrigger) { content, x in
-            content.offset(x: reduceMotion ? 0 : x)
+        // With Reduce Motion the trigger never changes, so the shake never runs.
+        .keyframeAnimator(initialValue: CGFloat(0), trigger: reduceMotion ? 0 : shakeTrigger) { content, x in
+            content.offset(x: x)
         } keyframes: { _ in
             KeyframeTrack {
                 // A quick push, then a fast, underdamped spring back: period

@@ -408,9 +408,8 @@ final class FileTransferService: MessageHandler {
             //    `pendingOutgoingFiles`. Registering after accept creates a
             //    race where the GET hits 404 (we observed this in testing —
             //    "Unknown transferId" within ~80ms of Android's GET).
-            let onProgress: @Sendable (Int64, Int64) -> Void = { [weak self] sent, total in
+            let onProgress: @Sendable (Int64, Int64) -> Void = { sent, total in
                 Task { @MainActor in
-                    guard let self else { return }
                     self.lastOutgoingActivity = Date()
                     let progress = total > 0 ? Double(sent) / Double(total) : 0
                     // Clamp away from 0 so the view state computation
@@ -453,8 +452,7 @@ final class FileTransferService: MessageHandler {
             //    phone answers within 60 s or never (it enforces the same
             //    timeout on its side) — a disconnected or unresponsive peer
             //    must not leave the island on "waiting" forever.
-            let offerTimeout = Task { @MainActor [weak self] in
-                guard let self else { return }
+            let offerTimeout = Task { @MainActor in
                 try? await Task.sleep(nanoseconds: UInt64(self.offerAcceptTimeout * 1_000_000_000))
                 guard !Task.isCancelled else { return }
                 self.failPendingOutgoingWait()
@@ -523,11 +521,11 @@ final class FileTransferService: MessageHandler {
             //    watchdog fails the wait when progress stops for too long.
             self.lastOutgoingActivity = Date()
             let stallTimeout = self.uploadStallTimeout
-            let watchdog = Task { @MainActor [weak self] in
+            let watchdog = Task { @MainActor in
                 let interval = max(0.05, min(5, stallTimeout / 3))
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                    guard !Task.isCancelled, let self else { return }
+                    guard !Task.isCancelled else { return }
                     if Date().timeIntervalSince(self.lastOutgoingActivity) > stallTimeout {
                         httpContinuation.yield(false)
                         httpContinuation.finish()
