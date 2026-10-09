@@ -231,9 +231,9 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
                         val isFirst = index == 0
                         val isLast = index == paneEntries.lastIndex
                         // Corner sizes come from the theme's shape tokens: the group's outer
-                        // corners sit one step above the page cards.
-                        val outer = MaterialTheme.shapes.largeIncreased.topStart
-                        val inner = MaterialTheme.shapes.small.topStart
+                        // corners match the page cards (medium); rows between share the extraSmall corner.
+                        val outer = MaterialTheme.shapes.medium.topStart
+                        val inner = MaterialTheme.shapes.extraSmall.topStart
                         val shape = RoundedCornerShape(
                             topStart = if (isFirst) outer else inner,
                             topEnd = if (isFirst) outer else inner,
