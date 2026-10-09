@@ -85,7 +85,7 @@ struct MenuBarView: View {
                                     ? (L10n.isPL ? "Przenoszenie słuchawek…" : "Moving headphones…")
                                     : (connectionService.headphoneHandoffPhase == .failed
                                         ? (L10n.isPL ? "Nie udało się przenieść słuchawek" : "Headphone handoff failed")
-                                        : (L10n.isPL ? "Przenieś słuchawki na Maka" : "Move headphones to Mac"))),
+                                        : (L10n.isPL ? "Przenieś słuchawki na Maca" : "Move headphones to Mac"))),
                             systemImage: showHandoffSuccess
                                 ? "checkmark.circle"
                                 : (connectionService.headphoneHandoffPhase == .failed

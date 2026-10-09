@@ -734,7 +734,7 @@ struct TransferPopupView: View {
         } texts: {
             VStack(alignment: .leading, spacing: 3) {
                 caption(L10n.isPL ? "Słuchawki" : "Headphones")
-                headline(L10n.isPL ? "Przełączyć na Maka?" : "Switch to this Mac?")
+                headline(L10n.isPL ? "Przełączyć na Maca?" : "Switch to this Mac?")
             }
         } controls: {
             IslandIconButton(systemName: "xmark", label: L10n.isPL ? "Nie teraz" : "Not now") {
