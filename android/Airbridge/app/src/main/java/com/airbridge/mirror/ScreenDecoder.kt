@@ -34,6 +34,17 @@ class ScreenDecoder(
     private val pendingFrames = ArrayDeque<Pair<ByteArray, Long>>()   // (annexB, ptsUs)
     private val freeInputs = ArrayDeque<Int>()
 
+    /**
+     * Frame pacing. Decoded frames are released for the vsync that matches
+     * their source timing plus one frame of budget, instead of the instant they
+     * leave the decoder. Without it network jitter becomes judder: one frame
+     * shown twice, the next one skipped. [ptsBaseNs] is the smallest
+     * (arrival - pts) seen, i.e. the fastest path the network has shown, and it
+     * creeps upward slowly so a stale reference recovers from clock drift.
+     */
+    private var ptsBaseNs = Long.MIN_VALUE
+    private val pacingBudgetNs = 16_666_667L   // one frame at 60 fps
+
     /** First config: SPS/PPS (raw, no start codes). Builds + starts the codec. */
     /** H.264 config: SPS/PPS (raw, no start codes). */
     fun onConfig(sps: ByteArray, pps: ByteArray) {
@@ -82,8 +93,19 @@ class ScreenDecoder(
             }
             override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
                 if (stopped) return
-                // render = true draws the decoded frame onto the Surface.
-                runCatching { codec.releaseOutputBuffer(index, info.size > 0) }
+                if (info.size <= 0) {
+                    runCatching { codec.releaseOutputBuffer(index, false) }
+                    return
+                }
+                val nowNs = System.nanoTime()
+                val ptsNs = info.presentationTimeUs * 1_000L
+                val offset = nowNs - ptsNs
+                ptsBaseNs = when {
+                    ptsBaseNs == Long.MIN_VALUE || offset < ptsBaseNs -> offset
+                    else -> ptsBaseNs + (offset - ptsBaseNs) / 256
+                }
+                // A timestamp in the past means "as soon as possible", so a late frame is never held back.
+                runCatching { codec.releaseOutputBuffer(index, ptsNs + ptsBaseNs + pacingBudgetNs) }
             }
             override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
                 if (stopped) return

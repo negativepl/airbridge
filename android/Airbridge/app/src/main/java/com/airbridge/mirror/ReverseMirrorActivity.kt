@@ -3,6 +3,7 @@ package com.airbridge.mirror
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
@@ -267,7 +268,13 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
     }
 
     override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
-        videoSurface = Surface(st)
+        videoSurface = Surface(st).also { surface ->
+            // The Mac sends 60 fps; let the panel settle on a matching refresh
+            // rate so each frame lands on a whole number of vsyncs.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                surface.setFrameRate(60f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+            }
+        }
         startStream()
     }
 

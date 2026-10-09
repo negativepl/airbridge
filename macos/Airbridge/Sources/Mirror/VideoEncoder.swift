@@ -74,6 +74,11 @@ public final class VideoEncoder {
         set(kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrateBps))
         set(kVTCompressionPropertyKey_ExpectedFrameRate, NSNumber(value: config.fps))
         set(kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, NSNumber(value: config.keyframeIntervalSeconds))
+        // Hand each frame out as soon as it is encoded: no look-ahead queue, and
+        // speed over compression efficiency (a mirror is latency-bound, not size-bound).
+        set(kVTCompressionPropertyKey_MaxFrameDelayCount, NSNumber(value: 0))
+        set(kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality, kCFBooleanTrue)
+        set(kVTCompressionPropertyKey_MaximizePowerEfficiency, kCFBooleanFalse)
         VTCompressionSessionPrepareToEncodeFrames(session)
     }
 

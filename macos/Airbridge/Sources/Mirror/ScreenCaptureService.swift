@@ -64,7 +64,8 @@ public final class ScreenCaptureService: NSObject, SCStreamOutput {
         config.height = outH
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)   // up to 60 fps
         config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-        config.queueDepth = 5
+        // Apple's recommended minimum; a deeper queue only adds frames of latency under load.
+        config.queueDepth = 3
         config.showsCursor = true
 
         let stream = SCStream(filter: filter, configuration: config, delegate: nil)

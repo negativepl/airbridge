@@ -144,7 +144,11 @@ public actor WebSocketServer {
         sec_protocol_options_set_local_identity(
             tlsOptions.securityProtocolOptions,
             secIdentity)
-        let parameters = NWParameters(tls: tlsOptions)
+        // Nagle off: a 60 fps stream is mostly small P-frames, and holding them
+        // back for an ACK turns network jitter into visible judder on the phone.
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.noDelay = true
+        let parameters = NWParameters(tls: tlsOptions, tcp: tcpOptions)
         parameters.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
 
         let nwPort: NWEndpoint.Port

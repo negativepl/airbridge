@@ -1,6 +1,9 @@
 package com.airbridge.mirror
 
 import com.airbridge.network.PinnedTls
+import java.net.InetAddress
+import java.net.Socket
+import javax.net.SocketFactory
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -30,6 +33,7 @@ class ReverseMirrorClient(
 ) {
     private val http = PinnedTls.apply(
         OkHttpClient.Builder()
+            .socketFactory(NoDelaySocketFactory)
             .pingInterval(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS),
         certFingerprint
@@ -86,4 +90,20 @@ class ReverseMirrorClient(
         http.dispatcher.executorService.shutdown()
         http.connectionPool.evictAll()
     }
+}
+
+/**
+ * Plain sockets with Nagle's algorithm off. Input events to the Mac are a few
+ * bytes each; buffered behind an ACK they would reach the cursor late.
+ */
+private object NoDelaySocketFactory : SocketFactory() {
+    private val delegate: SocketFactory = SocketFactory.getDefault()
+    private fun Socket.noDelay(): Socket = apply { tcpNoDelay = true }
+    override fun createSocket(): Socket = delegate.createSocket().noDelay()
+    override fun createSocket(host: String, port: Int): Socket = delegate.createSocket(host, port).noDelay()
+    override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket =
+        delegate.createSocket(host, port, localHost, localPort).noDelay()
+    override fun createSocket(host: InetAddress, port: Int): Socket = delegate.createSocket(host, port).noDelay()
+    override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket =
+        delegate.createSocket(address, port, localAddress, localPort).noDelay()
 }
