@@ -88,7 +88,13 @@
 
     CGVirtualDisplaySettings *settings = [[setClass alloc] init];
     settings.hiDPI = hiDPI ? 1 : 0;
-    CGVirtualDisplayMode *mode = [[modeClass alloc] initWithWidth:width height:height refreshRate:60.0];
+    // A mode is declared in POINTS. With hiDPI set, the WindowServer backs it
+    // with 2x pixels, so the Retina mode is half the pixel size; declaring the
+    // full pixel size here would ask for a 2x backing twice as large as
+    // maxPixelsWide allows, and the display would fall back to 1x.
+    uint32_t modeW = hiDPI ? width / 2 : width;
+    uint32_t modeH = hiDPI ? height / 2 : height;
+    CGVirtualDisplayMode *mode = [[modeClass alloc] initWithWidth:modeW height:modeH refreshRate:60.0];
     settings.modes = @[mode];
 
     if (![display applySettings:settings]) {

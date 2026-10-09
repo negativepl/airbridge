@@ -79,6 +79,8 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     // Launch splash held until the Mac is connected and its info has arrived.
     implementation("androidx.core:core-splashscreen:1.2.0")
+    // Window metrics without the deprecated Display APIs (mirror stream sizing).
+    implementation("androidx.window:window:1.5.0")
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")

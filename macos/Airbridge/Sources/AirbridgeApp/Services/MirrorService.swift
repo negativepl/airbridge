@@ -32,24 +32,6 @@ public enum MirrorSlot: Int, CaseIterable, Sendable {
     case reverseVirtual = 2  // virtual display -> phone
 }
 
-private enum MirrorDebugLog {
-    static let url = URL(fileURLWithPath: "/tmp/airbridge-mirror.log")
-
-    static func write(_ message: String) {
-        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
-        let data = Data(line.utf8)
-        if FileManager.default.fileExists(atPath: url.path) {
-            if let handle = try? FileHandle(forWritingTo: url) {
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-                try? handle.close()
-            }
-        } else {
-            try? data.write(to: url)
-        }
-    }
-}
-
 // Swift 6 strict concurrency: CMSampleBuffer's Sendable conformance is unavailable on macOS.
 // Box it so it can cross actor/Task boundaries safely (all actual usage is @MainActor).
 private struct UncheckedSampleBuffer: @unchecked Sendable {
@@ -216,7 +198,7 @@ public final class MirrorService {
         guard let tlsIdentity else {
             // Programmer error: ConnectionService.provideMirrorTLSIdentity()
             // must run first. Don't start the mirror; main channels still work.
-            MirrorDebugLog.write("mirror server NOT started: missing TLS identity")
+            Diag.log("Mirror", "mirror server NOT started: missing TLS identity")
             return
         }
         await server.setCallbacks(
@@ -231,7 +213,7 @@ public final class MirrorService {
         )
         try await server.start(tlsIdentity: tlsIdentity)
         actualPort = await server.actualPort
-        MirrorDebugLog.write("mirror server started on port \(actualPort ?? 0)")
+        Diag.log("Mirror", "mirror server started on port \(actualPort ?? 0)")
     }
 
     public func stop() async {
@@ -256,7 +238,7 @@ public final class MirrorService {
         bitrateByteCount = 0
         fpsWindowStartedAt = Date()
         fpsFrameCount = 0
-        MirrorDebugLog.write("mirror server stopped")
+        Diag.log("Mirror", "mirror server stopped")
     }
 
     /// A VideoDecoder wired to the forward (phone -> Mac) sample pipeline. Codec
@@ -269,7 +251,7 @@ public final class MirrorService {
                 self.frameCounter += 1
                 self.updateDecodedFPS()
                 if self.frameCounter <= 10 || self.frameCounter.isMultiple(of: 60) {
-                    MirrorDebugLog.write("decoded sample #\(self.frameCounter)")
+                    Diag.log("Mirror", "decoded sample #\(self.frameCounter)")
                 }
                 for continuation in self.sampleSubscribers.values {
                     continuation.yield(box.value)
@@ -290,7 +272,7 @@ public final class MirrorService {
                 break
             default:
                 guard authenticatedMirrorConnections.contains(connectionId) else {
-                    MirrorDebugLog.write("dropping pre-auth frame from \(connectionId)")
+                    Diag.log("Mirror", "dropping pre-auth frame from \(connectionId)")
                     Task { await server.disconnectClient(connectionId) }
                     return
                 }
@@ -298,9 +280,9 @@ public final class MirrorService {
 
             switch msg {
             case let .hello(token, screenWidth, screenHeight, _):
-                MirrorDebugLog.write("received HELLO tokenBytes=\(token.count)")
+                Diag.log("Mirror", "received HELLO tokenBytes=\(token.count)")
                 guard mirrorTokenValidator(token) else {
-                    MirrorDebugLog.write("HELLO rejected")
+                    Diag.log("Mirror", "HELLO rejected")
                     Task { await server.disconnectClient(connectionId) }
                     return
                 }
@@ -323,10 +305,10 @@ public final class MirrorService {
                 bitrateByteCount = 0
                 fpsWindowStartedAt = Date()
                 fpsFrameCount = 0
-                MirrorDebugLog.write("sending HELLO_ACK fps=\(q.fps) size=\(targetStreamWidth)x\(targetStreamHeight) aspect=\(remoteScreenWidth)x\(remoteScreenHeight)")
+                Diag.log("Mirror", "sending HELLO_ACK fps=\(q.fps) size=\(targetStreamWidth)x\(targetStreamHeight) aspect=\(remoteScreenWidth)x\(remoteScreenHeight)")
                 Task { try? await server.sendBinary(ack.encode(), connectionId: connectionId) }
             case let .videoConfig(sps, pps):
-                MirrorDebugLog.write("received VIDEO_CONFIG H264 sps=\(sps.count) pps=\(pps.count)")
+                Diag.log("Mirror", "received VIDEO_CONFIG H264 sps=\(sps.count) pps=\(pps.count)")
                 let dec = makeForwardDecoder()
                 let dims = try dec.configure(sps: sps, pps: pps)
                 videoWidth = CGFloat(dims.width)
@@ -336,7 +318,7 @@ public final class MirrorService {
                 self.isStreaming = true
 
             case let .videoConfigHEVC(vps, sps, pps):
-                MirrorDebugLog.write("received VIDEO_CONFIG HEVC vps=\(vps.count) sps=\(sps.count) pps=\(pps.count)")
+                Diag.log("Mirror", "received VIDEO_CONFIG HEVC vps=\(vps.count) sps=\(sps.count) pps=\(pps.count)")
                 let dec = makeForwardDecoder()
                 let dims = try dec.configureHEVC(vps: vps, sps: sps, pps: pps)
                 videoWidth = CGFloat(dims.width)
@@ -352,7 +334,7 @@ public final class MirrorService {
                 let avcc = NALUParser.accessUnitToAVCC(naluBytes)
                 updateIncomingBitrate(frameBytes: naluBytes.count)
                 if frameCounter < 5 {
-                    MirrorDebugLog.write("received VIDEO_FRAME pts=\(pts) raw=\(naluBytes.count) avcc=\(avcc.count) prefix=\(Array(naluBytes.prefix(8)))")
+                    Diag.log("Mirror", "received VIDEO_FRAME pts=\(pts) raw=\(naluBytes.count) avcc=\(avcc.count) prefix=\(Array(naluBytes.prefix(8)))")
                 }
                 try decoder.decode(avccFrame: avcc, presentationTimestampUs: pts)
 
@@ -377,9 +359,9 @@ public final class MirrorService {
                 if isReverseStreaming { ReverseInputInjector.injectKey(code: code, modifiers: modifiers) }
 
             case let .reverseHello(token, w, h, mode):
-                MirrorDebugLog.write("received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
+                Diag.log("Mirror", "received REVERSE_HELLO tokenBytes=\(token.count) phone=\(w)x\(h) mode=\(mode)")
                 guard mirrorTokenValidator(token) else {
-                    MirrorDebugLog.write("REVERSE_HELLO rejected")
+                    Diag.log("Mirror", "REVERSE_HELLO rejected")
                     Task { await server.disconnectClient(connectionId) }
                     return
                 }
@@ -391,7 +373,7 @@ public final class MirrorService {
                 break
             }
         } catch {
-            MirrorDebugLog.write("mirror error: \(error)")
+            Diag.log("Mirror", "mirror error: \(error)")
         }
     }
 
@@ -410,7 +392,7 @@ public final class MirrorService {
         bitrateByteCount = 0
         fpsWindowStartedAt = Date()
         fpsFrameCount = 0
-        MirrorDebugLog.write("mirror client disconnected")
+        Diag.log("Mirror", "mirror client disconnected")
     }
 
     public func sendTap(xNorm: CGFloat, yNorm: CGFloat) {
@@ -460,19 +442,19 @@ public final class MirrorService {
             useHEVC: q.useHEVC,
             virtualSize: virtualSize,
             onPacket: { packet in cont.yield(packet) },
-            onLog: { msg in MirrorDebugLog.write(msg) },
+            onLog: { msg in Diag.log("Mirror", msg) },
             onDisplayID: { [weak self] id in
                 Task { @MainActor in self?.reverseDisplayID = id }
             }
         )
         reversePipeline = pipeline
         isReverseStreaming = true
-        MirrorDebugLog.write("reverse mirror starting slot=\(slot.rawValue) fps=\(q.fps) bitrate=\(bitrate) hevc=\(q.useHEVC)")
+        Diag.log("Mirror", "reverse mirror starting slot=\(slot.rawValue) fps=\(q.fps) bitrate=\(bitrate) hevc=\(q.useHEVC)")
         Task {
             do {
                 try await pipeline.start()
             } catch {
-                MirrorDebugLog.write("reverse mirror start failed: \(error)")
+                Diag.log("Mirror", "reverse mirror start failed: \(error)")
                 await MainActor.run { self.stopReverseMirror() }
             }
         }
@@ -487,7 +469,7 @@ public final class MirrorService {
         reverseDisplayID = nil
         isReverseStreaming = false
         Task { await pipeline?.stop() }
-        MirrorDebugLog.write("reverse mirror stopped")
+        Diag.log("Mirror", "reverse mirror stopped")
     }
 
     private static func fitCap(_ w: Int, _ h: Int, cap: Int) -> (Int, Int) {

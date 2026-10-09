@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
+import androidx.window.layout.WindowMetricsCalculator
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
@@ -336,11 +337,10 @@ class ReverseMirrorActivity : ComponentActivity(), TextureView.SurfaceTextureLis
         c.close()   // → onClientGone(currentGen) → startStream()
     }
 
-    @Suppress("DEPRECATION")
+    /** Full physical size of the current screen, in pixels (the Fold reports the open panel once unfolded). */
     private fun realDisplaySize(): Pair<Int, Int> {
-        val wm = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
-        val m = android.util.DisplayMetrics().also { wm.defaultDisplay.getRealMetrics(it) }
-        return m.widthPixels to m.heightPixels
+        val bounds = WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(this).bounds
+        return bounds.width() to bounds.height()
     }
 
     /** Bottom space currently occupied by whichever panel is up (keyboard or trackpad).

@@ -5,14 +5,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import androidx.window.layout.WindowMetricsCalculator
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import androidx.core.content.IntentCompat
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.IBinder
-import android.util.DisplayMetrics
-import android.view.WindowManager
 import com.airbridge.R
 
 class MirrorService : Service() {
@@ -108,11 +107,10 @@ class MirrorService : Service() {
         startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
     }
 
-    @Suppress("DEPRECATION")
+    /** Full physical size of the screen the service captures, in pixels. */
     private fun displayDimensions(): Pair<Int, Int> {
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val metrics = DisplayMetrics().also { wm.defaultDisplay.getRealMetrics(it) }
-        return metrics.widthPixels to metrics.heightPixels
+        val bounds = WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(this).bounds
+        return bounds.width() to bounds.height()
     }
 
     companion object {
