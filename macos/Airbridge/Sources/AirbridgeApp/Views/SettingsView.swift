@@ -130,13 +130,13 @@ struct SettingsView: View {
                     }
                 }
             }
-            // The action sits inside the group, like every other button.
+        } header: {
+            Text(L10n.isPL ? "Sparowane urządzenia" : "Paired Devices")
+        } footer: {
             HStack {
                 Spacer()
                 Button(L10n.isPL ? "Dodaj urządzenie…" : "Add Device…") { showPairing = true }
             }
-        } header: {
-            Text(L10n.isPL ? "Sparowane urządzenia" : "Paired Devices")
         }
     }
 
