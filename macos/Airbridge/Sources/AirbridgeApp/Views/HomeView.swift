@@ -162,7 +162,7 @@ struct HomeView: View {
     private func deviceDetails(_ device: ConnectedDevice) -> some View {
         if let info = device.deviceInfo {
             LabeledContent(L10n.isPL ? "Model" : "Model", value: "\(info.manufacturer) \(info.model)")
-            LabeledContent("Android", value: info.androidVersion)
+            LabeledContent("Android", value: androidVersionText(info.androidVersion))
             LabeledContent(L10n.isPL ? "Bateria" : "Battery", value: batteryText(info))
             if info.totalStorageBytes > 0 {
                 // Text only, like System Settings › General › About.
@@ -248,18 +248,36 @@ struct HomeView: View {
         return device.name
     }
 
+    /// "16 (Baklava)". The phone reports only the number (Build.VERSION.CODENAME
+    /// is "REL" on release builds) and since Android 10 the dessert names are
+    /// Google's internal codenames rather than public branding, so they are
+    /// listed here; an unknown version shows the number alone.
+    private func androidVersionText(_ version: String) -> String {
+        let codenames = [
+            "10": "Quince Tart", "11": "Red Velvet Cake", "12": "Snow Cone",
+            "13": "Tiramisu", "14": "Upside Down Cake", "15": "Vanilla Ice Cream",
+            "16": "Baklava", "17": "Cinnamon Bun",
+        ]
+        let major = version.split(separator: ".").first.map(String.init) ?? version
+        guard let name = codenames[major] else { return version }
+        return "\(version) (\(name))"
+    }
+
+    /// "78% (Na baterii)" or "78% (Ładowanie, do pełna za 33 min)".
     private func batteryText(_ info: DeviceInfo) -> String {
-        guard info.batteryCharging else { return "\(info.batteryPercent)%" }
-        var text = "\(info.batteryPercent)% · " + (L10n.isPL ? "Ładowanie" : "Charging")
+        guard info.batteryCharging else {
+            return "\(info.batteryPercent)% (" + (L10n.isPL ? "Na baterii" : "On battery") + ")"
+        }
+        var state = L10n.isPL ? "Ładowanie" : "Charging"
         if info.chargeTimeRemainingMs > 0 {
             let f = DateComponentsFormatter()
             f.unitsStyle = .short
             f.allowedUnits = [.hour, .minute]
             if let left = f.string(from: Double(info.chargeTimeRemainingMs) / 1000) {
-                text += L10n.isPL ? " (pełna za \(left))" : " (full in \(left))"
+                state += L10n.isPL ? ", do pełna za \(left)" : ", full in \(left)"
             }
         }
-        return text
+        return "\(info.batteryPercent)% (\(state))"
     }
 
     private func batterySymbol(_ info: DeviceInfo) -> String {
