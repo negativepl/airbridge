@@ -451,8 +451,16 @@ struct FilesBrowserView: View {
     /// "Folder", or the file type's system name ("Obraz JPEG").
     private func kindText(_ entry: FileEntry) -> String {
         if entry.isDirectory { return "Folder" }
-        return UTType(mimeType: entry.mimeType)?.localizedDescription ?? entry.mimeType
+        if let known = Self.kindNames[entry.mimeType] { return known }
+        let name = UTType(mimeType: entry.mimeType)?.localizedDescription ?? entry.mimeType
+        Self.kindNames[entry.mimeType] = name
+        return name
     }
+
+    /// Row text is rebuilt on every selection change; the type lookup and
+    /// the date formatting are kept so a fast click run stays instant.
+    @MainActor private static var kindNames: [String: String] = [:]
+    @MainActor private static var dates: [Int64: String] = [:]
 
     /// A folder's item count ("12 elementów"); empty for files.
     private func contentsText(_ entry: FileEntry) -> String {
@@ -469,7 +477,10 @@ struct FilesBrowserView: View {
     }
 
     private static func date(_ millis: Int64) -> String {
-        Date(timeIntervalSince1970: TimeInterval(millis) / 1000).formatted(date: .abbreviated, time: .shortened)
+        if let known = dates[millis] { return known }
+        let text = Date(timeIntervalSince1970: TimeInterval(millis) / 1000).formatted(date: .abbreviated, time: .shortened)
+        dates[millis] = text
+        return text
     }
 
     // MARK: - Sorting
