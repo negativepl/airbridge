@@ -11,6 +11,10 @@ struct MessagesView: View {
     @State private var selectedId: SmsConversationMeta.ID?
     @State private var searchText = ""
     @State private var messageText = ""
+    /// Height of the floating reply bar; the conversation ends that far
+    /// above the bottom, since safeAreaBar draws over the content without
+    /// insetting it (the last bubble sat under the bar).
+    @State private var replyBarHeight: CGFloat = 0
 
     private var selectedConversation: SmsConversationMeta? {
         smsService.conversations.first { $0.id == selectedId }
@@ -142,58 +146,67 @@ struct MessagesView: View {
         }
     }
 
+    /// The conversation appears only once its own messages are in: built
+    /// then, with its content complete, the scroll view opens at the end.
+    /// (Built earlier it showed the previous thread for a moment and was
+    /// anchored against content that was about to change.)
     private func conversationView(_ convo: SmsConversationMeta) -> some View {
-        // The phone sends newest first; the conversation reads oldest first.
-        let messages = Array(smsService.currentMessages.reversed())
-        return ScrollViewReader { proxy in
-            ScrollView {
-                // Not lazy: a page is 30 messages, laid out at once with their
-                // real heights, so the conversation opens exactly at its end.
-                VStack(spacing: 6) {
-                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
-                        if index == 0 || msg.date - messages[index - 1].date > Self.burstGapMillis {
-                            Text(Self.headerText(msg.date))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, index == 0 ? 8 : 16)
-                                .padding(.bottom, 4)
-                        }
-                        MessageBubble(message: msg)
-                            .id(msg.id)
-                    }
+        let loaded = smsService.currentThreadId == convo.threadId && !smsService.currentMessages.isEmpty
+        return Group {
+            if loaded {
+                messagesScroll(convo)
+            } else if smsService.messagesLoadFailed {
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Nie udało się załadować wiadomości" : "Could Not Load Messages",
+                          systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
+                } actions: {
+                    Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { smsService.loadMessages(threadId: convo.threadId) }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            }
-            .defaultScrollAnchor(.bottom)
-            // A fresh scroll view per conversation, so each opens at its end.
-            .id(convo.id)
-            .overlay {
-                if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
-                    // Plain background; the toolbar spinner says it is loading.
-                    Color(nsColor: .windowBackgroundColor)
-                } else if smsService.messagesLoadFailed && smsService.currentMessages.isEmpty {
-                    ContentUnavailableView {
-                        Label(L10n.isPL ? "Nie udało się załadować wiadomości" : "Could Not Load Messages",
-                              systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
-                    } actions: {
-                        Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { smsService.loadMessages(threadId: convo.threadId) }
-                    }
-                }
-            }
-            .onChange(of: smsService.currentMessages.first?.id) { _, newest in
-                // A new message (sent or received) brings the end into view.
-                if let newest { proxy.scrollTo(newest, anchor: .bottom) }
-            }
-            // A Liquid Glass bar: the conversation scrolls under it and the
-            // system's scroll edge effect keeps the field legible.
-            .safeAreaBar(edge: .bottom) {
-                replyBar(convo)
+            } else {
+                // Plain background; the toolbar spinner says it is loading.
+                Color.clear
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A Liquid Glass bar: the conversation scrolls under it and the
+        // system's scroll edge effect keeps the field legible.
+        .safeAreaBar(edge: .bottom) {
+            replyBar(convo)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { replyBarHeight = $0 }
+        }
+    }
+
+    private func messagesScroll(_ convo: SmsConversationMeta) -> some View {
+        // The phone sends newest first; the conversation reads oldest first.
+        let messages = Array(smsService.currentMessages.reversed())
+        return ScrollView {
+            // Not lazy: a page is 30 messages, laid out at once with their
+            // real heights, so the conversation opens exactly at its end.
+            VStack(spacing: 6) {
+                ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                    if index == 0 || msg.date - messages[index - 1].date > Self.burstGapMillis {
+                        Text(Self.headerText(msg.date))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, index == 0 ? 8 : 16)
+                            .padding(.bottom, 4)
+                    }
+                    MessageBubble(message: msg)
+                        .id(msg.id)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8 + replyBarHeight)
+        }
+        .defaultScrollAnchor(.bottom)
+        // A new message grows the content; the view stays at its end.
+        .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        // A fresh scroll view per conversation, so each opens at its end.
+        .id(convo.id)
     }
 
     @ViewBuilder
