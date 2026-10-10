@@ -251,7 +251,7 @@ struct FilesBrowserView: View {
               columnCustomization: $columnCustomization) {
             TableColumn(L10n.isPL ? "Nazwa" : "Name", value: \.name) { entry in
                 HStack(spacing: 6) {
-                    FileIcon(entry: entry, thumbnail: service.thumbnails[entry.relativePath], size: 18)
+                    FileIcon(entry: entry, thumbnail: service.thumbnail(for: entry.relativePath), size: 18)
                     Text(service.isSearching ? entry.relativePath : entry.name)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -302,7 +302,7 @@ struct FilesBrowserView: View {
                       spacing: 16) {
                 ForEach(shownEntries) { entry in
                     FileIconItem(entry: entry,
-                                 thumbnail: service.thumbnails[entry.relativePath],
+                                 thumbnail: service.thumbnail(for: entry.relativePath),
                                  name: service.isSearching ? entry.relativePath : entry.name,
                                  isSelected: selection.contains(entry.id))
                         .onTapGesture {
@@ -543,13 +543,14 @@ private func fileSymbol(for mime: String) -> String {
 /// folder or file-type symbol.
 private struct FileIcon: View {
     let entry: FileEntry
-    let thumbnail: NSImage?
+    /// Read here, so a thumbnail arriving redraws this icon only.
+    let thumbnail: Thumbnail
     let size: CGFloat
 
     var body: some View {
         Group {
-            if let thumbnail {
-                Image(nsImage: thumbnail)
+            if let image = thumbnail.image {
+                Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
@@ -568,7 +569,7 @@ private struct FileIcon: View {
 /// highlight and the name in an accent capsule when selected.
 private struct FileIconItem: View {
     let entry: FileEntry
-    let thumbnail: NSImage?
+    let thumbnail: Thumbnail
     let name: String
     let isSelected: Bool
 

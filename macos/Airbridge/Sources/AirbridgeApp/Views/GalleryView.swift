@@ -338,7 +338,7 @@ private struct GalleryTile: View {
 
     /// Observed on its own: another photo's thumbnail arriving doesn't redraw
     /// this tile.
-    private var thumbnail: GalleryService.Thumbnail { galleryService.thumbnail(for: photo.id) }
+    private var thumbnail: Thumbnail { galleryService.thumbnail(for: photo.id) }
 
     var body: some View {
         // Color.clear sets the square at the column's width; the image fills an

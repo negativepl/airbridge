@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import ImageIO
 import Protocol
 
 @Observable
@@ -8,28 +7,11 @@ import Protocol
 final class GalleryService: MessageHandler, ActiveDeviceObserver {
 
     private(set) var photos: [GalleryPhotoMeta] = []
-    /// One photo's thumbnail, observed on its own: with every thumbnail in one
-    /// observed dictionary, each arrival while scrolling redrew every tile.
-    @Observable
-    @MainActor
-    final class Thumbnail {
-        fileprivate(set) var image: NSImage?
-    }
+    @ObservationIgnored private let thumbnails = ThumbnailBoxes()
 
-    /// Boxes live as long as the service; a reset empties them in place, so a
-    /// tile still holding one sees the new image.
-    @ObservationIgnored private var thumbnails: [String: Thumbnail] = [:]
+    func thumbnail(for photoId: String) -> Thumbnail { thumbnails.box(for: photoId) }
 
-    func thumbnail(for photoId: String) -> Thumbnail {
-        if let existing = thumbnails[photoId] { return existing }
-        let created = Thumbnail()
-        thumbnails[photoId] = created
-        return created
-    }
-
-    private func clearThumbnails() {
-        for box in thumbnails.values { box.image = nil }
-    }
+    private func clearThumbnails() { thumbnails.clearAll() }
     private(set) var previewImages: [String: NSImage] = [:]    // photoId -> cached larger preview
     private(set) var totalCount: Int = 0
     private(set) var currentPage: Int = 0
@@ -140,7 +122,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
                 guard let deviceKey,
                       let data = cache.loadImageData(device: deviceKey, folder: "gallery-thumbs", key: photoId)
                 else { return nil }
-                return Self.decodeThumbnail(data)
+                return ThumbnailBoxes.decode(data)
             }.value
             if let cached {
                 setThumbnail(cached, for: photoId)
@@ -151,20 +133,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
     }
 
     private func setThumbnail(_ image: CGImage, for photoId: String) {
-        thumbnail(for: photoId).image = NSImage(cgImage: image, size: .zero)
-    }
-
-    /// Decoded up front (the bitmap is cached immediately) with the EXIF
-    /// orientation applied, as NSImage(data:) would.
-    nonisolated private static func decodeThumbnail(_ data: Data) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1024,
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        thumbnails.set(image, for: photoId)
     }
 
     func requestPreview(photoId: String, maxSize: Int = 1920) {
@@ -249,7 +218,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         case .galleryDeleteResponse(let photoId, let success, let error):
             if success {
                 photos.removeAll { $0.id == photoId }
-                thumbnails[photoId]?.image = nil
+                thumbnails.clear(photoId)
                 previewImages[photoId] = nil
                 totalCount = max(0, totalCount - 1)
                 if let deviceKey {
@@ -265,7 +234,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
             Task {
                 let image: CGImage? = await Task.detached(priority: .userInitiated) {
                     guard let imageData = Data(base64Encoded: data),
-                          let image = Self.decodeThumbnail(imageData) else { return nil }
+                          let image = ThumbnailBoxes.decode(imageData) else { return nil }
                     if let deviceKey {
                         cache.saveImage(imageData, device: deviceKey, folder: "gallery-thumbs", key: photoId)
                     }

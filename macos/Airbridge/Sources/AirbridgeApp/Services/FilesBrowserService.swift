@@ -31,7 +31,9 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
     private(set) var loadFailed: Bool = false
     private(set) var needsPermission: Bool = false
     private(set) var hasLoadedOnce: Bool = false
-    private(set) var thumbnails: [String: NSImage] = [:]   // relativePath -> thumb
+    /// Thumbnails by relative path, each observed on its own (see Thumbnail).
+    @ObservationIgnored private let thumbnails = ThumbnailBoxes()
+    func thumbnail(for path: String) -> Thumbnail { thumbnails.box(for: path) }
     private(set) var folderStats: [String: FolderStats] = [:]  // relativePath -> stats
 
     // MARK: - Preview (QuickLook)
@@ -320,18 +322,32 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
 
     // MARK: - Thumbnails
 
+    /// Shows the disk-cached thumbnail, or asks the phone for it. Reading and
+    /// decoding run off the main thread: done on it, a folder's worth of
+    /// thumbnails held up clicks until they were all in.
     func requestThumbnail(_ entry: FileEntry) {
+        let path = entry.relativePath
         guard !entry.isDirectory,
               entry.mimeType.hasPrefix("image/") || entry.mimeType.hasPrefix("video/"),
-              thumbnails[entry.relativePath] == nil,
-              !requestedThumbnails.contains(entry.relativePath),
+              thumbnail(for: path).image == nil,
+              !requestedThumbnails.contains(path),
               let connectionService else { return }
-        if let deviceKey, let cached = cache.loadImage(device: deviceKey, folder: "files-thumbs", key: "\(entry.relativePath)|\(entry.modified)") {
-            thumbnails[entry.relativePath] = cached
-            return
+        requestedThumbnails.insert(path)
+        let deviceKey = deviceKey
+        let cache = cache
+        let key = "\(path)|\(entry.modified)"
+        Task {
+            let cached: CGImage? = await Task.detached(priority: .userInitiated) {
+                guard let deviceKey, let data = cache.loadImageData(device: deviceKey, folder: "files-thumbs", key: key)
+                else { return nil }
+                return ThumbnailBoxes.decode(data)
+            }.value
+            if let cached {
+                thumbnails.set(cached, for: path)
+            } else {
+                try? await connectionService.sendToActive(.fileThumbnailRequest(path: path))
+            }
         }
-        requestedThumbnails.insert(entry.relativePath)
-        Task { try? await connectionService.sendToActive(.fileThumbnailRequest(path: entry.relativePath)) }
     }
 
     // MARK: - Folder stats
@@ -424,7 +440,7 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
         // The listing belongs to the previous phone (paths differ per device)
         // — clear it so it is never shown as the new device's contents.
         entries = []
-        thumbnails = [:]
+        thumbnails.clearAll()
         folderStats = [:]
         requestedThumbnails = []
         requestedFolderStats = []
@@ -468,11 +484,19 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
             requestNextFolderStats()
 
         case .fileThumbnailResponse(let path, let data):
-            if let imageData = Data(base64Encoded: data), let image = NSImage(data: imageData) {
-                thumbnails[path] = image
-                if let deviceKey, let entry = entries.first(where: { $0.relativePath == path }) {
-                    cache.saveImage(imageData, device: deviceKey, folder: "files-thumbs", key: "\(path)|\(entry.modified)")
-                }
+            let deviceKey = deviceKey
+            let cache = cache
+            let modified = entries.first(where: { $0.relativePath == path })?.modified
+            Task {
+                let image: CGImage? = await Task.detached(priority: .userInitiated) {
+                    guard let imageData = Data(base64Encoded: data),
+                          let image = ThumbnailBoxes.decode(imageData) else { return nil }
+                    if let deviceKey, let modified {
+                        cache.saveImage(imageData, device: deviceKey, folder: "files-thumbs", key: "\(path)|\(modified)")
+                    }
+                    return image
+                }.value
+                if let image { thumbnails.set(image, for: path) }
             }
 
         case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
