@@ -147,9 +147,25 @@ struct MirrorTabView: View {
             }
             .padding(.vertical, 4)
             settings()
-            // The whole row opens it, as in System Settings; a plain
-            // DisclosureGroup on the Mac answers only its small chevron.
-            DisclosureGroup(isExpanded: advancedBinding(slot)) {
+            // "Advanced" is a row of the section that reveals the encoder's
+            // settings as ordinary rows below it, spaced and separated like
+            // the rest of the form (a DisclosureGroup crammed them together).
+            let open = advancedBinding(slot)
+            Button {
+                withAnimation { open.wrappedValue.toggle() }
+            } label: {
+                HStack {
+                    Text(L10n.isPL ? "Zaawansowane" : "Advanced")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(open.wrappedValue ? 90 : 0))
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            if open.wrappedValue {
                 Picker(L10n.isPL ? "Klatki na sekundę" : "Frame Rate", selection: fpsBinding(slot)) {
                     Text("30").tag(30)
                     Text("60").tag(60)
@@ -167,13 +183,6 @@ struct MirrorTabView: View {
                     Text("40 Mb/s").tag(40_000_000)
                 }
                 Toggle(L10n.isPL ? "Kodek HEVC (H.265)" : "HEVC (H.265) Codec", isOn: hevcBinding(slot))
-            } label: {
-                Text(L10n.isPL ? "Zaawansowane" : "Advanced")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
-                    .onTapGesture {
-                        withAnimation { advancedBinding(slot).wrappedValue.toggle() }
-                    }
             }
         }
     }
