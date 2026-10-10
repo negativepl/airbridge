@@ -10,9 +10,15 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/macos/Airbridge"
 
 echo "--- swift build ---"
-swift build 2>&1 | tee /tmp/airbridge-build.log | grep -E ": (error|warning):" | head -40 || true
+# The exit status decides, not a grep: swift build colours its diagnostics,
+# so ": error:" never matched and a failed build shipped the old binary.
+set +e
+swift build > /tmp/airbridge-build.log 2>&1
+BUILD_STATUS=$?
+set -e
+sed $'s/\x1b\\[[0-9;]*m//g' /tmp/airbridge-build.log | grep -E "(error|warning):" | head -40 || true
 
-if grep -qE ': error:' /tmp/airbridge-build.log; then
+if [ "$BUILD_STATUS" -ne 0 ]; then
     echo "BUILD FAILED — see /tmp/airbridge-build.log"
     exit 1
 fi
