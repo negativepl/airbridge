@@ -79,13 +79,15 @@ struct MessagesView: View {
 
     // MARK: - Conversations
 
+    private var searchQuery: String { searchText.trimmingCharacters(in: .whitespaces) }
+
     private var filteredConversations: [SmsConversationMeta] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return smsService.conversations }
         return smsService.conversations.filter {
-            $0.displayName.localizedCaseInsensitiveContains(query)
-                || $0.address.localizedCaseInsensitiveContains(query)
-                || $0.snippet.localizedCaseInsensitiveContains(query)
+            SearchHighlight.matches($0.displayName, query)
+                || SearchHighlight.matches($0.address, query)
+                || SearchHighlight.matches($0.snippet, query)
         }
     }
 
@@ -108,7 +110,7 @@ struct MessagesView: View {
                 LazyVStack(spacing: 8) {
                     ForEach(filteredConversations) { convo in
                         Button { selectedId = convo.id } label: {
-                            ConversationRow(conversation: convo, isSelected: convo.id == selectedId)
+                            ConversationRow(conversation: convo, isSelected: convo.id == selectedId, query: searchQuery)
                         }
                         .buttonStyle(.plain)
                         .glassEffect(convo.id == selectedId ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
@@ -194,7 +196,7 @@ struct MessagesView: View {
                             .padding(.top, index == 0 ? 8 : 16)
                             .padding(.bottom, 4)
                     }
-                    MessageBubble(message: msg)
+                    MessageBubble(message: msg, query: searchQuery)
                         .id(msg.id)
                 }
             }
@@ -286,6 +288,7 @@ struct MessagesView: View {
 private struct ConversationRow: View {
     let conversation: SmsConversationMeta
     let isSelected: Bool
+    let query: String
 
     /// On the accent-tinted tile the text turns white, as in a selected row.
     private var secondary: AnyShapeStyle { isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary) }
@@ -303,7 +306,7 @@ private struct ConversationRow: View {
                 .foregroundStyle(secondary)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(conversation.displayName)
+                    Text(SearchHighlight.text(conversation.displayName, query))
                         .font(.headline)
                         .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                         .lineLimit(1)
@@ -312,7 +315,7 @@ private struct ConversationRow: View {
                         .font(.caption)
                         .foregroundStyle(secondary)
                 }
-                Text(conversation.snippet)
+                Text(SearchHighlight.text(conversation.snippet, query))
                     .font(.subheadline)
                     .foregroundStyle(secondary)
                     .lineLimit(2)
@@ -341,13 +344,14 @@ private struct ConversationRow: View {
 /// ones grey on the left, as Messages.
 private struct MessageBubble: View {
     let message: SmsMessageMeta
+    let query: String
 
     private var isSent: Bool { message.type == 2 }
 
     var body: some View {
         HStack {
             if isSent { Spacer(minLength: 0) }
-            Text(message.body)
+            Text(SearchHighlight.text(message.body, query))
                 .textSelection(.enabled)
                 .foregroundStyle(isSent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                 .padding(.horizontal, 14)
@@ -363,5 +367,31 @@ private struct MessageBubble: View {
                     .formatted(date: .abbreviated, time: .shortened))
             if !isSent { Spacer(minLength: 0) }
         }
+    }
+}
+
+/// Search matches marked as the system marks found text (Safari, Messages):
+/// the find-highlight colour behind them, dark text on it. Case and
+/// diacritics are ignored, so "dzie" finds "Dzięki".
+enum SearchHighlight {
+    private static let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+
+    static func matches(_ text: String, _ query: String) -> Bool {
+        query.isEmpty || text.range(of: query, options: options) != nil
+    }
+
+    static func text(_ text: String, _ query: String) -> AttributedString {
+        var result = AttributedString(text)
+        guard !query.isEmpty else { return result }
+        var searchStart = text.startIndex
+        while let range = text.range(of: query, options: options, range: searchStart..<text.endIndex) {
+            if let lower = AttributedString.Index(range.lowerBound, within: result),
+               let upper = AttributedString.Index(range.upperBound, within: result) {
+                result[lower..<upper].backgroundColor = Color(nsColor: .findHighlightColor)
+                result[lower..<upper].foregroundColor = .black
+            }
+            searchStart = range.upperBound
+        }
+        return result
     }
 }
