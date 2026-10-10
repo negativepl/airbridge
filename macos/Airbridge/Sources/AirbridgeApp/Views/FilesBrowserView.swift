@@ -267,7 +267,9 @@ struct FilesBrowserView: View {
 
     private var iconView: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 128), spacing: 8)], spacing: 16) {
+            // Top-aligned rows: a two-line name grows down, the icons stay level.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 128), spacing: 8, alignment: .top)],
+                      spacing: 16) {
                 ForEach(service.displayedEntries) { entry in
                     FileIconItem(entry: entry,
                                  thumbnail: service.thumbnails[entry.relativePath],
