@@ -52,10 +52,6 @@ struct SendView: View {
                         .buttonStyle(.borderedProminent)
                     Button(L10n.isPL ? "Wyślij schowek" : "Send Clipboard") { sendClipboard() }
                 }
-                // macOS 26 draws large controls as capsules; the standalone
-                // actions of an empty state are large, like Photos' "Import".
-                .controlSize(.extraLarge)
-                .buttonBorderShape(.capsule)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

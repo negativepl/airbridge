@@ -102,8 +102,6 @@ struct HomeView: View {
                 HStack {
                     Spacer()
                     Button(L10n.disconnect) { vm.disconnect() }
-                        .controlSize(.large)
-                        .buttonBorderShape(.capsule)
                 }
             }
         }

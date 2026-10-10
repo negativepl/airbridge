@@ -43,8 +43,6 @@ struct MirrorTabView: View {
         } actions: {
             Button(L10n.isPL ? "Pokaż tutaj" : "Show Here") { dismissWindow(id: "mirror") }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .buttonBorderShape(.capsule)
         }
     }
 
@@ -146,8 +144,6 @@ struct MirrorTabView: View {
                 Spacer()
                 Button(L10n.isPL ? "Rozpocznij" : "Start", action: action)
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .buttonBorderShape(.capsule)
             }
             .padding(.vertical, 4)
             settings()
