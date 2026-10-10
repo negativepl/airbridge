@@ -18,10 +18,6 @@ struct FilesBrowserView: View {
     @State private var entriesPendingDeletion: [FileEntry] = []
     /// A file drag is over the window: the folder takes the drop.
     @State private var isDropTargeted = false
-    /// The spinner only appears once a load has taken a moment (350 ms). A
-    /// listing that arrives sooner never shows one — a spinner that flashes
-    /// for a few frames reads as a glitch, not as progress.
-    @State private var showSpinner = false
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
     private var service: FilesBrowserService { filesBrowserService }
@@ -165,20 +161,19 @@ struct FilesBrowserView: View {
 
     // MARK: - Content
 
-    private enum ContentKind: Hashable { case permission, loading, blank, failed, empty, icons, list }
+    private enum ContentKind: Hashable { case permission, loading, failed, empty, icons, list }
 
     private var contentKind: ContentKind {
         let s = service
         if s.needsPermission { return .permission }
-        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return showSpinner ? .loading : .blank }
+        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return .loading }
         if s.loadFailed && s.displayedEntries.isEmpty { return .failed }
         if s.displayedEntries.isEmpty && s.hasLoadedOnce { return .empty }
         return viewMode == .grid ? .icons : .list
     }
 
-    /// The listing always comes fresh from the phone (a cached one showed a
-    /// folder's old contents before the real ones replaced them); the spinner
-    /// appears only when the phone takes longer than 350 ms.
+    /// The listing comes fresh from the phone; a small spinner shows at once
+    /// while it does (in the path bar when the folder is already on screen).
     private var content: some View {
         Group {
             switch contentKind {
@@ -195,9 +190,8 @@ struct FilesBrowserView: View {
                 }
             case .loading:
                 ProgressView()
+                    .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .blank:
-                Color.clear
             case .failed:
                 ContentUnavailableView {
                     Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
@@ -225,11 +219,6 @@ struct FilesBrowserView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transaction { $0.animation = nil }
-        .task(id: service.isLoading) {
-            guard service.isLoading else { showSpinner = false; return }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if !Task.isCancelled && service.isLoading { showSpinner = true }
-        }
     }
 
     // MARK: - List (Table)
@@ -329,6 +318,11 @@ struct FilesBrowserView: View {
             }
 
             Spacer()
+
+            // Refreshing a folder that is already on screen.
+            if service.isLoading && !service.displayedEntries.isEmpty {
+                ProgressView().controlSize(.small)
+            }
 
             if service.isPreviewPresented && service.previewURL == nil && !service.previewFailed {
                 Text(service.previewName)
