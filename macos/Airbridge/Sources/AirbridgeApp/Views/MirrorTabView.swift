@@ -158,7 +158,7 @@ struct MirrorTabView: View {
                 // be sent faster.
                 if slot == .forward { Text("120").tag(120) }
             } label: {
-                Text(L10n.isPL ? "klatki na sekundę" : "frame rate").padding(.leading, Self.subIndent)
+                Text(L10n.isPL ? "Klatki na sekundę" : "Frame rate").padding(.leading, Self.subIndent)
             }
             Picker(selection: bitrateBinding(slot)) {
                 Text(L10n.isPL ? "Automatyczna" : "Automatic").tag(0)
@@ -168,10 +168,10 @@ struct MirrorTabView: View {
                 Text("30 Mb/s").tag(30_000_000)
                 Text("40 Mb/s").tag(40_000_000)
             } label: {
-                Text(L10n.isPL ? "przepływność" : "bitrate").padding(.leading, Self.subIndent)
+                Text(L10n.isPL ? "Przepływność" : "Bitrate").padding(.leading, Self.subIndent)
             }
             Toggle(isOn: hevcBinding(slot)) {
-                Text(L10n.isPL ? "kodek HEVC (H.265)" : "HEVC (H.265) codec").padding(.leading, Self.subIndent)
+                Text(L10n.isPL ? "Kodek HEVC (H.265)" : "HEVC (H.265) codec").padding(.leading, Self.subIndent)
             }
         }
     }
