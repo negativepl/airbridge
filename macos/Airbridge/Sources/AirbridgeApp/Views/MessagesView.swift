@@ -105,23 +105,13 @@ struct MessagesView: View {
                 Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { smsService.loadConversations() }
             }
         } else {
-            // Liquid Glass tiles, the selected one tinted with the accent.
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(filteredConversations) { convo in
-                        Button { selectedId = convo.id } label: {
-                            ConversationRow(conversation: convo, isSelected: convo.id == selectedId, query: searchQuery)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(convo.id == selectedId ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
-                                     in: .rect(cornerRadius: 14, style: .continuous))
-                        .onAppear {
-                            if convo.id == smsService.conversations.last?.id { smsService.loadMoreConversations() }
-                        }
+            List(filteredConversations, selection: $selectedId) { convo in
+                ConversationRow(conversation: convo, isSelected: convo.id == selectedId, query: searchQuery)
+                    .onAppear {
+                        if convo.id == smsService.conversations.last?.id { smsService.loadMoreConversations() }
                     }
-                }
-                .padding(10)
             }
+            .listStyle(.inset)
             .overlay {
                 if !searchText.isEmpty && filteredConversations.isEmpty {
                     ContentUnavailableView.search(text: searchText)
@@ -174,9 +164,8 @@ struct MessagesView: View {
         .safeAreaBar(edge: .bottom) {
             if loaded { replyBar(convo) }
         }
-        // The conversation appears at once, at full size. Picked with a tap
-        // on a glass tile, the change rode the tile's animation and the
-        // bubbles grew in from nothing, clipped.
+        // The conversation appears at once, at full size, without riding
+        // the selection change's animation (bubbles grew in from nothing).
         .transaction { $0.animation = nil }
     }
 
@@ -283,19 +272,17 @@ struct MessagesView: View {
     }
 }
 
-/// A conversation tile: the unread dot, the contact symbol, the name with the
-/// date and two lines of the last message.
+/// A conversation in the list, as Messages draws one: the unread dot, the
+/// contact symbol, the name with the date and two lines of the last message.
 private struct ConversationRow: View {
     let conversation: SmsConversationMeta
     let isSelected: Bool
     let query: String
 
-    /// On the accent-tinted tile the text turns white, as in a selected row.
-    private var secondary: AnyShapeStyle { isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary) }
-
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Circle()
+                // White on the accent-coloured selection, where the tint would vanish.
                 .fill(conversation.unreadCount > 0
                       ? (isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.tint)) : AnyShapeStyle(.clear))
                 .frame(width: 8, height: 8)
@@ -303,28 +290,24 @@ private struct ConversationRow: View {
             Image(systemName: "person.crop.circle.fill")
                 .resizable()
                 .frame(width: 36, height: 36)
-                .foregroundStyle(secondary)
+                .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(SearchHighlight.text(conversation.displayName, query))
                         .font(.headline)
-                        .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(Self.dateText(conversation.date))
                         .font(.caption)
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(.secondary)
                 }
                 Text(SearchHighlight.text(conversation.snippet, query))
                     .font(.subheadline)
-                    .foregroundStyle(secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect)
+        .padding(.vertical, 4)
     }
 
     /// Time today, "Wczoraj", the weekday within a week, else the date.
