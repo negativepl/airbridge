@@ -13,14 +13,10 @@ struct MirrorTabView: View {
     var body: some View {
         Group {
             if !connectionService.isConnected {
-                EmptyStateContainer {
-                    EmptyStateView(
-                        systemImage: "iphone.gen3.radiowaves.left.and.right",
-                        title: L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing",
-                        subtitle: L10n.isPL
-                            ? "Połącz się z telefonem, aby udostępnić jego ekran."
-                            : "Connect to your phone to mirror its screen."
-                    )
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Brak połączenia" : "Not Connected", systemImage: "wifi.slash")
+                } description: {
+                    Text(L10n.isPL ? "Połącz się z telefonem, aby udostępniać ekran." : "Connect to your phone to share screens.")
                 }
             } else if mirrorService.isStreaming {
                 if mirrorService.presentedInWindow {
@@ -37,20 +33,16 @@ struct MirrorTabView: View {
     }
 
     private var poppedOutView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "rectangle.on.rectangle",
-                title: L10n.isPL ? "Udostępnianie w osobnym oknie" : "Sharing in a separate window",
-                subtitle: L10n.isPL
-                    ? "Stream odtwarza się w wydzielonym oknie."
-                    : "The stream is playing in its own window."
-            ) {
-                Button(L10n.isPL ? "Pokaż tutaj" : "Show here") {
-                    dismissWindow(id: "mirror")
-                }
+        ContentUnavailableView {
+            Label(L10n.isPL ? "Udostępnianie w osobnym oknie" : "Sharing in a Separate Window",
+                  systemImage: "macwindow.on.rectangle")
+        } description: {
+            Text(L10n.isPL ? "Ekran telefonu jest wyświetlany w osobnym oknie." : "The phone's screen is showing in its own window.")
+        } actions: {
+            Button(L10n.isPL ? "Pokaż tutaj" : "Show Here") { dismissWindow(id: "mirror") }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-            }
+                .buttonBorderShape(.capsule)
         }
     }
 
@@ -81,148 +73,100 @@ struct MirrorTabView: View {
 
     // MARK: - Start / settings
 
+    /// The three modes as System Settings lays out a pane: a grouped form,
+    /// one section per mode with its Start button, the one setting people
+    /// understand on show and the encoder's knobs under "Advanced" (Sidecar
+    /// shows none of them).
     private var startView: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                mirrorOptionCard(
-                    slot: .forward,
-                    icon: "iphone.gen3.radiowaves.left.and.right",
-                    title: L10n.isPL ? "Udostępnianie ekranu" : "Screen Sharing",
-                    subtitle: L10n.isPL
-                        ? "Udostępnij ekran telefonu i steruj nim klikając."
-                        : "Mirror your phone screen and control it by clicking.",
-                    showResolution: true,
-                    action: { start() }
-                )
-
-                mirrorOptionCard(
-                    slot: .reverseMirror,
-                    icon: "macbook.and.iphone",
-                    title: L10n.isPL ? "Mój ekran na telefonie" : "My Screen on Phone",
-                    subtitle: L10n.isPL
-                        ? "Lustro głównego ekranu Maca."
-                        : "Mirror this Mac's main screen.",
-                    showResolution: false,
-                    action: { startReverse(mode: 0) }
-                )
-
-                mirrorOptionCard(
-                    slot: .reverseVirtual,
-                    icon: "rectangle.portrait.on.rectangle.portrait.angled",
-                    title: L10n.isPL ? "Telefon jako drugi monitor" : "Phone as Second Display",
-                    subtitle: L10n.isPL
-                        ? "Dodatkowy pulpit dopasowany do ekranu telefonu — pełny ekran, bez pasów."
-                        : "An extra desktop shaped to the phone — full screen, no bars.",
-                    showUIScale: true,
-                    action: { startReverse(mode: 1) }
-                )
+        Form {
+            modeSection(
+                slot: .forward,
+                icon: "iphone.gen3.radiowaves.left.and.right",
+                title: L10n.isPL ? "Ekran telefonu na Macu" : "Phone Screen on Mac",
+                subtitle: L10n.isPL ? "Wyświetl ekran telefonu i steruj nim klikając." : "Show the phone's screen and control it by clicking.",
+                action: { start() }
+            ) {
+                Picker(L10n.isPL ? "Rozdzielczość" : "Resolution", selection: scaleBinding(.forward, choices: [1.0, 0.75, 0.5])) {
+                    Text(L10n.isPL ? "Pełna" : "Full").tag(1.0)
+                    Text("75%").tag(0.75)
+                    Text("50%").tag(0.5)
+                }
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            modeSection(
+                slot: .reverseMirror,
+                icon: "macbook.and.iphone",
+                title: L10n.isPL ? "Ekran Maca na telefonie" : "Mac Screen on Phone",
+                subtitle: L10n.isPL ? "Lustro głównego ekranu Maca." : "Mirror this Mac's main screen.",
+                action: { startReverse(mode: 0) }
+            ) {
+                EmptyView()
+            }
+
+            modeSection(
+                slot: .reverseVirtual,
+                icon: "rectangle.portrait.on.rectangle.portrait.angled",
+                title: L10n.isPL ? "Telefon jako drugi monitor" : "Phone as Second Display",
+                subtitle: L10n.isPL ? "Dodatkowy pulpit dopasowany do ekranu telefonu." : "An extra desktop shaped to the phone's screen.",
+                action: { startReverse(mode: 1) }
+            ) {
+                // Named as in System Settings › Displays.
+                Picker(L10n.isPL ? "Wielkość interfejsu" : "Interface Size", selection: scaleBinding(.reverseVirtual, choices: [0.8, 1.0, 1.4])) {
+                    Text(L10n.isPL ? "Większy tekst" : "Larger Text").tag(0.8)
+                    Text(L10n.isPL ? "Standardowa" : "Default").tag(1.0)
+                    Text(L10n.isPL ? "Więcej miejsca" : "More Space").tag(1.4)
+                }
+            }
         }
+        .formStyle(.grouped)
     }
 
-    /// One launch option in the Mirror tab — icon, CTA, and its own quality
-    /// settings (each mode keeps independent settings).
-    private func mirrorOptionCard(
+    /// One mode: icon, name and a line of explanation with Start on the
+    /// right, its own settings below, the encoder's under "Advanced".
+    private func modeSection<Settings: View>(
         slot: MirrorSlot,
         icon: String,
         title: String,
         subtitle: String,
-        showResolution: Bool = false,
-        showUIScale: Bool = false,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        @ViewBuilder settings: () -> Settings
     ) -> some View {
-        GlassSection {
-            VStack(spacing: 14) {
-                HStack(spacing: 14) {
-                    Image(systemName: icon)
-                        .font(.system(size: 26))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 36, height: 36)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(title)
-                            .font(.ab(.headline, weight: .semibold))
-                        Text(subtitle)
-                            .font(.ab(.subheadline))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    Button(L10n.isPL ? "Rozpocznij" : "Start", action: action)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.extraLarge)
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text(subtitle).foregroundStyle(.secondary)
                 }
-
-                Divider().opacity(0.4)
-
-                qualityControls(slot: slot, showResolution: showResolution, showUIScale: showUIScale)
+                Spacer()
+                Button(L10n.isPL ? "Rozpocznij" : "Start", action: action)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .buttonBorderShape(.capsule)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func qualityControls(slot: MirrorSlot, showResolution: Bool, showUIScale: Bool) -> some View {
-        VStack(spacing: 10) {
-            settingRow(L10n.isPL ? "Klatki" : "Frame rate") {
-                Picker("", selection: fpsBinding(slot)) {
-                    Text("30 FPS").tag(30)
-                    Text("60 FPS").tag(60)
+            .padding(.vertical, 4)
+            settings()
+            DisclosureGroup(L10n.isPL ? "Zaawansowane" : "Advanced") {
+                Picker(L10n.isPL ? "Klatki na sekundę" : "Frame Rate", selection: fpsBinding(slot)) {
+                    Text("30").tag(30)
+                    Text("60").tag(60)
                     // The Mac side captures at 60 Hz at most (the virtual
                     // display runs at 60 Hz), so only the phone's screen can
                     // be sent faster.
-                    if slot == .forward {
-                        Text("120 FPS").tag(120)
-                    }
+                    if slot == .forward { Text("120").tag(120) }
                 }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-
-            if showResolution {
-                settingRow(L10n.isPL ? "Rozdzielczość" : "Resolution") {
-                    Picker("", selection: scaleBinding(slot, choices: [1.0, 0.75, 0.5])) {
-                        Text(L10n.isPL ? "Pełna" : "Full").tag(1.0)
-                        Text("75%").tag(0.75)
-                        Text("50%").tag(0.5)
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
+                Picker(L10n.isPL ? "Przepływność" : "Bitrate", selection: bitrateBinding(slot)) {
+                    Text(L10n.isPL ? "Automatyczna" : "Automatic").tag(0)
+                    Text("8 Mb/s").tag(8_000_000)
+                    Text("12 Mb/s").tag(12_000_000)
+                    Text("20 Mb/s").tag(20_000_000)
+                    Text("30 Mb/s").tag(30_000_000)
+                    Text("40 Mb/s").tag(40_000_000)
                 }
-            }
-
-            if showUIScale {
-                settingRow(L10n.isPL ? "Skala UI" : "UI scale") {
-                    Picker("", selection: scaleBinding(slot, choices: [0.8, 1.0, 1.4])) {
-                        Text(L10n.isPL ? "Większe UI" : "Bigger UI").tag(0.8)
-                        Text(L10n.isPL ? "Standard" : "Standard").tag(1.0)
-                        Text(L10n.isPL ? "Więcej miejsca" : "More space").tag(1.4)
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
-                }
-            }
-
-            settingRow("Bitrate") {
-                Picker("", selection: bitrateBinding(slot)) {
-                    Text("Auto").tag(0)
-                    Text("8 Mbps").tag(8_000_000)
-                    Text("12 Mbps").tag(12_000_000)
-                    Text("20 Mbps").tag(20_000_000)
-                    Text("30 Mbps").tag(30_000_000)
-                    Text("40 Mbps").tag(40_000_000)
-                }
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-
-            settingRow(L10n.isPL ? "HEVC (H.265)" : "HEVC (H.265)") {
-                Toggle("", isOn: hevcBinding(slot))
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
+                Toggle(L10n.isPL ? "Kodek HEVC (H.265)" : "HEVC (H.265) Codec", isOn: hevcBinding(slot))
             }
         }
     }
@@ -264,22 +208,6 @@ struct MirrorTabView: View {
             get: { mirrorService.quality(slot).useHEVC },
             set: { var q = mirrorService.quality(slot); q.useHEVC = $0; mirrorService.setQuality(slot, q) }
         )
-    }
-
-    private func settingRow<Control: View>(_ label: String, @ViewBuilder _ control: () -> Control) -> some View {
-        HStack {
-            Text(label).font(.ab(.body)).foregroundStyle(.secondary)
-            Spacer()
-            control().labelsHidden()
-        }
-    }
-
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).font(.ab(.body)).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.ab(.body)).monospacedDigit()
-        }
     }
 
     // MARK: - Actions
