@@ -25,11 +25,14 @@ struct MessagesView: View {
                     Text(L10n.isPL ? "Połącz się z telefonem, aby przeglądać wiadomości." : "Connect to your phone to browse messages.")
                 }
             } else {
-                HSplitView {
+                // Fixed list width: a split view sized itself to the selected
+                // conversation, and long bubbles pushed the list narrower.
+                HStack(spacing: 0) {
                     conversationList
-                        .frame(minWidth: 240, idealWidth: 320, maxWidth: 480)
+                        .frame(width: 320)
+                    Divider()
                     detail
-                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .searchable(text: $searchText, placement: .toolbar,
                             prompt: L10n.isPL ? "Szukaj w wiadomościach" : "Search messages")
@@ -42,6 +45,7 @@ struct MessagesView: View {
                 ToolbarItem(placement: .primaryAction) {
                     ProgressView().controlSize(.small)
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .navigationSubtitle(subtitle)
@@ -169,7 +173,9 @@ struct MessagesView: View {
             .onChange(of: smsService.currentMessages.first?.id) { _, newest in
                 if let newest { proxy.scrollTo(newest, anchor: .bottom) }
             }
-            .safeAreaInset(edge: .bottom) {
+            // A Liquid Glass bar: the conversation scrolls under it and the
+            // system's scroll edge effect keeps the field legible.
+            .safeAreaBar(edge: .bottom) {
                 replyBar(convo)
             }
         }
@@ -181,29 +187,33 @@ struct MessagesView: View {
             Text(L10n.isPL ? "Nie można odpowiedzieć na tę wiadomość." : "You can't reply to this message.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .glassEffect(in: .capsule)
                 .frame(maxWidth: .infinity)
                 .padding(12)
         } else {
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 10) {
                 TextField(L10n.isPL ? "Wiadomość SMS" : "Text Message", text: $messageText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...6)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(Capsule().strokeBorder(.separator))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(in: .rect(cornerRadius: 20, style: .continuous))
                     .onSubmit { send(to: convo) }
                 Button { send(to: convo) } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(.tint)
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
                 .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .help(L10n.isPL ? "Wyślij" : "Send")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(.bar)
         }
     }
 
@@ -292,7 +302,7 @@ private struct MessageBubble: View {
 
     var body: some View {
         HStack {
-            if isSent { Spacer(minLength: 80) }
+            if isSent { Spacer(minLength: 0) }
             Text(message.body)
                 .textSelection(.enabled)
                 .foregroundStyle(isSent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
@@ -300,9 +310,14 @@ private struct MessageBubble: View {
                 .padding(.vertical, 9)
                 .background(isSent ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.secondary),
                             in: .rect(cornerRadius: 19, style: .continuous))
+                // At most ~3/4 of the conversation's width, as Messages: a
+                // long text wraps there, a short one keeps its own width.
+                .containerRelativeFrame(.horizontal, alignment: isSent ? .trailing : .leading) { width, _ in
+                    width * 0.72
+                }
                 .help(message.date == 0 ? "" : Date(timeIntervalSince1970: TimeInterval(message.date) / 1000)
                     .formatted(date: .abbreviated, time: .shortened))
-            if !isSent { Spacer(minLength: 80) }
+            if !isSent { Spacer(minLength: 0) }
         }
     }
 }
