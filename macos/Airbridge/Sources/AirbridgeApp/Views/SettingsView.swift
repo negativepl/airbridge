@@ -42,7 +42,9 @@ struct SettingsView: View {
 
     var body: some View {
         let vm = viewModel
-        VStack(spacing: 16) {
+        // System Settings' layout: a grouped form, a section per topic with
+        // its explanation in the footer, standard controls.
+        Form {
             pairedDevicesSection(vm)
             generalSection
             headphoneSection
@@ -54,6 +56,7 @@ struct SettingsView: View {
             }
             AboutSection(updateService: updateService, phoneAppVersion: connectionService.deviceInfo?.appVersion)
         }
+        .formStyle(.grouped)
         .onAppear {
             pairingService.refreshPairedDevices()
             accessibilityGranted = AXIsProcessTrusted()
@@ -103,93 +106,72 @@ struct SettingsView: View {
         }
     }
 
+    /// Indent of the options under a "Heading:" row, as System Settings.
+    private static let subIndent: CGFloat = 20
+
     private func pairedDevicesSection(_ vm: SettingsViewModel) -> some View {
-        GlassSection(
-            title: LocalizedStringKey(L10n.isPL ? "Sparowane urządzenia" : "Paired Devices"),
-            systemImage: "iphone"
-        ) {
+        Section {
             if vm.pairedDevices.isEmpty {
-                HStack(spacing: 12) {
-                    Text(L10n.noDevicePaired)
-                        .font(.ab(.body))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    addDeviceButton
-                }
+                Text(L10n.noDevicePaired).foregroundStyle(.secondary)
             } else {
                 ForEach(vm.pairedDevices, id: \.publicKeyBase64) { device in
-                    HStack(spacing: 12) {
-                        Image(systemName: "iphone")
-                            .font(.ab(.title3))
-                            .foregroundStyle(Color.accentColor)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(device.deviceName)
-                                .font(.ab(.body, weight: .medium))
-                            Text(device.pairedAt, style: .date)
-                                .font(.ab(.footnote))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(L10n.isPL ? "Usuń" : "Remove", role: .destructive) {
+                    LabeledContent {
+                        Button(L10n.isPL ? "Usuń…" : "Remove…", role: .destructive) {
                             vm.unpairDevice(publicKey: device.publicKeyBase64)
                         }
-                        .controlSize(.extraLarge)
+                    } label: {
+                        Label {
+                            Text(device.deviceName)
+                            Text(L10n.isPL ? "Sparowano \(device.pairedAt.formatted(date: .long, time: .omitted))"
+                                           : "Paired \(device.pairedAt.formatted(date: .long, time: .omitted))")
+                        } icon: {
+                            Image(systemName: "smartphone")
+                        }
                     }
                 }
-                HStack {
-                    Spacer()
-                    addDeviceButton
-                }
+            }
+        } header: {
+            Text(L10n.isPL ? "Sparowane urządzenia" : "Paired Devices")
+        } footer: {
+            HStack {
+                Spacer()
+                Button(L10n.isPL ? "Dodaj urządzenie…" : "Add Device…") { showPairing = true }
             }
         }
-    }
-
-    private var addDeviceButton: some View {
-        Button(L10n.isPL ? "Dodaj nowe urządzenie" : "Add New Device") {
-            showPairing = true
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.extraLarge)
     }
 
     private var notificationsSection: some View {
-        GlassSection {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    SectionHeader(title: LocalizedStringKey(L10n.isPL ? "Powiadomienia" : "Notifications"),
-                                  systemImage: "bell.badge")
-                    Text(L10n.isPL ? "Powiadomienia pojawiają się na żywo, w miarę jak telefon je otrzymuje."
-                                   : "Notifications appear live, as your phone receives them.")
-                        .font(.ab(.subheadline)).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Toggle("", isOn: Binding(
-                    get: { notificationService.enabled },
-                    set: { notificationService.setEnabled($0) }
-                ))
-                .toggleStyle(.switch)
-                .labelsHidden()
-            }
-
-            if notificationService.knownApps.isEmpty {
-                Text(L10n.isPL ? "Powiadomienia pojawią się tu, gdy telefon je przyśle."
-                               : "Apps will appear here once the phone sends notifications.")
-                    .font(.ab(.subheadline)).foregroundStyle(.secondary)
-            } else {
+        Section {
+            Toggle(L10n.isPL ? "Pokazuj powiadomienia z telefonu" : "Show notifications from the phone", isOn: Binding(
+                get: { notificationService.enabled },
+                set: { notificationService.setEnabled($0) }
+            ))
+            if !notificationService.knownApps.isEmpty {
+                Text(L10n.isPL ? "Aplikacje:" : "Apps:")
                 ForEach(notificationService.knownApps.sorted { $0.value < $1.value }, id: \.key) { pkg, name in
-                    Toggle(name, isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { !notificationService.disabledApps.contains(pkg) },
                         set: { notificationService.setAppEnabled(pkg, $0) }
-                    ))
-                    .font(.ab(.body))
+                    )) {
+                        Text(name).padding(.leading, Self.subIndent)
+                    }
                     .disabled(!notificationService.enabled)
                 }
             }
+        } header: {
+            Text(L10n.isPL ? "Powiadomienia" : "Notifications")
+        } footer: {
+            Text(notificationService.knownApps.isEmpty
+                 ? (L10n.isPL ? "Aplikacje pojawią się tutaj, gdy telefon przyśle od nich powiadomienia."
+                              : "Apps appear here once the phone sends their notifications.")
+                 : (L10n.isPL ? "Powiadomienia pojawiają się na bieżąco, gdy telefon je otrzymuje."
+                              : "Notifications appear live, as the phone receives them."))
+                .foregroundStyle(.secondary)
         }
     }
 
     private var generalSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.general), systemImage: "gearshape") {
+        Section {
             Toggle(L10n.launchAtLogin, isOn: Binding(
                 get: { launchAtLogin },
                 set: { newValue in
@@ -204,21 +186,8 @@ struct SettingsView: View {
                     }
                 }
             ))
-            .font(.ab(.body))
-
-            if let launchAtLoginError {
-                Text(L10n.isPL ? "Nie udało się ustawić autostartu: \(launchAtLoginError)"
-                               : "Couldn't set launch at login: \(launchAtLoginError)")
-                    .font(.ab(.caption))
-                    .foregroundStyle(.red)
-            }
-
             Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
-                .font(.ab(.body))
-
             Toggle(L10n.clipboardReceiptSetting, isOn: $clipboardReceipt)
-                .font(.ab(.body))
-
             Toggle(L10n.isPL ? "Pokaż w Docku" : "Show in Dock", isOn: Binding(
                 get: { showInDock },
                 set: { newValue in
@@ -226,21 +195,25 @@ struct SettingsView: View {
                     NSApp.setActivationPolicy(newValue ? .regular : .accessory)
                 }
             ))
-            .font(.ab(.body))
+        } header: {
+            Text(L10n.general)
+        } footer: {
+            if let launchAtLoginError {
+                Text(L10n.isPL ? "Nie udało się ustawić autostartu: \(launchAtLoginError)"
+                               : "Couldn't set launch at login: \(launchAtLoginError)")
+                    .foregroundStyle(.red)
+            }
         }
     }
 
     private var headphoneSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Słuchawki (beta)" : "Headphones (beta)"),
-                     systemImage: "headphones") {
+        Section {
             Toggle(L10n.isPL ? "Przełączanie słuchawek" : "Headphone handoff", isOn: Binding(
                 get: { bluetoothAudio.enabled },
                 set: { bluetoothAudio.enabled = $0 }
             ))
-            .font(.ab(.body))
-
             if bluetoothAudio.enabled {
-                Picker(L10n.isPL ? "Słuchawki:" : "Headphones:", selection: Binding(
+                Picker(L10n.isPL ? "Słuchawki" : "Headphones", selection: Binding(
                     get: { bluetoothAudio.selectedAddress ?? "" },
                     set: { address in
                         bluetoothAudio.selectedAddress = address.isEmpty ? nil : address
@@ -248,161 +221,117 @@ struct SettingsView: View {
                             pairedAudio.first(where: { $0.address == address })?.name
                     }
                 )) {
-                    Text(L10n.isPL ? "Nie wybrano" : "Not selected").tag("")
+                    Text(L10n.isPL ? "Nie wybrano" : "Not Selected").tag("")
                     ForEach(pairedAudio) { device in
                         Text(device.name).tag(device.address)
                     }
                 }
-                .font(.ab(.body))
-
-                Text(L10n.isPL
-                    ? "Słuchawki muszą być sparowane zarówno z tym Makiem, jak i z telefonem."
-                    : "The headphones must be paired with both this Mac and the phone.")
-                    .font(.ab(.caption))
-                    .foregroundStyle(.secondary)
-
                 Toggle(L10n.isPL ? "Proponuj przełączanie" : "Suggest switching", isOn: Binding(
                     get: { bluetoothAudio.autoSwitchEnabled },
                     set: { bluetoothAudio.autoSwitchEnabled = $0 }
                 ))
-                .font(.ab(.body))
-                Text(L10n.isPL ? "Pytaj przed przeniesieniem słuchawek na urządzenie, które zaczyna odtwarzać." : "Ask before moving the headphones to the device that starts playing.")
-                    .font(.ab(.caption))
-                    .foregroundStyle(.secondary)
             }
+        } header: {
+            Text(L10n.isPL ? "Słuchawki (beta)" : "Headphones (beta)")
+        } footer: {
+            Text(bluetoothAudio.enabled
+                 ? (L10n.isPL ? "Słuchawki muszą być sparowane z tym Makiem i z telefonem. Proponowanie przełączania pyta przed przeniesieniem słuchawek na urządzenie, które zaczyna odtwarzać."
+                              : "The headphones must be paired with this Mac and the phone. Suggest switching asks before moving them to the device that starts playing.")
+                 : (L10n.isPL ? "Przenosi słuchawki Bluetooth między telefonem a tym Makiem."
+                              : "Moves Bluetooth headphones between the phone and this Mac."))
+                .foregroundStyle(.secondary)
         }
         .task { pairedAudio = await BluetoothAudioService.pairedAudioDevices() }
     }
 
     private var quickDropSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.quickDropShortcut), systemImage: "keyboard") {
-            HStack {
-                Text(L10n.isPL ? "Dostępność:" : "Accessibility:")
-                    .font(.ab(.body))
-                Spacer()
-                HStack(spacing: 6) {
-                    StatusIndicator(state: accessibilityGranted ? .connected : .error, size: 12)
-                    Text(accessibilityGranted
-                        ? (L10n.isPL ? "Nadane" : "Granted")
-                        : (L10n.isPL ? "Brak uprawnień" : "Not granted"))
-                        .font(.ab(.body))
-                }
-                if !accessibilityGranted && accessibilityAwaitingRestart {
-                    // AXIsProcessTrusted() is cached per-process — a freshly granted
-                    // Accessibility permission only applies after a relaunch.
-                    Button(L10n.isPL ? "Zrestartuj, aby zastosować" : "Restart to apply") {
-                        AppRelauncher.relaunch()
+        Section {
+            LabeledContent(L10n.isPL ? "Dostęp do Dostępności" : "Accessibility Access") {
+                HStack(spacing: 10) {
+                    Label {
+                        Text(accessibilityGranted ? (L10n.isPL ? "Nadany" : "Granted")
+                                                  : (L10n.isPL ? "Nie nadano" : "Not Granted"))
+                    } icon: {
+                        Image(systemName: "circle.fill")
+                            .imageScale(.small)
+                            .foregroundStyle(accessibilityGranted ? .green : .red)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.extraLarge)
-                } else if !accessibilityGranted {
-                    Button(L10n.isPL ? "Nadaj" : "Grant") {
-                        hotkeyService.requestAccessibilityAndStart()
-                        accessibilityAwaitingRestart = true
-                        startAccessibilityPolling()
+                    if !accessibilityGranted && accessibilityAwaitingRestart {
+                        // AXIsProcessTrusted() is cached per-process — a freshly granted
+                        // Accessibility permission only applies after a relaunch.
+                        Button(L10n.isPL ? "Uruchom ponownie" : "Relaunch") { AppRelauncher.relaunch() }
+                    } else if !accessibilityGranted {
+                        Button(L10n.isPL ? "Nadaj…" : "Grant…") {
+                            hotkeyService.requestAccessibilityAndStart()
+                            accessibilityAwaitingRestart = true
+                            startAccessibilityPolling()
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.extraLarge)
                 }
             }
-
-            Text(L10n.isPL
-                ? "Skrót działa globalnie tylko z uprawnieniami Dostępności."
-                : "The shortcut works globally only with Accessibility permission.")
-                .font(.ab(.footnote))
+            LabeledContent(L10n.isPL ? "Skrót" : "Shortcut") {
+                HStack(spacing: 10) {
+                    if isRecordingShortcut {
+                        Text(L10n.pressNewShortcut)
+                            .foregroundStyle(.secondary)
+                            .onAppear { startRecordingShortcut() }
+                    } else {
+                        Text(shortcutDisplay).monospaced()
+                    }
+                    Button(isRecordingShortcut ? (L10n.isPL ? "Anuluj" : "Cancel") : L10n.change) {
+                        isRecordingShortcut.toggle()
+                        if !isRecordingShortcut { stopRecordingShortcut() }
+                    }
+                    if UserDefaults.standard.integer(forKey: "dropZoneShortcutKeyCode") != 0 {
+                        Button(L10n.resetToDefault) {
+                            UserDefaults.standard.removeObject(forKey: "dropZoneShortcutKeyCode")
+                            UserDefaults.standard.removeObject(forKey: "dropZoneShortcutModifiers")
+                            shortcutDisplay = GlobalHotkeyService.currentShortcutDisplay()
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text(L10n.quickDropShortcut)
+        } footer: {
+            Text(L10n.isPL ? "Skrót działa w całym systemie tylko z dostępem do Dostępności."
+                           : "The shortcut works system-wide only with Accessibility access.")
                 .foregroundStyle(.secondary)
-
-            Divider()
-
-            HStack {
-                Text(L10n.isPL ? "Skrót:" : "Shortcut:")
-                    .font(.ab(.body))
-                Spacer()
-
-                if isRecordingShortcut {
-                    Text(L10n.pressNewShortcut)
-                        .font(.ab(.body))
-                        .foregroundStyle(.orange)
-                        .onAppear { startRecordingShortcut() }
-                } else {
-                    Text(shortcutDisplay)
-                        .font(.ab(.body, design: .monospaced))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .glassEffect(.regular, in: .capsule)
-                }
-
-                Button(isRecordingShortcut
-                    ? (L10n.isPL ? "Anuluj" : "Cancel")
-                    : L10n.change
-                ) {
-                    isRecordingShortcut.toggle()
-                    if !isRecordingShortcut { stopRecordingShortcut() }
-                }
-                .controlSize(.extraLarge)
-
-                if UserDefaults.standard.integer(forKey: "dropZoneShortcutKeyCode") != 0 {
-                    Button(L10n.resetToDefault) {
-                        UserDefaults.standard.removeObject(forKey: "dropZoneShortcutKeyCode")
-                        UserDefaults.standard.removeObject(forKey: "dropZoneShortcutModifiers")
-                        shortcutDisplay = GlobalHotkeyService.currentShortcutDisplay()
-                    }
-                    .controlSize(.extraLarge)
-                }
-            }
         }
     }
 
     private var fileTransferSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.fileTransfer), systemImage: "folder") {
-            HStack {
-                Text(L10n.downloadFolder)
-                    .font(.ab(.body))
-                Spacer()
-                Text(downloadFolder)
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Button(L10n.change) { chooseDownloadFolder() }
-                    .controlSize(.extraLarge)
+        Section {
+            LabeledContent(L10n.isPL ? "Folder pobierania" : "Download Folder") {
+                HStack(spacing: 10) {
+                    Text(downloadFolder)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button(L10n.change) { chooseDownloadFolder() }
+                }
             }
-
-            Text(L10n.receivedFilesSaved)
-                .font(.ab(.footnote))
-                .foregroundStyle(.secondary)
+        } header: {
+            Text(L10n.fileTransfer)
+        } footer: {
+            Text(L10n.receivedFilesSaved).foregroundStyle(.secondary)
         }
     }
 
     private var diagnosticsSection: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "Diagnostyka" : "Diagnostics"),
-                     systemImage: "doc.text.magnifyingglass") {
-            HStack {
-                Text(L10n.isPL
-                     ? "Zapisz plik tekstowy z wersją aplikacji, stanem połączenia i ostatnimi wpisami dziennika. Plik pozostaje na tym Macu — nic nie jest wysyłane."
-                     : "Save a text file with the app version, connection state, and recent log entries. The file stays on this Mac — nothing is uploaded.")
-                    .font(.ab(.body))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(L10n.isPL ? "Zapisz raport diagnostyczny" : "Save diagnostic report") {
-                    saveDiagnosticReport()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
+        Section {
+            LabeledContent(L10n.isPL ? "Raport diagnostyczny" : "Diagnostic Report") {
+                Button(L10n.isPL ? "Zapisz…" : "Save…") { saveDiagnosticReport() }
             }
-            Divider()
-            HStack {
-                Text(L10n.isPL
-                     ? "Ukrywa tę sekcję. Aby ją przywrócić, kliknij numer wersji w sekcji O aplikacji siedem razy."
-                     : "Hides this section. Click the version number in About seven times to bring it back.")
-                    .font(.ab(.footnote))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(L10n.isPL ? "Ukryj diagnostykę" : "Hide diagnostics") {
-                    diagnosticsUnlocked = false
-                }
-                .controlSize(.large)
+            LabeledContent(L10n.isPL ? "Sekcja diagnostyki" : "Diagnostics Section") {
+                Button(L10n.isPL ? "Ukryj" : "Hide") { diagnosticsUnlocked = false }
             }
+        } header: {
+            Text(L10n.isPL ? "Diagnostyka" : "Diagnostics")
+        } footer: {
+            Text(L10n.isPL
+                 ? "Raport to plik tekstowy z wersją aplikacji, stanem połączenia i ostatnimi wpisami dziennika. Zostaje na tym Macu i nie jest nigdzie wysyłany. Aby przywrócić ukrytą sekcję, kliknij siedem razy numer wersji w sekcji O aplikacji."
+                 : "The report is a text file with the app version, connection state and recent log entries. It stays on this Mac and is not uploaded. To bring the hidden section back, click the version number in About seven times.")
+                .foregroundStyle(.secondary)
         }
     }
 

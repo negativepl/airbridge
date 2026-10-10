@@ -66,7 +66,7 @@ struct MainWindow: View {
             }
 
             Tab(NavigationItem.settings.title, systemImage: "gearshape.fill", value: .settings) {
-                ScreenContainer {
+                ScreenContainer(scroll: false) {
                     SettingsView(
                         connectionService: connectionService,
                         pairingService: pairingService,

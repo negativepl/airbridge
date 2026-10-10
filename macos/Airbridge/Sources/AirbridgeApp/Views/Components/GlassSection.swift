@@ -49,19 +49,3 @@ struct GlassSection<Content: View>: View {
         .contentCard(cornerRadius: cornerRadius)
     }
 }
-
-/// Compact unnamed content row for lists (history, conversations, gallery tiles).
-///
-/// Smaller padding and a tighter 12pt continuous corner.
-struct GlassRow<Content: View>: View {
-    var padding: CGFloat = 12
-    var cornerRadius: CGFloat = 12
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentCard(cornerRadius: cornerRadius)
-    }
-}

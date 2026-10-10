@@ -20,43 +20,39 @@ struct AboutSection: View {
     @State private var hintReset: Task<Void, Never>?
 
     var body: some View {
-        GlassSection(title: LocalizedStringKey(L10n.isPL ? "O aplikacji" : "About"), systemImage: "info.circle") {
-            VStack(alignment: .leading, spacing: 0) {
+        Section {
+            creditRow(
+                image: loadBundledImage("logo_negative"),
+                fallback: "person.circle.fill",
+                caption: L10n.isPL ? "Szef projektu" : "Project lead",
+                name: "Marcin Baszewski",
+                url: "https://github.com/negativepl"
+            )
+            ForEach(ClaudeTeam.members, id: \.name) { member in
                 creditRow(
-                    image: loadBundledImage("logo_negative"),
-                    fallback: "person.circle.fill",
-                    caption: L10n.isPL ? "Szef projektu" : "Project lead",
-                    name: "Marcin Baszewski",
-                    url: "https://github.com/negativepl"
+                    image: loadBundledImage("logo_claude"),
+                    fallback: "sparkles",
+                    caption: member.role,
+                    name: member.name,
+                    url: "https://anthropic.com"
                 )
-                ForEach(ClaudeTeam.members, id: \.name) { member in
-                    Divider().padding(.vertical, 8)
-                    creditRow(
-                        image: loadBundledImage("logo_claude"),
-                        fallback: "sparkles",
-                        caption: member.role,
-                        name: member.name,
-                        url: "https://anthropic.com"
-                    )
-                }
-                Divider().padding(.vertical, 8)
-                linkRow(
-                    systemImage: "curlybraces",
-                    title: L10n.isPL ? "Kod źródłowy" : "Source code",
-                    url: "https://github.com/negativepl/airbridge"
-                )
-                Divider().padding(.vertical, 8)
-                linkRow(
-                    systemImage: "ladybug",
-                    title: L10n.isPL ? "Zgłoś błąd" : "Report an issue",
-                    url: "https://github.com/negativepl/airbridge/issues"
-                )
-                Divider().padding(.vertical, 8)
-                updateRow
-                updateDetails
-                Divider().padding(.vertical, 8)
-                footer
             }
+            linkRow(
+                systemImage: "curlybraces",
+                title: L10n.isPL ? "Kod źródłowy" : "Source code",
+                url: "https://github.com/negativepl/airbridge"
+            )
+            linkRow(
+                systemImage: "ladybug",
+                title: L10n.isPL ? "Zgłoś błąd" : "Report an issue",
+                url: "https://github.com/negativepl/airbridge/issues"
+            )
+            updateRow
+            updateDetails
+        } header: {
+            Text(L10n.isPL ? "O aplikacji" : "About")
+        } footer: {
+            footer
         }
     }
 
@@ -75,11 +71,11 @@ struct AboutSection: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.ab(.body, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 Text(L10n.isPL ? "Sprawdź aktualizacje" : "Check for updates")
-                    .font(.ab(.body))
+                    .font(.body)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
                 updateRowTrailing
@@ -95,7 +91,7 @@ struct AboutSection: View {
     private var updateRowTrailing: some View {
         if !UpdateService.isAvailable {
             Text(L10n.isPL ? "Tymczasowo niedostępne" : "Temporarily unavailable")
-                .font(.ab(.caption, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         } else {
             updatePhaseTrailing
@@ -115,13 +111,13 @@ struct AboutSection: View {
 
         case .upToDate:
             Label(L10n.isPL ? "Masz najnowszą wersję" : "Up to date", systemImage: "checkmark.circle.fill")
-                .font(.ab(.caption, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
                 .labelStyle(.titleAndIcon)
 
         case .available(let manifest):
             Text(L10n.isPL ? "Dostępna: \(manifest.version)" : "Available: \(manifest.version)")
-                .font(.ab(.caption, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.accentColor)
 
         case .downloading, .installing:
@@ -130,7 +126,7 @@ struct AboutSection: View {
 
         case .failed:
             Label(L10n.isPL ? "Spróbuj ponownie" : "Retry", systemImage: "exclamationmark.triangle.fill")
-                .font(.ab(.caption, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.red)
                 .labelStyle(.titleAndIcon)
         }
@@ -145,9 +141,9 @@ struct AboutSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.isPL ? "Dostępna aktualizacja: \(manifest.version)"
                                        : "Update available: \(manifest.version)")
-                            .font(.ab(.body, weight: .medium))
+                            .font(.body.weight(.medium))
                         Text(L10n.isPL ? "Wydano \(manifest.publishedAt)" : "Released \(manifest.publishedAt)")
-                            .font(.ab(.footnote))
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -155,50 +151,44 @@ struct AboutSection: View {
                         Task { await updateService.downloadAndInstall() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.extraLarge)
                 }
                 let items = L10n.isPL ? manifest.changelog.pl : manifest.changelog.en
                 if !items.isEmpty {
                     Text(L10n.isPL ? "Co nowego" : "What's new")
-                        .font(.ab(.subheadline, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                     ForEach(items, id: \.self) { item in
                         Text("• \(item)")
-                            .font(.ab(.body))
+                            .font(.body)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .padding(.top, 12)
 
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.isPL ? "Pobieranie…" : "Downloading…")
-                    .font(.ab(.footnote))
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                 ProgressView(value: progress)
             }
-            .padding(.top, 12)
 
         case .installing:
             Text(L10n.isPL ? "Instalowanie…" : "Installing…")
-                .font(.ab(.footnote))
+                .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.top, 12)
 
         case .failed(let message):
             Text(message)
-                .font(.ab(.caption))
+                .font(.caption)
                 .foregroundStyle(.tertiary)
-                .padding(.top, 8)
 
         default:
             if let mismatched = mismatchedVersion {
                 Text(L10n.isPL
                      ? "Telefon ma wersję AirBridge \(mismatched). Zaktualizuj obie aplikacje, aby zachować zgodność."
                      : "Your phone runs AirBridge \(mismatched). Update both apps to keep them in sync.")
-                    .font(.ab(.footnote))
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .padding(.top, 8)
             }
         }
     }
@@ -231,7 +221,7 @@ struct AboutSection: View {
                 .contentShape(Rectangle())
                 .onTapGesture { versionTapped() }
         }
-        .font(.ab(.caption2))
+        .font(.caption2)
         .foregroundStyle(.tertiary)
     }
 
@@ -281,15 +271,15 @@ struct AboutSection: View {
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(caption)
-                        .font(.ab(.caption2))
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(name)
-                        .font(.ab(.subheadline, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "arrow.up.right")
-                    .font(.ab(.caption, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
             .contentShape(Rectangle())
@@ -303,15 +293,15 @@ struct AboutSection: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
-                    .font(.ab(.body, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 Text(title)
-                    .font(.ab(.body))
+                    .font(.body)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
                 Image(systemName: "arrow.up.right")
-                    .font(.ab(.caption, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
             .contentShape(Rectangle())
