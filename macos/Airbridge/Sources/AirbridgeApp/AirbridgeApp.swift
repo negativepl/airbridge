@@ -162,9 +162,9 @@ struct AirbridgeApp: App {
                         notificationService: notificationService,
                         onComplete: { onboardingCompleted = true }
                     )
+                    .frame(minWidth: 900, minHeight: 700)
                 }
             }
-            .frame(minWidth: 900, minHeight: 700)
         }
         .defaultSize(width: 1100, height: 900)
         .windowResizability(.contentMinSize)

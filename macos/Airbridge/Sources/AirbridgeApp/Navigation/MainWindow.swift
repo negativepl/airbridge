@@ -23,7 +23,7 @@ struct MainWindow: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab(NavigationItem.home.title, systemImage: "house.fill", value: .home) {
-                ScreenContainer {
+                ScreenContainer(scroll: false) {
                     HomeView(
                         connectionService: connectionService,
                         fileTransferService: fileTransferService,
@@ -81,7 +81,15 @@ struct MainWindow: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
+        // The window keeps room for the sidebar even while it is hidden, so
+        // showing it never has to grow a squeezed window in one jump. SwiftUI
+        // sets the window's minimum to the detail minimum alone whenever the
+        // sidebar hides, so it is raised again as a resize begins.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willStartLiveResizeNotification)) { note in
+            guard let window = note.object as? NSWindow, window.identifier?.rawValue.hasPrefix("main") == true else { return }
+            let minWidth = ScreenMetrics.minDetailWidth + ScreenMetrics.sidebarWidth
+            if window.contentMinSize.width < minWidth { window.contentMinSize.width = minWidth }
+        }
         .navigationTitle(selectedTab.title)
         // Toolbar holds per-tab ACTIONS only (HIG: toolbars are for verbs, not
         // status). Connection state lives on the Home card + menu bar extra.

@@ -23,6 +23,15 @@ struct ScreenContainer<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
+        // The minimum belongs to the detail column: a minimum on the whole
+        // TabView went to the detail column alone, and in a window narrower
+        // than sidebar + minimum the sidebar slid three quarters of the way
+        // open and then snapped. The window's own minimum is set in MainWindow.
+        content_
+            .frame(minWidth: ScreenMetrics.minDetailWidth, minHeight: 600)
+    }
+
+    @ViewBuilder private var content_: some View {
         if scroll {
             ScrollView {
                 VStack(spacing: 10) {
@@ -36,4 +45,10 @@ struct ScreenContainer<Content: View>: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+}
+
+enum ScreenMetrics {
+    /// Room the sidebar takes while it is shown (the system default width).
+    static let sidebarWidth: CGFloat = 210
+    static let minDetailWidth: CGFloat = 680
 }
