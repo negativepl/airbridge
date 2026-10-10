@@ -179,57 +179,75 @@ struct FilesBrowserView: View {
 
     /// The listing comes fresh from the phone; a small spinner shows at once
     /// while it does (in the path bar when the folder is already on screen).
+    /// The list (or icon view) stays in place across folders, as the Finder's
+    /// does; loading, empty and error states sit over it. Swapping the table
+    /// out for a spinner on every folder change made a new table each time,
+    /// and the first click into it only gave it focus before selecting.
     private var content: some View {
-        Group {
-            switch contentKind {
-            case .permission:
-                ContentUnavailableView {
-                    Label(L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant File Access on Your Phone",
-                          systemImage: "folder.badge.questionmark")
-                } description: {
-                    Text(L10n.isPL
-                         ? "Na telefonie otwórz AirBridge → uprawnienia → „Pliki” i zezwól na dostęp do pamięci wewnętrznej."
-                         : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage.")
-                } actions: {
-                    Button(L10n.isPL ? "Odśwież" : "Refresh") { service.reload() }
-                }
-            case .loading:
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .failed:
-                ContentUnavailableView {
-                    Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
-                          systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
-                } actions: {
-                    Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { service.reload() }
-                }
-            case .empty:
-                if service.isSearching {
-                    ContentUnavailableView.search(text: service.searchQuery)
-                } else {
-                    ContentUnavailableView(
-                        L10n.isPL ? "Ten folder jest pusty" : "This Folder Is Empty",
-                        systemImage: "folder",
-                        description: Text(L10n.isPL ? "Przeciągnij tu pliki, aby wysłać je do tego folderu."
-                                                    : "Drag files here to send them to this folder."))
-                }
-            case .icons:
-                iconView
-            case .list:
-                listView
+        ZStack {
+            switch viewMode {
+            case .list: listView
+            case .grid: iconView
             }
+            stateOverlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transaction { $0.animation = nil }
     }
 
+    /// Rows on screen: none while the first page is still coming together.
+    private var shownEntries: [FileEntry] {
+        switch contentKind {
+        case .list, .icons: service.displayedEntries
+        default: []
+        }
+    }
+
+    @ViewBuilder
+    private var stateOverlay: some View {
+        switch contentKind {
+        case .permission:
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant File Access on Your Phone",
+                      systemImage: "folder.badge.questionmark")
+            } description: {
+                Text(L10n.isPL
+                     ? "Na telefonie otwórz AirBridge → uprawnienia → „Pliki” i zezwól na dostęp do pamięci wewnętrznej."
+                     : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage.")
+            } actions: {
+                Button(L10n.isPL ? "Odśwież" : "Refresh") { service.reload() }
+            }
+        case .loading:
+            ProgressView()
+                .controlSize(.small)
+        case .failed:
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
+                      systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
+            } actions: {
+                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { service.reload() }
+            }
+        case .empty:
+            if service.isSearching {
+                ContentUnavailableView.search(text: service.searchQuery)
+            } else {
+                ContentUnavailableView(
+                    L10n.isPL ? "Ten folder jest pusty" : "This Folder Is Empty",
+                    systemImage: "folder",
+                    description: Text(L10n.isPL ? "Przeciągnij tu pliki, aby wysłać je do tego folderu."
+                                                : "Drag files here to send them to this folder."))
+            }
+        case .icons, .list:
+            EmptyView()
+        }
+    }
+
     // MARK: - List (Table)
 
     private var listView: some View {
-        Table(service.displayedEntries, selection: $selection, sortOrder: $sortOrder,
+        Table(shownEntries, selection: $selection, sortOrder: $sortOrder,
               columnCustomization: $columnCustomization) {
             TableColumn(L10n.isPL ? "Nazwa" : "Name", value: \.name) { entry in
                 HStack(spacing: 6) {
@@ -282,7 +300,7 @@ struct FilesBrowserView: View {
             // Top-aligned rows: a two-line name grows down, the icons stay level.
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 128), spacing: 8, alignment: .top)],
                       spacing: 16) {
-                ForEach(service.displayedEntries) { entry in
+                ForEach(shownEntries) { entry in
                     FileIconItem(entry: entry,
                                  thumbnail: service.thumbnails[entry.relativePath],
                                  name: service.isSearching ? entry.relativePath : entry.name,
