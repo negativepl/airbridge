@@ -229,8 +229,9 @@ struct FilesBrowserView: View {
                 Button(L10n.isPL ? "Odśwież" : "Refresh") { service.reload() }
             }
         case .loading:
-            // Plain background; the path bar says it is loading.
-            EmptyView()
+            // Plain background; the path bar says it is loading. Color.clear,
+            // not EmptyView: an EmptyView draws nothing, its background neither.
+            Color.clear
         case .failed:
             ContentUnavailableView {
                 Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
