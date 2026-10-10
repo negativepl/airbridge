@@ -370,8 +370,6 @@ struct FilesBrowserView: View {
             // opened for the first time, or one on screen being refreshed.
             if service.isLoading || contentKind == .loading {
                 ProgressView().controlSize(.small)
-                Text(L10n.isPL ? "Wczytywanie…" : "Loading…")
-                    .foregroundStyle(.secondary)
             }
 
             if service.isPreviewPresented && service.previewURL == nil && !service.previewFailed {
