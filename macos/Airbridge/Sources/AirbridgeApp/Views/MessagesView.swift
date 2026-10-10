@@ -198,18 +198,22 @@ struct MessagesView: View {
                     .textFieldStyle(.plain)
                     .lineLimit(1...6)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassEffect(in: .rect(cornerRadius: 20, style: .continuous))
+                    .padding(.vertical, 8)
+                    .frame(minHeight: Self.barHeight)
+                    .glassEffect(in: .rect(cornerRadius: Self.barHeight / 2, style: .continuous))
                     .onSubmit { send(to: convo) }
+                // The same height as a one-line field, so the two line up.
+                let canSend = !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 Button { send(to: convo) } label: {
                     Image(systemName: "arrow.up")
                         .font(.body.weight(.semibold))
-                        .frame(width: 22, height: 22)
+                        .foregroundStyle(canSend ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
+                        .frame(width: Self.barHeight, height: Self.barHeight)
+                        .contentShape(.circle)
                 }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .buttonStyle(.plain)
+                .glassEffect(canSend ? .regular.tint(.accentColor).interactive() : .regular, in: .circle)
+                .disabled(!canSend)
                 .help(L10n.isPL ? "Wyślij" : "Send")
             }
             .padding(.horizontal, 16)
@@ -225,6 +229,9 @@ struct MessagesView: View {
     }
 
     // MARK: - Formatting
+
+    /// Height of the one-line reply field and of the send button.
+    private static let barHeight: CGFloat = 38
 
     /// Messages further apart than this get a time header between them.
     private static let burstGapMillis: Int64 = 60 * 60 * 1000
