@@ -27,7 +27,6 @@ enum L10n {
     static var change: String { isPL ? "Zmień..." : "Change..." }
     static var pairedWith: String { isPL ? "Sparowano z:" : "Paired with:" }
     static var noDevicePaired: String { isPL ? "Brak sparowanego urządzenia" : "No device paired" }
-    static var dropFilesHere: String { isPL ? "Upuść pliki tutaj lub kliknij aby wybrać" : "Drop files here or click to select" }
     static var sendToAndroid: String { isPL ? "Wyślij do Androida" : "Send to Android" }
     static var fileReceived: String { isPL ? "Otrzymano plik:" : "File received:" }
     static var reconnect: String { isPL ? "Połącz ponownie" : "Reconnect" }
@@ -39,7 +38,7 @@ enum L10n {
     static var localIP: String { isPL ? "Lokalny IP" : "Local IP" }
     static var receivedFilesSaved: String { isPL ? "Otrzymane pliki będą zapisane w tym folderze" : "Received files will be saved to this folder" }
     static var device: String { isPL ? "Urządzenie" : "Device" }
-    static var selectFiles: String { isPL ? "Wybierz pliki..." : "Select files..." }
+    static var selectFiles: String { isPL ? "Wybierz pliki…" : "Choose Files…" }
     static var sending: String { isPL ? "Wysyłanie..." : "Sending..." }
     static var pairingFailed: String { isPL ? "Nie udało się wygenerować kodu parowania" : "Failed to generate pairing payload" }
     static var qrFailed: String { isPL ? "Generowanie QR nie powiodło się" : "QR generation failed" }

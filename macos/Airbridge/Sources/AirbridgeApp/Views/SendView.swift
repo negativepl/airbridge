@@ -9,15 +9,69 @@ struct SendView: View {
 
     @State private var viewModel: TransferViewModel?
     @State private var isTargeted = false
-    @State private var isHovering = false
 
+    /// Like the AirDrop window: the whole tab takes the drop, with the target
+    /// phone and the two ways to send in a system empty-state view; while a
+    /// file goes out the same place shows its progress.
     var body: some View {
         Group {
             if let vm = viewModel, !vm.isConnected {
-                notConnectedView
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Brak połączenia" : "Not Connected", systemImage: "wifi.slash")
+                } description: {
+                    Text(L10n.isPL
+                         ? "Połącz się z telefonem, aby wysyłać pliki i zawartość schowka."
+                         : "Connect to your phone to send files and clipboard content.")
+                }
+            } else if let vm = viewModel, vm.isSending {
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Wysyłanie" : "Sending", systemImage: "arrow.up.doc")
+                } description: {
+                    Text(vm.fileName)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } actions: {
+                    ProgressView(value: vm.progress) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        Text(vm.progress, format: .percent.precision(.fractionLength(0)))
+                            .contentTransition(.numericText())
+                    }
+                    .frame(width: 280)
+                }
             } else {
-                sendContent
+                ContentUnavailableView {
+                    Label(targetTitle, systemImage: "arrow.up.doc")
+                        .symbolEffect(.bounce, value: isTargeted)
+                } description: {
+                    Text(L10n.isPL
+                         ? "Przeciągnij pliki lub foldery do tego okna albo wybierz je z dysku."
+                         : "Drag files or folders into this window, or choose them from disk.")
+                } actions: {
+                    Button(L10n.selectFiles) { openFilePicker() }
+                        .buttonStyle(.borderedProminent)
+                    Button(L10n.isPL ? "Wyślij schowek" : "Send Clipboard") { sendClipboard() }
+                }
+                // macOS 26 draws large controls as capsules; the standalone
+                // actions of an empty state are large, like Photos' "Import".
+                .controlSize(.large)
+                .buttonBorderShape(.capsule)
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Drop highlight: an accent outline around the whole drop area, as
+        // Finder outlines a folder window that is about to take a drop.
+        .overlay {
+            if isTargeted {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(.tint, lineWidth: 3)
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .contentShape(Rectangle())
+        .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
+            handleDrop(providers)
         }
         .onAppear {
             if viewModel == nil {
@@ -29,103 +83,12 @@ struct SendView: View {
         }
     }
 
-    private var notConnectedView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "wifi.slash",
-                title: L10n.isPL ? "Wyślij" : "Send",
-                subtitle: L10n.isPL
-                    ? "Połącz się z telefonem, aby wysyłać pliki i zawartość schowka."
-                    : "Connect to your phone to send files and clipboard content."
-            )
-        }
-    }
-
-    private var sendContent: some View {
-        VStack(spacing: 10) {
-            dropZone
-
-            if let vm = viewModel, vm.isSending {
-                GlassSection {
-                    Text(vm.fileName)
-                        .font(.ab(.body))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    ProgressView(value: vm.progress)
-                        .tint(.accentColor)
-                    Text("\(Int(vm.progress * 100))%")
-                        .font(.ab(.subheadline))
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-            }
-
-            HStack(spacing: 14) {
-                Button { openFilePicker() } label: {
-                    Label(L10n.selectFiles, systemImage: "folder")
-                        .font(.ab(.body))
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
-
-                Button { sendClipboard() } label: {
-                    Label(L10n.isPL ? "Wyślij schowek" : "Send Clipboard", systemImage: "doc.on.clipboard")
-                        .font(.ab(.body))
-                }
-                .controlSize(.extraLarge)
-                .disabled(viewModel.map { !$0.isConnected } ?? true)
-            }
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var dropZone: some View {
-        ZStack {
-            VStack(spacing: 14) {
-                Image(systemName: "arrow.down.doc")
-                    .font(.system(size: 44))
-                    .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
-                    .symbolEffect(.pulse, options: .repeating, isActive: !isTargeted)
-                    .symbolEffect(.bounce, value: isTargeted)
-                Text(L10n.dropFilesHere)
-                    .font(.ab(.callout))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, minHeight: 220)
-        }
-        // Solid content surface (Liquid Glass is reserved for chrome). The
-        // drop affordance is carried by the accent tint while a file is over
-        // the zone plus the dashed border below — no glass refraction.
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(isTargeted
-                    ? Color.accentColor.opacity(0.18)
-                    : Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 1, dash: [6, 4])
-                )
-                .foregroundStyle(.secondary.opacity(isTargeted ? 0 : (isHovering ? 0.5 : 0.25)))
-                .padding(8)
-                .allowsHitTesting(false)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { openFilePicker() }
-        .onHover { isHovering = $0 }
-        .animation(.airbridgeQuick, value: isTargeted)
-        .animation(.airbridgeQuick, value: isHovering)
-        .onDrop(of: [UTType.fileURL], isTargeted: $isTargeted) { providers in
-            handleDrop(providers)
-        }
+    /// "Wyślij do Galaxy Z Fold7" — the phone the files will go to.
+    private var targetTitle: String {
+        let device = connectionService.activeDevice
+        let name = device?.deviceInfo?.name.isEmpty == false ? device?.deviceInfo?.name : device?.name
+        guard let name else { return L10n.isPL ? "Wyślij do telefonu" : "Send to Phone" }
+        return L10n.isPL ? "Wyślij do \(name)" : "Send to \(name)"
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
