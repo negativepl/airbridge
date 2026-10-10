@@ -108,7 +108,7 @@
     // macOS may auto-join a new display into a mirror set (cloning the main
     // screen and forcing a shared resolution) and/or pick a scaled-down default
     // mode. Force it standalone (extended) at its highest 1:1 resolution.
-    [self configureDisplay:display.displayID];
+    [self configureDisplay:display.displayID pixelWidth:width pixelHeight:height];
 
     return self;
 }
@@ -126,8 +126,10 @@
 }
 
 /// Wait for the display to register, then break it out of any mirror set and
-/// select the highest-resolution (least-scaled) mode it offers.
-- (void)configureDisplay:(CGDirectDisplayID)displayID {
+/// select the mode that matches the requested backing size exactly.
+- (void)configureDisplay:(CGDirectDisplayID)displayID
+              pixelWidth:(uint32_t)width
+             pixelHeight:(uint32_t)height {
     for (int i = 0; i < 40; i++) {
         uint32_t count = 0;
         CGDirectDisplayID ids[32];
@@ -139,40 +141,35 @@
         usleep(50000);  // 50 ms
     }
 
-    // Target the standard 2× Retina mode: backing = the largest available
-    // (sharpest), logical "looks like" = half of it (comfortable, big UI).
-    // That is the mode where pixelWidth == maxBacking and width == pixelWidth/2.
     // Without this option CoreGraphics hides the HiDPI ("looks like") modes,
     // so the Retina mode would never be found and the display would stay 1x.
+    // A display that has only just registered can still report no modes
+    // (logged 2026-10-10: "offered" empty, the display stayed at 800x600), so
+    // wait for the list to fill.
     CFDictionaryRef opts = (__bridge CFDictionaryRef)@{ (__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes: @YES };
-    CFArrayRef modes = CGDisplayCopyAllDisplayModes(displayID, opts);
-    size_t maxBacking = 0;
-    if (modes) {
-        for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
-            CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
-            size_t pw = CGDisplayModeGetPixelWidth(m);
-            if (pw > maxBacking) maxBacking = pw;
-        }
+    CFArrayRef modes = NULL;
+    for (int i = 0; i < 40; i++) {
+        modes = CGDisplayCopyAllDisplayModes(displayID, opts);
+        if (modes && CFArrayGetCount(modes) > 0) break;
+        if (modes) { CFRelease(modes); modes = NULL; }
+        usleep(50000);  // 50 ms
     }
 
+    // The WindowServer adds stock modes (800x600 @ 1600x1200, 640x480, ...) next
+    // to the declared one, so "the widest backing" is not the requested display:
+    // for a portrait or 21:9 panel it picked the 4:3 800x600 mode and the
+    // desktop arrived letterboxed. Match the requested backing size instead:
+    // first the 2x Retina mode, then any mode of that pixel size.
     CGDisplayModeRef best = NULL;
     if (modes) {
-        // First choice: 2× Retina at full backing.
-        for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
-            CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
-            size_t pw = CGDisplayModeGetPixelWidth(m);
-            size_t w  = CGDisplayModeGetWidth(m);
-            if (pw == maxBacking && pw > w && (w * 2 == pw || (w * 2 >= pw - 4 && w * 2 <= pw + 4))) {
-                best = m; break;
-            }
-        }
-        // Fallback: any HiDPI mode at full backing.
-        if (!best) {
+        for (int pass = 0; pass < 2 && !best; pass++) {
             for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
                 CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
-                size_t pw = CGDisplayModeGetPixelWidth(m);
-                size_t w  = CGDisplayModeGetWidth(m);
-                if (pw == maxBacking && pw > w) { best = m; break; }
+                if (CGDisplayModeGetPixelWidth(m) != width || CGDisplayModeGetPixelHeight(m) != height) continue;
+                if (!CGDisplayModeIsUsableForDesktopGUI(m)) continue;
+                size_t w = CGDisplayModeGetWidth(m);
+                if (pass == 0 && w * 2 != width) continue;
+                best = m; break;
             }
         }
     }
@@ -193,7 +190,7 @@
                          (size_t)CGDisplayModeGetPixelWidth(best), (size_t)CGDisplayModeGetPixelHeight(best),
                          [offered componentsJoinedByString:@","]];
     } else {
-        _selectedMode = [NSString stringWithFormat:@"no HiDPI mode found; offered %@",
+        _selectedMode = [NSString stringWithFormat:@"no usable mode of the requested size; offered %@",
                          [offered componentsJoinedByString:@","]];
     }
 

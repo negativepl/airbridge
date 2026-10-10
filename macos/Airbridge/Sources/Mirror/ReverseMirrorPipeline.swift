@@ -40,6 +40,12 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     /// H.264 alike, measured 2026-10-09), so anything larger cannot reach
     /// 60 fps; a bigger virtual display is captured scaled down to this.
     private static let encodeLongEdgeCap = 2200
+    /// Shortest backing edge of the virtual display. macOS marks a 2x mode
+    /// below 600 pt on its short edge as unusable for the desktop and keeps
+    /// the stock 800x600 mode instead, so the folded Fold's 21:9 cover panel
+    /// (1008x432 pt) arrived as a letterboxed 4:3 desktop. Measured 2026-10-10:
+    /// 1400x600 and 600x1400 pt are accepted, 1200x514 pt is not.
+    private static let minBackingShortEdge = 1200
 
     public init(fps: Int, bitrate: Int, useHEVC: Bool = false,
                 virtualSize: (Int, Int)? = nil,
@@ -65,8 +71,11 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
             // setting), capped for very large panels.
             let (dw, dh) = Self.fit(pw, ph, cap: 3200)
             // HiDPI: backing = native pixels (sharp), logical "looks like" = half
-            // (comfortable UI), exactly like a Retina display.
-            let vd = ABVirtualDisplay(width: UInt32(dw), height: UInt32(dh), hiDPI: true, name: "AirBridge Phone")
+            // (comfortable UI), exactly like a Retina display. A panel too small
+            // for macOS's minimum gets a larger display of the same aspect,
+            // captured down to the phone's size.
+            let (bw, bh) = Self.enlarge(dw, dh, minShortEdge: Self.minBackingShortEdge)
+            let vd = ABVirtualDisplay(width: UInt32(bw), height: UInt32(bh), hiDPI: true, name: "AirBridge Phone")
             guard let vd, vd.displayID != 0 else {
                 onLog("virtual display FAILED: \(vd?.failureReason ?? "nil")")
                 throw ScreenCaptureError.noDisplay
@@ -75,7 +84,7 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
             targetDisplayID = vd.displayID
             capLongEdge = nil
             forcedOutputSize = Self.fit(dw, dh, cap: Self.encodeLongEdgeCap)   // backing pixels (not halved points), scaled down only above the encoder's limit
-            onLog("virtual display created id=\(vd.displayID) \(dw)x\(dh) (HiDPI) mode=\(vd.selectedMode ?? "?")")
+            onLog("virtual display created id=\(vd.displayID) \(bw)x\(bh) for \(dw)x\(dh) (HiDPI) mode=\(vd.selectedMode ?? "?")")
             onDisplayID(vd.displayID)
         } else {
             onDisplayID(CGMainDisplayID())
@@ -162,6 +171,16 @@ public final class ReverseMirrorPipeline: @unchecked Sendable {
     }
 
     /// Fit (w,h) so the long edge is at most `cap`, keeping aspect, even pixels.
+    /// Scales (w, h) up, keeping its aspect, until the short edge reaches
+    /// `minShortEdge`; even dimensions, unchanged when already large enough.
+    static func enlarge(_ w: Int, _ h: Int, minShortEdge: Int) -> (Int, Int) {
+        let shortEdge = min(w, h)
+        guard shortEdge > 0, shortEdge < minShortEdge else { return (w, h) }
+        let scale = Double(minShortEdge) / Double(shortEdge)
+        func even(_ v: Double) -> Int { let r = Int(v.rounded()); return r + (r % 2) }
+        return (even(Double(w) * scale), even(Double(h) * scale))
+    }
+
     static func fit(_ w: Int, _ h: Int, cap: Int) -> (Int, Int) {
         let longEdge = max(w, h)
         let scale = longEdge > cap ? Double(cap) / Double(longEdge) : 1.0
