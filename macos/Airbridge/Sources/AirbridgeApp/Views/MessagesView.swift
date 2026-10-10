@@ -11,10 +11,6 @@ struct MessagesView: View {
     @State private var selectedId: SmsConversationMeta.ID?
     @State private var searchText = ""
     @State private var messageText = ""
-    /// Height of the floating reply bar; the conversation ends that far
-    /// above the bottom, since safeAreaBar draws over the content without
-    /// insetting it (the last bubble sat under the bar).
-    @State private var replyBarHeight: CGFloat = 0
 
     private var selectedConversation: SmsConversationMeta? {
         smsService.conversations.first { $0.id == selectedId }
@@ -174,7 +170,6 @@ struct MessagesView: View {
         // system's scroll edge effect keeps the field legible.
         .safeAreaBar(edge: .bottom) {
             replyBar(convo)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { replyBarHeight = $0 }
         }
     }
 
@@ -200,7 +195,7 @@ struct MessagesView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 8 + replyBarHeight)
+            .padding(.bottom, 8)
         }
         .defaultScrollAnchor(.bottom)
         // A new message grows the content; the view stays at its end.
