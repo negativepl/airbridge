@@ -177,8 +177,7 @@ struct FilesBrowserView: View {
         return viewMode == .grid ? .icons : .list
     }
 
-    /// The listing comes fresh from the phone; a small spinner shows at once
-    /// while it does (in the path bar when the folder is already on screen).
+    /// The listing comes fresh from the phone; the path bar shows it loading.
     /// The list (or icon view) stays in place across folders, as the Finder's
     /// does; loading, empty and error states sit over it. Swapping the table
     /// out for a spinner on every folder change made a new table each time,
@@ -230,8 +229,8 @@ struct FilesBrowserView: View {
                 Button(L10n.isPL ? "Odśwież" : "Refresh") { service.reload() }
             }
         case .loading:
-            ProgressView()
-                .controlSize(.small)
+            // Plain background; the path bar says it is loading.
+            EmptyView()
         case .failed:
             ContentUnavailableView {
                 Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
@@ -367,9 +366,12 @@ struct FilesBrowserView: View {
 
             Spacer()
 
-            // Refreshing a folder that is already on screen.
-            if service.isLoading && contentKind != .loading {
+            // The one place that says a listing is on its way: a folder
+            // opened for the first time, or one on screen being refreshed.
+            if service.isLoading || contentKind == .loading {
                 ProgressView().controlSize(.small)
+                Text(L10n.isPL ? "Wczytywanie…" : "Loading…")
+                    .foregroundStyle(.secondary)
             }
 
             if service.isPreviewPresented && service.previewURL == nil && !service.previewFailed {
