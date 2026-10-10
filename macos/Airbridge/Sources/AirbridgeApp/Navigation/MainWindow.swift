@@ -4,7 +4,6 @@ import Mirror
 struct MainWindow: View {
     @State private var selectedTab: NavigationItem = .home
     @Environment(\.openWindow) private var openWindow
-    @AppStorage("files.viewMode") private var filesViewModeRaw: String = FileViewMode.list.rawValue
 
     let connectionService: ConnectionService
     let clipboardService: ClipboardService
@@ -131,14 +130,6 @@ struct MainWindow: View {
                 }
                 ToolbarSpacer(.fixed)
             }
-            if selectedTab == .files {
-                // One consolidated options menu instead of three separate items —
-                // alongside the device switcher and the search field they would
-                // otherwise overflow into the toolbar's ">>" collapse.
-                ToolbarItem(placement: .primaryAction) {
-                    filesOptionsMenu
-                }
-            }
             if selectedTab == .mirror && mirrorService.isStreaming {
                 // Native toolbar items — macOS sizes, styles and glass-groups
                 // them itself (like Notes). No custom glass/frames.
@@ -178,46 +169,5 @@ struct MainWindow: View {
     private var activeDeviceLabel: String {
         connectionService.activeDevice.map { deviceLabel($0) }
             ?? (L10n.isPL ? "Urządzenie" : "Device")
-    }
-
-    // View mode + sorting + refresh folded into one toolbar menu so the Files
-    // toolbar stays compact next to the device switcher and the search field.
-    private var filesOptionsMenu: some View {
-        Menu {
-            Picker(L10n.isPL ? "Widok" : "View",
-                   selection: Binding(get: { FileViewMode(rawValue: filesViewModeRaw) ?? .list },
-                                      set: { filesViewModeRaw = $0.rawValue })) {
-                Label(L10n.isPL ? "Lista" : "List", systemImage: "list.bullet").tag(FileViewMode.list)
-                Label(L10n.isPL ? "Siatka" : "Grid", systemImage: "square.grid.2x2").tag(FileViewMode.grid)
-            }
-            Divider()
-            Picker(L10n.isPL ? "Sortuj wg" : "Sort by",
-                   selection: Binding(get: { filesBrowserService.sortBy },
-                                      set: { filesBrowserService.sortBy = $0 })) {
-                Text(L10n.isPL ? "Nazwa" : "Name").tag(FileSortKey.name)
-                Text(L10n.isPL ? "Rozmiar" : "Size").tag(FileSortKey.size)
-                Text(L10n.isPL ? "Data modyfikacji" : "Date modified").tag(FileSortKey.modified)
-                Text(L10n.isPL ? "Typ" : "Type").tag(FileSortKey.type)
-            }
-            Picker(L10n.isPL ? "Kierunek" : "Order",
-                   selection: Binding(get: { filesBrowserService.sortAscending },
-                                      set: { filesBrowserService.sortAscending = $0 })) {
-                Text(L10n.isPL ? "Rosnąco" : "Ascending").tag(true)
-                Text(L10n.isPL ? "Malejąco" : "Descending").tag(false)
-            }
-            Toggle(L10n.isPL ? "Foldery na początku" : "Folders first",
-                   isOn: Binding(get: { filesBrowserService.foldersFirst },
-                                 set: { filesBrowserService.foldersFirst = $0 }))
-            Divider()
-            Button {
-                filesBrowserService.reload()
-            } label: {
-                Label(L10n.isPL ? "Odśwież" : "Refresh", systemImage: "arrow.clockwise")
-            }
-        } label: {
-            Image(systemName: "slider.horizontal.3")
-                .accessibilityLabel(L10n.isPL ? "Opcje" : "Options")
-        }
-        .help(L10n.isPL ? "Widok, sortowanie, odświeżanie" : "View, sorting and refresh")
     }
 }

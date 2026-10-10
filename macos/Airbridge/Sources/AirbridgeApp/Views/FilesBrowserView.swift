@@ -2,15 +2,21 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Protocol
 import os
+import QuickLook
 
+/// The phone's files, laid out like the Finder: a sortable list (a system
+/// Table) or an icon view, Back/Forward in the toolbar, the path bar at the
+/// bottom and Quick Look for previews.
 struct FilesBrowserView: View {
     let filesBrowserService: FilesBrowserService
     let connectionService: ConnectionService
 
     @AppStorage("files.viewMode") private var viewModeRaw: String = FileViewMode.list.rawValue
     @State private var searchText: String = ""
-    @State private var entryPendingDeletion: FileEntry?
-    /// A file drag is over the window: the folder lights up as the target.
+    @State private var selection: Set<FileEntry.ID> = []
+    @State private var sortOrder: [KeyPathComparator<FileEntry>] = [KeyPathComparator(\.name)]
+    @State private var entriesPendingDeletion: [FileEntry] = []
+    /// A file drag is over the window: the folder takes the drop.
     @State private var isDropTargeted = false
     /// The spinner only appears once a load has taken a moment (350 ms). A
     /// listing that arrives sooner never shows one — a spinner that flashes
@@ -18,25 +24,24 @@ struct FilesBrowserView: View {
     @State private var showSpinner = false
 
     private var viewMode: FileViewMode { FileViewMode(rawValue: viewModeRaw) ?? .list }
-
-    private var deletionAlertTitle: String {
-        guard let e = entryPendingDeletion else { return "" }
-        if L10n.isPL {
-            // Cudzysłowy „ " jako \u — literalne typograficzne znaki łamią parser tuż przed znakiem `?`.
-            return "Usunąć \u{201E}\(e.name)\u{201D}?"
-        } else {
-            return "Delete \"\(e.name)\"?"
-        }
-    }
+    private var service: FilesBrowserService { filesBrowserService }
 
     var body: some View {
+        withAlerts(withLifecycle(browser))
+    }
+
+    private var browser: some View {
         Group {
             if !connectionService.isConnected {
-                notConnectedView
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Brak połączenia" : "Not Connected", systemImage: "wifi.slash")
+                } description: {
+                    Text(L10n.isPL ? "Połącz się z telefonem, aby przeglądać pliki." : "Connect to your phone to browse files.")
+                }
             } else {
                 VStack(spacing: 0) {
                     content
-                        .overlay { dropTargetOverlay }
+                        .overlay { dropOutline }
                     Divider()
                     pathBar
                 }
@@ -47,397 +52,356 @@ struct FilesBrowserView: View {
                 )
             }
         }
-        .onChange(of: searchText) { _, new in
-            filesBrowserService.setSearchQuery(new)
-        }
-        .onAppear {
-            filesBrowserService.loadPersistedSort()
-            if connectionService.isConnected && !filesBrowserService.hasLoadedOnce {
-                filesBrowserService.open(path: "")
+    }
+
+    private func withLifecycle(_ view: some View) -> some View {
+        view
+            .navigationTitle(service.breadcrumbs.last ?? (L10n.isPL ? "Pliki" : "Files"))
+            .toolbar { toolbar }
+            .onChange(of: searchText) { _, new in
+                service.setSearchQuery(new)
             }
-        }
-        .onChange(of: connectionService.isConnected) { _, connected in
-            if connected && !filesBrowserService.hasLoadedOnce {
-                filesBrowserService.open(path: "")
+            .onAppear {
+                service.loadPersistedSort()
+                sortOrder = [Self.comparator(for: service.sortBy, ascending: service.sortAscending)]
+                if connectionService.isConnected && !service.hasLoadedOnce {
+                    service.open(path: "")
+                }
             }
-        }
-        .onChange(of: connectionService.activeDeviceId) { _, _ in
-            // Switched phones — paths differ per device, so reopen the new root.
-            if connectionService.isConnected { filesBrowserService.open(path: "") }
-        }
-        .onChange(of: filesBrowserService.searchQuery) { _, q in
-            if q.isEmpty && !searchText.isEmpty { searchText = "" }
-        }
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-            handleDrop(providers)
-        }
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: isDropTargeted)
-        .alert(
-            deletionAlertTitle,
-            isPresented: Binding(
-                get: { entryPendingDeletion != nil },
-                set: { if !$0 { entryPendingDeletion = nil } }
-            ),
-            presenting: entryPendingDeletion
-        ) { entry in
-            Button(L10n.isPL ? "Usuń" : "Delete", role: .destructive) {
-                filesBrowserService.delete(entry)
-                entryPendingDeletion = nil
+            .onChange(of: connectionService.isConnected) { _, connected in
+                if connected && !service.hasLoadedOnce { service.open(path: "") }
             }
-            Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) {
-                entryPendingDeletion = nil
+            .onChange(of: connectionService.activeDeviceId) { _, _ in
+                // Switched phones — paths differ per device, so reopen the new root.
+                if connectionService.isConnected { service.open(path: "") }
             }
-        } message: { _ in
-            Text(L10n.isPL ? "Tej operacji nie można cofnąć." : "This cannot be undone.")
+            .onChange(of: service.searchQuery) { _, q in
+                if q.isEmpty && !searchText.isEmpty { searchText = "" }
+            }
+            .onChange(of: service.currentPath) { _, _ in selection = [] }
+            // Sorting happens on the phone: a column click asks for the listing
+            // in the new order.
+            .onChange(of: sortOrder) { _, order in applySort(order) }
+            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+                handleDrop(providers)
+            }
+            // Quick Look, as the Finder's space bar: the panel opens once the file
+            // has come over from the phone.
+            .quickLookPreview(quickLookItem)
+    }
+
+    private var quickLookItem: Binding<URL?> {
+        Binding<URL?>(
+            get: { service.isPreviewPresented ? service.previewURL : nil },
+            set: { url in if url == nil { service.dismissPreview() } }
+        )
+    }
+
+    private func withAlerts(_ view: some View) -> some View {
+        view
+            .alert(
+                deletionTitle,
+                isPresented: Binding(get: { !entriesPendingDeletion.isEmpty },
+                                     set: { if !$0 { entriesPendingDeletion = [] } })
+            ) {
+                Button(L10n.isPL ? "Usuń" : "Delete", role: .destructive) {
+                    entriesPendingDeletion.forEach { service.delete($0) }
+                    entriesPendingDeletion = []
+                }
+                Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) { entriesPendingDeletion = [] }
+            } message: {
+                Text(L10n.isPL ? "Tej operacji nie można cofnąć." : "This cannot be undone.")
+            }
+            .alert(
+                L10n.isPL ? "Nie udało się usunąć" : "Delete Failed",
+                isPresented: Binding(get: { service.deleteError != nil }, set: { if !$0 { service.deleteError = nil } })
+            ) {
+                Button("OK", role: .cancel) { service.deleteError = nil }
+            } message: {
+                Text(L10n.isPL ? "Nie można było usunąć tego elementu. Spróbuj ponownie."
+                               : "This item could not be deleted. Please try again.")
+            }
+            .alert(
+                L10n.isPL ? "Nie udało się otworzyć pliku" : "Could Not Open the File",
+                isPresented: Binding(get: { service.isPreviewPresented && service.previewFailed },
+                                     set: { if !$0 { service.dismissPreview() } })
+            ) {
+                Button("OK", role: .cancel) { service.dismissPreview() }
+            } message: {
+                Text(L10n.isPL ? "Nie udało się pobrać pliku z telefonu do podglądu."
+                               : "The file could not be fetched from the phone for preview.")
+            }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Button { service.goBack() } label: {
+                Label(L10n.isPL ? "Wstecz" : "Back", systemImage: "chevron.backward")
+            }
+            .keyboardShortcut("[", modifiers: .command)
+            .disabled(service.backStack.isEmpty)
+            Button { service.goForward() } label: {
+                Label(L10n.isPL ? "Dalej" : "Forward", systemImage: "chevron.forward")
+            }
+            .keyboardShortcut("]", modifiers: .command)
+            .disabled(service.forwardStack.isEmpty)
         }
-        .alert(
-            L10n.isPL ? "Nie udało się usunąć" : "Delete failed",
-            isPresented: Binding(
-                get: { filesBrowserService.deleteError != nil },
-                set: { if !$0 { filesBrowserService.deleteError = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) { filesBrowserService.deleteError = nil }
-        } message: {
-            Text(L10n.isPL
-                 ? "Nie można było usunąć tego elementu. Spróbuj ponownie."
-                 : "This item could not be deleted. Please try again.")
+        ToolbarItem(placement: .primaryAction) {
+            Picker(L10n.isPL ? "Widok" : "View", selection: $viewModeRaw) {
+                Label(L10n.isPL ? "Lista" : "List", systemImage: "list.bullet").tag(FileViewMode.list.rawValue)
+                Label(L10n.isPL ? "Ikony" : "Icons", systemImage: "square.grid.2x2").tag(FileViewMode.grid.rawValue)
+            }
+            .pickerStyle(.segmented)
         }
-        .sheet(isPresented: Binding(
-            get: { filesBrowserService.isPreviewPresented },
-            set: { if !$0 { filesBrowserService.dismissPreview() } }
-        )) {
-            FilePreviewSheet(service: filesBrowserService)
+        ToolbarItem(placement: .primaryAction) {
+            Button { service.reload() } label: {
+                Label(L10n.isPL ? "Odśwież" : "Refresh", systemImage: "arrow.clockwise")
+            }
         }
     }
 
-    private var notConnectedView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "folder",
-                title: L10n.isPL ? "Pliki" : "Files",
-                subtitle: L10n.isPL
-                    ? "Połącz się z telefonem, aby przeglądać pliki."
-                    : "Connect to your phone to browse files."
-            )
+    // MARK: - Content
+
+    private enum ContentKind: Hashable { case permission, loading, blank, failed, empty, icons, list }
+
+    private var contentKind: ContentKind {
+        let s = service
+        if s.needsPermission { return .permission }
+        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return showSpinner ? .loading : .blank }
+        if s.loadFailed && s.displayedEntries.isEmpty { return .failed }
+        if s.displayedEntries.isEmpty && s.hasLoadedOnce { return .empty }
+        return viewMode == .grid ? .icons : .list
+    }
+
+    /// The listing always comes fresh from the phone (a cached one showed a
+    /// folder's old contents before the real ones replaced them); the spinner
+    /// appears only when the phone takes longer than 350 ms.
+    private var content: some View {
+        Group {
+            switch contentKind {
+            case .permission:
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant File Access on Your Phone",
+                          systemImage: "folder.badge.questionmark")
+                } description: {
+                    Text(L10n.isPL
+                         ? "Na telefonie otwórz AirBridge → uprawnienia → „Pliki” i zezwól na dostęp do pamięci wewnętrznej."
+                         : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage.")
+                } actions: {
+                    Button(L10n.isPL ? "Odśwież" : "Refresh") { service.reload() }
+                }
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .blank:
+                Color.clear
+            case .failed:
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
+                          systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
+                } actions: {
+                    Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { service.reload() }
+                }
+            case .empty:
+                if service.isSearching {
+                    ContentUnavailableView.search(text: service.searchQuery)
+                } else {
+                    ContentUnavailableView(
+                        L10n.isPL ? "Ten folder jest pusty" : "This Folder Is Empty",
+                        systemImage: "folder",
+                        description: Text(L10n.isPL ? "Przeciągnij tu pliki, aby wysłać je do tego folderu."
+                                                    : "Drag files here to send them to this folder."))
+                }
+            case .icons:
+                iconView
+            case .list:
+                listView
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transaction { $0.animation = nil }
+        .task(id: service.isLoading) {
+            guard service.isLoading else { showSpinner = false; return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if !Task.isCancelled && service.isLoading { showSpinner = true }
         }
     }
 
-    /// Ścieżka jak pasek dolny Findera — kompaktowa, na materiale paska,
-    /// klikalne segmenty.
+    // MARK: - List (Table)
+
+    private var listView: some View {
+        Table(service.displayedEntries, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn(L10n.isPL ? "Nazwa" : "Name", value: \.name) { entry in
+                HStack(spacing: 6) {
+                    FileIcon(entry: entry, thumbnail: service.thumbnails[entry.relativePath], size: 18)
+                    Text(service.isSearching ? entry.relativePath : entry.name)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .onAppear { loadMoreIfLast(entry) }
+            }
+            .width(min: 200, ideal: 320)
+            TableColumn(L10n.isPL ? "Data modyfikacji" : "Date Modified", value: \.modified) { entry in
+                Text(Self.date(entry.modified)).foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 170)
+            TableColumn(L10n.isPL ? "Rozmiar" : "Size", value: \.size) { entry in
+                Text(sizeText(entry))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 70, ideal: 90)
+            TableColumn(L10n.isPL ? "Rodzaj" : "Kind", value: \.mimeType) { entry in
+                Text(kindText(entry)).foregroundStyle(.secondary)
+            }
+            .width(min: 80, ideal: 130)
+            TableColumn(L10n.isPL ? "Zawartość" : "Contents") { entry in
+                Text(contentsText(entry))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 80, ideal: 100)
+        }
+        .contextMenu(forSelectionType: FileEntry.ID.self) { ids in
+            contextMenu(for: entries(ids))
+        } primaryAction: { ids in
+            // Double-click or Return, as the Finder.
+            if let entry = entries(ids).first { service.activate(entry) }
+        }
+        .onKeyPress(.space) { previewSelection() }
+    }
+
+    // MARK: - Icons
+
+    private var iconView: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 128), spacing: 8)], spacing: 16) {
+                ForEach(service.displayedEntries) { entry in
+                    FileIconItem(entry: entry,
+                                 thumbnail: service.thumbnails[entry.relativePath],
+                                 name: service.isSearching ? entry.relativePath : entry.name,
+                                 isSelected: selection.contains(entry.id))
+                        .onTapGesture {
+                            selection = [entry.id]
+                            if NSApp.currentEvent?.clickCount == 2 { service.activate(entry) }
+                        }
+                        .contextMenu { contextMenu(for: [entry]) }
+                        .onAppear { loadMoreIfLast(entry) }
+                }
+            }
+            .padding(16)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { selection = [] }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.space) { previewSelection() }
+        .onKeyPress(.return) {
+            guard let entry = entries(selection).first else { return .ignored }
+            service.activate(entry)
+            return .handled
+        }
+    }
+
+    // MARK: - Path bar
+
+    /// The Finder's path bar: clickable segments from the phone's root, and
+    /// the download of a file being opened in Quick Look.
     private var pathBar: some View {
         HStack(spacing: 4) {
-            Button {
-                filesBrowserService.open(path: "")
-            } label: {
+            Button { service.open(path: "") } label: {
                 Label(L10n.isPL ? "Telefon" : "Phone", systemImage: "smartphone")
-                    .labelStyle(.titleAndIcon)
             }
             .buttonStyle(.borderless)
 
-            ForEach(Array(filesBrowserService.breadcrumbs.enumerated()), id: \.offset) { index, segment in
+            ForEach(Array(service.breadcrumbs.enumerated()), id: \.offset) { index, segment in
                 Image(systemName: "chevron.compact.right")
                     .foregroundStyle(.tertiary)
                 Button {
-                    let path = filesBrowserService.breadcrumbs.prefix(index + 1).joined(separator: "/")
-                    filesBrowserService.open(path: path)
+                    service.open(path: service.breadcrumbs.prefix(index + 1).joined(separator: "/"))
                 } label: {
-                    if index == filesBrowserService.breadcrumbs.count - 1 {
-                        Label(segment, systemImage: "folder.fill")
-                    } else {
-                        Text(segment)
-                    }
+                    Label(segment, systemImage: "folder.fill")
                 }
                 .buttonStyle(.borderless)
             }
 
             Spacer()
+
+            if service.isPreviewPresented && service.previewURL == nil && !service.previewFailed {
+                Text(service.previewName)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                ProgressView(value: service.previewProgress)
+                    .controlSize(.small)
+                    .frame(width: 100)
+            }
         }
-        .font(.ab(.caption))
+        .font(.callout)
         .lineLimit(1)
+        // Fixed height: the download progress must not make the bar grow.
+        .frame(height: 22)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.bar)
     }
 
-    /// While a file hovers over the window: an accent-tinted, dashed frame
-    /// inside the content area and the name of the folder it will land in,
-    /// so the drop reads as "into this folder", not "somewhere in the app".
-    /// A row that has just become ready (its folder stats arrived) settles in
-    /// from a few points up with a short fade. Only the arriving row moves;
-    /// rows already on screen stay put — the list itself never animates.
-    private struct RowReveal: ViewModifier {
-        @State private var shown = false
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
-        func body(content: Content) -> some View {
-            content
-                .opacity(shown ? 1 : 0)
-                .offset(y: shown ? 0 : -6)
-                .onAppear {
-                    if reduceMotion { shown = true } else {
-                        withAnimation(.easeOut(duration: 0.22)) { shown = true }
-                    }
-                }
+    /// The whole folder takes a drop; an accent outline marks it, as the
+    /// Finder outlines a window about to take one.
+    @ViewBuilder
+    private var dropOutline: some View {
+        if isDropTargeted && !service.needsPermission {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.tint, lineWidth: 3)
+                .padding(6)
+                .allowsHitTesting(false)
         }
     }
+
+    // MARK: - Actions
 
     @ViewBuilder
-    private var dropTargetOverlay: some View {
-        if isDropTargeted {
-            let folder = filesBrowserService.breadcrumbs.last ?? (L10n.isPL ? "Telefon" : "Phone")
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.08))
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.accentColor.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-                VStack(spacing: 10) {
-                    Image(systemName: "tray.and.arrow.down.fill")
-                        .font(.system(size: 36, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                        .symbolEffect(.bounce, value: isDropTargeted)
-                    Text(L10n.isPL ? "Puść, aby wysłać do „\(folder)”" : "Release to send to \"\(folder)\"")
-                        .font(.ab(.title3, weight: .semibold))
-                        .foregroundStyle(.primary)
-                }
-                .padding(20)
-                .glassEffect(.regular, in: .rect(cornerRadius: 16, style: .continuous))
-            }
-            .padding(12)
-            .allowsHitTesting(false)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    private func contextMenu(for entries: [FileEntry]) -> some View {
+        if entries.count == 1, let entry = entries.first {
+            Button(L10n.isPL ? "Otwórz" : "Open") { service.activate(entry) }
         }
-    }
-
-    private enum ContentKind: Hashable { case permission, loading, blank, failed, empty, grid, list }
-
-    private var contentKind: ContentKind {
-        let s = filesBrowserService
-        if s.needsPermission { return .permission }
-        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return showSpinner ? .loading : .blank }
-        if s.loadFailed && s.displayedEntries.isEmpty { return .failed }
-        if s.displayedEntries.isEmpty && s.hasLoadedOnce { return .empty }
-        return viewMode == .grid ? .grid : .list
-    }
-
-    /// Folder changes are instant, like the Finder: no slide, no crossfade.
-    /// The listing usually comes straight from the on-disk cache, so the new
-    /// folder is simply there; the spinner appears only when the phone takes
-    /// longer than 350 ms and there is nothing cached to show.
-    private var content: some View {
-        Group {
-            switch contentKind {
-            case .permission:
-                permissionEmptyState
-            case .loading:
-                ProgressView()
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .blank:
-                Color.clear
-            case .failed:
-                loadFailedState
-            case .empty:
-                emptyFolderState
-            case .grid:
-                gridView
-            case .list:
-                listView
-            }
+        let files = entries.filter { !$0.isDirectory }
+        if !files.isEmpty {
+            Button(L10n.isPL ? "Pobierz" : "Download") { files.forEach { service.download($0) } }
         }
-        .transaction { $0.animation = nil }
-        .task(id: filesBrowserService.isLoading) {
-            guard filesBrowserService.isLoading else { showSpinner = false; return }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if !Task.isCancelled && filesBrowserService.isLoading { showSpinner = true }
-        }
-    }
-
-    private var listView: some View {
-        List {
-            ForEach(entryGroups) { group in
-                Section {
-                    ForEach(group.entries) { entry in
-                        listRow(entry)
-                            .modifier(RowReveal())
-                    }
-                } header: {
-                    if !group.title.isEmpty { Text(group.title) }
-                }
-            }
-        }
-        .listStyle(.inset)
-    }
-
-    @ViewBuilder
-    private func listRow(_ entry: FileEntry) -> some View {
-        FileRow(
-            entry: entry,
-            thumbnail: filesBrowserService.thumbnails[entry.relativePath],
-            stats: filesBrowserService.folderStats[entry.relativePath],
-            showPath: filesBrowserService.isSearching
-        )
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
-        .contextMenu { contextMenuItems(entry) }
-    }
-
-    private var gridView: some View {
-        ScrollView {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 14)],
-                alignment: .leading,
-                spacing: 16,
-                pinnedViews: [.sectionHeaders]
-            ) {
-                ForEach(entryGroups) { group in
-                    Section {
-                        ForEach(group.entries) { entry in gridCell(entry) }
-                    } header: {
-                        if !group.title.isEmpty {
-                            DateSectionHeader(title: group.title)
-                        }
-                    }
-                }
-            }
-            .padding(16)
-        }
-    }
-
-    @ViewBuilder
-    private func gridCell(_ entry: FileEntry) -> some View {
-        FileGridCell(
-            entry: entry,
-            thumbnail: filesBrowserService.thumbnails[entry.relativePath],
-            showPath: filesBrowserService.isSearching
-        )
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { filesBrowserService.activate(entry) }
-        .contextMenu { contextMenuItems(entry) }
-    }
-
-    @ViewBuilder
-    private func contextMenuItems(_ entry: FileEntry) -> some View {
-        if !entry.isDirectory {
-            Button { filesBrowserService.preview(entry) } label: {
-                Label(L10n.isPL ? "Otwórz" : "Open", systemImage: "eye")
-            }
-            Button { filesBrowserService.download(entry) } label: {
-                Label(L10n.isPL ? "Pobierz" : "Download", systemImage: "arrow.down.circle")
-            }
+        if !entries.isEmpty {
             Divider()
-        }
-        Button(role: .destructive) { entryPendingDeletion = entry } label: {
-            Label(L10n.isPL ? "Usuń" : "Delete", systemImage: "trash")
+            Button(L10n.isPL ? "Usuń…" : "Delete…", role: .destructive) { entriesPendingDeletion = entries }
         }
     }
 
-    /// Grupuje wpisy: foldery w sekcji „Foldery", pliki wg dnia modyfikacji
-    /// (najnowsze u góry). W trybie wyszukiwania jedna sekcja bez nagłówka.
-    /// Wspólne dla widoku siatki i listy.
-    private var entryGroups: [FileDateGroup] {
-        let entries = filesBrowserService.displayedEntries
-        if filesBrowserService.isSearching {
-            return entries.isEmpty ? [] : [FileDateGroup(id: "__search", title: "", entries: entries)]
-        }
-        var groups: [FileDateGroup] = []
-        let dirs = entries.filter { $0.isDirectory }
-        if !dirs.isEmpty {
-            groups.append(FileDateGroup(id: "__folders", title: L10n.isPL ? "Foldery" : "Folders", entries: dirs))
-        }
-        let cal = Calendar.current
-        var dayOrder: [Date] = []
-        var byDay: [Date: [FileEntry]] = [:]
-        for f in entries where !f.isDirectory {
-            let day = cal.startOfDay(for: Date(timeIntervalSince1970: Double(f.modified) / 1000))
-            if byDay[day] == nil { dayOrder.append(day) }
-            byDay[day, default: []].append(f)
-        }
-        for day in dayOrder.sorted(by: >) {
-            groups.append(FileDateGroup(
-                id: Self.dayKeyFormatter.string(from: day),
-                title: Self.sectionTitle(for: day),
-                entries: byDay[day] ?? []
-            ))
-        }
-        return groups
+    private func entries(_ ids: Set<FileEntry.ID>) -> [FileEntry] {
+        service.displayedEntries.filter { ids.contains($0.id) }
     }
 
-    private static let dayKeyFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
-    }()
-
-    private static let sectionDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: L10n.isPL ? "pl_PL" : "en_US")
-        f.setLocalizedDateFormatFromTemplate("d MMMM yyyy")
-        return f
-    }()
-
-    /// Nagłówek dnia: „Dziś" / „Wczoraj" / pełna data.
-    private static func sectionTitle(for day: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(day) { return L10n.isPL ? "Dziś" : "Today" }
-        if cal.isDateInYesterday(day) { return L10n.isPL ? "Wczoraj" : "Yesterday" }
-        return sectionDateFormatter.string(from: day)
+    private func previewSelection() -> KeyPress.Result {
+        guard let entry = entries(selection).first(where: { !$0.isDirectory }) else { return .ignored }
+        service.preview(entry)
+        return .handled
     }
 
-    private var loadFailedState: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "exclamationmark.triangle",
-                title: L10n.isPL ? "Nie udało się załadować plików" : "Could Not Load Files",
-                subtitle: L10n.isPL
-                    ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
-                    : "The phone did not respond to the request. Please try again."
-            ) {
-                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { filesBrowserService.reload() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-            }
-        }
+    private func loadMoreIfLast(_ entry: FileEntry) {
+        if entry.id == service.displayedEntries.last?.id { service.loadNextPage() }
     }
 
-    /// The folder (or the search) came back with nothing in it.
-    private var emptyFolderState: some View {
-        EmptyStateContainer {
-            if filesBrowserService.isSearching {
-                EmptyStateView(
-                    systemImage: "magnifyingglass",
-                    title: L10n.isPL ? "Brak wyników" : "No Results",
-                    subtitle: L10n.isPL
-                        ? "Żaden plik ani folder nie pasuje do „\(filesBrowserService.searchQuery)”."
-                        : "No file or folder matches \"\(filesBrowserService.searchQuery)\"."
-                )
-            } else {
-                EmptyStateView(
-                    systemImage: "folder",
-                    title: L10n.isPL ? "Ten folder jest pusty" : "This Folder Is Empty",
-                    subtitle: L10n.isPL
-                        ? "Nie ma tu żadnych plików ani folderów. Upuść plik w tym oknie, aby wysłać go tutaj."
-                        : "There are no files or folders here. Drop a file on this window to send it here."
-                )
-            }
+    private var deletionTitle: String {
+        guard let first = entriesPendingDeletion.first else { return "" }
+        if entriesPendingDeletion.count > 1 {
+            return L10n.isPL ? "Usunąć \(entriesPendingDeletion.count) elementy?" : "Delete \(entriesPendingDeletion.count) items?"
         }
-    }
-
-    private var permissionEmptyState: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "folder.badge.questionmark",
-                title: L10n.isPL ? "Przyznaj dostęp do plików na telefonie" : "Grant file access on your phone",
-                subtitle: L10n.isPL
-                    ? "Na telefonie otwórz AirBridge → wizard uprawnień → „Pliki” i zezwól na dostęp do Pamięci wewnętrznej."
-                    : "On your phone open AirBridge → permissions → \"Files\" and allow access to internal storage."
-            ) {
-                Button(L10n.isPL ? "Odśwież" : "Refresh") { filesBrowserService.reload() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-            }
-        }
+        return L10n.isPL ? "Usunąć \u{201E}\(first.name)\u{201D}?" : "Delete \"\(first.name)\"?"
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard !filesBrowserService.needsPermission else { return false }
+        guard !service.needsPermission else { return false }
         // Sendable lock-guarded accumulator: provider completions fire on
         // arbitrary queues, so the collected URLs need synchronized shared state
         // that is safe to capture in the @Sendable completion closures.
@@ -453,78 +417,82 @@ struct FilesBrowserView: View {
         }
         group.notify(queue: .main) {
             let urls = collected.withLock { $0 }
-            if !urls.isEmpty { filesBrowserService.upload(urls: urls) }
+            if !urls.isEmpty { service.upload(urls: urls) }
         }
         return true
     }
-}
 
-/// Okno podglądu pliku (QuickLook). Pokazuje spinner w trakcie pobierania,
-/// potem podgląd; „Pobierz" zapisuje już-pobrane bajty do Downloads.
-private struct FilePreviewSheet: View {
-    let service: FilesBrowserService
+    // MARK: - Formatting
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text(service.previewName)
-                    .font(.headline).lineLimit(1).truncationMode(.middle)
-                Spacer()
-                if service.previewURL != nil {
-                    Button { service.saveCurrentPreviewToDownloads() } label: {
-                        Label(L10n.isPL ? "Pobierz" : "Download", systemImage: "arrow.down.circle")
-                    }
-                }
-                Button(L10n.isPL ? "Zamknij" : "Close") { service.dismissPreview() }
-                    .keyboardShortcut(.cancelAction)
-            }
-            .padding(12)
-            Divider()
-            content
+    private func sizeText(_ entry: FileEntry) -> String {
+        if entry.isDirectory {
+            guard let stats = service.folderStats[entry.relativePath] else { return "—" }
+            return Self.sizeFormatter.string(fromByteCount: stats.totalSize)
         }
-        .frame(minWidth: 720, minHeight: 520)
+        return Self.sizeFormatter.string(fromByteCount: entry.size)
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if let url = service.previewURL {
-            QuickLookPreview(url: url)
-        } else if service.previewFailed {
-            VStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 34)).foregroundStyle(.secondary)
-                Text(L10n.isPL ? "Nie udało się pobrać pliku do podglądu."
-                               : "Couldn't load the file for preview.")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            VStack(spacing: 12) {
-                if service.previewProgress > 0 {
-                    ProgressView(value: service.previewProgress)
-                        .progressViewStyle(.linear)
-                        .frame(width: 240)
-                    Text("\(Int(service.previewProgress * 100))%")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .monospacedDigit()
-                } else {
-                    ProgressView()
-                    Text(L10n.isPL ? "Pobieram…" : "Loading…").foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    /// "0 bajtów", not the formatter's worded "Zero KB".
+    private static let sizeFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        f.allowsNonnumericFormatting = false
+        return f
+    }()
+
+    /// "Folder", or the file type's system name ("Obraz JPEG").
+    private func kindText(_ entry: FileEntry) -> String {
+        if entry.isDirectory { return "Folder" }
+        return UTType(mimeType: entry.mimeType)?.localizedDescription ?? entry.mimeType
+    }
+
+    /// A folder's item count ("12 elementów"); empty for files.
+    private func contentsText(_ entry: FileEntry) -> String {
+        guard entry.isDirectory, let stats = service.folderStats[entry.relativePath] else { return "" }
+        return Self.itemCount(stats.dirCount + stats.fileCount)
+    }
+
+    private static func itemCount(_ n: Int) -> String {
+        guard L10n.isPL else { return n == 1 ? "1 item" : "\(n) items" }
+        let mod10 = n % 10, mod100 = n % 100
+        if n == 1 { return "1 element" }
+        if (2...4).contains(mod10) && !(12...14).contains(mod100) { return "\(n) elementy" }
+        return "\(n) elementów"
+    }
+
+    private static func date(_ millis: Int64) -> String {
+        Date(timeIntervalSince1970: TimeInterval(millis) / 1000).formatted(date: .abbreviated, time: .shortened)
+    }
+
+    // MARK: - Sorting
+
+    private static func comparator(for key: FileSortKey, ascending: Bool) -> KeyPathComparator<FileEntry> {
+        let order: SortOrder = ascending ? .forward : .reverse
+        switch key {
+        case .name: return KeyPathComparator(\.name, order: order)
+        case .size: return KeyPathComparator(\.size, order: order)
+        case .modified: return KeyPathComparator(\.modified, order: order)
+        case .type: return KeyPathComparator(\.mimeType, order: order)
         }
+    }
+
+    private func applySort(_ order: [KeyPathComparator<FileEntry>]) {
+        guard let first = order.first, let key = Self.sortKey(for: first) else { return }
+        service.sortAscending = first.order == .forward
+        service.sortBy = key
+    }
+
+    private static func sortKey(for comparator: KeyPathComparator<FileEntry>) -> FileSortKey? {
+        let keyPath: PartialKeyPath<FileEntry> = comparator.keyPath
+        let keys: [(PartialKeyPath<FileEntry>, FileSortKey)] = [
+            (\FileEntry.name, .name), (\FileEntry.size, .size),
+            (\FileEntry.modified, .modified), (\FileEntry.mimeType, .type),
+        ]
+        return keys.first { $0.0 == keyPath }?.1
     }
 }
 
-/// Sekcja siatki: foldery lub pliki z danego dnia. `title` puste = bez nagłówka.
-private struct FileDateGroup: Identifiable {
-    let id: String
-    let title: String
-    let entries: [FileEntry]
-}
-
-/// SF Symbol dla danego typu MIME (wspólne dla wiersza i kafelka siatki).
+/// SF Symbol for a MIME type.
 private func fileSymbol(for mime: String) -> String {
     if mime.hasPrefix("image/") { return "photo" }
     if mime.hasPrefix("video/") { return "film" }
@@ -534,151 +502,58 @@ private func fileSymbol(for mime: String) -> String {
     return "doc"
 }
 
-private struct FileRow: View {
+/// A file's icon: its thumbnail when the phone sent one, otherwise the
+/// folder or file-type symbol.
+private struct FileIcon: View {
     let entry: FileEntry
     let thumbnail: NSImage?
-    var stats: FolderStats? = nil
-    var showPath: Bool = false
+    let size: CGFloat
 
     var body: some View {
-        HStack(spacing: 10) {
-            icon
-            VStack(alignment: .leading, spacing: 2) {
-                Text(showPath ? entry.relativePath : entry.name).lineLimit(1)
-                if entry.isDirectory {
-                    if let stats {
-                        Text(Self.folderSubtitle(stats))
-                            .font(.caption).foregroundStyle(.secondary)
-                            .contentTransition(.numericText())
-                    }
-                } else {
-                    Text(Self.sizeFormatter.string(fromByteCount: entry.size))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if entry.isDirectory {
-                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        Group {
+            if let thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: entry.isDirectory ? "folder.fill" : fileSymbol(for: entry.mimeType))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundStyle(entry.isDirectory ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .padding(size * 0.08)
             }
         }
-        .padding(.vertical, 2)
-        .animation(.default, value: stats)
-    }
-
-    private static func folderSubtitle(_ s: FolderStats) -> String {
-        let isPL = L10n.isPL
-        var parts: [String] = []
-        if s.dirCount > 0 {
-            parts.append(isPL ? "\(s.dirCount) \(plural(s.dirCount, "folder", "foldery", "folderów"))"
-                              : "\(s.dirCount) \(s.dirCount == 1 ? "folder" : "folders")")
-        }
-        parts.append(isPL ? "\(s.fileCount) \(plural(s.fileCount, "plik", "pliki", "plików"))"
-                          : "\(s.fileCount) \(s.fileCount == 1 ? "file" : "files")")
-        parts.append(sizeFormatter.string(fromByteCount: s.totalSize))
-        return parts.joined(separator: " · ")
-    }
-
-    /// Polish plural: 1 / 2-4 (excl. teens) / rest.
-    private static func plural(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
-        let mod10 = n % 10, mod100 = n % 100
-        if n == 1 { return one }
-        if mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14) { return few }
-        return many
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        if let thumbnail {
-            Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fill)
-                .frame(width: 28, height: 28).clipShape(RoundedRectangle(cornerRadius: 4))
-        } else {
-            Image(systemName: entry.isDirectory ? "folder.fill" : fileSymbol(for: entry.mimeType))
-                .frame(width: 28, height: 28)
-                .foregroundStyle(entry.isDirectory ? Color.accentColor : Color.secondary)
-        }
-    }
-
-    private static let sizeFormatter: ByteCountFormatter = {
-        let f = ByteCountFormatter(); f.countStyle = .file; return f
-    }()
-}
-
-/// Wspólny formatter rozmiaru pliku (kafelek + wiersz). Używany tylko z głównego wątku (SwiftUI).
-private nonisolated(unsafe) let fileSizeFormatter: ByteCountFormatter = {
-    let f = ByteCountFormatter(); f.countStyle = .file; return f
-}()
-
-/// Sticky nagłówek sekcji daty w siatce („Dziś", „Wczoraj", pełna data).
-private struct DateSectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.ab(.subheadline, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 6)
-            .background(.bar, in: RoundedRectangle(cornerRadius: 8))
+        .frame(width: size, height: size)
     }
 }
 
-private struct FileGridCell: View {
+/// An item of the icon view, as the Finder draws one: the icon on a soft
+/// highlight and the name in an accent capsule when selected.
+private struct FileIconItem: View {
     let entry: FileEntry
     let thumbnail: NSImage?
-    var showPath: Bool = false
-
-    private var isVideo: Bool { entry.mimeType.hasPrefix("video/") }
-    private var isMedia: Bool { isVideo || entry.mimeType.hasPrefix("image/") }
-    private var displayName: String { showPath ? entry.relativePath : entry.name }
+    let name: String
+    let isSelected: Bool
 
     var body: some View {
         VStack(spacing: 6) {
-            tile
-            VStack(spacing: 1) {
-                Text(displayName)
-                    .font(.caption).lineLimit(1).truncationMode(.middle)
-                if !entry.isDirectory {
-                    Text(fileSizeFormatter.string(fromByteCount: entry.size))
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .help(displayName)
+            FileIcon(entry: entry, thumbnail: thumbnail, size: 64)
+                .padding(6)
+                .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                            in: .rect(cornerRadius: 8, style: .continuous))
+            Text(name)
+                .font(.callout)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .background(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear),
+                            in: .rect(cornerRadius: 4, style: .continuous))
         }
-    }
-
-    private var tile: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10).fill(.quaternary)
-            if let thumbnail {
-                Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fill)
-            } else if entry.isDirectory {
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 40)).foregroundStyle(Color.accentColor)
-            } else if isMedia {
-                ProgressView().controlSize(.small)   // szkielet, zanim miniaturka dojdzie
-            } else {
-                Image(systemName: fileSymbol(for: entry.mimeType))
-                    .font(.system(size: 38)).foregroundStyle(.secondary)
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .overlay(alignment: .center) {
-            if isVideo {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(9)
-                    .background(.black.opacity(0.5), in: Circle())
-            }
-        }
-        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+        .contentShape(Rectangle())
+        .help(name)
     }
 }

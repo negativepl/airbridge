@@ -90,37 +90,37 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
     private var deviceKey: String? { connectionService?.activeDevice?.publicKey }
     private let cache = DeviceDataCache.shared
 
-    private struct CachedListing: Codable {
+    /// Folders seen in this session, as the Finder keeps a network volume's:
+    /// going back shows the folder at once while the phone sends the current
+    /// listing, which then replaces it. RAM only — a listing kept on disk
+    /// could be days old and showed contents that were no longer there.
+    private struct SessionListing {
         let entries: [FileEntry]
         let totalCount: Int
         let needsPermission: Bool
-        /// Stats of the folders in this listing, keyed by path.
         let folderStats: [String: FolderStats]
     }
+    @ObservationIgnored private var sessionListings: [String: SessionListing] = [:]
 
-    /// One listing per (path, sort order); search results are never cached.
-    private func listingCacheName(for path: String) -> String {
-        "files-" + DeviceDataCache.hash("\(path)|\(sortBy.rawValue)|\(sortAscending)|\(foldersFirst)")
+    /// One listing per (path, sort order); search results are never kept.
+    private func sessionKey(for path: String) -> String {
+        "\(path)|\(sortBy.rawValue)|\(sortAscending)|\(foldersFirst)"
     }
 
-    /// Show the folder as last seen while the fresh listing is on its way.
-    /// Folder stats come back with it; a folder whose modification time changed
-    /// since gets its stats requested again.
-    private func restoreListingFromCache(path: String) {
-        guard !isSearching, let deviceKey,
-              let cached = cache.load(CachedListing.self, device: deviceKey, name: listingCacheName(for: path)) else { return }
-        entries = cached.entries
-        totalCount = cached.totalCount
-        needsPermission = cached.needsPermission
-        folderStats = cached.folderStats
+    private func rememberListing() {
+        guard !isSearching else { return }
+        sessionListings[sessionKey(for: currentPath)] = SessionListing(
+            entries: entries, totalCount: totalCount, needsPermission: needsPermission,
+            folderStats: folderStats.filter { key, _ in entries.contains { $0.relativePath == key } })
+    }
+
+    private func restoreSessionListing(path: String) {
+        guard !isSearching, let seen = sessionListings[sessionKey(for: path)] else { return }
+        entries = seen.entries
+        totalCount = seen.totalCount
+        needsPermission = seen.needsPermission
+        folderStats = seen.folderStats
         hasLoadedOnce = true
-    }
-
-    private func saveListingToCache() {
-        guard !isSearching, let deviceKey else { return }
-        let stats = folderStats.filter { key, _ in entries.contains { $0.relativePath == key } }
-        cache.save(CachedListing(entries: entries, totalCount: totalCount, needsPermission: needsPermission, folderStats: stats),
-                   device: deviceKey, name: listingCacheName(for: currentPath))
     }
 
     private enum DefaultsKey {
@@ -158,11 +158,31 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
 
     // MARK: - Navigation
 
-    func open(path: String, page: Int = 0) {
+    /// Folders left behind with Back / Forward, as the Finder keeps them.
+    private(set) var backStack: [String] = []
+    private(set) var forwardStack: [String] = []
+
+    func goBack() {
+        guard let path = backStack.popLast() else { return }
+        forwardStack.append(currentPath)
+        open(path: path, recordHistory: false)
+    }
+
+    func goForward() {
+        guard let path = forwardStack.popLast() else { return }
+        backStack.append(currentPath)
+        open(path: path, recordHistory: false)
+    }
+
+    func open(path: String, page: Int = 0, recordHistory: Bool = true) {
         guard let connectionService, connectionService.isConnected else { return }
         isLoading = true
         loadFailed = false
         if page == 0 {
+            if recordHistory, hasLoadedOnce, path != currentPath {
+                backStack.append(currentPath)
+                forwardStack.removeAll()
+            }
             currentPath = path
             entries = []
             thumbnails = [:]
@@ -170,7 +190,7 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
             folderStats = [:]
             requestedFolderStats = []
             failedFolderStats = []
-            restoreListingFromCache(path: path)
+            restoreSessionListing(path: path)
         }
         let message = Message.filesListRequest(
             path: path, page: page, pageSize: pageSize,
@@ -197,7 +217,7 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
         }
     }
 
-    func reload() { open(path: currentPath) }
+    func reload() { open(path: currentPath, recordHistory: false) }
 
     private var searchTask: Task<Void, Never>?
 
@@ -409,11 +429,14 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
         requestedThumbnails = []
         requestedFolderStats = []
         failedFolderStats = []
+        sessionListings = [:]
         totalCount = 0
         currentPage = 0
         currentPath = ""
         needsPermission = false
         hasLoadedOnce = false
+        backStack = []
+        forwardStack = []
     }
 
     // MARK: - MessageHandler
@@ -440,7 +463,7 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
             currentPage = page
             isLoading = false
             hasLoadedOnce = true
-            saveListingToCache()
+            rememberListing()
             for entry in newEntries { requestThumbnail(entry) }
             requestNextFolderStats()
 
@@ -455,7 +478,7 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
         case .folderStatsResponse(let path, let dirCount, let fileCount, let totalSize):
             statsWatchdogTask?.cancel()
             folderStats[path] = FolderStats(dirCount: dirCount, fileCount: fileCount, totalSize: totalSize)
-            saveListingToCache()
+            rememberListing()
             requestNextFolderStats()
 
         case .fileDeleteResponse(_, let success, let error):
