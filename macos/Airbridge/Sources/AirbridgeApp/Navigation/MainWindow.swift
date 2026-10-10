@@ -4,7 +4,6 @@ import Mirror
 struct MainWindow: View {
     @State private var selectedTab: NavigationItem = .home
     @Environment(\.openWindow) private var openWindow
-    @AppStorage("gallery.viewMode") private var galleryViewModeRaw: String = GalleryViewMode.filmstrip.rawValue
     @AppStorage("files.viewMode") private var filesViewModeRaw: String = FileViewMode.list.rawValue
 
     let connectionService: ConnectionService
@@ -131,31 +130,6 @@ struct MainWindow: View {
                     .help(L10n.isPL ? "Aktywne urządzenie dla galerii, plików, SMS i wysyłki" : "Active device for gallery, files, SMS and sending")
                 }
                 ToolbarSpacer(.fixed)
-            }
-            if selectedTab == .gallery {
-                if !galleryService.photos.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        Picker("", selection: Binding(
-                            get: { GalleryViewMode(rawValue: galleryViewModeRaw) ?? .filmstrip },
-                            set: { galleryViewModeRaw = $0.rawValue }
-                        )) {
-                            Image(systemName: "rectangle.split.3x1")
-                                .accessibilityLabel(L10n.isPL ? "Pasek zdjęć" : "Filmstrip").tag(GalleryViewMode.filmstrip)
-                            Image(systemName: "square.grid.3x3")
-                                .accessibilityLabel(L10n.isPL ? "Siatka" : "Grid").tag(GalleryViewMode.grid)
-                        }
-                        .pickerStyle(.segmented)
-                        .help(L10n.isPL ? "Tryb widoku" : "View mode")
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        galleryService.clearAndReload()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help(L10n.isPL ? "Odśwież" : "Refresh")
-                }
             }
             if selectedTab == .files {
                 // One consolidated options menu instead of three separate items —

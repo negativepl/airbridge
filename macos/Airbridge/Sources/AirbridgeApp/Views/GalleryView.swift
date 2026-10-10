@@ -1,55 +1,57 @@
 import SwiftUI
 import Protocol
 
-enum GalleryViewMode: String {
-    case filmstrip   // poziomy rząd dużych zdjęć (oryginalny)
-    case grid        // pionowa gęsta siatka małych miniatur, grupowana po dacie
-}
-
+/// The phone's photos, laid out like Photos on the Mac: one dense square grid,
+/// and a photo that zooms out of its tile into the window with its actions in
+/// the toolbar and its details in an inspector.
 struct GalleryView: View {
     let galleryService: GalleryService
     let connectionService: ConnectionService
 
-    @State private var selectedPhoto: GalleryPhotoMeta?
-    @AppStorage("gallery.viewMode") private var viewModeRaw: String = GalleryViewMode.filmstrip.rawValue
-
-    private var viewMode: GalleryViewMode { GalleryViewMode(rawValue: viewModeRaw) ?? .filmstrip }
-
+    /// The photo shown over the grid. Not a NavigationStack push: the zoom
+    /// out of the tile (`navigationTransition(.zoom)`) is iOS-only, so the
+    /// viewer is a layer over the grid sharing a matched geometry with it.
+    @State private var openPhoto: String?
+    @Namespace private var zoomSpace
+    @State private var selection: String?
+    /// "11.06–09.09.2025": the dates of the photos in view, under the title.
+    @State private var visibleRange = ""
+    /// Old ÷ new column count of the zoom in flight (>1 zooming in).
+    @State private var zoomRatio: CGFloat = 1
+    /// Middle of the visible part of the grid; the zoom scales about it.
+    @State private var zoomAnchor: UnitPoint = .center
+    /// Photo at the centre of the scroll view, kept in place while zooming.
+    @State private var centerPhoto: String?
     @State private var photoPendingDeletion: GalleryPhotoMeta?
-
-    /// Right-click actions on a photo: download it, or delete it on the phone
-    /// (after a confirmation here; the phone asks once more with its own sheet).
-    @ViewBuilder
-    private func photoContextMenu(_ photo: GalleryPhotoMeta) -> some View {
-        Button {
-            galleryService.downloadPhoto(photoId: photo.id)
-        } label: {
-            Label(L10n.isPL ? "Pobierz" : "Download", systemImage: "arrow.down.circle")
-        }
-        Divider()
-        Button(role: .destructive) {
-            photoPendingDeletion = photo
-        } label: {
-            Label(L10n.isPL ? "Usuń z telefonu" : "Delete from Phone", systemImage: "trash")
-        }
-    }
+    /// Zoom level as a column count, like Photos: resizing the window scales
+    /// the tiles and never reflows the grid (a minimum tile size changed the
+    /// column count as the window moved, and every row jumped).
+    @AppStorage("gallery.columns") private var savedColumns: Int = 5
+    /// What the grid draws. An @AppStorage write reaches the view outside the
+    /// animation transaction, so the zoom never animated while the grid read
+    /// the stored value directly.
+    @State private var columns: Int = 5
+    private static let columnRange = 2...12
 
     var body: some View {
-        Group {
-            if !connectionService.isConnected {
-                notConnectedView
-            } else if galleryService.photos.isEmpty && galleryService.isLoading {
-                initialLoadingView
-            } else if galleryService.photos.isEmpty && galleryService.loadFailed {
-                loadFailedView
-            } else if galleryService.photos.isEmpty {
-                emptyView
-            } else {
-                if viewMode == .grid { gridGallery } else { filmstripGallery }
+        ZStack {
+            content
+                .opacity(openPhoto == nil ? 1 : 0)
+                .allowsHitTesting(openPhoto == nil)
+            if let id = openPhoto, let photo = galleryService.photos.first(where: { $0.id == id }) {
+                PhotoViewer(
+                    photo: photo,
+                    galleryService: galleryService,
+                    zoomSpace: zoomSpace,
+                    onStep: { step(from: id, by: $0) },
+                    onClose: { close() },
+                    onDelete: { photoPendingDeletion = photo }
+                )
+                .zIndex(1)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
+            columns = savedColumns
             if connectionService.isConnected && galleryService.photos.isEmpty {
                 galleryService.loadPhotos()
             }
@@ -61,10 +63,8 @@ struct GalleryView: View {
         }
         .onChange(of: connectionService.activeDeviceId) { _, _ in
             // Switched to a different phone — reload its gallery.
+            openPhoto = nil
             if connectionService.isConnected { galleryService.clearAndReload() }
-        }
-        .sheet(item: $selectedPhoto) { photo in
-            PhotoDetailView(photo: photo, galleryService: galleryService, onClose: { selectedPhoto = nil })
         }
         .alert(
             photoPendingDeletion.map { L10n.isPL ? "Usunąć „\($0.filename)” z telefonu?" : "Delete \"\($0.filename)\" from the phone?" } ?? "",
@@ -73,6 +73,7 @@ struct GalleryView: View {
         ) { photo in
             Button(L10n.isPL ? "Usuń" : "Delete", role: .destructive) {
                 galleryService.deletePhoto(photoId: photo.id)
+                if openPhoto == photo.id { close() }
                 photoPendingDeletion = nil
             }
             Button(L10n.isPL ? "Anuluj" : "Cancel", role: .cancel) { photoPendingDeletion = nil }
@@ -93,352 +94,391 @@ struct GalleryView: View {
         }
     }
 
-    private var notConnectedView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "photo.on.rectangle",
-                title: L10n.isPL ? "Galeria" : "Gallery",
-                subtitle: L10n.isPL
-                    ? "Połącz się z telefonem, aby przeglądać zdjęcia."
-                    : "Connect to your phone to browse photos."
-            )
-        }
-    }
-
-    private var initialLoadingView: some View {
-        EmptyStateContainer {
-            VStack(spacing: 14) {
-                ProgressView()
-                    .controlSize(.large)
-                Text(L10n.isPL ? "Ładowanie galerii…" : "Loading gallery…")
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
+    @ViewBuilder
+    private var content: some View {
+        if !connectionService.isConnected {
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Brak połączenia" : "Not Connected", systemImage: "wifi.slash")
+            } description: {
+                Text(L10n.isPL ? "Połącz się z telefonem, aby przeglądać zdjęcia." : "Connect to your phone to browse photos.")
             }
-        }
-    }
-
-    private var loadFailedView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "exclamationmark.triangle",
-                title: L10n.isPL ? "Nie udało się załadować galerii" : "Could Not Load Gallery",
-                subtitle: L10n.isPL
-                    ? "Telefon nie odpowiedział na żądanie. Spróbuj ponownie."
-                    : "The phone did not respond to the request. Please try again."
-            ) {
-                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") {
-                    galleryService.clearAndReload()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+        } else if galleryService.photos.isEmpty && galleryService.isLoading {
+            ProgressView(L10n.isPL ? "Ładowanie zdjęć…" : "Loading Photos…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if galleryService.photos.isEmpty && galleryService.loadFailed {
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Nie udało się załadować zdjęć" : "Could Not Load Photos",
+                      systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(L10n.isPL ? "Telefon nie odpowiedział. Spróbuj ponownie." : "The phone did not respond. Please try again.")
+            } actions: {
+                Button(L10n.isPL ? "Spróbuj ponownie" : "Try Again") { galleryService.clearAndReload() }
             }
+        } else if galleryService.photos.isEmpty {
+            ContentUnavailableView(L10n.isPL ? "Brak zdjęć" : "No Photos",
+                                   systemImage: "photo.on.rectangle",
+                                   description: Text(L10n.isPL ? "Na telefonie nie ma zdjęć." : "There are no photos on the phone."))
+        } else {
+            grid
         }
     }
 
-    private var emptyView: some View {
-        EmptyStateContainer {
-            EmptyStateView(
-                systemImage: "photo.on.rectangle",
-                title: L10n.isPL ? "Brak zdjęć" : "No Photos",
-                subtitle: L10n.isPL
-                    ? "Nie znaleziono zdjęć na telefonie."
-                    : "No photos found on your phone."
-            ) {
-                Button(L10n.isPL ? "Odśwież" : "Refresh") {
-                    galleryService.clearAndReload()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
-        }
-    }
+    // MARK: - Grid
 
-    // MARK: - Filmstrip (poziomy, oryginalny)
-
-    private var filmstripGallery: some View {
-        GeometryReader { geo in
-            let rowHeight = max(200, geo.size.height - 20)
-            ScrollView(.horizontal, showsIndicators: true) {
-                LazyHStack(spacing: 10) {
-                    ForEach(galleryService.photos) { photo in
-                        ThumbnailCell(
-                            photo: photo,
-                            galleryService: galleryService,
-                            height: rowHeight
-                        ) {
-                            selectedPhoto = photo
-                        }
-                        .contextMenu { photoContextMenu(photo) }
-                        .onAppear {
-                            if photo.id == galleryService.photos.last?.id {
-                                galleryService.loadNextPage()
-                            }
-                        }
-                    }
-
-                    if galleryService.isLoading {
-                        ProgressView()
-                            .frame(width: 80, height: rowHeight)
-                    }
-                }
-                .padding(10)
-            }
-        }
-    }
-
-    // MARK: - Grid (pionowy, gęsta siatka po dacie)
-
-    private var gridGallery: some View {
+    private var grid: some View {
         ScrollView {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 108, maximum: 160), spacing: 6)],
-                alignment: .leading,
-                spacing: 6
-            ) {
-                ForEach(photoGroups) { group in
-                    Section {
-                        ForEach(group.photos) { photo in
-                            GalleryGridCell(photo: photo, galleryService: galleryService) {
-                                selectedPhoto = photo
+            // Zoom as Photos does it: the grid is magnified (or shrunk) about
+            // the middle of the view while the new layout fades in from the
+            // inverse scale. Tiles don't travel between rows. The ZStack keeps
+            // the outgoing and incoming grids on top of each other.
+            ZStack(alignment: .top) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: columns),
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    ForEach(galleryService.photos) { photo in
+                        GalleryTile(photo: photo, galleryService: galleryService,
+                                    isSelected: selection == photo.id,
+                                    isOpen: openPhoto == photo.id, zoomSpace: zoomSpace)
+                            .onTapGesture {
+                                selection = photo.id
+                                // Double-click opens, like Photos; reading the
+                                // click count keeps the single click instant.
+                                if NSApp.currentEvent?.clickCount == 2 { open(photo.id) }
                             }
-                            .contextMenu { photoContextMenu(photo) }
-                            .onAppear {
-                                if photo.id == galleryService.photos.last?.id {
-                                    galleryService.loadNextPage()
-                                }
-                            }
-                        }
-                    } header: {
-                        GalleryDateSectionHeader(title: group.title)
+                            .contextMenu { contextMenu(photo) }
+                            .onAppear { prefetchIfNear(photo) }
                     }
                 }
+                .scrollTargetLayout()
+                .padding(.horizontal, 2)
+                .id(columns)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 1 / zoomRatio, anchor: zoomAnchor).combined(with: .opacity),
+                    removal: .scale(scale: zoomRatio, anchor: zoomAnchor).combined(with: .opacity)
+                ))
             }
-            .padding(12)
 
-            if galleryService.isLoading {
-                ProgressView().padding(.vertical, 12)
+            // Fixed-height footer: the spinner only fades, so the content
+            // height doesn't change under the scroll's rubber band (which
+            // shook the grid at the bottom).
+            ProgressView()
+                .controlSize(.small)
+                .opacity(galleryService.isLoading ? 1 : 0)
+                .frame(height: 44)
+        }
+        .scrollPosition(id: $centerPhoto, anchor: .center)
+        .onScrollGeometryChange(for: UnitPoint.self) { geo in
+            // The middle of the visible part, in the grid's own unit space.
+            let height = max(geo.contentSize.height, 1)
+            return UnitPoint(x: 0.5, y: (geo.contentOffset.y + geo.containerSize.height / 2) / height)
+        } action: { _, anchor in
+            zoomAnchor = anchor
+        }
+        // One continuous grid, as Photos' library: the dates of the photos in
+        // view go under the title instead of day headers splitting the grid.
+        .onScrollTargetVisibilityChange(idType: String.self) { visibleIDs in
+            visibleRange = dateRange(of: visibleIDs)
+        }
+        .navigationTitle(openPhotoDate.map { $0.formatted(.dateTime.day().month(.wide).year()) }
+                         ?? (L10n.isPL ? "Galeria" : "Gallery"))
+        .navigationSubtitle(openPhotoDate.map { $0.formatted(date: .omitted, time: .shortened) } ?? visibleRange)
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.return) {
+            guard let selection else { return .ignored }
+            open(selection)
+            return .handled
+        }
+        .toolbar {
+            if openPhoto == nil { gridToolbar }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var gridToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                zoom(by: -1)
+            } label: {
+                Label(L10n.isPL ? "Pomniejsz" : "Zoom Out", systemImage: "minus.magnifyingglass")
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(columns >= Self.columnRange.upperBound)
+            Button {
+                zoom(by: 1)
+            } label: {
+                Label(L10n.isPL ? "Powiększ" : "Zoom In", systemImage: "plus.magnifyingglass")
+            }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(columns <= Self.columnRange.lowerBound)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                galleryService.clearAndReload()
+            } label: {
+                Label(L10n.isPL ? "Odśwież" : "Refresh", systemImage: "arrow.clockwise")
             }
         }
     }
 
-    /// Grupuje zdjęcia po dniu zrobienia (najnowsze u góry). Grupowanie w widoku.
-    private var photoGroups: [GalleryDateGroup] {
-        let cal = Calendar.current
-        var order: [Date] = []
-        var byDay: [Date: [GalleryPhotoMeta]] = [:]
-        for p in galleryService.photos {
-            let day = cal.startOfDay(for: Date(timeIntervalSince1970: Double(p.dateTaken) / 1000))
-            if byDay[day] == nil { order.append(day) }
-            byDay[day, default: []].append(p)
-        }
-        return order.sorted(by: >).map { day in
-            GalleryDateGroup(
-                id: Self.dayKeyFormatter.string(from: day),
-                title: Self.sectionTitle(for: day),
-                photos: byDay[day] ?? []
-            )
+    @ViewBuilder
+    private func contextMenu(_ photo: GalleryPhotoMeta) -> some View {
+        Button(L10n.isPL ? "Otwórz" : "Open") { open(photo.id) }
+        Button(L10n.isPL ? "Pobierz" : "Download") { galleryService.downloadPhoto(photoId: photo.id) }
+        Divider()
+        Button(L10n.isPL ? "Usuń z telefonu…" : "Delete from Phone…", role: .destructive) {
+            photoPendingDeletion = photo
         }
     }
 
-    private static let dayKeyFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
-    }()
+    /// Asks for the next page while there are still ~40 photos to go, so it
+    /// usually lands before the scroll reaches the bottom.
+    private func prefetchIfNear(_ photo: GalleryPhotoMeta) {
+        let photos = galleryService.photos
+        guard let i = photos.lastIndex(where: { $0.id == photo.id }), i >= photos.count - 40 else { return }
+        galleryService.loadNextPage()
+    }
 
-    private static let sectionDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: L10n.isPL ? "pl_PL" : "en_US")
-        f.setLocalizedDateFormatFromTemplate("d MMMM yyyy")
+    private func open(_ id: String) {
+        selection = id
+        withAnimation(.smooth(duration: 0.4)) { openPhoto = id }
+    }
+
+    /// Back to the grid, scrolled so the photo's tile is on screen for the
+    /// zoom back into it.
+    private func close() {
+        guard let id = openPhoto else { return }
+        selection = id
+        centerPhoto = id
+        withAnimation(.smooth(duration: 0.4)) { openPhoto = nil }
+    }
+
+    private var openPhotoDate: Date? {
+        guard let id = openPhoto, let photo = galleryService.photos.first(where: { $0.id == id }) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(photo.dateTaken) / 1000)
+    }
+
+    /// Previous/next photo in the viewer; loads the next page at the end.
+    private func step(from id: String, by delta: Int) {
+        let photos = galleryService.photos
+        guard let i = photos.firstIndex(where: { $0.id == id }) else { return }
+        let j = i + delta
+        if j >= photos.count - 3 { galleryService.loadNextPage() }
+        guard photos.indices.contains(j) else { return }
+        selection = photos[j].id
+        openPhoto = photos[j].id
+    }
+
+    /// Zooming in shows fewer, larger tiles.
+    /// Cross-zoom between the two layouts (see the grid); the scroll position
+    /// keeps the photo at the centre where it was.
+    private func zoom(by direction: Int) {
+        let next = min(max(columns - direction, Self.columnRange.lowerBound), Self.columnRange.upperBound)
+        guard next != columns else { return }
+        zoomRatio = CGFloat(columns) / CGFloat(next)
+        withAnimation(.smooth(duration: 0.35)) { columns = next }
+        savedColumns = next
+    }
+
+    private func dateRange(of ids: [String]) -> String {
+        let wanted = Set(ids)
+        let dates = galleryService.photos.lazy
+            .filter { wanted.contains($0.id) }
+            .map { Date(timeIntervalSince1970: TimeInterval($0.dateTaken) / 1000) }
+        guard let first = dates.min(), let last = dates.max() else { return "" }
+        return Self.rangeFormatter.string(from: first, to: last)
+    }
+
+    private static let rangeFormatter: DateIntervalFormatter = {
+        let f = DateIntervalFormatter()
+        f.dateTemplate = "ddMMyyyy"
         return f
     }()
-
-    private static func sectionTitle(for day: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(day) { return L10n.isPL ? "Dziś" : "Today" }
-        if cal.isDateInYesterday(day) { return L10n.isPL ? "Wczoraj" : "Yesterday" }
-        return sectionDateFormatter.string(from: day)
-    }
 }
 
-/// Sekcja galerii: zdjęcia z danego dnia.
-private struct GalleryDateGroup: Identifiable {
-    let id: String
-    let title: String
-    let photos: [GalleryPhotoMeta]
-}
-
-/// Nagłówek dnia w gridzie galerii — natywny, pogrubiony tekst (jak w Zdjęciach),
-/// bez szarego paska. Przewija się z treścią.
-private struct GalleryDateSectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.ab(.title3, weight: .semibold))
-            .foregroundStyle(.primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-    }
-}
-
-/// Kwadratowy kafel siatki galerii. Te same miniatury i cache co filmstrip.
-private struct GalleryGridCell: View {
+/// Square grid tile: the thumbnail fills and is cropped; the selection is the
+/// accent outline Photos draws.
+private struct GalleryTile: View {
     let photo: GalleryPhotoMeta
     let galleryService: GalleryService
-    let onTap: () -> Void
-
-    @State private var image: NSImage?
+    let isSelected: Bool
+    /// The photo is open in the viewer: its image is there, not here.
+    let isOpen: Bool
+    let zoomSpace: Namespace.ID
 
     var body: some View {
-        // Color.clear wymusza kwadrat na całą szerokość kolumny; obraz wypełnia
-        // overlay i jest przycinany — dzięki temu kafle nigdy nie rozpychają siatki.
+        // Color.clear sets the square at the column's width; the image fills an
+        // overlay and is clipped, so a tile never pushes the grid apart.
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .transition(.opacity)
-                } else {
-                    Rectangle().fill(.secondary.opacity(0.15))
+                // The zoom's source is the visible square, not the image: an
+                // aspect-filled image's own frame overhangs the tile (a tall
+                // screenshot reaches far above and below it).
+                if !isOpen {
+                    Color.clear
+                        .overlay {
+                            if let image = galleryService.thumbnailImages[photo.id] {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                Rectangle().fill(.quaternary)
+                            }
+                        }
+                        .clipped()
+                        .matchedGeometryEffect(id: photo.id, in: zoomSpace)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                if isSelected {
+                    Rectangle().strokeBorder(.tint, lineWidth: 3)
+                }
+            }
             .contentShape(Rectangle())
-            .animation(.easeOut(duration: 0.2), value: image == nil)
-            .onTapGesture { onTap() }
-            .onAppear { loadImage() }
-            .onChange(of: galleryService.thumbnailImages[photo.id]) { _, newImage in
-                image = newImage
+            .onAppear {
+                if galleryService.thumbnailImages[photo.id] == nil {
+                    galleryService.requestThumbnail(photoId: photo.id)
+                }
             }
-    }
-
-    private func loadImage() {
-        if let cached = galleryService.thumbnailImages[photo.id] {
-            image = cached
-        } else {
-            galleryService.requestThumbnail(photoId: photo.id)
-        }
     }
 }
 
-// MARK: - Thumbnail Cell (isolated to avoid full-grid re-renders)
+// MARK: - Photo viewer
 
-private struct ThumbnailCell: View {
+/// One photo in place of the grid, as Photos opens it: the system back button,
+/// the date as the title, actions in the toolbar and details in an inspector.
+/// ←/→ step through the library, Esc returns to the grid.
+private struct PhotoViewer: View {
     let photo: GalleryPhotoMeta
     let galleryService: GalleryService
-    let height: CGFloat
-    let onTap: () -> Void
-
-    @State private var image: NSImage?
-
-    private var aspect: CGFloat {
-        guard photo.height > 0 else { return 1 }
-        return CGFloat(photo.width) / CGFloat(photo.height)
-    }
-
-    private var width: CGFloat {
-        max(180, min(720, height * aspect))
-    }
-
-    var body: some View {
-        ZStack {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .transition(.opacity)
-            } else {
-                // Plain placeholder, no per-tile spinner — tiles fill in
-                // progressively (Photos-style). The only loader is the main
-                // one, so a refresh doesn't spray a spinner over every cell.
-                Rectangle()
-                    .fill(.secondary.opacity(0.15))
-            }
-        }
-        .frame(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(Rectangle())
-        .animation(.easeOut(duration: 0.2), value: image == nil)
-        .onTapGesture { onTap() }
-        .onAppear { loadImage() }
-        .onChange(of: galleryService.thumbnailImages[photo.id]) { _, newImage in
-            image = newImage
-        }
-    }
-
-    private func loadImage() {
-        if let cached = galleryService.thumbnailImages[photo.id] {
-            image = cached
-        } else {
-            galleryService.requestThumbnail(photoId: photo.id)
-        }
-    }
-}
-
-// MARK: - Photo Detail View
-
-struct PhotoDetailView: View {
-    let photo: GalleryPhotoMeta
-    let galleryService: GalleryService
+    let zoomSpace: Namespace.ID
+    let onStep: (Int) -> Void
     let onClose: () -> Void
+    let onDelete: () -> Void
 
     @State private var rotation: Angle = .zero
-    @State private var scale: CGFloat = 1.0
-    @State private var committedScale: CGFloat = 1.0
+    @State private var scale: CGFloat = 1
+    @State private var committedScale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var committedOffset: CGSize = .zero
     @State private var downloaded = false
+    @AppStorage("gallery.showInfo") private var showInfo = false
+    @FocusState private var focused: Bool
+
+    private var taken: Date { Date(timeIntervalSince1970: TimeInterval(photo.dateTaken) / 1000) }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.92)
-                .ignoresSafeArea()
-
-            photoLayer
-
-            VStack {
-                topBar
-                Spacer()
-                bottomBar
+        photoLayer
+            .toolbar { toolbar }
+            .inspector(isPresented: $showInfo) {
+                info.inspectorColumnWidth(min: 240, ideal: 280, max: 360)
             }
-            .padding(20)
-        }
-        .frame(minWidth: 600, idealWidth: 860, minHeight: 500, idealHeight: 640)
-    }
-
-    // MARK: - Photo with zoom / pan / rotation
-
-    private var displayedImage: NSImage? {
-        galleryService.previewImages[photo.id] ?? galleryService.thumbnailImages[photo.id]
+            .focusable()
+            .focusEffectDisabled()
+            .focused($focused)
+            .onAppear { focused = true }
+            .onKeyPress(.leftArrow) { onStep(-1); return .handled }
+            .onKeyPress(.rightArrow) { onStep(1); return .handled }
+            .onKeyPress(.escape) { onClose(); return .handled }
+            .onChange(of: photo.id) { _, _ in
+                rotation = .zero
+                downloaded = false
+                resetZoom(animated: false)
+            }
     }
 
     private var photoLayer: some View {
         Group {
-            if let nsImage = displayedImage {
-                Image(nsImage: nsImage)
+            if let image = galleryService.previewImages[photo.id] ?? galleryService.thumbnailImages[photo.id] {
+                Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
+                    .matchedGeometryEffect(id: photo.id, in: zoomSpace)
                     .rotationEffect(rotation)
                     .scaleEffect(scale)
                     .offset(offset)
                     .gesture(zoomGesture)
                     .simultaneousGesture(panGesture)
-                    .onTapGesture(count: 2) { toggleDoubleTapZoom() }
-                    .animation(.airbridgeSmooth, value: rotation)
+                    .onTapGesture(count: 2) { toggleZoom() }
             } else {
                 ProgressView()
-                    .controlSize(.large)
-                    .tint(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
         .task(id: photo.id) {
             galleryService.requestPreview(photoId: photo.id, maxSize: 1920)
         }
     }
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button(action: onClose) {
+                Label(L10n.isPL ? "Wstecz" : "Back", systemImage: "chevron.backward")
+            }
+            .help(L10n.isPL ? "Wróć do zdjęć" : "Back to photos")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                withAnimation { rotation -= .degrees(90) }
+            } label: {
+                Label(L10n.isPL ? "Obróć" : "Rotate", systemImage: "rotate.left")
+            }
+            .keyboardShortcut("r", modifiers: .command)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                galleryService.downloadPhoto(photoId: photo.id)
+                downloaded = true
+            } label: {
+                Label(downloaded ? (L10n.isPL ? "Pobrano" : "Downloaded") : (L10n.isPL ? "Pobierz" : "Download"),
+                      systemImage: downloaded ? "checkmark.circle" : "arrow.down.circle")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .help(L10n.isPL ? "Pobierz oryginał do folderu Pobrane" : "Download the original to Downloads")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(role: .destructive, action: onDelete) {
+                Label(L10n.isPL ? "Usuń z telefonu" : "Delete from Phone", systemImage: "trash")
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showInfo.toggle()
+            } label: {
+                Label(L10n.isPL ? "Informacje" : "Info", systemImage: "info.circle")
+            }
+            .keyboardShortcut("i", modifiers: .command)
+        }
+    }
+
+    private var info: some View {
+        Form {
+            Section {
+                LabeledContent(L10n.isPL ? "Nazwa" : "Name") {
+                    Text(photo.filename).textSelection(.enabled)
+                }
+                LabeledContent(L10n.isPL ? "Data" : "Date",
+                               value: taken.formatted(date: .long, time: .shortened))
+            }
+            Section {
+                LabeledContent(L10n.isPL ? "Wymiary" : "Dimensions", value: "\(photo.width) × \(photo.height)")
+                LabeledContent(L10n.isPL ? "Rozmiar" : "Size",
+                               value: ByteCountFormatter.string(fromByteCount: photo.size, countStyle: .file))
+                LabeledContent(L10n.isPL ? "Format" : "Format",
+                               value: photo.mimeType.replacingOccurrences(of: "image/", with: "").uppercased())
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Zoom and pan
 
     private var zoomGesture: some Gesture {
         MagnifyGesture()
@@ -446,11 +486,7 @@ struct PhotoDetailView: View {
                 scale = max(0.8, min(6, committedScale * value.magnification))
             }
             .onEnded { _ in
-                if scale < 1 {
-                    resetZoomAndOffset()
-                } else {
-                    committedScale = scale
-                }
+                if scale < 1 { resetZoom(animated: true) } else { committedScale = scale }
             }
     }
 
@@ -458,161 +494,25 @@ struct PhotoDetailView: View {
         DragGesture()
             .onChanged { value in
                 guard scale > 1 else { return }
-                offset = CGSize(
-                    width: committedOffset.width + value.translation.width,
-                    height: committedOffset.height + value.translation.height
-                )
+                offset = CGSize(width: committedOffset.width + value.translation.width,
+                                height: committedOffset.height + value.translation.height)
             }
-            .onEnded { _ in
-                committedOffset = offset
-            }
+            .onEnded { _ in committedOffset = offset }
     }
 
-    private func toggleDoubleTapZoom() {
-        withAnimation(.airbridgeSmooth) {
-            if scale > 1 {
-                resetZoomAndOffset()
-            } else {
-                scale = 2
-                committedScale = 2
-            }
+    private func toggleZoom() {
+        if scale > 1 {
+            resetZoom(animated: true)
+        } else {
+            withAnimation { scale = 2; committedScale = 2 }
         }
     }
 
-    private func resetZoomAndOffset() {
-        withAnimation(.airbridgeSmooth) {
-            scale = 1
-            committedScale = 1
-            offset = .zero
-            committedOffset = .zero
+    private func resetZoom(animated: Bool) {
+        let reset = {
+            scale = 1; committedScale = 1
+            offset = .zero; committedOffset = .zero
         }
-    }
-
-    private var isAltered: Bool {
-        rotation != .zero || scale != 1 || offset != .zero
-    }
-
-    // MARK: - Top bar (close + rotate/reset)
-
-    private var topBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                onClose()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.ab(.subheadline, weight: .bold))
-                    .frame(width: 36, height: 36)
-                    .foregroundStyle(.primary)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
-            .keyboardShortcut(.cancelAction)
-            .help(L10n.isPL ? "Zamknij" : "Close")
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                iconButton(systemName: "rotate.left", help: L10n.isPL ? "Obróć w lewo" : "Rotate left") {
-                    withAnimation(.airbridgeSmooth) { rotation -= .degrees(90) }
-                }
-                iconButton(systemName: "rotate.right", help: L10n.isPL ? "Obróć w prawo" : "Rotate right") {
-                    withAnimation(.airbridgeSmooth) { rotation += .degrees(90) }
-                }
-
-                Divider()
-                    .frame(height: 20)
-                    .padding(.horizontal, 2)
-
-                iconButton(systemName: "arrow.counterclockwise", help: L10n.isPL ? "Resetuj widok" : "Reset view") {
-                    withAnimation(.airbridgeSmooth) {
-                        rotation = .zero
-                        resetZoomAndOffset()
-                    }
-                }
-                .disabled(!isAltered)
-            }
-            .padding(.horizontal, 6)
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-    }
-
-    private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.ab(.subheadline, weight: .semibold))
-                .frame(width: 32, height: 32)
-                .foregroundStyle(.primary)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-    }
-
-    // MARK: - Bottom bar (meta + download)
-
-    private var bottomBar: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(photo.filename)
-                    .font(.ab(.body, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(metaLine)
-                    .font(.ab(.footnote))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button {
-                galleryService.downloadPhoto(photoId: photo.id)
-                downloaded = true
-                Task {
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    downloaded = false
-                }
-            } label: {
-                Image(systemName: downloaded ? "checkmark.circle.fill" : "arrow.down.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .contentTransition(.symbolEffect(.replace))
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
-            .symbolEffect(.bounce, value: downloaded)
-            .help(downloaded
-                  ? (L10n.isPL ? "Pobrano" : "Downloaded")
-                  : (L10n.isPL ? "Pobierz oryginał" : "Download Original"))
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .contentCard(cornerRadius: 18)
-    }
-
-    private var metaLine: String {
-        let res = "\(photo.width) × \(photo.height)"
-        let size = formatFileSize(photo.size)
-        let date = formatDate(photo.dateTaken)
-        let format = photo.mimeType.replacingOccurrences(of: "image/", with: "").uppercased()
-        return "\(res)  ·  \(size)  ·  \(format)  ·  \(date)"
-    }
-
-    private func formatFileSize(_ bytes: Int64) -> String {
-        if bytes > 1024 * 1024 {
-            return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
-        } else if bytes > 1024 {
-            return String(format: "%.0f KB", Double(bytes) / 1024)
-        }
-        return "\(bytes) B"
-    }
-
-    private func formatDate(_ timestamp: Int64) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        if animated { withAnimation { reset() } } else { reset() }
     }
 }
