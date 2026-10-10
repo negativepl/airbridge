@@ -4,7 +4,6 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.provider.ContactsContract
 import android.provider.Telephony
 import android.telephony.SmsManager
@@ -62,34 +61,23 @@ class SmsProvider(private val context: Context) {
     fun getMessages(threadId: String, page: Int, pageSize: Int): Pair<List<SmsMessage>, Int> {
         val messages = mutableListOf<SmsMessage>()
 
-        val countCursor = contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(Telephony.Sms._ID),
-            "${Telephony.Sms.THREAD_ID} = ?",
-            arrayOf(threadId),
-            null
-        )
-        val totalCount = countCursor?.count ?: 0
-        countCursor?.close()
-
-        val queryBundle = Bundle().apply {
-            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(Telephony.Sms.DATE))
-            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
-            putInt(ContentResolver.QUERY_ARG_LIMIT, pageSize)
-            putInt(ContentResolver.QUERY_ARG_OFFSET, page * pageSize)
-            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${Telephony.Sms.THREAD_ID} = ?")
-            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf(threadId))
-        }
-
+        // Paged by cursor position, as getConversations: Samsung's SMS provider
+        // ignores QUERY_ARG_LIMIT/OFFSET, so a 4,827-message thread came back
+        // whole and the Mac froze laying it out.
         val cursor = contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE, Telephony.Sms.READ),
-            queryBundle,
-            null
+            "${Telephony.Sms.THREAD_ID} = ?",
+            arrayOf(threadId),
+            "${Telephony.Sms.DATE} DESC"
         )
 
+        var totalCount = 0
         cursor?.use {
-            while (it.moveToNext()) {
+            totalCount = it.count
+            // A fresh cursor sits before the first row, where page 0 starts.
+            if (page > 0 && !it.moveToPosition(page * pageSize - 1)) return@use
+            while (messages.size < pageSize && it.moveToNext()) {
                 messages.add(SmsMessage(
                     id = it.getString(0) ?: "",
                     address = it.getString(1) ?: "",
