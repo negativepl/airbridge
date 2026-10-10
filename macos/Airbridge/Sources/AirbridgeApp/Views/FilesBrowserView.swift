@@ -270,30 +270,33 @@ struct FilesBrowserView: View {
                 }
                 .onAppear { loadMoreIfLast(entry) }
             }
+            // Minimums fit the content, as the Finder's columns: a window
+            // narrower than all of them scrolls the table sideways instead of
+            // cutting dates short.
             .width(min: 200, ideal: 320)
             .customizationID("name")
             .disabledCustomizationBehavior(.visibility)
             TableColumn(L10n.isPL ? "Data modyfikacji" : "Date Modified", value: \.modified) { entry in
                 Text(Self.date(entry.modified)).foregroundStyle(.secondary)
             }
-            .width(min: 120, ideal: 170)
+            .width(min: 160, ideal: 170)
             .customizationID("modified")
             TableColumn(L10n.isPL ? "Rozmiar" : "Size", value: \.size) { entry in
                 Text(sizeText(entry))
                     .foregroundStyle(.secondary)
             }
-            .width(min: 70, ideal: 90)
+            .width(min: 80, ideal: 90)
             .customizationID("size")
             TableColumn(L10n.isPL ? "Rodzaj" : "Kind", value: \.mimeType) { entry in
                 Text(kindText(entry)).foregroundStyle(.secondary)
             }
-            .width(min: 80, ideal: 130)
+            .width(min: 110, ideal: 130)
             .customizationID("kind")
             TableColumn(L10n.isPL ? "Zawartość" : "Contents") { entry in
                 Text(contentsText(entry))
                     .foregroundStyle(.secondary)
             }
-            .width(min: 80, ideal: 100)
+            .width(min: 110, ideal: 110)
             .customizationID("contents")
         }
         .contextMenu(forSelectionType: FileEntry.ID.self) { ids in
