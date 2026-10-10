@@ -203,8 +203,20 @@ struct FilesBrowserView: View {
         }
     }
 
-    @ViewBuilder
+    /// States cover the table with the window background, so its empty
+    /// striped rows don't show through the message.
     private var stateOverlay: some View {
+        stateMessage
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                if contentKind != .list && contentKind != .icons && contentKind != .loading {
+                    Color(nsColor: .windowBackgroundColor)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var stateMessage: some View {
         switch contentKind {
         case .permission:
             ContentUnavailableView {
@@ -290,6 +302,10 @@ struct FilesBrowserView: View {
             // Double-click or Return, as the Finder.
             if let entry = entries(ids).first { service.activate(entry) }
         }
+        // A fresh table per folder. Replacing every row of one table played
+        // its row animation, and a click in the first ~0.5 s after opening a
+        // folder waited for it to finish (measured 2026-10-10: 570–580 ms).
+        .id(service.currentPath)
         .onKeyPress(.space) { previewSelection() }
     }
 
