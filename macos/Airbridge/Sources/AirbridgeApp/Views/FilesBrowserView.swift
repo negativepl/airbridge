@@ -166,7 +166,9 @@ struct FilesBrowserView: View {
     private var contentKind: ContentKind {
         let s = service
         if s.needsPermission { return .permission }
-        if s.displayedEntries.isEmpty && (s.isLoading || s.isLoadingMoreRows) { return .loading }
+        // The first page shows all at once when every folder in it has its
+        // size and count, not row by row as the phone answers for each.
+        if (s.displayedEntries.isEmpty && s.isLoading) || (s.currentPage == 0 && s.isLoadingMoreRows) { return .loading }
         if s.loadFailed && s.displayedEntries.isEmpty { return .failed }
         if s.displayedEntries.isEmpty && s.hasLoadedOnce { return .empty }
         return viewMode == .grid ? .icons : .list
@@ -322,7 +324,7 @@ struct FilesBrowserView: View {
             Spacer()
 
             // Refreshing a folder that is already on screen.
-            if service.isLoading && !service.displayedEntries.isEmpty {
+            if service.isLoading && contentKind != .loading {
                 ProgressView().controlSize(.small)
             }
 
