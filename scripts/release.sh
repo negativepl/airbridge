@@ -226,6 +226,14 @@ echo "=== Release $TAG published ==="
 echo "https://github.com/negativepl/airbridge/releases/tag/$TAG"
 
 # --- Update manifest (in-app updater) ---
+# SKIP_UPDATE_MANIFEST=1 while the update server is offline: the apps report
+# the update check as unavailable, and an scp to a missing host would fail
+# the script after the release is already live.
+if [ "${SKIP_UPDATE_MANIFEST:-}" = "1" ]; then
+    echo ""
+    echo "--- Update manifest skipped (SKIP_UPDATE_MANIFEST=1) ---"
+    exit 0
+fi
 echo ""
 echo "--- Publishing update manifest ---"
 UPDATES_SSH="root@178.104.224.23"
