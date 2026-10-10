@@ -185,8 +185,8 @@ final class FilesBrowserService: MessageHandler, ActiveDeviceObserver {
             }
             currentPath = path
             entries = []
-            thumbnails = [:]
-            requestedThumbnails = []
+            // Thumbnails stay for the session (keyed by path): a folder you go
+            // back to shows its pictures with the listing, not refilled later.
             folderStats = [:]
             requestedFolderStats = []
             failedFolderStats = []
