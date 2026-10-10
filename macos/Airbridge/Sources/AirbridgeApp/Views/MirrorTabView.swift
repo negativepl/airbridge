@@ -9,8 +9,8 @@ struct MirrorTabView: View {
     let connectionService: ConnectionService
 
     @Environment(\.dismissWindow) private var dismissWindow
-    /// Modes whose "Advanced" group is open.
-    @State private var advancedOpen: Set<String> = []
+    /// Indent of the options under a "Heading:" row, as System Settings.
+    private static let subIndent: CGFloat = 20
 
     var body: some View {
         Group {
@@ -147,55 +147,36 @@ struct MirrorTabView: View {
             }
             .padding(.vertical, 4)
             settings()
-            // "Advanced" is a row of the section that reveals the encoder's
-            // settings as ordinary rows below it, spaced and separated like
-            // the rest of the form (a DisclosureGroup crammed them together).
-            let open = advancedBinding(slot)
-            Button {
-                withAnimation { open.wrappedValue.toggle() }
+            // The encoder's settings as System Settings groups related
+            // options: a "Heading:" row with the options indented below it.
+            Text(L10n.isPL ? "Zaawansowane:" : "Advanced:")
+            Picker(selection: fpsBinding(slot)) {
+                Text("30").tag(30)
+                Text("60").tag(60)
+                // The Mac side captures at 60 Hz at most (the virtual
+                // display runs at 60 Hz), so only the phone's screen can
+                // be sent faster.
+                if slot == .forward { Text("120").tag(120) }
             } label: {
-                HStack {
-                    Text(L10n.isPL ? "Zaawansowane" : "Advanced")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(open.wrappedValue ? 90 : 0))
-                }
-                .contentShape(.rect)
+                Text(L10n.isPL ? "klatki na sekundę" : "frame rate").padding(.leading, Self.subIndent)
             }
-            .buttonStyle(.plain)
-            if open.wrappedValue {
-                Picker(L10n.isPL ? "Klatki na sekundę" : "Frame Rate", selection: fpsBinding(slot)) {
-                    Text("30").tag(30)
-                    Text("60").tag(60)
-                    // The Mac side captures at 60 Hz at most (the virtual
-                    // display runs at 60 Hz), so only the phone's screen can
-                    // be sent faster.
-                    if slot == .forward { Text("120").tag(120) }
-                }
-                Picker(L10n.isPL ? "Przepływność" : "Bitrate", selection: bitrateBinding(slot)) {
-                    Text(L10n.isPL ? "Automatyczna" : "Automatic").tag(0)
-                    Text("8 Mb/s").tag(8_000_000)
-                    Text("12 Mb/s").tag(12_000_000)
-                    Text("20 Mb/s").tag(20_000_000)
-                    Text("30 Mb/s").tag(30_000_000)
-                    Text("40 Mb/s").tag(40_000_000)
-                }
-                Toggle(L10n.isPL ? "Kodek HEVC (H.265)" : "HEVC (H.265) Codec", isOn: hevcBinding(slot))
+            Picker(selection: bitrateBinding(slot)) {
+                Text(L10n.isPL ? "Automatyczna" : "Automatic").tag(0)
+                Text("8 Mb/s").tag(8_000_000)
+                Text("12 Mb/s").tag(12_000_000)
+                Text("20 Mb/s").tag(20_000_000)
+                Text("30 Mb/s").tag(30_000_000)
+                Text("40 Mb/s").tag(40_000_000)
+            } label: {
+                Text(L10n.isPL ? "przepływność" : "bitrate").padding(.leading, Self.subIndent)
+            }
+            Toggle(isOn: hevcBinding(slot)) {
+                Text(L10n.isPL ? "kodek HEVC (H.265)" : "HEVC (H.265) codec").padding(.leading, Self.subIndent)
             }
         }
     }
 
     // MARK: - Per-slot quality bindings
-
-    private func advancedBinding(_ slot: MirrorSlot) -> Binding<Bool> {
-        let key = "\(slot)"
-        return Binding(
-            get: { advancedOpen.contains(key) },
-            set: { open in if open { advancedOpen.insert(key) } else { advancedOpen.remove(key) } }
-        )
-    }
 
     private func fpsBinding(_ slot: MirrorSlot) -> Binding<Int> {
         Binding(
