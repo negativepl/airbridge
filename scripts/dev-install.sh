@@ -6,6 +6,11 @@
 # does NOT recreate the full bundle — only replaces binary/resources and re-signs.
 set -euo pipefail
 
+# --release builds optimised code (SwiftUI scrolling and animations run
+# noticeably slower in a debug build).
+CONFIG=debug
+[ "${1:-}" = "--release" ] && CONFIG=release
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/macos/Airbridge"
 
@@ -13,7 +18,7 @@ echo "--- swift build ---"
 # The exit status decides, not a grep: swift build colours its diagnostics,
 # so ": error:" never matched and a failed build shipped the old binary.
 set +e
-swift build > /tmp/airbridge-build.log 2>&1
+swift build -c "$CONFIG" > /tmp/airbridge-build.log 2>&1
 BUILD_STATUS=$?
 set -e
 sed $'s/\x1b\\[[0-9;]*m//g' /tmp/airbridge-build.log | grep -E "(error|warning):" | head -40 || true
@@ -34,7 +39,7 @@ killall AirbridgeApp 2>/dev/null || true
 sleep 0.3
 
 echo "--- copying binary ---"
-cp .build/debug/AirbridgeApp "$APP/Contents/MacOS/AirbridgeApp"
+cp "$(swift build -c "$CONFIG" --show-bin-path)/AirbridgeApp" "$APP/Contents/MacOS/AirbridgeApp"
 
 # Copy resources directly into Contents/Resources. Code uses
 # AppResources.bundle = Bundle.main, not SwiftPM's Bundle.module.
@@ -69,4 +74,4 @@ codesign --force --deep --sign "AirBridge Signing" "$APP" 2>&1 | tail -5
 
 echo "--- launching ---"
 open "$APP"
-echo "✓ AirBridge running from debug build"
+echo "✓ AirBridge running from $CONFIG build"

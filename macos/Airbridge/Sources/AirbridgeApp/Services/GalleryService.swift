@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ImageIO
 import Protocol
 
 @Observable
@@ -7,7 +8,28 @@ import Protocol
 final class GalleryService: MessageHandler, ActiveDeviceObserver {
 
     private(set) var photos: [GalleryPhotoMeta] = []
-    private(set) var thumbnailImages: [String: NSImage] = [:]  // photoId -> cached small thumb
+    /// One photo's thumbnail, observed on its own: with every thumbnail in one
+    /// observed dictionary, each arrival while scrolling redrew every tile.
+    @Observable
+    @MainActor
+    final class Thumbnail {
+        fileprivate(set) var image: NSImage?
+    }
+
+    /// Boxes live as long as the service; a reset empties them in place, so a
+    /// tile still holding one sees the new image.
+    @ObservationIgnored private var thumbnails: [String: Thumbnail] = [:]
+
+    func thumbnail(for photoId: String) -> Thumbnail {
+        if let existing = thumbnails[photoId] { return existing }
+        let created = Thumbnail()
+        thumbnails[photoId] = created
+        return created
+    }
+
+    private func clearThumbnails() {
+        for box in thumbnails.values { box.image = nil }
+    }
     private(set) var previewImages: [String: NSImage] = [:]    // photoId -> cached larger preview
     private(set) var totalCount: Int = 0
     private(set) var currentPage: Int = 0
@@ -85,7 +107,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
     func clearAndReload() {
         loadWatchdogTask?.cancel()
         photos = []
-        thumbnailImages = [:]
+        clearThumbnails()
         previewImages = [:]
         requestedThumbnails = []
         requestedPreviews = []
@@ -103,19 +125,46 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         loadPhotos(page: nextPage)
     }
 
+    /// Shows the disk-cached thumbnail, or asks the phone for it. The file read
+    /// and the JPEG decode run off the main thread: decoding lazily on first
+    /// draw stalled the scroll.
     func requestThumbnail(photoId: String) {
-        guard thumbnailImages[photoId] == nil,
+        guard thumbnail(for: photoId).image == nil,
               !requestedThumbnails.contains(photoId),
               let connectionService else { return }
-        if let deviceKey, let cached = cache.loadImage(device: deviceKey, folder: "gallery-thumbs", key: photoId) {
-            thumbnailImages[photoId] = cached
-            return
-        }
         requestedThumbnails.insert(photoId)
-        let message = Message.galleryThumbnailRequest(photoId: photoId)
+        let deviceKey = deviceKey
+        let cache = cache
         Task {
-            try? await connectionService.sendToActive(message)
+            let cached: CGImage? = await Task.detached(priority: .userInitiated) {
+                guard let deviceKey,
+                      let data = cache.loadImageData(device: deviceKey, folder: "gallery-thumbs", key: photoId)
+                else { return nil }
+                return Self.decodeThumbnail(data)
+            }.value
+            if let cached {
+                setThumbnail(cached, for: photoId)
+            } else {
+                try? await connectionService.sendToActive(.galleryThumbnailRequest(photoId: photoId))
+            }
         }
+    }
+
+    private func setThumbnail(_ image: CGImage, for photoId: String) {
+        thumbnail(for: photoId).image = NSImage(cgImage: image, size: .zero)
+    }
+
+    /// Decoded up front (the bitmap is cached immediately) with the EXIF
+    /// orientation applied, as NSImage(data:) would.
+    nonisolated private static func decodeThumbnail(_ data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1024,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     func requestPreview(photoId: String, maxSize: Int = 1920) {
@@ -165,7 +214,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         isLoading = false
         loadFailed = false
         photos = []
-        thumbnailImages = [:]
+        clearThumbnails()
         previewImages = [:]
         requestedThumbnails = []
         requestedPreviews = []
@@ -200,7 +249,7 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
         case .galleryDeleteResponse(let photoId, let success, let error):
             if success {
                 photos.removeAll { $0.id == photoId }
-                thumbnailImages[photoId] = nil
+                thumbnails[photoId]?.image = nil
                 previewImages[photoId] = nil
                 totalCount = max(0, totalCount - 1)
                 if let deviceKey {
@@ -211,12 +260,18 @@ final class GalleryService: MessageHandler, ActiveDeviceObserver {
             }
 
         case .galleryThumbnailResponse(let photoId, let data):
-            if let imageData = Data(base64Encoded: data),
-               let image = NSImage(data: imageData) {
-                thumbnailImages[photoId] = image
-                if let deviceKey {
-                    cache.saveImage(imageData, device: deviceKey, folder: "gallery-thumbs", key: photoId)
-                }
+            let deviceKey = deviceKey
+            let cache = cache
+            Task {
+                let image: CGImage? = await Task.detached(priority: .userInitiated) {
+                    guard let imageData = Data(base64Encoded: data),
+                          let image = Self.decodeThumbnail(imageData) else { return nil }
+                    if let deviceKey {
+                        cache.saveImage(imageData, device: deviceKey, folder: "gallery-thumbs", key: photoId)
+                    }
+                    return image
+                }.value
+                if let image { setThumbnail(image, for: photoId) }
             }
 
         case .galleryPreviewResponse(let photoId, let data):

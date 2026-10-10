@@ -52,6 +52,11 @@ final class DeviceDataCache: @unchecked Sendable {
         }
     }
 
+    /// The stored bytes, for callers that decode off the main thread.
+    func loadImageData(device: String, folder: String, key: String) -> Data? {
+        try? Data(contentsOf: imageURL(device: device, folder: folder, key: key))
+    }
+
     func loadImage(device: String, folder: String, key: String) -> NSImage? {
         let url = imageURL(device: device, folder: folder, key: key)
         guard let data = try? Data(contentsOf: url) else { return nil }
