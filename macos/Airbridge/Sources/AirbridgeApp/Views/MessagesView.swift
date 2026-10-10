@@ -167,10 +167,15 @@ struct MessagesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // A Liquid Glass bar: the conversation scrolls under it and the
-        // system's scroll edge effect keeps the field legible.
+        // system's scroll edge effect keeps the field legible. It comes with
+        // the messages, not before them.
         .safeAreaBar(edge: .bottom) {
-            replyBar(convo)
+            if loaded { replyBar(convo) }
         }
+        // The conversation appears at once, at full size. Picked with a tap
+        // on a glass tile, the change rode the tile's animation and the
+        // bubbles grew in from nothing, clipped.
+        .transaction { $0.animation = nil }
     }
 
     private func messagesScroll(_ convo: SmsConversationMeta) -> some View {
