@@ -203,13 +203,13 @@ struct FilesBrowserView: View {
         }
     }
 
-    /// States cover the table with the window background, so its empty
-    /// striped rows don't show through the message.
+    /// States (the spinner too) cover the table with the window background,
+    /// so its empty striped rows don't show through.
     private var stateOverlay: some View {
         stateMessage
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
-                if contentKind != .list && contentKind != .icons && contentKind != .loading {
+                if contentKind != .list && contentKind != .icons {
                     Color(nsColor: .windowBackgroundColor)
                 }
             }
