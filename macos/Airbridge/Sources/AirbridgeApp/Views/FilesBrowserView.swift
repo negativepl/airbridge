@@ -15,6 +15,9 @@ struct FilesBrowserView: View {
     @State private var searchText: String = ""
     @State private var selection: Set<FileEntry.ID> = []
     @State private var sortOrder: [KeyPathComparator<FileEntry>] = [KeyPathComparator(\.name)]
+    /// Which columns show, their order and widths — the header's right-click
+    /// menu, as the Finder's; kept with the window.
+    @SceneStorage("files.columns") private var columnCustomization = TableColumnCustomization<FileEntry>()
     @State private var entriesPendingDeletion: [FileEntry] = []
     /// A file drag is over the window: the folder takes the drop.
     @State private var isDropTargeted = false
@@ -226,7 +229,8 @@ struct FilesBrowserView: View {
     // MARK: - List (Table)
 
     private var listView: some View {
-        Table(service.displayedEntries, selection: $selection, sortOrder: $sortOrder) {
+        Table(service.displayedEntries, selection: $selection, sortOrder: $sortOrder,
+              columnCustomization: $columnCustomization) {
             TableColumn(L10n.isPL ? "Nazwa" : "Name", value: \.name) { entry in
                 HStack(spacing: 6) {
                     FileIcon(entry: entry, thumbnail: service.thumbnails[entry.relativePath], size: 18)
@@ -237,24 +241,30 @@ struct FilesBrowserView: View {
                 .onAppear { loadMoreIfLast(entry) }
             }
             .width(min: 200, ideal: 320)
+            .customizationID("name")
+            .disabledCustomizationBehavior(.visibility)
             TableColumn(L10n.isPL ? "Data modyfikacji" : "Date Modified", value: \.modified) { entry in
                 Text(Self.date(entry.modified)).foregroundStyle(.secondary)
             }
             .width(min: 120, ideal: 170)
+            .customizationID("modified")
             TableColumn(L10n.isPL ? "Rozmiar" : "Size", value: \.size) { entry in
                 Text(sizeText(entry))
                     .foregroundStyle(.secondary)
             }
             .width(min: 70, ideal: 90)
+            .customizationID("size")
             TableColumn(L10n.isPL ? "Rodzaj" : "Kind", value: \.mimeType) { entry in
                 Text(kindText(entry)).foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 130)
+            .customizationID("kind")
             TableColumn(L10n.isPL ? "Zawartość" : "Contents") { entry in
                 Text(contentsText(entry))
                     .foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 100)
+            .customizationID("contents")
         }
         .contextMenu(forSelectionType: FileEntry.ID.self) { ids in
             contextMenu(for: entries(ids))
