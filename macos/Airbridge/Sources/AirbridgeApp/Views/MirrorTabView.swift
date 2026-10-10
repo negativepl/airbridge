@@ -9,6 +9,8 @@ struct MirrorTabView: View {
     let connectionService: ConnectionService
 
     @Environment(\.dismissWindow) private var dismissWindow
+    /// Modes whose "Advanced" group is open.
+    @State private var advancedOpen: Set<String> = []
 
     var body: some View {
         Group {
@@ -149,7 +151,9 @@ struct MirrorTabView: View {
             }
             .padding(.vertical, 4)
             settings()
-            DisclosureGroup(L10n.isPL ? "Zaawansowane" : "Advanced") {
+            // The whole row opens it, as in System Settings; a plain
+            // DisclosureGroup on the Mac answers only its small chevron.
+            DisclosureGroup(isExpanded: advancedBinding(slot)) {
                 Picker(L10n.isPL ? "Klatki na sekundę" : "Frame Rate", selection: fpsBinding(slot)) {
                     Text("30").tag(30)
                     Text("60").tag(60)
@@ -167,11 +171,26 @@ struct MirrorTabView: View {
                     Text("40 Mb/s").tag(40_000_000)
                 }
                 Toggle(L10n.isPL ? "Kodek HEVC (H.265)" : "HEVC (H.265) Codec", isOn: hevcBinding(slot))
+            } label: {
+                Text(L10n.isPL ? "Zaawansowane" : "Advanced")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        withAnimation { advancedBinding(slot).wrappedValue.toggle() }
+                    }
             }
         }
     }
 
     // MARK: - Per-slot quality bindings
+
+    private func advancedBinding(_ slot: MirrorSlot) -> Binding<Bool> {
+        let key = "\(slot)"
+        return Binding(
+            get: { advancedOpen.contains(key) },
+            set: { open in if open { advancedOpen.insert(key) } else { advancedOpen.remove(key) } }
+        )
+    }
 
     private func fpsBinding(_ slot: MirrorSlot) -> Binding<Int> {
         Binding(
