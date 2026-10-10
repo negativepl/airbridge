@@ -28,44 +28,24 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
     @ObservationIgnored var requestTimeout: TimeInterval = 20
     @ObservationIgnored private var conversationsWatchdogTask: Task<Void, Never>?
     @ObservationIgnored private var messagesWatchdogTask: Task<Void, Never>?
+    /// When the pending requests left, for the response time in the diagnostics log.
+    @ObservationIgnored private var conversationsRequestedAt: Date?
+    @ObservationIgnored private var messagesRequestedAt: Date?
 
     func configure(connectionService: ConnectionService) {
         self.connectionService = connectionService
+        // Earlier versions wrote conversation lists and whole threads to disk.
+        DeviceDataCache.shared.removeFiles(named: "sms-")
     }
 
-    // MARK: - Cache
-
-    private var deviceKey: String? { connectionService?.activeDevice?.publicKey }
-    private let cache = DeviceDataCache.shared
-
-    private struct CachedConversations: Codable {
-        let conversations: [SmsConversationMeta]
-        let total: Int
-    }
-    /// Threads seen this session, shown at once when opened again while the
-    /// phone sends the current copy. RAM only — a thread kept on disk showed
-    /// an old copy that then jumped to the new one.
-    @ObservationIgnored private var sessionThreads: [String: (messages: [SmsMessageMeta], total: Int)] = [:]
-
-    /// Show the last conversation list this phone gave us before asking again.
-    private func restoreConversationsFromCache() {
-        guard conversations.isEmpty, let deviceKey,
-              let cached = cache.load(CachedConversations.self, device: deviceKey, name: "sms-conversations") else { return }
-        conversations = cached.conversations
-        totalConversations = cached.total
-    }
-
-    private func restoreSessionThread(threadId: String) {
-        guard let seen = sessionThreads[threadId] else { return }
-        currentMessages = seen.messages
-        totalMessages = seen.total
-    }
+    // SMS stay on the phone: nothing of them is kept on the Mac beyond the
+    // conversation on screen. Each opening asks the phone again.
 
     func loadConversations(page: Int = 0) {
         guard let connectionService, connectionService.isConnected, !isLoadingConversations else { return }
         isLoadingConversations = true
         conversationsLoadFailed = false
-        if page == 0 { restoreConversationsFromCache() }
+        conversationsRequestedAt = .now
         Task {
             try? await connectionService.sendToActive(Message.smsConversationsRequest(page: page, pageSize: pageSize))
         }
@@ -83,6 +63,15 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         loadConversations(page: conversations.count / pageSize)
     }
 
+    /// The open thread has older messages the phone has not sent yet.
+    var hasOlderMessages: Bool { currentThreadId != nil && currentMessages.count < totalMessages }
+
+    /// The next page back in the open thread, when it has one.
+    func loadOlderMessages() {
+        guard let currentThreadId, hasOlderMessages else { return }
+        loadMessages(threadId: currentThreadId, page: currentMessages.count / pageSize)
+    }
+
     func loadMessages(threadId: String, page: Int = 0) {
         // Only a request for the thread already loading waits; another thread
         // replaces it. Rejected, a conversation picked mid-load never loaded:
@@ -91,12 +80,14 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
               !(isLoadingMessages && currentThreadId == threadId) else { return }
         isLoadingMessages = true
         messagesLoadFailed = false
-        if page == 0 || currentThreadId != threadId {
+        // Another thread starts empty. The open one refreshing (after a reply
+        // is sent) keeps what is on screen; its newest page merges in.
+        if currentThreadId != threadId {
             currentMessages = []
+            totalMessages = 0
             currentThreadId = threadId
-            // The thread as seen earlier this session, while the fresh copy is on its way.
-            restoreSessionThread(threadId: threadId)
         }
+        messagesRequestedAt = .now
         Task {
             try? await connectionService.sendToActive(Message.smsMessagesRequest(threadId: threadId, page: page, pageSize: pageSize))
         }
@@ -118,6 +109,10 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
             guard !Task.isCancelled else { return }
             onTimeout(self)
         }
+    }
+
+    private static func elapsedMillis(since start: Date?) -> Int {
+        start.map { Int(Date.now.timeIntervalSince($0) * 1000) } ?? -1
     }
 
     func sendMessage(address: String, body: String) {
@@ -144,11 +139,9 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         conversations = []
         currentMessages = []
         currentThreadId = nil
-        sessionThreads = [:]
         totalConversations = 0
         totalMessages = 0
         sendResult = nil
-        restoreConversationsFromCache()
     }
 
     func handleMessage(_ message: Message) {
@@ -163,22 +156,27 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
             }
             totalConversations = total
             isLoadingConversations = false
-            if let deviceKey {
-                cache.save(CachedConversations(conversations: conversations, total: total), device: deviceKey, name: "sms-conversations")
-            }
+            Diag.log("SMS", "conversations page \(page): \(convos.count) in \(Self.elapsedMillis(since: conversationsRequestedAt)) ms")
 
         case .smsMessagesResponse(let threadId, let msgs, let total, let page):
             guard threadId == currentThreadId else { return }
             messagesWatchdogTask?.cancel()
             messagesLoadFailed = false
             if page == 0 {
-                currentMessages = msgs
+                // The fresh newest page replaces only its own span; older
+                // pages already scrolled through stay where the reader is.
+                let fresh = Set(msgs.map(\.id))
+                let oldestFresh = msgs.last?.date ?? .max
+                currentMessages = msgs + currentMessages.filter { !fresh.contains($0.id) && $0.date <= oldestFresh }
             } else {
-                currentMessages.append(contentsOf: msgs)
+                // A message arriving between pages shifts the phone's offsets
+                // by one; skip what is already here rather than show it twice.
+                let known = Set(currentMessages.map(\.id))
+                currentMessages.append(contentsOf: msgs.filter { !known.contains($0.id) })
             }
             totalMessages = total
             isLoadingMessages = false
-            sessionThreads[threadId] = (currentMessages, total)
+            Diag.log("SMS", "thread \(threadId) page \(page): \(msgs.count) of \(total) in \(Self.elapsedMillis(since: messagesRequestedAt)) ms")
 
         case .smsSendResponse(let success, let error):
             sendResult = (success, error)

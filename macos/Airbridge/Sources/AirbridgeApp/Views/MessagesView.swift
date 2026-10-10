@@ -11,6 +11,13 @@ struct MessagesView: View {
     @State private var selectedId: SmsConversationMeta.ID?
     @State private var searchText = ""
     @State private var messageText = ""
+    /// The oldest message on screen when an older page was asked for; the
+    /// view is brought back to it once that page is in.
+    @State private var olderPageAnchor: SmsMessageMeta.ID?
+    /// The conversation is scrolled to within reach of its top.
+    @State private var nearTop = false
+    /// The top was reached while another load was in flight; that ask waits for it.
+    @State private var olderPagePending = false
 
     private var selectedConversation: SmsConversationMeta? {
         smsService.conversations.first { $0.id == selectedId }
@@ -40,13 +47,15 @@ struct MessagesView: View {
         }
         .navigationTitle(selectedConversation?.displayName ?? (L10n.isPL ? "Wiadomości" : "Messages"))
         .toolbar {
-            // The one place that says the phone is sending something.
-            if smsService.isLoadingConversations || smsService.isLoadingMessages {
-                ToolbarItem(placement: .primaryAction) {
-                    ProgressView().controlSize(.small)
-                }
-                .sharedBackgroundVisibility(.hidden)
+            // The one place that says the phone is sending something. The
+            // item stays in place and only fades: added and removed, it
+            // re-laid the whole toolbar, and the window shook with every page.
+            ToolbarItem(placement: .primaryAction) {
+                ProgressView()
+                    .controlSize(.small)
+                    .opacity(smsService.isLoadingConversations || smsService.isLoadingMessages ? 1 : 0)
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .navigationSubtitle(subtitle)
         .onAppear {
@@ -65,6 +74,9 @@ struct MessagesView: View {
         }
         .onChange(of: selectedId) { _, id in
             messageText = ""
+            olderPageAnchor = nil
+            nearTop = false
+            olderPagePending = false
             if let convo = smsService.conversations.first(where: { $0.id == id }) {
                 smsService.loadMessages(threadId: convo.threadId)
             }
@@ -172,10 +184,17 @@ struct MessagesView: View {
     private func messagesScroll(_ convo: SmsConversationMeta) -> some View {
         // The phone sends newest first; the conversation reads oldest first.
         let messages = Array(smsService.currentMessages.reversed())
-        return ScrollView {
+        return ScrollViewReader { proxy in ScrollView {
             // Not lazy: a page is 30 messages, laid out at once with their
             // real heights, so the conversation opens exactly at its end.
             VStack(spacing: 6) {
+                // Older messages load as the conversation is scrolled to its top.
+                if smsService.hasOlderMessages {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
                 ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
                     if index == 0 || msg.date - messages[index - 1].date > Self.burstGapMillis {
                         Text(Self.headerText(msg.date))
@@ -196,8 +215,43 @@ struct MessagesView: View {
         .defaultScrollAnchor(.bottom)
         // A new message grows the content; the view stays at its end.
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        // Near the top, the next page back. Acts on the change into that
+        // state, not on the first layout before the view settles at its end.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < Self.olderPageThreshold
+                && geometry.contentSize.height > geometry.containerSize.height
+        } action: { _, isNearTop in
+            nearTop = isNearTop
+            if isNearTop { loadOlderPage(above: messages.first?.id) }
+        }
+        // The top reached while a reopened thread was refreshing: that ask
+        // was held, and goes out once the refresh is in. Only a held ask —
+        // after every load it chained page after page while the view was
+        // still at the top, before it returned to its anchor.
+        .onChange(of: smsService.isLoadingMessages) { _, loading in
+            guard !loading, olderPagePending else { return }
+            olderPagePending = false
+            if nearTop { loadOlderPage(above: messages.first?.id) }
+        }
+        // The older page lands above; the view returns to the message that
+        // was on top, as Messages does. Left alone, it jumped to the very
+        // top, the spinner stayed in sight and no further page was asked for.
+        .onChange(of: smsService.currentMessages.count) {
+            guard let anchor = olderPageAnchor else { return }
+            olderPageAnchor = nil
+            proxy.scrollTo(anchor, anchor: .top)
+        }
+        }
         // A fresh scroll view per conversation, so each opens at its end.
         .id(convo.id)
+    }
+
+    /// The next page back, the view to return to `anchor` once it is in.
+    private func loadOlderPage(above anchor: SmsMessageMeta.ID?) {
+        guard smsService.hasOlderMessages else { return }
+        guard !smsService.isLoadingMessages else { olderPagePending = true; return }
+        olderPageAnchor = anchor
+        smsService.loadOlderMessages()
     }
 
     @ViewBuilder
@@ -248,6 +302,9 @@ struct MessagesView: View {
     }
 
     // MARK: - Formatting
+
+    /// How close to the top of a conversation the next page back is asked for.
+    private static let olderPageThreshold: CGFloat = 200
 
     /// Height of the one-line reply field and of the send button.
     private static let barHeight: CGFloat = 38

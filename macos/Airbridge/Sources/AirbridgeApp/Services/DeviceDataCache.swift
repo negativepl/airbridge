@@ -3,7 +3,7 @@ import AppKit
 import CryptoKit
 
 /// On-disk cache of what the phone last told us — gallery listing and thumbs,
-/// SMS conversations and threads, file listings, folder stats and thumbs —
+/// file listings, folder stats and thumbs (never SMS) —
 /// keyed by the phone's public key, so each paired device keeps its own.
 ///
 /// The services show the cached data the moment a tab opens (or the app
@@ -40,6 +40,21 @@ final class DeviceDataCache: @unchecked Sendable {
         let url = fileURL(device: device, name: name + ".json")
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? decoder.decode(type, from: data)
+    }
+
+    /// Deletes every listing whose name starts with `prefix`, for all devices.
+    func removeFiles(named prefix: String) {
+        let root = self.root
+        io.async {
+            let fm = FileManager.default
+            guard let devices = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
+            for device in devices {
+                guard let files = try? fm.contentsOfDirectory(at: device, includingPropertiesForKeys: nil) else { continue }
+                for file in files where file.lastPathComponent.hasPrefix(prefix) {
+                    try? fm.removeItem(at: file)
+                }
+            }
+        }
     }
 
     // MARK: - Images
