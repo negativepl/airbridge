@@ -1,6 +1,10 @@
 import SwiftUI
 import Protocol
 
+/// Home: the connected phone, laid out like a device page in System Settings —
+/// a grouped `Form` with the device at the top, its details as labeled rows and
+/// the connection action under the group. Only system components: no custom
+/// cards, bars or indicators.
 struct HomeView: View {
     let connectionService: ConnectionService
     let fileTransferService: FileTransferService
@@ -28,14 +32,11 @@ struct HomeView: View {
 
     var body: some View {
         let vm = viewModel
-        VStack(spacing: 16) {
-            connectionCard(vm)
-            if vm.isTransferring {
-                transferCard(vm)
-            }
-            deviceCard(vm)
-            if !vm.hasPairedDevices {
-                noPairedDevicesCard
+        Group {
+            if vm.isConnected, !vm.connectedDevices.isEmpty {
+                devicesForm(vm)
+            } else {
+                unavailableView(vm)
             }
         }
         .sheet(isPresented: $showPairing) {
@@ -56,284 +57,214 @@ struct HomeView: View {
         }
     }
 
-    /// User disconnected manually (phase-driven, no string matching).
-    private var isDisconnected: Bool {
-        viewModel.phase == .disconnected
-    }
+    // MARK: - Connected
 
-    private func indicatorState(_ vm: HomeViewModel) -> StatusIndicator.State {
-        if !vm.hasPairedDevices { return .disconnected }
-        switch vm.phase {
-        case .connected: return .connected
-        case .disconnected, .stopped: return .disconnected
-        case .error: return .error
-        case .starting, .listening: return .connecting
-        }
-    }
-
-    /// Przyjazna nazwa telefonu (marketingowa z DeviceInfo, np. "Galaxy Z Fold7"),
-    /// z fallbackiem do nazwy z parowania zanim przyjdzie device_info.
-    private func connectedName(_ vm: HomeViewModel) -> String {
-        if let name = vm.deviceInfo?.name, !name.isEmpty { return name }
-        return vm.deviceName
-    }
-
-    private func connectionHeadline(_ vm: HomeViewModel) -> String {
-        let n = vm.connectedDevices.count
-        if n > 1 {
-            return L10n.isPL ? "Połączono z \(n) urządzeniami" : "Connected to \(n) devices"
-        }
-        return L10n.isPL ? "Połączono z \(connectedName(vm))" : "Connected to \(connectedName(vm))"
-    }
-
-    private func connectedDetail(_ vm: HomeViewModel) -> String {
-        var parts: [String] = []
-        // With more than one device the per-device cards carry the model, so the
-        // header summarises with just the Mac's network address.
-        if vm.connectedDevices.count <= 1, let model = vm.deviceInfo?.model, !model.isEmpty {
-            parts.append(model)
-        }
-        if let ip = vm.localIP { parts.append(ip) }
-        return parts.joined(separator: " · ")
-    }
-
-    private func connectionCard(_ vm: HomeViewModel) -> some View {
-        GlassSection {
-            HStack(spacing: 14) {
-                StatusIndicator(state: indicatorState(vm), size: 18)
-                    .frame(width: 28, height: 28)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Group {
-                        if vm.isConnected {
-                            Text(connectionHeadline(vm))
-                        } else if !vm.hasPairedDevices {
-                            Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
-                        } else if isDisconnected {
-                            Text(L10n.isPL ? "Rozłączono" : "Disconnected")
-                        } else {
-                            Text(vm.statusMessage)
-                        }
-                    }
-                    .font(.ab(.headline, weight: .semibold))
-                    .contentTransition(.interpolate)
-
-                    Group {
-                        if vm.isConnected {
-                            Text(connectedDetail(vm)).contentTransition(.numericText())
-                        } else if !vm.hasPairedDevices {
-                            Text(L10n.isPL ? "Sparuj telefon aby rozpocząć" : "Pair your phone to get started")
-                        } else if isDisconnected {
-                            Text(L10n.isPL ? "Kliknij Połącz ponownie aby wznowić" : "Click Reconnect to resume")
-                        } else if !vm.isConnected {
-                            Text(L10n.isPL ? "Szukam sparowanego urządzenia…" : "Looking for paired device…")
-                        }
-                    }
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
+    private func devicesForm(_ vm: HomeViewModel) -> some View {
+        let switchable = vm.connectedDevices.count > 1
+        return Form {
+            ForEach(vm.connectedDevices) { device in
+                Section {
+                    deviceHeader(device, isActive: switchable && device.connectionId == connectionService.activeDeviceId)
                 }
-                Spacer()
-                connectionActionButton(vm)
+                Section {
+                    deviceDetails(device)
+                    if switchable, device.connectionId != connectionService.activeDeviceId {
+                        LabeledContent(L10n.isPL ? "Urządzenie docelowe" : "Target device") {
+                            Button(L10n.isPL ? "Używaj tego telefonu" : "Use This Phone") {
+                                connectionService.setActiveDevice(device.connectionId)
+                            }
+                        }
+                    }
+                }
             }
-            .animation(.airbridgeQuick, value: vm.isConnected)
-            .animation(.airbridgeQuick, value: vm.statusMessage)
+
+            if vm.isTransferring {
+                Section(L10n.fileTransfer) {
+                    transferRow(vm)
+                }
+            }
+
+            if bluetoothAudio.enabled, connectionService.phoneHeadphoneState?.connected == true {
+                Section {
+                    headphonesRow
+                } footer: {
+                    if connectionService.headphoneHandoffPhase == .failed {
+                        Text(L10n.isPL
+                            ? "Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami."
+                            : "Headphone handoff failed. Make sure the headphones are on and paired with both devices.")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+
+            Section {
+            } footer: {
+                HStack {
+                    Spacer()
+                    Button(L10n.disconnect) { vm.disconnect() }
+                }
+            }
         }
+        .formStyle(.grouped)
+    }
+
+    /// The phone itself: its wallpaper as a square tile, the
+    /// name as the page title and one line of status underneath.
+    private func deviceHeader(_ device: ConnectedDevice, isActive: Bool) -> some View {
+        VStack(spacing: 10) {
+            if let data = device.wallpaper, let image = NSImage(data: data) {
+                // Square tile: the wallpaper fills it and is cropped, so the
+                // header keeps its size whatever the phone's proportions.
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 120, height: 120)
+                    .clipShape(.rect(cornerRadius: 22, style: .continuous))
+            } else {
+                Image(systemName: "smartphone")
+                    .font(.system(size: 64, weight: .thin))
+                    .foregroundStyle(.secondary)
+                    .frame(height: 120)
+            }
+            Text(displayName(device))
+                .font(.title2.bold())
+            // Icon and text centred on one line with the same gap for every
+            // item; a Label's fixed icon slot pushed the small dot down and away.
+            HStack(spacing: 14) {
+                HStack(spacing: 5) {
+                    Image(systemName: "circle.fill")
+                        .imageScale(.small)
+                        .foregroundStyle(.green)
+                    Text(L10n.isPL ? "Połączono" : "Connected")
+                }
+                if let info = device.deviceInfo {
+                    HStack(spacing: 5) {
+                        Image(systemName: batterySymbol(info))
+                        Text("\(info.batteryPercent)%")
+                            .contentTransition(.numericText())
+                    }
+                }
+                if isActive {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark")
+                        Text(L10n.isPL ? "Urządzenie docelowe" : "Target device")
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
-    private func connectionActionButton(_ vm: HomeViewModel) -> some View {
-        if vm.isConnected {
-            Button(L10n.disconnect) { vm.disconnect() }
-                .controlSize(.extraLarge)
-        } else if isDisconnected {
-            Button(L10n.reconnect) { vm.reconnect() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
-        } else if !vm.hasPairedDevices {
-            Button(L10n.pairDevice) { showPairing = true }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
-        } else if vm.phase == .error {
-            Button(L10n.reconnect) { vm.reconnect() }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-                .controlSize(.extraLarge)
+    private func deviceDetails(_ device: ConnectedDevice) -> some View {
+        if let info = device.deviceInfo {
+            LabeledContent(L10n.isPL ? "Model" : "Model", value: "\(info.manufacturer) \(info.model)")
+            LabeledContent("Android", value: info.androidVersion)
+            LabeledContent(L10n.isPL ? "Bateria" : "Battery", value: batteryText(info))
+            if info.totalStorageBytes > 0 {
+                // Text only, like System Settings › General › About.
+                LabeledContent(L10n.isPL ? "Pamięć" : "Storage",
+                               value: L10n.isPL
+                                   ? "\(Self.bytes(info.freeStorageBytes)) wolne z \(Self.bytes(info.totalStorageBytes))"
+                                   : "\(Self.bytes(info.freeStorageBytes)) available of \(Self.bytes(info.totalStorageBytes))")
+            }
+        }
+        if let ip = device.clientIP {
+            LabeledContent(L10n.isPL ? "Adres IP" : "IP Address", value: ip)
         }
     }
 
-    private func transferCard(_ vm: HomeViewModel) -> some View {
-        GlassSection(title: LocalizedStringKey(L10n.fileTransfer), systemImage: "arrow.down.circle") {
+    private func transferRow(_ vm: HomeViewModel) -> some View {
+        ProgressView(value: vm.transferProgress) {
             Text(vm.transferFileName)
-                .font(.ab(.body))
                 .lineLimit(1)
                 .truncationMode(.middle)
-
-            ProgressView(value: vm.transferProgress)
-                .tint(.accentColor)
-
-            HStack {
-                Text(formatSpeed(vm.transferSpeed))
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
-                Spacer()
-                Text(formatEta(vm.transferEta))
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
-            }
+        } currentValueLabel: {
+            Text([formatSpeed(vm.transferSpeed), formatEta(vm.transferEta)]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " · "))
+                .contentTransition(.numericText())
         }
     }
 
-    private var noPairedDevicesCard: some View {
-        GlassSection {
-            VStack(spacing: 14) {
-                Image(systemName: "iphone.and.arrow.forward")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.secondary)
-                    .symbolEffect(.pulse, options: .repeating)
-                Text(L10n.isPL ? "Brak sparowanych urządzeń" : "No paired devices")
-                    .font(.ab(.body))
-                    .foregroundStyle(.secondary)
+    private var headphonesRow: some View {
+        LabeledContent {
+            Button(connectionService.headphoneHandoffPhase == .inProgress
+                    ? (L10n.isPL ? "Przenoszenie…" : "Moving…")
+                    : (L10n.isPL ? "Przenieś tutaj" : "Move Here")) {
+                connectionService.takeoverHeadphones()
+            }
+            .disabled(connectionService.headphoneHandoffPhase == .inProgress)
+        } label: {
+            Label(L10n.isPL ? "Słuchawki są połączone z telefonem"
+                            : "Headphones are connected to the phone",
+                  systemImage: "headphones")
+        }
+    }
+
+    // MARK: - Not connected
+
+    @ViewBuilder
+    private func unavailableView(_ vm: HomeViewModel) -> some View {
+        if !vm.hasPairedDevices {
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Brak sparowanych urządzeń" : "No Paired Devices", systemImage: "smartphone")
+            } description: {
+                Text(L10n.isPL ? "Sparuj telefon, aby rozpocząć." : "Pair your phone to get started.")
+            } actions: {
                 Button(L10n.pairDevice) { showPairing = true }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.extraLarge)
             }
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    // MARK: - Device card (Phone Link-style: wallpaper preview + info)
-
-    @ViewBuilder
-    private func deviceCard(_ vm: HomeViewModel) -> some View {
-        // One card per connected phone — they stack instead of fighting over a
-        // single slot, so two devices read as a list rather than flipping.
-        let switchable = vm.connectedDevices.count > 1
-        VStack(spacing: 12) {
-            ForEach(vm.connectedDevices) { device in
-                singleDeviceCard(
-                    info: device.deviceInfo,
-                    wallpaper: device.wallpaper.flatMap { NSImage(data: $0) },
-                    isActive: switchable && device.connectionId == connectionService.activeDeviceId,
-                    switchable: switchable,
-                    onSelect: { connectionService.setActiveDevice(device.connectionId) }
-                )
+        } else if vm.phase == .disconnected || vm.phase == .error {
+            ContentUnavailableView {
+                Label(vm.phase == .error ? vm.statusMessage : (L10n.isPL ? "Rozłączono" : "Disconnected"),
+                      systemImage: "smartphone.slash")
+            } description: {
+                Text(L10n.isPL ? "Połącz ponownie, aby wznowić." : "Reconnect to resume.")
+            } actions: {
+                Button(L10n.reconnect) { vm.reconnect() }
+                    .buttonStyle(.borderedProminent)
             }
-
-            if bluetoothAudio.enabled,
-               connectionService.phoneHeadphoneState?.connected == true {
-                HStack {
-                    Image(systemName: "headphones")
-                        .foregroundStyle(.secondary)
-                    Text(L10n.isPL ? "Słuchawki są połączone z telefonem"
-                                   : "Headphones are connected to the phone")
-                        .font(.ab(.subheadline))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(connectionService.headphoneHandoffPhase == .inProgress
-                            ? (L10n.isPL ? "Przenoszenie…" : "Moving…")
-                            : (L10n.isPL ? "Przenieś tutaj" : "Move here")) {
-                        connectionService.takeoverHeadphones()
-                    }
-                    .disabled(connectionService.headphoneHandoffPhase == .inProgress)
-                }
-                if connectionService.headphoneHandoffPhase == .failed {
-                    Text(L10n.isPL
-                        ? "Przeniesienie słuchawek nie powiodło się. Upewnij się, że słuchawki są włączone i sparowane z oboma urządzeniami."
-                        : "Headphone handoff failed. Make sure the headphones are on and paired with both devices.")
-                        .font(.ab(.caption))
-                        .foregroundStyle(.red)
+        } else {
+            ContentUnavailableView {
+                Label(L10n.isPL ? "Szukam telefonu" : "Looking for Your Phone", systemImage: "smartphone")
+            } description: {
+                VStack(spacing: 12) {
+                    Text(L10n.isPL ? "Otwórz AirBridge na telefonie w tej samej sieci Wi-Fi."
+                                   : "Open AirBridge on the phone on the same Wi-Fi network.")
+                    ProgressView().controlSize(.small)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func singleDeviceCard(
-        info: DeviceInfo?,
-        wallpaper: NSImage?,
-        isActive: Bool,
-        switchable: Bool,
-        onSelect: @escaping () -> Void
-    ) -> some View {
-        if wallpaper != nil || info != nil {
-            GlassSection {
-                HStack(alignment: .center, spacing: 18) {
-                    if let img = wallpaper {
-                        phonePreview(img, info: info)
-                    }
-                    if let info {
-                        deviceInfoColumn(info)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-            // With more than one phone, the card is a selectable target: click to
-            // make it active; the accent border marks the current target.
-            .overlay {
-                if isActive {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: 2)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { if switchable { onSelect() } }
-            .animation(.airbridgeQuick, value: isActive)
-        }
+    // MARK: - Formatting
+
+    private func displayName(_ device: ConnectedDevice) -> String {
+        if let name = device.deviceInfo?.name, !name.isEmpty { return name }
+        return device.name
     }
 
-    private func phonePreview(_ img: NSImage, info: DeviceInfo?) -> some View {
-        // Fixed square tile: the wallpaper fills and is cropped to it, so the
-        // card keeps its shape no matter what dimensions the phone reports.
-        let side: CGFloat = 150
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        return Image(nsImage: img)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(width: side, height: side)
-            .clipShape(shape)
-            .overlay(
-                // Soft inner edge — clipped to the tile so the blur never
-                // bleeds outside and shimmers against the glass background.
-                shape
-                    .strokeBorder(.black.opacity(0.25), lineWidth: 3)
-                    .blur(radius: 2)
-                    .clipShape(shape)
-            )
-            .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 1))
-            .overlay(alignment: .bottom) {
-                if let info {
-                    batteryPill(info.batteryPercent, charging: info.batteryCharging)
-                        .padding(.bottom, 10)
-                }
-            }
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
-            .animation(.airbridgeQuick, value: info?.batteryPercent)
-            .animation(.airbridgeQuick, value: info?.batteryCharging)
-    }
-
-    private func batteryPill(_ percent: Int, charging: Bool) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: batterySymbol(percent))
-            Text("\(percent)%")
-                .contentTransition(.numericText())
-            if charging {
-                Image(systemName: "bolt.fill")
-                    .accessibilityHidden(true)
+    private func batteryText(_ info: DeviceInfo) -> String {
+        guard info.batteryCharging else { return "\(info.batteryPercent)%" }
+        var text = "\(info.batteryPercent)% · " + (L10n.isPL ? "Ładowanie" : "Charging")
+        if info.chargeTimeRemainingMs > 0 {
+            let f = DateComponentsFormatter()
+            f.unitsStyle = .short
+            f.allowedUnits = [.hour, .minute]
+            if let left = f.string(from: Double(info.chargeTimeRemainingMs) / 1000) {
+                text += L10n.isPL ? " (pełna za \(left))" : " (full in \(left))"
             }
         }
-        .font(.ab(.caption2, weight: .semibold))
-        .foregroundStyle(.primary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.primary.opacity(0.15), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+        return text
     }
 
-    private func batterySymbol(_ percent: Int) -> String {
-        switch percent {
+    private func batterySymbol(_ info: DeviceInfo) -> String {
+        if info.batteryCharging { return "battery.100percent.bolt" }
+        switch info.batteryPercent {
         case ..<13: return "battery.0percent"
         case ..<38: return "battery.25percent"
         case ..<63: return "battery.50percent"
@@ -342,78 +273,20 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Device info column
-
-    @ViewBuilder
-    private func deviceInfoColumn(_ info: DeviceInfo) -> some View {
-        VStack(spacing: 12) {
-            infoRow(L10n.isPL ? "Model" : "Model", "\(info.manufacturer) \(info.model)")
-
-            usageRow(
-                label: L10n.isPL ? "Pamięć" : "Storage",
-                freeBytes: info.freeStorageBytes,
-                totalBytes: info.totalStorageBytes
-            )
-            usageRow(
-                label: "RAM",
-                freeBytes: info.freeRamBytes,
-                totalBytes: info.totalRamBytes
-            )
-            // Power state intentionally has no row — the battery pill on the
-            // wallpaper tile already shows percentage and a charging bolt.
-        }
-    }
-
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.ab(.body))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.ab(.body))
-                .textSelection(.enabled)
-        }
-    }
-
-    @ViewBuilder
-    private func usageRow(label: String, freeBytes: Int64, totalBytes: Int64) -> some View {
-        let used = max(0, totalBytes - freeBytes)
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(label)
-                    .font(.ab(.body))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(L10n.isPL
-                     ? "\(Self.bytes(freeBytes)) wolne z \(Self.bytes(totalBytes))"
-                     : "\(Self.bytes(freeBytes)) free of \(Self.bytes(totalBytes))")
-                    .font(.ab(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
-            }
-            if totalBytes > 0 {
-                ProgressView(value: Double(used), total: Double(totalBytes))
-                    .tint(.accentColor)
-            }
-        }
-    }
-
     private static func bytes(_ value: Int64) -> String {
-        let f = ByteCountFormatter()
-        f.countStyle = .binary
-        return f.string(fromByteCount: value)
+        ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
     }
 
     private func formatSpeed(_ speed: Double) -> String {
-        if speed > 1024 * 1024 { return String(format: "%.1f MB/s", speed / (1024 * 1024)) }
-        else if speed > 1024 { return String(format: "%.0f KB/s", speed / 1024) }
-        return ""
+        speed > 1024 ? ByteCountFormatter.string(fromByteCount: Int64(speed), countStyle: .file) + "/s" : ""
     }
 
     private func formatEta(_ eta: Int) -> String {
-        if eta > 60 { return "\(eta / 60) min \(eta % 60) s" }
-        else if eta > 3 { return "\(eta) s" }
-        return ""
+        guard eta > 3 else { return "" }
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .short
+        f.allowedUnits = [.minute, .second]
+        return f.string(from: Double(eta)) ?? ""
     }
 }
+
