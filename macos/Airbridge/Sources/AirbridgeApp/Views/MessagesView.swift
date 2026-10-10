@@ -160,11 +160,16 @@ struct MessagesView: View {
                         MessageBubble(message: msg)
                             .id(msg.id)
                     }
+                    // The true end of the conversation, below the last bubble.
+                    Color.clear.frame(height: 1).id(Self.bottomID)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
+            // Opens at the bottom and stays there while lazily drawn bubbles
+            // settle their heights.
             .defaultScrollAnchor(.bottom)
+            .defaultScrollAnchor(.bottom, for: .sizeChanges)
             .overlay {
                 if smsService.isLoadingMessages && smsService.currentMessages.isEmpty {
                     // Plain background; the toolbar spinner says it is loading.
@@ -180,8 +185,9 @@ struct MessagesView: View {
                     }
                 }
             }
-            .onChange(of: smsService.currentMessages.first?.id) { _, newest in
-                if let newest { proxy.scrollTo(newest, anchor: .bottom) }
+            .onChange(of: smsService.currentMessages.first?.id) { _, _ in
+                // After the layout pass, once the bubbles have their heights.
+                DispatchQueue.main.async { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             // A Liquid Glass bar: the conversation scrolls under it and the
             // system's scroll edge effect keeps the field legible.
@@ -239,6 +245,8 @@ struct MessagesView: View {
     }
 
     // MARK: - Formatting
+
+    private static let bottomID = "conversation-bottom"
 
     /// Height of the one-line reply field and of the send button.
     private static let barHeight: CGFloat = 38
