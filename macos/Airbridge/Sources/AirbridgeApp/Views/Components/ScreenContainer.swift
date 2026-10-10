@@ -50,5 +50,7 @@ struct ScreenContainer<Content: View>: View {
 enum ScreenMetrics {
     /// Room the sidebar takes while it is shown (the system default width).
     static let sidebarWidth: CGFloat = 210
-    static let minDetailWidth: CGFloat = 680
+    /// Messages needs its 320 pt list beside a conversation that still has
+    /// room for bubbles; squeezed below this the panes started to jitter.
+    static let minDetailWidth: CGFloat = 820
 }
