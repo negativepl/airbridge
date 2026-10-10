@@ -84,7 +84,11 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
     }
 
     func loadMessages(threadId: String, page: Int = 0) {
-        guard let connectionService, connectionService.isConnected, !isLoadingMessages else { return }
+        // Only a request for the thread already loading waits; another thread
+        // replaces it. Rejected, a conversation picked mid-load never loaded:
+        // the earlier thread's reply was dropped and the panel stayed empty.
+        guard let connectionService, connectionService.isConnected,
+              !(isLoadingMessages && currentThreadId == threadId) else { return }
         isLoadingMessages = true
         messagesLoadFailed = false
         if page == 0 || currentThreadId != threadId {
