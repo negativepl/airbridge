@@ -54,7 +54,7 @@ struct SendView: View {
                 }
                 // macOS 26 draws large controls as capsules; the standalone
                 // actions of an empty state are large, like Photos' "Import".
-                .controlSize(.large)
+                .controlSize(.extraLarge)
                 .buttonBorderShape(.capsule)
             }
         }
