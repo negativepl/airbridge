@@ -49,7 +49,8 @@ import com.airbridge.ui.AirbridgeTheme
  * Reverse mirror viewer: shows the Mac's screen on the phone. Display-only for
  * now — connects to the Mac mirror server, sends ReverseHello, decodes the
  * incoming stream onto a [SurfaceView] that is sized and placed (letterboxed to
- * the Mac's aspect ratio, fitted above the keyboard/trackpad panel) by layout.
+ * the Mac's aspect ratio, kept at full size and panned above the keyboard/trackpad
+ * panel) by layout.
  * The video view is display-only: there is no magnifier, and the trackpad panel
  * carries the input.
  */
@@ -106,7 +107,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private val keyboardActive = androidx.compose.runtime.mutableStateOf(false)
 
     // MARK: - Video placement
-    private var fitScale = 1f           // extra downscale so the video fits above a panel
+    private var panTop = 0f             // video top while a panel hides part of it (0 = not panned)
     private var videoReveal: ValueAnimator? = null
     private var videoRevealed = false   // reveal animation runs once per stream, not per frame
     /// Last observed soft-keyboard height, so the trackpad panel can match it exactly.
@@ -399,29 +400,34 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
      *  SurfaceView to the letterboxed, keyboard-fitted video rect. */
     private fun applyAspect() { updateVideoOffset() }
 
-    /** Base letterbox height (px) of the video inside the full container. */
-    private fun baseVideoHeight(): Float {
-        val w = container.width; val h = container.height
-        if (w <= 0 || h <= 0 || videoW <= 0 || videoH <= 0) return 0f
-        val base = minOf(w.toFloat() / videoW, h.toFloat() / videoH)
-        return videoH * base
-    }
-
-    /** Recompute the keyboard/trackpad fit, then size and place the video view:
-     *  aspect letterbox, shrunk only if it would not fit above the panel, centred
-     *  horizontally and on the free area's vertical centre. No-op until both the
-     *  container and the video size are known. */
+    /** Size and place the video view: aspect letterbox at full size, centred
+     *  horizontally and on the vertical centre of the area above the panel.
+     *  A video taller than that area is never shrunk (it read as a postage
+     *  stamp on the folded Fold): it pans up instead, just far enough to keep
+     *  the trackpad cursor in view. No-op until both the container and the
+     *  video size are known. */
     private fun updateVideoOffset(force: Boolean = false) {
-        val dispH = baseVideoHeight()
-        if (dispH <= 0f) return
         val w = container.width; val h = container.height
+        if (w <= 0 || h <= 0 || videoW <= 0 || videoH <= 0) return
         val usableH = (h - bottomInset()).coerceAtLeast(1)
-        fitScale = if (dispH > usableH) usableH / dispH else 1f   // shrink only if it wouldn't fit
         val base = minOf(w.toFloat() / videoW, h.toFloat() / videoH)
-        val vw = Math.round(videoW * base * fitScale)
-        val vh = Math.round(videoH * base * fitScale)
+        val vw = Math.round(videoW * base)
+        val vh = Math.round(videoH * base)
         val left = Math.round((w - vw) / 2f)
-        val top = Math.round(usableCenterY() - vh / 2f)
+        val top = if (vh <= usableH) {
+            panTop = 0f
+            Math.round(usableCenterY() - vh / 2f)
+        } else {
+            // Keep the cursor inside the visible band, moving the video no more
+            // than needed so typing doesn't make the picture jump around.
+            val margin = dp(48).toFloat()
+            val cy = cursorY * vh
+            var t = panTop
+            if (cy + t < margin) t = margin - cy
+            if (cy + t > usableH - margin) t = usableH - margin - cy
+            panTop = t.coerceIn((usableH - vh).toFloat(), 0f)
+            Math.round(panTop)
+        }
         val lp = surfaceView.layoutParams as FrameLayout.LayoutParams
         val unchanged = lp.width == vw && lp.height == vh && lp.leftMargin == left && lp.topMargin == top &&
             lp.gravity == (Gravity.TOP or Gravity.START)
@@ -434,7 +440,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
         lp.width = vw; lp.height = vh
         lp.leftMargin = left; lp.topMargin = top
         lp.gravity = Gravity.TOP or Gravity.START
-        android.util.Log.d("ReverseMirror", "video fit ${vw}x$vh at $left,$top in ${w}x$h (fitScale=$fitScale inset=${bottomInset()})")
+        android.util.Log.d("ReverseMirror", "video fit ${vw}x$vh at $left,$top in ${w}x$h (panTop=$panTop inset=${bottomInset()})")
         surfaceView.layoutParams = lp
     }
 
@@ -717,6 +723,7 @@ class ReverseMirrorActivity : ComponentActivity(), SurfaceHolder.Callback {
                         cursorX = (cursorX + (dx / w) * trackpadGain * accel).coerceIn(0f, 1f)
                         cursorY = (cursorY + (dy / h) * trackpadGain * accel).coerceIn(0f, 1f)
                         c.sendInput(0u, cursorX, cursorY)   // bare move — never a drag
+                        updateVideoOffset()                 // pan a partly hidden video after the cursor
                     }
                 }
                 MotionEvent.ACTION_POINTER_UP -> {
