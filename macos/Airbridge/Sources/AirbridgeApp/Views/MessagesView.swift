@@ -346,58 +346,26 @@ private struct MessageBubble: View {
     let message: SmsMessageMeta
     let query: String
 
-    @State private var copied = false
-
     private var isSent: Bool { message.type == 2 }
-    private var code: String? { isSent ? nil : OneTimeCode.find(in: message.body) }
 
     var body: some View {
         HStack {
             if isSent { Spacer(minLength: 0) }
-            VStack(alignment: isSent ? .trailing : .leading, spacing: 4) {
-                Text(SearchHighlight.text(message.body, query))
-                    .textSelection(.enabled)
-                    .foregroundStyle(isSent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(isSent ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.secondary),
-                                in: .rect(cornerRadius: 19, style: .continuous))
-                    .help(message.date == 0 ? "" : Date(timeIntervalSince1970: TimeInterval(message.date) / 1000)
-                        .formatted(date: .abbreviated, time: .shortened))
-                    .contextMenu {
-                        Button(L10n.isPL ? "Kopiuj" : "Copy") { OneTimeCode.copy(message.body) }
-                        if let code {
-                            Button(L10n.isPL ? "Kopiuj kod \(code)" : "Copy Code \(code)") { copyCode(code) }
-                        }
-                    }
-                // A one-time code gets its own copy button, as iOS offers.
-                if let code {
-                    Button { copyCode(code) } label: {
-                        Label(copied ? (L10n.isPL ? "Skopiowano" : "Copied")
-                                     : (L10n.isPL ? "Kopiuj kod \(code)" : "Copy Code \(code)"),
-                              systemImage: copied ? "checkmark" : "doc.on.doc")
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .buttonStyle(.borderless)
-                    .font(.callout)
-                    .padding(.leading, 6)
+            Text(SearchHighlight.text(message.body, query))
+                .textSelection(.enabled)
+                .foregroundStyle(isSent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(isSent ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.secondary),
+                            in: .rect(cornerRadius: 19, style: .continuous))
+                // At most ~3/4 of the conversation's width, as Messages: a
+                // long text wraps there, a short one keeps its own width.
+                .containerRelativeFrame(.horizontal, alignment: isSent ? .trailing : .leading) { width, _ in
+                    width * 0.72
                 }
-            }
-            // At most ~3/4 of the conversation's width, as Messages: a
-            // long text wraps there, a short one keeps its own width.
-            .containerRelativeFrame(.horizontal, alignment: isSent ? .trailing : .leading) { width, _ in
-                width * 0.72
-            }
+                .help(message.date == 0 ? "" : Date(timeIntervalSince1970: TimeInterval(message.date) / 1000)
+                    .formatted(date: .abbreviated, time: .shortened))
             if !isSent { Spacer(minLength: 0) }
-        }
-    }
-
-    private func copyCode(_ code: String) {
-        OneTimeCode.copy(code)
-        copied = true
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            copied = false
         }
     }
 }

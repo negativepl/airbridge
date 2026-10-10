@@ -23,10 +23,6 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
     /// Kategoria powiadomień z akcją odpowiedzi tekstowej.
     private static let replyCategoryId = "AIRBRIDGE_REPLYABLE"
     private static let replyActionId = "AIRBRIDGE_REPLY"
-    /// Notifications carrying a one-time code get a "Copy Code" button.
-    private static let codeCategoryId = "AIRBRIDGE_CODE"
-    private static let replyCodeCategoryId = "AIRBRIDGE_REPLYABLE_CODE"
-    nonisolated private static let copyCodeActionId = "AIRBRIDGE_COPY_CODE"
 
     @ObservationIgnored private weak var connectionService: ConnectionService?
     /// Set by `AirbridgeApp` so action taps on its category (posted through
@@ -52,19 +48,13 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
             textInputButtonTitle: L10n.isPL ? "Wyślij" : "Send",
             textInputPlaceholder: L10n.isPL ? "Odpowiedź…" : "Reply…"
         )
-        let copyCodeAction = UNNotificationAction(
-            identifier: Self.copyCodeActionId,
-            title: L10n.isPL ? "Kopiuj kod" : "Copy Code",
+        let category = UNNotificationCategory(
+            identifier: Self.replyCategoryId,
+            actions: [replyAction],
+            intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([
-            UNNotificationCategory(identifier: Self.replyCategoryId, actions: [replyAction],
-                                   intentIdentifiers: [], options: []),
-            UNNotificationCategory(identifier: Self.codeCategoryId, actions: [copyCodeAction],
-                                   intentIdentifiers: [], options: []),
-            UNNotificationCategory(identifier: Self.replyCodeCategoryId, actions: [copyCodeAction, replyAction],
-                                   intentIdentifiers: [], options: []),
-        ])
+        center.setNotificationCategories([category])
     }
 
     func configure(connectionService: ConnectionService) {
@@ -106,17 +96,9 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
         // Źródło i tak identyfikuje `subtitle = appName`.
 
         // Powiadomienia z akcją reply (np. WhatsApp): dołącz natywne pole odpowiedzi.
-        let replyable = canReply && !notificationKey.isEmpty
-        let code = OneTimeCode.find(in: text)
-        var info: [String: String] = [:]
-        if replyable { info["notificationKey"] = notificationKey }
-        if let code { info["oneTimeCode"] = code }
-        content.userInfo = info
-        switch (replyable, code != nil) {
-        case (true, true): content.categoryIdentifier = Self.replyCodeCategoryId
-        case (true, false): content.categoryIdentifier = Self.replyCategoryId
-        case (false, true): content.categoryIdentifier = Self.codeCategoryId
-        case (false, false): break
+        if canReply, !notificationKey.isEmpty {
+            content.categoryIdentifier = Self.replyCategoryId
+            content.userInfo = ["notificationKey": notificationKey]
         }
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
@@ -147,10 +129,6 @@ final class NotificationService: NSObject, MessageHandler, UNUserNotificationCen
             Task { @MainActor in self.sendReply(notificationKey: key, text: reply) }
         }
         let actionIdentifier = response.actionIdentifier
-        if actionIdentifier == Self.copyCodeActionId,
-           let code = response.notification.request.content.userInfo["oneTimeCode"] as? String {
-            Task { @MainActor in OneTimeCode.copy(code) }
-        }
         Task { @MainActor in self.handoffNotifier?.handleAction(actionIdentifier) }
         completionHandler()
     }
