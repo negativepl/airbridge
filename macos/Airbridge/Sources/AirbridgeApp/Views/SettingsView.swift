@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("playSound") private var playSound = true
     @AppStorage("clipboardReceipt") private var clipboardReceipt = true
+    @AppStorage(BrowserPicker.preferenceKey) private var linkBrowser = BrowserPicker.inUse
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
@@ -170,6 +171,13 @@ struct SettingsView: View {
         }
     }
 
+    /// An app icon at menu size; NSWorkspace hands it out at 32 pt.
+    private static func menuIcon(for appURL: URL) -> NSImage {
+        let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
+    }
+
     private var generalSection: some View {
         Section {
             Toggle(L10n.launchAtLogin, isOn: Binding(
@@ -188,6 +196,19 @@ struct SettingsView: View {
             ))
             Toggle(L10n.isPL ? "Dźwięk po odebraniu" : "Sound on receive", isOn: $playSound)
             Toggle(L10n.clipboardReceiptSetting, isOn: $clipboardReceipt)
+            Picker(L10n.linkBrowserSetting, selection: $linkBrowser) {
+                Text(L10n.linkBrowserInUse).tag(BrowserPicker.inUse)
+                Text(L10n.linkBrowserSystemDefault).tag(BrowserPicker.systemDefault)
+                Divider()
+                ForEach(BrowserPicker.installedBrowsers()) { browser in
+                    Label {
+                        Text(browser.name)
+                    } icon: {
+                        Image(nsImage: Self.menuIcon(for: browser.url))
+                    }
+                    .tag(browser.id)
+                }
+            }
             Toggle(L10n.isPL ? "Pokaż w Docku" : "Show in Dock", isOn: Binding(
                 get: { showInDock },
                 set: { newValue in

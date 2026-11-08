@@ -53,6 +53,9 @@ enum L10n {
     static var clipboardReceivedTitle: String { isPL ? "Skopiowano z telefonu" : "Copied from phone" }
     static var clipboardReceivedLinkTitle: String { isPL ? "Link z telefonu" : "Link from phone" }
     static var clipboardReceivedImage: String { isPL ? "Obraz" : "Image" }
+    static var linkBrowserSetting: String { isPL ? "Otwieraj linki z telefonu w" : "Open links from phone in" }
+    static var linkBrowserInUse: String { isPL ? "Przeglądarce w użyciu" : "Browser in use" }
+    static var linkBrowserSystemDefault: String { isPL ? "Przeglądarce domyślnej" : "Default browser" }
     static var clipboardOpenLink: String { isPL ? "Otwórz" : "Open" }
     static var clipboardReceiptSetting: String {
         isPL ? "Pokazuj odebraną zawartość schowka" : "Show received clipboard content"

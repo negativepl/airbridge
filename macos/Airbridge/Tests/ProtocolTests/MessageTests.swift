@@ -103,13 +103,31 @@ final class MessageTests: XCTestCase {
             "timestamp": 1712345678901
         ]
         let msg = try decode(dict)
-        guard case .clipboardUpdate(let sourceId, let contentType, let data) = msg else {
+        guard case .clipboardUpdate(let sourceId, let contentType, let data, let open) = msg else {
             XCTFail("Expected clipboardUpdate, got \(msg)")
             return
         }
         XCTAssertEqual(sourceId, "device-xyz")
         XCTAssertEqual(contentType, .plainText)
         XCTAssertEqual(data, "decoded text")
+        XCTAssertFalse(open, "an ordinary clipboard sync must not open anything")
+    }
+
+    func testDecodeClipboardUpdate_openFlag() throws {
+        let dict: [String: Any] = [
+            "type": "clipboard_update",
+            "source_id": "s",
+            "content_type": "text/plain",
+            "data": "https://example.com",
+            "timestamp": 1,
+            "open": true
+        ]
+        guard case .clipboardUpdate(_, _, let data, let open) = try decode(dict) else {
+            XCTFail("Expected clipboardUpdate")
+            return
+        }
+        XCTAssertEqual(data, "https://example.com")
+        XCTAssertTrue(open)
     }
 
     func testDecodeClipboardUpdate_htmlContentType() throws {
@@ -121,7 +139,7 @@ final class MessageTests: XCTestCase {
             "timestamp": 1234567890
         ]
         let msg = try decode(dict)
-        guard case .clipboardUpdate(_, let contentType, _) = msg else {
+        guard case .clipboardUpdate(_, let contentType, _, _) = msg else {
             XCTFail("Expected clipboardUpdate")
             return
         }

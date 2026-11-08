@@ -295,4 +295,6 @@
     <string name="home_section_connected_device">Connected device</string>
     <string name="pairing_status_paired">Paired</string>
     <string name="repair_needed_unpaired">%s removed this phone from its paired devices. Pair again by scanning the QR code on the Mac.</string>
+    <string name="share_open_on_mac">Open on Mac</string>
+    <string name="share_opening_on_mac">Opening on the Mac…</string>
 </resources>

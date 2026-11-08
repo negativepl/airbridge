@@ -47,7 +47,7 @@ final class EndToEndTests: XCTestCase {
         let serverReceived = await server.lastReceivedMessage
         XCTAssertNotNil(serverReceived, "Server should have received a message")
 
-        guard case .clipboardUpdate(let srcId, let contentType, let data) = serverReceived else {
+        guard case .clipboardUpdate(let srcId, let contentType, let data, _) = serverReceived else {
             XCTFail("Expected clipboardUpdate, got \(String(describing: serverReceived))")
             client.cancel(with: .normalClosure, reason: Data())
             await server.stop()
@@ -71,7 +71,7 @@ final class EndToEndTests: XCTestCase {
         switch receivedFrame {
         case .string(let frameString):
             let decoded = try JSONDecoder().decode(Message.self, from: Data(frameString.utf8))
-            guard case .clipboardUpdate(_, _, let receivedData) = decoded else {
+            guard case .clipboardUpdate(_, _, let receivedData, _) = decoded else {
                 XCTFail("Expected clipboardUpdate from server, got \(decoded)")
                 break
             }

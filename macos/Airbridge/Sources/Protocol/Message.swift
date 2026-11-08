@@ -27,7 +27,9 @@ public enum ContentType: String, Codable, Equatable, Sendable {
 /// `clipboardUpdate` and `fileTransferStart` automatically inject a
 /// millisecond-precision Unix `timestamp` on encode.
 public enum Message: Equatable, Sendable {
-    case clipboardUpdate(sourceId: String, contentType: ContentType, data: String)
+    /// `open`: a link the phone shared to the Mac, to be opened rather than
+    /// copied. Absent on the wire (and false) for ordinary clipboard syncs.
+    case clipboardUpdate(sourceId: String, contentType: ContentType, data: String, open: Bool = false)
     case fileTransferStart(
         sourceId: String,
         transferId: String,
@@ -474,6 +476,7 @@ extension Message: Codable {
         case sourceId           = "source_id"
         case contentType        = "content_type"
         case data
+        case open
         case timestamp
         case transferId         = "transfer_id"
         case filename
@@ -539,11 +542,12 @@ extension Message: Codable {
 
         switch self {
 
-        case .clipboardUpdate(let sourceId, let contentType, let data):
+        case .clipboardUpdate(let sourceId, let contentType, let data, let open):
             try container.encode(TypeKey.clipboardUpdate.rawValue, forKey: .type)
             try container.encode(sourceId, forKey: .sourceId)
             try container.encode(contentType, forKey: .contentType)
             try container.encode(data, forKey: .data)
+            if open { try container.encode(true, forKey: .open) }
             try container.encode(currentTimestamp(), forKey: .timestamp)
 
         case .fileTransferStart(let sourceId, let transferId, let filename,
@@ -918,7 +922,8 @@ extension Message: Codable {
             let sourceId = try container.decode(String.self, forKey: .sourceId)
             let contentType = try container.decode(ContentType.self, forKey: .contentType)
             let data = try container.decode(String.self, forKey: .data)
-            self = .clipboardUpdate(sourceId: sourceId, contentType: contentType, data: data)
+            let open = try container.decodeIfPresent(Bool.self, forKey: .open) ?? false
+            self = .clipboardUpdate(sourceId: sourceId, contentType: contentType, data: data, open: open)
 
         case .fileTransferStart:
             let sourceId    = try container.decode(String.self, forKey: .sourceId)

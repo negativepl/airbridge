@@ -98,7 +98,9 @@ sealed class Message {
         val sourceId: String,
         val contentType: ContentType,
         val data: String,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        /** A link shared to the Mac: open it there instead of putting it on the clipboard. */
+        val open: Boolean = false
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "clipboard_update")
@@ -106,6 +108,8 @@ sealed class Message {
             put("content_type", contentType.value)
             put("data", data)
             put("timestamp", timestamp)
+            // Only sent when set; a Mac that predates it reads a plain clipboard update.
+            if (open) put("open", true)
         }.toString()
     }
 

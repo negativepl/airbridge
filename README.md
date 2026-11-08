@@ -61,6 +61,8 @@ Read and reply to SMS conversations on the Mac, with contact names and search. S
 
 Text copied on one device can be pasted on the other, automatically and in both directions, with HTML formatting preserved. On Android, a "Send to Mac" option is also available in the text-selection menu of any app.
 
+Links shared to AirBridge from any Android app open on the Mac straight away, in the browser you are using at that moment. Settings can pin this to the default browser or a specific one.
+
 ### Headphone handoff
 
 Move Bluetooth headphones between the phone and the Mac with one click. Both devices coordinate the switch, so headphones that connect to one device at a time, such as Galaxy Buds, switch reliably. AirBridge can optionally offer to switch when playback starts on the other device. Nothing moves without confirmation.

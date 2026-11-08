@@ -312,4 +312,6 @@
     <string name="home_section_connected_device">Podłączone urządzenie</string>
     <string name="pairing_status_paired">Sparowano</string>
     <string name="repair_needed_unpaired">%s usunął ten telefon ze sparowanych urządzeń. Sparuj ponownie, skanując kod QR na Macu.</string>
+    <string name="share_open_on_mac">Otwórz na Macu</string>
+    <string name="share_opening_on_mac">Otwieranie na Macu…</string>
 </resources>

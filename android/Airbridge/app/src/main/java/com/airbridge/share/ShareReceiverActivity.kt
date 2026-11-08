@@ -34,6 +34,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -94,7 +96,10 @@ import androidx.compose.runtime.collectAsState
 private data class ParsedShare(
     val fileUris: List<Uri>,
     val text: String?
-)
+) {
+    /** The web link in shared text: it opens on the Mac instead of landing on its clipboard. */
+    val link: String? = text?.let(SharedLink::extract)
+}
 
 class ShareReceiverActivity : ComponentActivity() {
 
@@ -166,13 +171,14 @@ class ShareReceiverActivity : ComponentActivity() {
                     bottomBar = {
                         ShareSheetBottomBar(
                             sendEnabled = selectedIsOnline,
+                            isLink = parsed.link != null,
                             onCancel = { finish() },
                             onSend = {
                                 if (selectedIsOnline) {
                                     dispatchSend(parsed)
                                     Toast.makeText(
                                         this@ShareReceiverActivity,
-                                        R.string.share_sending,
+                                        if (parsed.link != null) R.string.share_opening_on_mac else R.string.share_sending,
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -272,7 +278,10 @@ class ShareReceiverActivity : ComponentActivity() {
             startService(
                 Intent(this, AirbridgeService::class.java).apply {
                     action = AirbridgeService.ACTION_SEND_FILE
-                    putExtra(Intent.EXTRA_TEXT, text)
+                    // A link goes on its own, without the title some apps put
+                    // in front of it, and the Mac opens it in the browser.
+                    putExtra(Intent.EXTRA_TEXT, parsed.link ?: text)
+                    putExtra(AirbridgeService.EXTRA_OPEN_ON_MAC, parsed.link != null)
                 }
             )
         }
@@ -291,6 +300,7 @@ class ShareReceiverActivity : ComponentActivity() {
 @Composable
 private fun ShareSheetBottomBar(
     sendEnabled: Boolean,
+    isLink: Boolean,
     onCancel: () -> Unit,
     onSend: () -> Unit
 ) {
@@ -327,13 +337,13 @@ private fun ShareSheetBottomBar(
                     .height(52.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.FileUpload,
+                    imageVector = if (isLink) Icons.AutoMirrored.Rounded.OpenInNew else Icons.Rounded.FileUpload,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = stringResource(R.string.share_sheet_send),
+                    text = stringResource(if (isLink) R.string.share_open_on_mac else R.string.share_sheet_send),
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -376,6 +386,53 @@ private fun EmptyDevicesState() {
 @Composable
 private fun SharePreview(parsed: ParsedShare) {
     val context = LocalContext.current
+
+    // Link share: the domain leads (it says where the link goes), the full
+    // address underneath.
+    if (parsed.link != null) {
+        val host = remember(parsed.link) { Uri.parse(parsed.link).host?.removePrefix("www.") ?: parsed.link }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Link,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = host,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = parsed.link,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        return
+    }
 
     // Text share: show a text snippet icon + character count
     if (parsed.text != null) {

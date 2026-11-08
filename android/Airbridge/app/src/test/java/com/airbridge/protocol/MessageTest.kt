@@ -37,6 +37,14 @@ class MessageTest {
     }
 
     @Test
+    fun `clipboard update carries the open flag only when set`() {
+        val link = JSONObject(Message.ClipboardUpdate("s", ContentType.PLAIN_TEXT, "https://x.pl", 1L, open = true).toJson())
+        assertEquals(true, link.getBoolean("open"))
+        val plain = JSONObject(Message.ClipboardUpdate("s", ContentType.PLAIN_TEXT, "text", 1L).toJson())
+        assertEquals(false, plain.has("open"))
+    }
+
+    @Test
     fun `decodes file transfer start`() {
         val json = """{"type":"file_transfer_start","source_id":"device-1","transfer_id":"txfr-123","filename":"photo.jpg","mime_type":"image/jpeg","total_size":204800,"total_chunks":200,"timestamp":1712345678901}"""
         val msg = Message.fromJson(json) as Message.FileTransferStart

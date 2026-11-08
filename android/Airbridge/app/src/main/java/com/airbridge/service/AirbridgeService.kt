@@ -96,6 +96,8 @@ class AirbridgeService : Service() {
         const val EXTRA_CERT_FINGERPRINT = "extra_cert_fingerprint"
         const val EXTRA_FILE_URI = "extra_file_uri"
         const val EXTRA_DESTINATION_DIR = "extra_destination_dir"
+        /** With a shared link in EXTRA_TEXT: open it on the Mac rather than copy it there. */
+        const val EXTRA_OPEN_ON_MAC = "extra_open_on_mac"
 
         const val ACTION_REDISCOVER = "com.airbridge.action.REDISCOVER"
 
@@ -212,7 +214,7 @@ class AirbridgeService : Service() {
         @Volatile
         private var instance: AirbridgeService? = null
 
-        fun sendClipboardToMac(contentType: ContentType, data: String) {
+        fun sendClipboardToMac(contentType: ContentType, data: String, openOnMac: Boolean = false) {
             val svc = instance ?: run {
                 Log.w(TAG, "sendClipboardToMac: service not running")
                 return
@@ -221,9 +223,16 @@ class AirbridgeService : Service() {
             val msg = Message.ClipboardUpdate(
                 sourceId = svc.deviceId,
                 contentType = contentType,
-                data = data
+                data = data,
+                open = openOnMac
             )
             svc.webSocketClient.send(msg)
+            // A link opened on the Mac never touches its clipboard, so it is
+            // not a clipboard sync for the Home card or the statistics.
+            if (openOnMac) {
+                Log.d(TAG, "Sent link to open on the Mac")
+                return
+            }
             addActivity(svc.applicationContext, ActivityItem("clipboard_sent", "", System.currentTimeMillis()))
             svc.statsStore.recordClipboardSync()
             Log.d(TAG, "Sent clipboard to Mac (${data.length} chars)")
@@ -571,7 +580,7 @@ class AirbridgeService : Service() {
                     handleSendFile(uri, destinationDir)
                 } else if (!text.isNullOrEmpty()) {
                     Log.d(TAG, "Text share requested (${text.length} chars)")
-                    sendClipboardToMac(ContentType.PLAIN_TEXT, text)
+                    sendClipboardToMac(ContentType.PLAIN_TEXT, text, openOnMac = intent.getBooleanExtra(EXTRA_OPEN_ON_MAC, false))
                 }
             }
             ACTION_ACCEPT_FILE -> {

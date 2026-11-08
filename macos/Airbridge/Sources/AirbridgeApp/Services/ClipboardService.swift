@@ -37,6 +37,8 @@ final class ClipboardService: MessageHandler {
     private weak var connectionService: ConnectionService?
 
     func configure(connectionService: ConnectionService) {
+        // Follows which browser is in use, so a link from the phone opens there.
+        BrowserPicker.shared.startTracking()
         self.connectionService = connectionService
     }
 
@@ -79,7 +81,16 @@ final class ClipboardService: MessageHandler {
     // MARK: - MessageHandler
 
     func handleMessage(_ message: Message) {
-        guard case .clipboardUpdate(_, let contentType, let data) = message else { return }
+        guard case .clipboardUpdate(_, let contentType, let data, let open) = message else { return }
+        // A link shared to the Mac opens in the browser chosen by BrowserPicker
+        // and leaves the pasteboard alone. Only a bare http(s) URL qualifies
+        // (see `detectURL`); anything else asked to open is treated as an
+        // ordinary clipboard sync, Open button included. No receipt: the page
+        // coming to the front is the confirmation, and a popup would only cover it.
+        if open, contentType == .plainText, let url = Self.detectURL(in: data) {
+            BrowserPicker.shared.open(url)
+            return
+        }
         handleIncomingClipboard(contentType: contentType, data: data)
     }
 
@@ -123,10 +134,10 @@ final class ClipboardService: MessageHandler {
         incomingURL = nil
     }
 
-    /// Open the received link in the default browser and drop the receipt.
+    /// Open the received link in the browser in use and drop the receipt.
     func openIncomingURL() {
         guard let url = incomingURL else { return }
-        NSWorkspace.shared.open(url)
+        BrowserPicker.shared.open(url)
         dismissIncomingPreview()
         TransferPopup.shared.hide(delay: 0)
     }
