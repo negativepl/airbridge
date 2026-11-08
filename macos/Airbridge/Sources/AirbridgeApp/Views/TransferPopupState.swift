@@ -18,6 +18,13 @@ enum TransferPopupState: Equatable {
     /// Clipboard content just arrived from the phone and was applied to the
     /// pasteboard. `isLink` drives the "Open" button for plain web links.
     case clipboardReceived(preview: String, isLink: Bool)
+    /// A call is ringing on the phone: who is calling, and which of Answer /
+    /// Decline the phone's call notification offers.
+    case incomingCall(caller: String, canAnswer: Bool, canDecline: Bool)
+    /// Answered from this Mac: the call goes on on the phone.
+    case callAnswered(caller: String, headphonesMoved: Bool)
+    /// This Mac asked the phone for a scan (`isScan`) or a photo and waits for it.
+    case captureWaiting(isScan: Bool)
 
     /// States the popup may leave on its own: nothing is in flight, so the
     /// idle countdown (with its hover pause) applies. A clipboard receipt is a
@@ -31,7 +38,7 @@ enum TransferPopupState: Equatable {
 
     var filename: String {
         switch self {
-        case .idle, .headphonePrompt, .clipboardReceived:
+        case .idle, .headphonePrompt, .clipboardReceived, .incomingCall, .callAnswered, .captureWaiting:
             return ""
         case .incoming(let f, _),
              .waiting(let f),

@@ -45,6 +45,29 @@ class MessageTest {
     }
 
     @Test
+    fun `capture messages round-trip`() {
+        val scan = Message.CaptureRequest("r1", scan = true)
+        assertEquals(scan, Message.fromJson(scan.toJson()))
+        assertEquals("photo", JSONObject(Message.CaptureRequest("r2", scan = false).toJson()).getString("mode"))
+        val cancelled = Message.CaptureCancelled("r1")
+        assertEquals(cancelled, Message.fromJson(cancelled.toJson()))
+        val offer = Message.FileTransferOffer("t", "Skan.pdf", "application/pdf", 10L, captureId = "r1")
+        assertEquals(offer, Message.fromJson(offer.toJson()))
+        assertEquals(false, JSONObject(Message.FileTransferOffer("t", "a", "b", 1L).toJson()).has("capture_id"))
+    }
+
+    @Test
+    fun `call messages round-trip`() {
+        val incoming = Message.CallIncoming("0|com.samsung|1|null|10", "Jan Kowalski", canAnswer = true, canDecline = false)
+        assertEquals(incoming, Message.fromJson(incoming.toJson()))
+        val ended = Message.CallEnded("k")
+        assertEquals(ended, Message.fromJson(ended.toJson()))
+        val action = Message.CallAction("k", answer = true, moveHeadphones = true)
+        assertEquals(action, Message.fromJson(action.toJson()))
+        assertEquals("decline", JSONObject(Message.CallAction("k", answer = false, moveHeadphones = false).toJson()).getString("action"))
+    }
+
+    @Test
     fun `decodes file transfer start`() {
         val json = """{"type":"file_transfer_start","source_id":"device-1","transfer_id":"txfr-123","filename":"photo.jpg","mime_type":"image/jpeg","total_size":204800,"total_chunks":200,"timestamp":1712345678901}"""
         val msg = Message.fromJson(json) as Message.FileTransferStart

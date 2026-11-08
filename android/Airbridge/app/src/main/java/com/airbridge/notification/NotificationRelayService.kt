@@ -43,9 +43,15 @@ class NotificationRelayService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         replyActions.remove(sbn.key)
+        CallNotifications.onRemoved(sbn.key)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        // Calls go to the Mac as calls (with Answer / Decline), not as ordinary
+        // notifications. Our own notifications are skipped, except the fake
+        // call of a debug build.
+        val ownDebugCall = com.airbridge.BuildConfig.DEBUG && sbn.packageName == packageName && sbn.tag == DebugCall.TAG
+        if ((sbn.packageName != packageName || ownDebugCall) && CallNotifications.onPosted(sbn)) return
         val n = sbn.notification ?: return
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()

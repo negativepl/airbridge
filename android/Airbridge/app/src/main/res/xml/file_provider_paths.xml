@@ -10,4 +10,6 @@
     <external-path name="external_files" path="." />
     <cache-path name="updates" path="updates/" />
     <cache-path name="diagnostics" path="diagnostics/" />
+    <!-- Scans and photos taken for the Mac, until they are sent. -->
+    <cache-path name="capture" path="capture/" />
 </paths>

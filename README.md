@@ -43,11 +43,19 @@ It is an open-source alternative to Phone Link, KDE Connect and Intel Unison, bu
 
 Phone notifications appear on the Mac as native macOS notifications. Apps that support inline replies, such as WhatsApp, can be answered directly from the notification on the Mac.
 
+### Calls
+
+When a call rings on the phone, the Mac shows the caller at the top of the screen with Answer and Decline. These press the same buttons as the phone's own call notification, so the call itself stays on the phone and is heard through its speaker, earpiece or connected headphones. The Mac does not carry call audio. If your headphones are connected to the Mac, answering there moves them to the phone so you can take the call in them. This uses notification access and needs no telephony permissions.
+
 ### Files
 
 - **Sending:** in both directions, and the receiver always accepts or declines first. On the Mac, a global shortcut (`⌃⌥⌘A` by default) opens a drop zone from anywhere. Transfers show their speed and remaining time, can be cancelled, and are verified with a SHA-256 checksum.
 - **Phone storage on the Mac:** a Finder-style browser with a sortable list and an icon view, Back and Forward, Quick Look, thumbnails, downloading, and drag-and-drop upload into the open folder.
 - **Mac files on the phone:** browse the Mac's folders, download files and upload into the current folder.
+
+### Scan and photo with the phone
+
+Choose Scan Document with Phone or Take Photo with Phone in the AirBridge menu bar item or in the File menu. The phone opens Google's document scanner, which detects the page edges, crops and straightens the page and can scan several pages into one PDF, or the camera. The result is saved on the Mac and copied to the clipboard, ready to paste. The phone needs to be unlocked; if the scanner cannot open on its own, a notification on the phone opens it.
 
 ### Photos
 
@@ -162,7 +170,7 @@ Each permission is explained during setup. Most are optional, and declining one 
 | Permission | Purpose |
 |---|---|
 | Notifications | Transfer progress and incoming file requests |
-| Notification access | Showing phone notifications on the Mac |
+| Notification access | Showing phone notifications and incoming calls on the Mac |
 | All files access | Browsing and transferring files across the phone's storage |
 | Photos | Browsing the photo library from the Mac |
 | SMS and contacts | Reading and sending SMS from the Mac, with contact names |

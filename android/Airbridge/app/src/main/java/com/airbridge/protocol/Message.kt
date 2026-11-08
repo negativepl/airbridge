@@ -174,7 +174,9 @@ sealed class Message {
         val filename: String,
         val mimeType: String,
         val fileSize: Long,
-        val destinationDir: String? = null
+        val destinationDir: String? = null,
+        /** Answers the Mac's capture request (scan / photo): the Mac accepts it without asking. */
+        val captureId: String? = null
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "file_transfer_offer")
@@ -183,6 +185,7 @@ sealed class Message {
             put("mime_type", mimeType)
             put("file_size", fileSize)
             if (destinationDir != null) put("destination_dir", destinationDir)
+            if (captureId != null) put("capture_id", captureId)
         }.toString()
     }
 
@@ -916,6 +919,61 @@ sealed class Message {
         }.toString()
     }
 
+    /** Phone → Mac: a call is ringing. `callId` is the phone's notification key. */
+    data class CallIncoming(
+        val callId: String,
+        val caller: String,
+        val canAnswer: Boolean,
+        val canDecline: Boolean
+    ) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "call_incoming")
+            put("call_id", callId)
+            put("caller", caller)
+            put("can_answer", canAnswer)
+            put("can_decline", canDecline)
+        }.toString()
+    }
+
+    /** Phone → Mac: the call stopped ringing (answered on the phone, declined, or the caller hung up). */
+    data class CallEnded(val callId: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "call_ended")
+            put("call_id", callId)
+        }.toString()
+    }
+
+    /**
+     * Mac → phone: press Answer or Decline on the ringing call. With
+     * `moveHeadphones` the Mac had the headphones, and they move to the phone
+     * so the call is heard in them.
+     */
+    data class CallAction(val callId: String, val answer: Boolean, val moveHeadphones: Boolean) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "call_action")
+            put("call_id", callId)
+            put("action", if (answer) "answer" else "decline")
+            put("move_headphones", moveHeadphones)
+        }.toString()
+    }
+
+    /** Mac → phone: open the document scanner (`scan = true`) or the camera; the result comes back as a file offer with `captureId`. */
+    data class CaptureRequest(val requestId: String, val scan: Boolean) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "capture_request")
+            put("request_id", requestId)
+            put("mode", if (scan) "scan" else "photo")
+        }.toString()
+    }
+
+    /** Phone → Mac: the scanner or camera was closed without a result. */
+    data class CaptureCancelled(val requestId: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "capture_cancelled")
+            put("request_id", requestId)
+        }.toString()
+    }
+
     companion object {
         /** Version of the Airbridge wire protocol this build speaks. Included in
          *  the pairing QR payload and the auth handshake; peers that omit the
@@ -958,7 +1016,8 @@ sealed class Message {
                     filename = obj.getString("filename"),
                     mimeType = obj.getString("mime_type"),
                     fileSize = obj.getLong("file_size"),
-                    destinationDir = if (obj.has("destination_dir")) obj.getString("destination_dir") else null
+                    destinationDir = if (obj.has("destination_dir")) obj.getString("destination_dir") else null,
+                    captureId = if (obj.has("capture_id")) obj.getString("capture_id") else null
                 )
                 "file_transfer_accept" -> FileTransferAccept(
                     transferId = obj.getString("transfer_id")
@@ -1238,6 +1297,23 @@ sealed class Message {
                     appIcon = obj.optString("app_icon", ""),
                     notificationKey = obj.optString("notification_key", ""),
                     canReply = obj.optBoolean("can_reply", false)
+                )
+                "call_incoming" -> CallIncoming(
+                    callId = obj.getString("call_id"),
+                    caller = obj.optString("caller", ""),
+                    canAnswer = obj.optBoolean("can_answer", false),
+                    canDecline = obj.optBoolean("can_decline", false)
+                )
+                "call_ended" -> CallEnded(callId = obj.getString("call_id"))
+                "capture_request" -> CaptureRequest(
+                    requestId = obj.getString("request_id"),
+                    scan = obj.optString("mode", "scan") != "photo"
+                )
+                "capture_cancelled" -> CaptureCancelled(requestId = obj.getString("request_id"))
+                "call_action" -> CallAction(
+                    callId = obj.getString("call_id"),
+                    answer = obj.getString("action") == "answer",
+                    moveHeadphones = obj.optBoolean("move_headphones", false)
                 )
                 "notification_reply" -> NotificationReply(
                     notificationKey = obj.getString("notification_key"),

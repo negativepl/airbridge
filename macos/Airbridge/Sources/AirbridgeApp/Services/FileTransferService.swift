@@ -32,6 +32,17 @@ final class FileTransferService: MessageHandler {
     /// accepted a file.
     private(set) var isAwaitingAcceptedTransfer = false
 
+    /// A scan or photo this Mac asked the phone for, until the file arrives
+    /// or the phone reports the scanner closed. Drives the island's waiting state.
+    struct PendingCapture: Equatable {
+        enum Mode: String { case scan, photo }
+        let requestId: String
+        let mode: Mode
+    }
+    private(set) var pendingCapture: PendingCapture?
+    /// The incoming upload answers a capture: once saved it goes on the pasteboard.
+    @ObservationIgnored private var receivingCapture = false
+
     private(set) var incomingOfferTransferId: String? = nil
     private(set) var incomingOfferFileSize: Int64 = 0
     var hasIncomingOffer: Bool { !pendingOffers.isEmpty }
@@ -121,8 +132,18 @@ final class FileTransferService: MessageHandler {
 
     func handleMessage(_ message: Message, from connectionId: String) {
         switch message {
-        case .fileTransferOffer(let transferId, let filename, _, let fileSize, _):
+        case .fileTransferOffer(let transferId, let filename, _, let fileSize, _, let captureId):
             handleIncomingOffer(transferId: transferId, filename: filename, fileSize: fileSize, connectionId: connectionId)
+            // The scan or photo this Mac asked for: accept it without asking.
+            if let captureId, captureId == pendingCapture?.requestId {
+                pendingCapture = nil
+                receivingCapture = true
+                acceptIncomingOffer()
+            }
+        case .captureCancelled(let requestId):
+            guard requestId == pendingCapture?.requestId else { return }
+            pendingCapture = nil
+            TransferPopup.shared.hide(delay: 0)
         case .fileTransferAccept:
             offerResponseStream?.yield(.accepted)
             offerResponseStream?.finish()
@@ -158,6 +179,40 @@ final class FileTransferService: MessageHandler {
         isRejected = false
         fileTransferProgress = 0
         TransferPopup.shared.show()
+    }
+
+    // MARK: - Capture (scan / photo with the phone)
+
+    /// Asks the active phone to open its document scanner or camera. The
+    /// result arrives as an ordinary file transfer, accepted automatically,
+    /// saved like any received file and put on the pasteboard.
+    func requestCapture(_ mode: PendingCapture.Mode) {
+        guard let connectionService, connectionService.isConnected else { return }
+        let capture = PendingCapture(requestId: UUID().uuidString, mode: mode)
+        pendingCapture = capture
+        TransferPopup.shared.show()
+        Task {
+            try? await connectionService.sendToActive(.captureRequest(requestId: capture.requestId, mode: mode.rawValue))
+        }
+    }
+
+    /// Island ✕ while waiting: stop waiting. A result that still arrives is
+    /// then offered like any other file.
+    func cancelCapture() {
+        pendingCapture = nil
+        TransferPopup.shared.hide(delay: 0)
+    }
+
+    /// Received scan or photo → pasteboard, ready for ⌘V: the file itself, and
+    /// for a photo the image too, so apps that take only images can paste it.
+    private func copyCaptureToPasteboard(_ url: URL) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        var items: [NSPasteboardWriting] = [url as NSURL]
+        if url.pathExtension.lowercased() != "pdf", let image = NSImage(contentsOf: url) {
+            items.append(image)
+        }
+        pasteboard.writeObjects(items)
     }
 
     func acceptIncomingOffer() {
@@ -239,6 +294,8 @@ final class FileTransferService: MessageHandler {
     /// dismiss the popup instead of leaving it orphaned (the bug where "Reject"
     /// appeared to do nothing after the connection died).
     func connectionLost() {
+        pendingCapture = nil
+        receivingCapture = false
         // An outgoing offer can't be answered over a dead session either —
         // fail its wait instead of leaving the island stuck on "waiting".
         failPendingOutgoingWait()
@@ -654,6 +711,10 @@ final class FileTransferService: MessageHandler {
                 }
 
                 guard ownsPopup else { return }
+                if self.receivingCapture {
+                    self.receivingCapture = false
+                    if let url = self.lastReceivedFileURL { self.copyCaptureToPasteboard(url) }
+                }
                 self.receivingOwnerKey = nil
                 // Best-effort: this callback isn't keyed by transferId, so a
                 // completed receive clears the whole accepted-set rather than

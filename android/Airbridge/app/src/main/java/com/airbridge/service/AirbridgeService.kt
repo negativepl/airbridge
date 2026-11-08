@@ -79,6 +79,11 @@ class AirbridgeService : Service() {
         /** Debug-only: render the transfer progress notification at a given
          *  percentage (extra "p") to inspect how the progress bar draws. */
         const val ACTION_DEBUG_PROGRESS_NOTIF = "com.airbridge.action.DEBUG_PROGRESS_NOTIF"
+        /** Debug builds: post a fake incoming call (extra "caller"), or end it ("the caller hung up"). */
+        const val ACTION_DEBUG_FAKE_CALL = "com.airbridge.action.DEBUG_FAKE_CALL"
+        const val ACTION_DEBUG_FAKE_CALL_END = "com.airbridge.action.DEBUG_FAKE_CALL_END"
+        /** The fake call's own Answer button (debug builds). */
+        const val ACTION_DEBUG_FAKE_CALL_ANSWERED = "com.airbridge.action.DEBUG_FAKE_CALL_ANSWERED"
         const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
         private const val RING_NOTIFICATION_ID = 7
         private const val TRANSFER_NOTIFICATION_ID = 2
@@ -95,6 +100,9 @@ class AirbridgeService : Service() {
         const val EXTRA_PORT = "extra_port"
         const val EXTRA_CERT_FINGERPRINT = "extra_cert_fingerprint"
         const val EXTRA_FILE_URI = "extra_file_uri"
+        /** With ACTION_SEND_FILE: the file answers the Mac's capture request with this id. */
+        const val EXTRA_CAPTURE_ID = "extra_capture_id"
+        private const val CAPTURE_PROMPT_NOTIFICATION_ID = 4712
         const val EXTRA_DESTINATION_DIR = "extra_destination_dir"
         /** With a shared link in EXTRA_TEXT: open it on the Mac rather than copy it there. */
         const val EXTRA_OPEN_ON_MAC = "extra_open_on_mac"
@@ -262,6 +270,30 @@ class AirbridgeService : Service() {
         }
 
         /** Most z NotificationRelayService: wyślij powiadomienie na Maca, gdy połączony. */
+        fun sendCaptureCancelled(requestId: String) {
+            val svc = instance ?: return
+            if (requestId.isEmpty() || !svc.webSocketClient.isConnected) return
+            svc.webSocketClient.send(Message.CaptureCancelled(requestId))
+        }
+
+        /** The capture screen came up: the "tap to scan" fallback is no longer needed. */
+        fun dismissCapturePrompt(context: Context) {
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .cancel(CAPTURE_PROMPT_NOTIFICATION_ID)
+        }
+
+        fun sendCallIncoming(callId: String, caller: String, canAnswer: Boolean, canDecline: Boolean) {
+            val svc = instance ?: return
+            if (!svc.webSocketClient.isConnected) return
+            svc.webSocketClient.send(Message.CallIncoming(callId, caller, canAnswer, canDecline))
+        }
+
+        fun sendCallEnded(callId: String) {
+            val svc = instance ?: return
+            if (!svc.webSocketClient.isConnected) return
+            svc.webSocketClient.send(Message.CallEnded(callId))
+        }
+
         fun relayNotification(
             packageName: String, appName: String, title: String, text: String,
             timestamp: Long, appIcon: String, notificationKey: String = "", canReply: Boolean = false
@@ -577,7 +609,7 @@ class AirbridgeService : Service() {
                 val destinationDir: String? = intent.getStringExtra(EXTRA_DESTINATION_DIR)
                 if (uri != null) {
                     Log.d(TAG, "File transfer requested: $uri (destinationDir=$destinationDir)")
-                    handleSendFile(uri, destinationDir)
+                    handleSendFile(uri, destinationDir, intent.getStringExtra(EXTRA_CAPTURE_ID))
                 } else if (!text.isNullOrEmpty()) {
                     Log.d(TAG, "Text share requested (${text.length} chars)")
                     sendClipboardToMac(ContentType.PLAIN_TEXT, text, openOnMac = intent.getBooleanExtra(EXTRA_OPEN_ON_MAC, false))
@@ -744,6 +776,17 @@ class AirbridgeService : Service() {
             ACTION_HEADPHONE_REFRESH -> refreshHeadphoneConfig()
             ACTION_DEBUG_HEADPHONE_PROMPT -> {
                 if (com.airbridge.BuildConfig.DEBUG) postHeadphonePromptNotification()
+            }
+            ACTION_DEBUG_FAKE_CALL -> {
+                if (com.airbridge.BuildConfig.DEBUG) {
+                    com.airbridge.notification.DebugCall.ring(this, intent.getStringExtra("caller") ?: "Jan Kowalski")
+                }
+            }
+            ACTION_DEBUG_FAKE_CALL_ANSWERED -> {
+                if (com.airbridge.BuildConfig.DEBUG) com.airbridge.notification.DebugCall.answered(this)
+            }
+            ACTION_DEBUG_FAKE_CALL_END -> {
+                if (com.airbridge.BuildConfig.DEBUG) com.airbridge.notification.DebugCall.end(this)
             }
             ACTION_DEBUG_PROGRESS_NOTIF -> {
                 if (com.airbridge.BuildConfig.DEBUG) {
@@ -1331,6 +1374,10 @@ class AirbridgeService : Service() {
         // Pull the Mac's system info + wallpaper for the Home monitor.
         webSocketClient.send(Message.MacInfoRequest)
         webSocketClient.send(Message.MacWallpaperRequest)
+        // A call already ringing when the Mac (re)connects still shows there.
+        com.airbridge.notification.CallNotifications.forEachRinging { id, caller, canAnswer, canDecline ->
+            webSocketClient.send(Message.CallIncoming(id, caller, canAnswer, canDecline))
+        }
         // Tell the Mac where the headphones are right now (it has no
         // other way to learn the phone-side state after a reconnect).
         val hpAddress = headphonePrefs().getString("headphone_address", null)
@@ -1725,6 +1772,14 @@ class AirbridgeService : Service() {
                     }
                 }
             }
+            is Message.CaptureRequest -> openCapture(message.requestId, message.scan)
+            is Message.CallAction -> {
+                val ok = com.airbridge.notification.CallNotifications.perform(message.callId, message.answer)
+                Log.i(TAG, "Call ${if (message.answer) "answer" else "decline"} from the Mac: ok=$ok")
+                // The headphones were on the Mac: bring them over so the call is
+                // heard in them, the same takeover as the Home button.
+                if (ok && message.answer && message.moveHeadphones) takeoverHeadphones(HandoffTrigger.MANUAL)
+            }
             is Message.NotificationReply -> {
                 val ok = com.airbridge.notification.NotificationRelayService
                     .sendReply(message.notificationKey, message.text)
@@ -1954,7 +2009,7 @@ class AirbridgeService : Service() {
         }
     }
 
-    private fun handleSendFile(uri: Uri, destinationDir: String? = null) {
+    private fun handleSendFile(uri: Uri, destinationDir: String? = null, captureId: String? = null) {
         if (!webSocketClient.isConnected) {
             Log.w(TAG, "handleSendFile: not connected")
             android.widget.Toast.makeText(this, getString(com.airbridge.R.string.not_connected), android.widget.Toast.LENGTH_SHORT).show()
@@ -2031,7 +2086,7 @@ class AirbridgeService : Service() {
             val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
             pendingOutgoingOffers[transferId] = deferred
             val mime = applicationContext.contentResolver.getType(uri) ?: "application/octet-stream"
-            webSocketClient.send(Message.FileTransferOffer(transferId, filename, mime, fileSize))
+            webSocketClient.send(Message.FileTransferOffer(transferId, filename, mime, fileSize, captureId = captureId))
 
             // Distinguish an explicit reject (deferred completes before the
             // timeout) from silence (withTimeoutOrNull returns null) — a
@@ -2266,6 +2321,39 @@ class AirbridgeService : Service() {
      *  This is a question, not an action: nothing moves until the user taps
      *  the Switch action, which fires the same manual takeover the Home
      *  button uses. */
+    /**
+     * The Mac asked for a scan or a photo: open the capture screen straight
+     * away. Starting an activity from the background needs the "display over
+     * other apps" access the app already asks for; if the screen still did not
+     * come up (access withdrawn, phone locked), a notification offers it instead.
+     */
+    private fun openCapture(requestId: String, scan: Boolean) {
+        val intent = com.airbridge.capture.CaptureActivity.intent(this, requestId, scan)
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "Capture screen could not be started directly", e)
+        }
+        serviceScope.launch {
+            kotlinx.coroutines.delay(1_500)
+            if (com.airbridge.capture.CaptureActivity.started) return@launch
+            val tap = android.app.PendingIntent.getActivity(
+                this@AirbridgeService, CAPTURE_PROMPT_NOTIFICATION_ID, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = Notification.Builder(this@AirbridgeService, CHANNEL_FILES_ID)
+                .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+                .setContentTitle(getString(if (scan) com.airbridge.R.string.capture_prompt_scan else com.airbridge.R.string.capture_prompt_photo))
+                .setContentText(getString(com.airbridge.R.string.capture_prompt_text))
+                .setContentIntent(tap)
+                .setAutoCancel(true)
+                .setTimeoutAfter(120_000L)
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(CAPTURE_PROMPT_NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun postHeadphonePromptNotification() {
         val takeoverIntent = android.app.PendingIntent.getService(
             this, HEADPHONE_PROMPT_NOTIFICATION_ID,

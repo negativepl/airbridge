@@ -172,6 +172,15 @@ struct AirbridgeApp: App {
             // Remove "New Window" and related document commands we don't use.
             CommandGroup(replacing: .newItem) { }
 
+            // File ▸ scan or photo with the phone, next to import/export like
+            // the system's own "Import from iPhone" commands.
+            CommandGroup(after: .importExport) {
+                Button(L10n.captureScan) { fileTransferService.requestCapture(.scan) }
+                    .disabled(!connectionService.isConnected)
+                Button(L10n.capturePhoto) { fileTransferService.requestCapture(.photo) }
+                    .disabled(!connectionService.isConnected)
+            }
+
             // Replace Apple menu → About with our custom SwiftUI About window
             // (a Window scene registered below with id "about"). Openable via
             // the openWindow environment action, which must be captured inside
@@ -216,7 +225,7 @@ struct AirbridgeApp: App {
         .windowResizability(.contentMinSize)
 
         MenuBarExtra {
-            MenuBarView(connectionService: connectionService, clipboardService: clipboardService, updateService: updateService, bluetoothAudio: bluetoothAudioService)
+            MenuBarView(connectionService: connectionService, clipboardService: clipboardService, updateService: updateService, bluetoothAudio: bluetoothAudioService, fileTransferService: fileTransferService)
         } label: {
             if connectionService.isConnected, let info = connectionService.deviceInfo {
                 Label {

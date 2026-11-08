@@ -73,7 +73,9 @@ public enum Message: Equatable, Sendable {
     case smsMessagesResponse(threadId: String, messages: [SmsMessageMeta], totalCount: Int, page: Int)
     case smsSendRequest(address: String, body: String)
     case smsSendResponse(success: Bool, error: String?)
-    case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64, destinationDir: String?)
+    /// `captureId`: the file answers this Mac's own capture request (scan or
+    /// photo), so it is accepted without asking.
+    case fileTransferOffer(transferId: String, filename: String, mimeType: String, fileSize: Int64, destinationDir: String?, captureId: String? = nil)
     case fileTransferAccept(transferId: String)
     case fileTransferReject(transferId: String)
     case mirrorStartRequest(token: String)
@@ -113,6 +115,18 @@ public enum Message: Equatable, Sendable {
     case macFileDownloadReady(transferId: String, filename: String, mimeType: String, fileSize: Int64)
     case notificationPosted(packageName: String, appName: String, title: String, text: String, timestamp: Int64, appIcon: String, notificationKey: String, canReply: Bool)
     case notificationReply(notificationKey: String, text: String)
+    /// Phone → Mac: a call is ringing. `callId` is the phone's notification key.
+    case callIncoming(callId: String, caller: String, canAnswer: Bool, canDecline: Bool)
+    /// Phone → Mac: the call stopped ringing (answered on the phone, declined, caller hung up).
+    case callEnded(callId: String)
+    /// Mac → phone: press Answer (`answer` true) or Decline on the ringing call;
+    /// `moveHeadphones` asks the phone to take the headphones from this Mac.
+    case callAction(callId: String, answer: Bool, moveHeadphones: Bool)
+    /// Mac → phone: open the document scanner (`mode` "scan") or the camera
+    /// ("photo"); the result comes back as a file offer carrying `requestId`.
+    case captureRequest(requestId: String, mode: String)
+    /// Phone → Mac: the user closed the scanner or camera without a result.
+    case captureCancelled(requestId: String)
     /// Both directions: connection state of the selected headphones on the
     /// sending side, so each device knows where the headphones currently are.
     case headphoneState(connected: Bool, address: String, name: String, audioActive: Bool?)
@@ -469,6 +483,11 @@ extension Message: Codable {
         case macFileDownloadReady     = "mac_file_download_ready"
         case notificationPosted       = "notification_posted"
         case notificationReply        = "notification_reply"
+        case callIncoming             = "call_incoming"
+        case callEnded                = "call_ended"
+        case callAction               = "call_action"
+        case captureRequest           = "capture_request"
+        case captureCancelled         = "capture_cancelled"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -528,6 +547,14 @@ extension Message: Codable {
         case appName            = "app_name"
         case appIcon            = "app_icon"
         case notificationKey    = "notification_key"
+        case callId             = "call_id"
+        case caller
+        case canAnswer          = "can_answer"
+        case canDecline         = "can_decline"
+        case callActionName     = "action"
+        case moveHeadphones     = "move_headphones"
+        case requestId          = "request_id"
+        case captureId          = "capture_id"
         case canReply           = "can_reply"
         case connected
         case name
@@ -731,13 +758,23 @@ extension Message: Codable {
             try container.encode(success, forKey: .success)
             try container.encodeIfPresent(error, forKey: .error)
 
-        case .fileTransferOffer(let transferId, let filename, let mimeType, let fileSize, let destinationDir):
+        case .fileTransferOffer(let transferId, let filename, let mimeType, let fileSize, let destinationDir, let captureId):
             try container.encode(TypeKey.fileTransferOffer.rawValue, forKey: .type)
             try container.encode(transferId, forKey: .transferId)
             try container.encode(filename, forKey: .filename)
             try container.encode(mimeType, forKey: .mimeType)
             try container.encode(fileSize, forKey: .fileSize)
             try container.encodeIfPresent(destinationDir, forKey: .destinationDir)
+            try container.encodeIfPresent(captureId, forKey: .captureId)
+
+        case .captureRequest(let requestId, let mode):
+            try container.encode(TypeKey.captureRequest.rawValue, forKey: .type)
+            try container.encode(requestId, forKey: .requestId)
+            try container.encode(mode, forKey: .mode)
+
+        case .captureCancelled(let requestId):
+            try container.encode(TypeKey.captureCancelled.rawValue, forKey: .type)
+            try container.encode(requestId, forKey: .requestId)
 
         case .fileTransferAccept(let transferId):
             try container.encode(TypeKey.fileTransferAccept.rawValue, forKey: .type)
@@ -849,6 +886,23 @@ extension Message: Codable {
             try container.encode(TypeKey.notificationReply.rawValue, forKey: .type)
             try container.encode(notificationKey, forKey: .notificationKey)
             try container.encode(text, forKey: .text)
+
+        case .callIncoming(let callId, let caller, let canAnswer, let canDecline):
+            try container.encode(TypeKey.callIncoming.rawValue, forKey: .type)
+            try container.encode(callId, forKey: .callId)
+            try container.encode(caller, forKey: .caller)
+            try container.encode(canAnswer, forKey: .canAnswer)
+            try container.encode(canDecline, forKey: .canDecline)
+
+        case .callEnded(let callId):
+            try container.encode(TypeKey.callEnded.rawValue, forKey: .type)
+            try container.encode(callId, forKey: .callId)
+
+        case .callAction(let callId, let answer, let moveHeadphones):
+            try container.encode(TypeKey.callAction.rawValue, forKey: .type)
+            try container.encode(callId, forKey: .callId)
+            try container.encode(answer ? "answer" : "decline", forKey: .callActionName)
+            try container.encode(moveHeadphones, forKey: .moveHeadphones)
 
         case .macFilesListRequest(let path, let page, let pageSize, let sortBy, let sortDir, let foldersFirst, let query):
             try container.encode(TypeKey.macFilesListRequest.rawValue, forKey: .type)
@@ -1121,7 +1175,16 @@ extension Message: Codable {
             let mimeType = try container.decode(String.self, forKey: .mimeType)
             let fileSize = try container.decode(Int64.self, forKey: .fileSize)
             let destinationDir = try container.decodeIfPresent(String.self, forKey: .destinationDir)
-            self = .fileTransferOffer(transferId: transferId, filename: filename, mimeType: mimeType, fileSize: fileSize, destinationDir: destinationDir)
+            let captureId = try container.decodeIfPresent(String.self, forKey: .captureId)
+            self = .fileTransferOffer(transferId: transferId, filename: filename, mimeType: mimeType, fileSize: fileSize,
+                                      destinationDir: destinationDir, captureId: captureId)
+
+        case .captureRequest:
+            self = .captureRequest(requestId: try container.decode(String.self, forKey: .requestId),
+                                   mode: try container.decode(String.self, forKey: .mode))
+
+        case .captureCancelled:
+            self = .captureCancelled(requestId: try container.decode(String.self, forKey: .requestId))
 
         case .fileTransferAccept:
             let transferId = try container.decode(String.self, forKey: .transferId)
@@ -1233,6 +1296,24 @@ extension Message: Codable {
             let notificationKey = try container.decode(String.self, forKey: .notificationKey)
             let text = try container.decode(String.self, forKey: .text)
             self = .notificationReply(notificationKey: notificationKey, text: text)
+
+        case .callIncoming:
+            self = .callIncoming(
+                callId: try container.decode(String.self, forKey: .callId),
+                caller: try container.decodeIfPresent(String.self, forKey: .caller) ?? "",
+                canAnswer: try container.decodeIfPresent(Bool.self, forKey: .canAnswer) ?? false,
+                canDecline: try container.decodeIfPresent(Bool.self, forKey: .canDecline) ?? false
+            )
+
+        case .callEnded:
+            self = .callEnded(callId: try container.decode(String.self, forKey: .callId))
+
+        case .callAction:
+            self = .callAction(
+                callId: try container.decode(String.self, forKey: .callId),
+                answer: try container.decode(String.self, forKey: .callActionName) == "answer",
+                moveHeadphones: try container.decodeIfPresent(Bool.self, forKey: .moveHeadphones) ?? false
+            )
 
         case .macFilesListRequest:
             let path = try container.decode(String.self, forKey: .path)

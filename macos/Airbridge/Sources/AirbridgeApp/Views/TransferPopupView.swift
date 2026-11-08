@@ -201,10 +201,23 @@ struct TransferPopupView: View {
             return CGSize(width: w, height: h * 0.90)
         case .clipboardReceived:
             return CGSize(width: w * 0.94, height: h)
+        case .incomingCall:
+            return CGSize(width: w, height: h)
+        case .callAnswered:
+            return CGSize(width: w * 0.88, height: h * 0.90)
+        case .captureWaiting:
+            return CGSize(width: w * 0.88, height: h * 0.90)
         }
     }
 
     private var state: TransferPopupState {
+        // A ringing call outranks everything: it is the one thing that cannot wait.
+        if let call = connectionService.incomingCall {
+            return .incomingCall(caller: call.caller, canAnswer: call.canAnswer, canDecline: call.canDecline)
+        }
+        if let notice = connectionService.callNotice {
+            return .callAnswered(caller: notice.caller, headphonesMoved: notice.headphonesMoved)
+        }
         if fileTransferService.hasIncomingOffer {
             return .incoming(
                 filename: fileTransferService.fileTransferFileName,
@@ -248,6 +261,10 @@ struct TransferPopupView: View {
                 isReceiving: true
             )
         }
+        // Waiting for a scan or photo this Mac asked for.
+        if let capture = fileTransferService.pendingCapture {
+            return .captureWaiting(isScan: capture.mode == .scan)
+        }
         // Clipboard receipt — a transfer in flight still owns the popup, but
         // an arriving link outranks both the headphone question and idle.
         if let preview = clipboardService.incomingPreview {
@@ -265,9 +282,9 @@ struct TransferPopupView: View {
     private func tint(for state: TransferPopupState) -> Color {
         switch state {
         case .idle: return .accentColor
-        case .incoming, .waiting, .transferring, .headphonePrompt: return .accentColor
+        case .incoming, .waiting, .transferring, .headphonePrompt, .captureWaiting: return .accentColor
         case .clipboardReceived: return .accentColor
-        case .complete: return .green
+        case .complete, .incomingCall, .callAnswered: return .green
         case .rejected, .failed: return .red
         }
     }
@@ -277,11 +294,11 @@ struct TransferPopupView: View {
     /// changes, so transitions blend the three colors smoothly.
     private func palette(for state: TransferPopupState) -> GradientPalette {
         switch state {
-        case .idle, .incoming, .waiting, .transferring, .headphonePrompt:
+        case .idle, .incoming, .waiting, .transferring, .headphonePrompt, .captureWaiting:
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
         case .clipboardReceived:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
-        case .complete:
+        case .complete, .incomingCall, .callAnswered:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
         case .rejected, .failed:
             return GradientPalette(primary: .red, secondary: .orange, tertiary: .pink)
@@ -299,6 +316,9 @@ struct TransferPopupView: View {
         case .failed: return 0.85
         case .headphonePrompt: return 0.9
         case .clipboardReceived: return 0.9
+        case .incomingCall: return 1.0
+        case .callAnswered: return 0.9
+        case .captureWaiting: return 0.8
         }
     }
 
@@ -328,6 +348,9 @@ struct TransferPopupView: View {
         case .headphonePrompt: return 6
         case .failed: return 7
         case .clipboardReceived: return 8
+        case .incomingCall: return 9
+        case .callAnswered: return 10
+        case .captureWaiting: return 11
         }
     }
 
@@ -356,6 +379,12 @@ struct TransferPopupView: View {
             headphonePromptView()
         case .clipboardReceived(let preview, let isLink):
             clipboardReceivedView(preview: preview, isLink: isLink)
+        case .incomingCall(let caller, let canAnswer, let canDecline):
+            incomingCallView(caller: caller, canAnswer: canAnswer, canDecline: canDecline)
+        case .callAnswered(let caller, let headphonesMoved):
+            callAnsweredView(caller: caller, headphonesMoved: headphonesMoved)
+        case .captureWaiting(let isScan):
+            captureWaitingView(isScan: isScan)
         }
     }
 
@@ -794,6 +823,70 @@ struct TransferPopupView: View {
         }
     }
 
+    /// A call ringing on the phone, laid out like a phone's call banner:
+    /// Decline on the left, who is calling in the middle, Answer on the right.
+    /// Both buttons wiggle while it rings. They press the same buttons on the
+    /// phone's call notification; the call itself stays on the phone.
+    private func incomingCallView(caller: String, canAnswer: Bool, canDecline: Bool) -> some View {
+        HStack(spacing: 16) {
+            callButtonSlot(visible: canDecline) {
+                IslandIconButton(systemName: "phone.down.fill", label: L10n.callDecline, tint: .red, ringing: true) {
+                    connectionService.declineCall()
+                }
+            }
+            VStack(spacing: 3) {
+                caption(L10n.callIncoming)
+                headline(caller.isEmpty ? L10n.callUnknownCaller : caller)
+            }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            callButtonSlot(visible: canAnswer) {
+                IslandIconButton(systemName: "phone.fill", label: L10n.callAnswer, tint: .green, ringing: true) {
+                    connectionService.answerCall()
+                }
+            }
+        }
+    }
+
+    /// Keeps the caller centred when the phone offers only one of the buttons.
+    @ViewBuilder
+    private func callButtonSlot<B: View>(visible: Bool, @ViewBuilder button: () -> B) -> some View {
+        if visible { button() } else { Color.clear.frame(width: 36, height: 36) }
+    }
+
+    /// Waiting for the phone: the scanner or camera is open there.
+    private func captureWaitingView(isScan: Bool) -> some View {
+        islandRow {
+            glyph(isScan ? "doc.viewfinder" : "camera.viewfinder").symbolEffect(.pulse, options: .repeating)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(isScan ? L10n.captureScanWaiting : L10n.capturePhotoWaiting)
+                headline(L10n.captureOnPhone)
+            }
+        } controls: {
+            IslandIconButton(systemName: "xmark", label: L10n.cancel) {
+                fileTransferService.cancelCapture()
+            }
+        }
+    }
+
+    /// Answered here: says where the call went (and the headphones, if they moved).
+    private func callAnsweredView(caller: String, headphonesMoved: Bool) -> some View {
+        islandRow {
+            glyph("iphone.gen3.radiowaves.left.and.right").symbolEffect(.bounce, value: caller)
+        } texts: {
+            VStack(alignment: .leading, spacing: 3) {
+                caption(L10n.callOnPhone)
+                headline(caller.isEmpty ? L10n.callUnknownCaller : caller)
+                if headphonesMoved {
+                    Text(L10n.callHeadphonesMoved).font(.ab(.footnote)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        } controls: {
+            EmptyView()
+        }
+    }
+
     /// Receipt for content synced from the phone: it is already on the
     /// pasteboard, this only makes that visible (so no "copy" — there is
     /// nothing left to copy). A plain web link also gets a one-click Open.
@@ -877,7 +970,12 @@ private struct IslandIconButton: View {
     let systemName: String
     let label: String
     var prominent: Bool = false
+    /// A colour of its own (green Answer, red Decline); implies prominent.
+    var tint: Color? = nil
+    /// Wiggles its symbol on repeat, like a ringing phone (off with Reduce Motion).
+    var ringing: Bool = false
     let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var pressed = false
 
@@ -885,12 +983,20 @@ private struct IslandIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(prominent ? Color.white : Color.primary)
+                .foregroundStyle(prominent || tint != nil ? Color.white : Color.primary)
+                .symbolEffect(.wiggle, options: .repeating, isActive: ringing && !reduceMotion)
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .glassEffect(prominent ? .regular.tint(Color.accentColor).interactive() : .regular.interactive(), in: .circle)
+        // A coloured action (Answer / Decline) is a solid disc, as on Apple's
+        // call screen: a glass tint is too faint to tell green from red.
+        .background { if let tint { Circle().fill(tint.gradient) } }
+        .glassEffect(
+            tint != nil ? .identity
+                : (prominent ? .regular.tint(Color.accentColor).interactive() : .regular.interactive()),
+            in: .circle
+        )
         .scaleEffect(pressed ? 0.94 : 1)
         .animation(.easeOut(duration: 0.12), value: pressed)
         .simultaneousGesture(

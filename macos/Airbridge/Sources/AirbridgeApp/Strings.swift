@@ -21,6 +21,7 @@ enum L10n {
     static var pairTitle: String { isPL ? "Sparuj z Androidem" : "Pair with Android" }
     static var pairDesc: String { isPL ? "Otwórz AirBridge na telefonie i zeskanuj ten kod QR" : "Open AirBridge on your phone and scan this QR code" }
     static var close: String { isPL ? "Zamknij" : "Close" }
+    static var cancel: String { isPL ? "Anuluj" : "Cancel" }
     static var launchAtLogin: String { isPL ? "Uruchom przy logowaniu" : "Launch at login" }
     static var showNotifications: String { isPL ? "Pokaż powiadomienia" : "Show notifications" }
     static var downloadFolder: String { isPL ? "Folder pobierania:" : "Download folder:" }
@@ -56,6 +57,17 @@ enum L10n {
     static var linkBrowserSetting: String { isPL ? "Otwieraj linki z telefonu w" : "Open links from phone in" }
     static var linkBrowserInUse: String { isPL ? "Przeglądarce w użyciu" : "Browser in use" }
     static var linkBrowserSystemDefault: String { isPL ? "Przeglądarce domyślnej" : "Default browser" }
+    static var callIncoming: String { isPL ? "Połączenie przychodzące" : "Incoming call" }
+    static var callUnknownCaller: String { isPL ? "Nieznany numer" : "Unknown caller" }
+    static var callAnswer: String { isPL ? "Odbierz" : "Answer" }
+    static var callDecline: String { isPL ? "Odrzuć" : "Decline" }
+    static var callOnPhone: String { isPL ? "Rozmowa na telefonie" : "Call continues on the phone" }
+    static var callHeadphonesMoved: String { isPL ? "Słuchawki przełączone na telefon" : "Headphones moved to the phone" }
+    static var captureScan: String { isPL ? "Zeskanuj dokument telefonem" : "Scan Document with Phone" }
+    static var capturePhoto: String { isPL ? "Zrób zdjęcie telefonem" : "Take Photo with Phone" }
+    static var captureScanWaiting: String { isPL ? "Skanowanie dokumentu" : "Scanning a document" }
+    static var capturePhotoWaiting: String { isPL ? "Zdjęcie" : "Photo" }
+    static var captureOnPhone: String { isPL ? "Dokończ na telefonie" : "Continue on your phone" }
     static var clipboardOpenLink: String { isPL ? "Otwórz" : "Open" }
     static var clipboardReceiptSetting: String {
         isPL ? "Pokazuj odebraną zawartość schowka" : "Show received clipboard content"

@@ -113,6 +113,41 @@ final class MessageTests: XCTestCase {
         XCTAssertFalse(open, "an ordinary clipboard sync must not open anything")
     }
 
+    func testCaptureMessages() throws {
+        let request = try encode(.captureRequest(requestId: "r1", mode: "scan"))
+        XCTAssertEqual(request["type"] as? String, "capture_request")
+        XCTAssertEqual(request["request_id"] as? String, "r1")
+        XCTAssertEqual(request["mode"] as? String, "scan")
+        XCTAssertEqual(try decode(["type": "capture_cancelled", "request_id": "r1"]), .captureCancelled(requestId: "r1"))
+        let offer = try decode(["type": "file_transfer_offer", "transfer_id": "t", "filename": "Skan.pdf",
+                                "mime_type": "application/pdf", "file_size": 10, "capture_id": "r1"])
+        XCTAssertEqual(offer, .fileTransferOffer(transferId: "t", filename: "Skan.pdf", mimeType: "application/pdf",
+                                                 fileSize: 10, destinationDir: nil, captureId: "r1"))
+    }
+
+    func testDecodeCallIncoming() throws {
+        let msg = try decode([
+            "type": "call_incoming", "call_id": "0|com.samsung.android.incallui|1|null|10",
+            "caller": "Jan Kowalski", "can_answer": true, "can_decline": true
+        ])
+        XCTAssertEqual(msg, .callIncoming(callId: "0|com.samsung.android.incallui|1|null|10",
+                                          caller: "Jan Kowalski", canAnswer: true, canDecline: true))
+    }
+
+    func testDecodeCallEnded() throws {
+        XCTAssertEqual(try decode(["type": "call_ended", "call_id": "k"]), .callEnded(callId: "k"))
+    }
+
+    func testEncodeCallAction() throws {
+        let answer = try encode(.callAction(callId: "k", answer: true, moveHeadphones: true))
+        XCTAssertEqual(answer["type"] as? String, "call_action")
+        XCTAssertEqual(answer["call_id"] as? String, "k")
+        XCTAssertEqual(answer["action"] as? String, "answer")
+        XCTAssertEqual(answer["move_headphones"] as? Bool, true)
+        let decline = try encode(.callAction(callId: "k", answer: false, moveHeadphones: false))
+        XCTAssertEqual(decline["action"] as? String, "decline")
+    }
+
     func testDecodeClipboardUpdate_openFlag() throws {
         let dict: [String: Any] = [
             "type": "clipboard_update",

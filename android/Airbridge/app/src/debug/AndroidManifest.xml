@@ -5,6 +5,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- The fake incoming call (DebugCall) is a CallStyle notification, which
+         Android only accepts with a full-screen intent the app may use.
+         Grant once: adb shell appops set com.airbridge USE_FULL_SCREEN_INTENT allow -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <application>
         <service
             android:name=".service.AirbridgeService"

@@ -314,4 +314,9 @@
     <string name="repair_needed_unpaired">%s usunął ten telefon ze sparowanych urządzeń. Sparuj ponownie, skanując kod QR na Macu.</string>
     <string name="share_open_on_mac">Otwórz na Macu</string>
     <string name="share_opening_on_mac">Otwieranie na Macu…</string>
+    <string name="capture_scan_name">Skan %1$s</string>
+    <string name="capture_photo_name">Zdjęcie %1$s</string>
+    <string name="capture_prompt_scan">Zeskanuj dokument dla Maca</string>
+    <string name="capture_prompt_photo">Zrób zdjęcie dla Maca</string>
+    <string name="capture_prompt_text">Dotknij, aby otworzyć</string>
 </resources>

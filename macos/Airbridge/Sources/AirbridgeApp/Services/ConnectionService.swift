@@ -166,6 +166,23 @@ final class ConnectionService {
     /// Drives the island's ask-first prompt state (`TransferPopupState.headphonePrompt`).
     /// Observed by `TransferPopupView`; set/cleared only from this file.
     var headphonePromptVisible = false
+
+    /// A call ringing on the phone, shown on the island with Answer / Decline.
+    struct IncomingCall: Equatable {
+        let callId: String
+        let caller: String
+        let canAnswer: Bool
+        let canDecline: Bool
+        let connectionId: String
+    }
+    /// Short confirmation after answering here: where the call continues.
+    struct CallNotice: Equatable {
+        let caller: String
+        let headphonesMoved: Bool
+    }
+    var incomingCall: IncomingCall?
+    var callNotice: CallNotice?
+    @ObservationIgnored private var callNoticeTask: Task<Void, Never>?
     @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
     /// Auto-clears a `.failed` handoff back to `.idle` (see `markHandoffFailed`).
     @ObservationIgnored private var handoffFailedResetTask: Task<Void, Never>?
@@ -589,6 +606,72 @@ final class ConnectionService {
         }
     }
 
+    // MARK: - Calls
+
+    private func handleIncomingCall(_ call: IncomingCall) {
+        let isNew = incomingCall?.callId != call.callId
+        Diag.log("Call", "ringing (answer=\(call.canAnswer), decline=\(call.canDecline), new=\(isNew))")
+        incomingCall = call
+        clearCallNotice()
+        TransferPopup.shared.show()
+        if isNew { playCallSound() }
+    }
+
+    private func handleCallEnded(callId: String) {
+        guard incomingCall?.callId == callId else { return }
+        Diag.log("Call", "stopped ringing")
+        incomingCall = nil
+        // An answer confirmation keeps the island until its own timer ends.
+        if callNotice == nil { hideIslandUnlessBusy() }
+    }
+
+    /// Island "Answer": the phone presses its own Answer button, so the call
+    /// continues on the phone. Headphones on this Mac move to the phone with it.
+    func answerCall() {
+        guard let call = incomingCall else { return }
+        let moveHeadphones = bluetoothAudio?.enabled == true && bluetoothAudio?.selectedConnected == true
+        send(.callAction(callId: call.callId, answer: true, moveHeadphones: moveHeadphones), to: call.connectionId)
+        incomingCall = nil
+        callNotice = CallNotice(caller: call.caller, headphonesMoved: moveHeadphones)
+        callNoticeTask?.cancel()
+        callNoticeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.callNotice = nil
+            if self.incomingCall == nil { self.hideIslandUnlessBusy() }
+        }
+    }
+
+    /// Island "Decline": the phone presses its own Decline button.
+    func declineCall() {
+        guard let call = incomingCall else { return }
+        send(.callAction(callId: call.callId, answer: false, moveHeadphones: false), to: call.connectionId)
+        incomingCall = nil
+        hideIslandUnlessBusy()
+    }
+
+    private func clearCallNotice() {
+        callNoticeTask?.cancel()
+        callNoticeTask = nil
+        callNotice = nil
+    }
+
+    private func send(_ message: Message, to connectionId: String) {
+        Task { try? await server.sendTo(message, connectionId: connectionId) }
+    }
+
+    /// Puts the island away unless a transfer or another prompt still needs it.
+    private func hideIslandUnlessBusy() {
+        if !isTransferPopupBusy() && !headphonePromptVisible {
+            TransferPopup.shared.hide(delay: 0)
+        }
+    }
+
+    private func playCallSound() {
+        guard UserDefaults.standard.bool(forKey: "playSound") else { return }
+        NSSound(named: "Submarine")?.play()
+    }
+
     /// User tapped "Switch" on the island prompt — same manual takeover the
     /// Home button uses.
     func confirmHeadphoneSwitch() {
@@ -869,7 +952,7 @@ final class ConnectionService {
         switch message {
         case .clipboardUpdate:
             clipboardHandler?.handleMessage(message)
-        case .fileTransferAccept, .fileTransferReject, .fileTransferOffer, .fileTransferCancel:
+        case .fileTransferAccept, .fileTransferReject, .fileTransferOffer, .fileTransferCancel, .captureCancelled:
             fileTransferHandler?.handleMessage(message, from: connectionId)
         case .galleryResponse, .galleryThumbnailResponse, .galleryPreviewResponse, .galleryDeleteResponse:
             galleryHandler?.handleMessage(message)
@@ -897,6 +980,11 @@ final class ConnectionService {
             }
         case .ping(let timestamp):
             Task { try? await server.broadcast(Message.pong(timestamp: timestamp)) }
+        case let .callIncoming(callId, caller, canAnswer, canDecline):
+            handleIncomingCall(IncomingCall(callId: callId, caller: caller, canAnswer: canAnswer,
+                                            canDecline: canDecline, connectionId: connectionId))
+        case let .callEnded(callId):
+            handleCallEnded(callId: callId)
         case .phoneRingStop:
             handlePhoneRingStopped()
         case .unpair:
@@ -941,6 +1029,12 @@ final class ConnectionService {
             // A visible ask-first prompt refers to a takeover from the phone
             // that just dropped — dismiss it rather than leaving it dangling.
             dismissHeadphonePrompt()
+            // So does a ringing call: nothing could answer it any more.
+            if incomingCall != nil || callNotice != nil {
+                incomingCall = nil
+                clearCallNotice()
+                hideIslandUnlessBusy()
+            }
             if !manuallyDisconnected {
                 statusMessage = L10n.isPL ? "Oczekiwanie na połączenie" : "Waiting for connection"
                 phase = .listening

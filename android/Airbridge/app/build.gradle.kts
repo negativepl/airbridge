@@ -74,6 +74,9 @@ dependencies {
     // native libs (libbarhopper_v3.so, libimage_processing_util_jni.so):
     // ML Kit 17.3.0 + CameraX 1.4.x are the first 16 KB-aligned releases.
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // Document scanner for "Scan Document with Phone" on the Mac: Google's own
+    // scanner UI (edge detection, cropping, multi-page PDF) via Play services.
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")

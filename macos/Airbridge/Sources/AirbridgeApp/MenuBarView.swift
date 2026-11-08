@@ -6,6 +6,7 @@ struct MenuBarView: View {
     let clipboardService: ClipboardService
     let updateService: UpdateService
     let bluetoothAudio: BluetoothAudioService
+    let fileTransferService: FileTransferService
     @Environment(\.openWindow) private var openWindow
     @State private var showHandoffSuccess = false
     @State private var showUpToDateBeat = false
@@ -70,6 +71,13 @@ struct MenuBarView: View {
                             systemImage: "iphone.radiowaves.left.and.right") {
                         connectionService.ringPhone()
                     }
+                }
+
+                MenuRow(title: L10n.captureScan, systemImage: "doc.viewfinder") {
+                    fileTransferService.requestCapture(.scan)
+                }
+                MenuRow(title: L10n.capturePhoto, systemImage: "camera") {
+                    fileTransferService.requestCapture(.photo)
                 }
 
                 if bluetoothAudio.enabled,

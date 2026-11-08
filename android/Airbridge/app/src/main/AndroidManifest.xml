@@ -101,6 +101,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Scan / photo requested from the Mac: no UI of its own, it opens
+             Google's document scanner or the camera and sends the result. -->
+        <activity
+            android:name=".capture.CaptureActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Airbridge.TransparentDialog"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="" />
+
         <activity
             android:name=".ui.FileOfferDialogActivity"
             android:exported="false"
