@@ -116,12 +116,12 @@ class HttpFileUploader {
             }
         }
 
-        val encodedFilename = java.net.URLEncoder.encode(filename, "UTF-8")
+        val encodedFilename = percentEncode(filename)
         val request = Request.Builder()
             .url("https://${com.airbridge.service.WebSocketClient.formatUrlHost(host)}:$port/upload")
             .header("X-Filename", encodedFilename)
             .header("X-Mime-Type", mimeType)
-            .apply { if (destinationDir != null) header("X-Destination-Dir", java.net.URLEncoder.encode(destinationDir, "UTF-8")) }
+            .apply { if (destinationDir != null) header("X-Destination-Dir", percentEncode(destinationDir)) }
             .apply { if (checksum != null) header("X-Checksum-SHA256", checksum) }
             .post(body)
             .build()
@@ -149,3 +149,13 @@ class HttpFileUploader {
         }
     }
 }
+
+/**
+ * Percent-encoding for the upload headers, as the Mac decodes them
+ * (`removingPercentEncoding`). URLEncoder does form encoding, which turns a
+ * space into "+" — the Mac kept that "+", so "Scan 2026.pdf" arrived as
+ * "Scan+2026.pdf" and a folder with a space in its name was never found.
+ * A literal "+" is already "%2B" here, so swapping the rest is safe.
+ */
+internal fun percentEncode(value: String): String =
+    java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20")
