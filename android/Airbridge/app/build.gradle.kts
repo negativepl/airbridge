@@ -54,8 +54,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     // Nadpisuje BOM: komponenty M3 Expressive (LoadingIndicator, WavyProgress, ButtonGroup,
-    // FAB menu, MaterialShapes) istnieją dopiero w linii 1.5.0-alpha.
-    implementation("androidx.compose.material3:material3:1.5.0-alpha27")
+    // FAB menu, MaterialShapes) istnieją dopiero w linii 1.5.0 (BOM wciąż daje 1.4).
+    implementation("androidx.compose.material3:material3:1.5.0-rc01")
     // Navigation 3: back stack of serializable keys, predictive back.
     implementation("androidx.navigation3:navigation3-runtime:1.2.1")
     implementation("androidx.navigation3:navigation3-ui:1.2.1")
