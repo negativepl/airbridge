@@ -95,6 +95,51 @@ extension AnyTransition {
     }
 }
 
+// MARK: - Island shape
+// The shell as the hardware notch draws it: square where it meets the top of
+// the screen, but flowing out of that edge through two concave "ears", and
+// continuous-curvature (G2) corners at the bottom. The ears sit just outside
+// the frame on both sides, so the content area keeps the full width.
+
+struct IslandShape: Shape {
+    var bottomRadius: CGFloat
+    var earRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let body = UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: bottomRadius,
+            bottomTrailingRadius: bottomRadius,
+            topTrailingRadius: 0,
+            style: .continuous
+        ).path(in: rect)
+
+        let e = min(earRadius, rect.height / 2)
+        guard e > 0 else { return body }
+        var ears = Path()
+        // Left ear: along the screen edge, then into the side. Control points
+        // lie on the edge and the side (35 % in from the corner): the bend is as
+        // deep as a circular fillet's, but eases in and out of the straight
+        // lines instead of starting with a jump in curvature (squircle-like).
+        let k: CGFloat = 0.35
+        let tl = CGPoint(x: rect.minX, y: rect.minY)
+        ears.move(to: CGPoint(x: tl.x - e, y: tl.y))
+        ears.addLine(to: tl)
+        ears.addLine(to: CGPoint(x: tl.x, y: tl.y + e))
+        ears.addCurve(to: CGPoint(x: tl.x - e, y: tl.y),
+                      control1: CGPoint(x: tl.x, y: tl.y + e * k), control2: CGPoint(x: tl.x - e * k, y: tl.y))
+        ears.closeSubpath()
+        let tr = CGPoint(x: rect.maxX, y: rect.minY)
+        ears.move(to: CGPoint(x: tr.x + e, y: tr.y))
+        ears.addLine(to: tr)
+        ears.addLine(to: CGPoint(x: tr.x, y: tr.y + e))
+        ears.addCurve(to: CGPoint(x: tr.x + e, y: tr.y),
+                      control1: CGPoint(x: tr.x, y: tr.y + e * k), control2: CGPoint(x: tr.x + e * k, y: tr.y))
+        ears.closeSubpath()
+        return Path(body.cgPath.union(ears.cgPath))
+    }
+}
+
 // MARK: - NSScreen notch helper
 
 extension NSScreen {
@@ -316,13 +361,13 @@ struct TransferPopupView: View {
 
     /// Outer island shape: square top corners (flush with the screen edge /
     /// notch), rounded bottom corners.
-    static let islandShape = UnevenRoundedRectangle(
-        topLeadingRadius: 0,
-        bottomLeadingRadius: 24,
-        bottomTrailingRadius: 24,
-        topTrailingRadius: 0,
-        style: .continuous
-    )
+    /// Inset of the glass pill inside the shell, on the sides and the bottom.
+    static let pillInset: CGFloat = 16
+    /// Shell and pill corners are concentric: inner radius = outer − inset, so
+    /// the gap between them is the same in the corners as along the edges.
+    static let shellRadius: CGFloat = 34
+    static let pillRadius: CGFloat = shellRadius - pillInset
+    static let islandShape = IslandShape(bottomRadius: shellRadius, earRadius: 16)
 
     var body: some View {
         let islandSize = size(for: state)
@@ -359,14 +404,15 @@ struct TransferPopupView: View {
                 // The pill clips its content: while the shell shrinks, the
                 // leaving content stays inside the glass instead of spilling
                 // past its edge.
-                .clipShape(.rect(cornerRadius: 18, style: .continuous))
+                .clipShape(.rect(cornerRadius: Self.pillRadius, style: .continuous))
                 .glassEffect(
                     isTargeted && isIdleConnected
                         ? .regular.tint(.accentColor).interactive()
                         : .regular.interactive(),
-                    in: .rect(cornerRadius: 18, style: .continuous)
+                    in: .rect(cornerRadius: Self.pillRadius, style: .continuous)
                 )
-                .padding(EdgeInsets(top: 16 + notchInset, leading: 16, bottom: 16, trailing: 16))
+                .padding(EdgeInsets(top: Self.pillInset + notchInset, leading: Self.pillInset,
+                                    bottom: Self.pillInset, trailing: Self.pillInset))
             }
             // The shell morphs between the per-state sizes with a spring
             // (interruptible: a state change mid-morph retargets, no restart).
@@ -376,7 +422,7 @@ struct TransferPopupView: View {
             // It scales/fades WITH the island on hide.
             .background(alignment: .top) {
                 Color.black
-                    .frame(width: islandSize.width, height: 120)
+                    .frame(width: islandSize.width + Self.islandShape.earRadius * 2, height: 120)
                     .offset(y: -120)
             }
             .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
@@ -391,11 +437,10 @@ struct TransferPopupView: View {
         } keyframes: { _ in
             KeyframeTrack {
                 // A quick push, then a fast, underdamped spring back: period
-                // ~0.2 s gives three brisk swings that die out on their own
-                // inside the 0.75 s window (a slower period read as bobbing,
-                // not a "no").
-                CubicKeyframe(18, duration: 0.05)
-                SpringKeyframe(0, duration: 0.75, spring: Spring(response: 0.2, dampingRatio: 0.3))
+                // ~0.12 s gives three brisk swings that die out inside ~0.4 s
+                // (a slower period read as bobbing, not a "no").
+                CubicKeyframe(16, duration: 0.04)
+                SpringKeyframe(0, duration: 0.36, spring: Spring(response: 0.12, dampingRatio: 0.3))
             }
         }
         // Wyspa ma zawsze czarną skorupę (jak notch), więc jej wnętrze musi
@@ -417,7 +462,7 @@ struct TransferPopupView: View {
         // drawn into the notch and only goes at the very end (genie).
         .animation(
             reduceMotion ? .easeOut(duration: 0.2)
-                : (presentation.isExiting ? .easeIn(duration: 0.34).delay(0.06) : .easeOut(duration: 0.22)),
+                : (presentation.isExiting ? .easeIn(duration: 0.18).delay(0.04) : .easeOut(duration: 0.15)),
             value: presentation.isPresented
         )
         .padding(.horizontal, Self.windowPadding)
@@ -430,11 +475,12 @@ struct TransferPopupView: View {
             alignment: .top
         )
         .contentShape(Rectangle())
-        // The one animation for a state change: shell size, content swap.
+        // The one animation for a state change: shell size, content swap and
+        // (in TransferStateEffects) the light's colour, all on one ~0.3 s beat.
         // Keyed on the state KIND so progress ticks never restart it.
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.44, dampingFraction: 0.84), value: stateKind)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : Self.stateSpring, value: stateKind)
         // Drag-over: the shell opens up (and closes again) with a livelier spring.
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.72), value: isTargeted)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.25, bounce: 0.25), value: isTargeted)
         .onAppear {
             // Popup just became visible — kick off the spring-in animation
             // from inside the view (this is the canonical SwiftUI pattern;
@@ -502,6 +548,10 @@ struct TransferPopupView: View {
 
     static let windowPadding: CGFloat = 40
 
+    /// Timing of a state change. Product UI stays inside ~300 ms; a hair of
+    /// bounce keeps the shell physical without a visible wobble.
+    static let stateSpring: Animation = .spring(duration: 0.3, bounce: 0.12)
+
     /// Content swap between states. Asymmetric on purpose: the new content
     /// materialises with a soft spring (blur + a hair of scale, inside the
     /// clipped glass pill so the shell never bumps), the old one leaves fast.
@@ -510,8 +560,9 @@ struct TransferPopupView: View {
     /// `.animation(value: stateKind)` on the body): per-transition animations
     /// left both sides frozen mid-flight when states changed in quick
     /// succession (offer → transfer), so the asymmetry lives in the values.
-    /// The block itself only crossfades through a light blur: the visible
-    /// motion belongs to its parts (StaggerIn), so it must not compete.
+    /// The parts of a state do not stagger: the island changes state many
+    /// times a day, and one entrance per container is enough. The glyph's own
+    /// symbol effect is the only accent, landing with the swap.
     static let stateTransition: AnyTransition = .asymmetric(
         insertion: .opacity.combined(with: .blurTransition(radius: 8)),
         removal: .opacity
@@ -535,12 +586,9 @@ struct TransferPopupView: View {
         HStack(spacing: 16) {
             glyph()
                 .frame(width: 40, alignment: .center)
-                .staggerIn(0)
             texts()
-                .staggerIn(1)
             Spacer(minLength: 12)
             HStack(spacing: 10) { controls() }
-                .staggerIn(2)
         }
     }
 
@@ -855,49 +903,6 @@ private struct IslandIconButton: View {
     }
 }
 
-// MARK: - StaggerIn
-// Parts of a state's content arrive one after another (icon, then text,
-// then controls), each rising a few points out of a light blur, so a state
-// change reads as one choreographed moment rather than a block crossfade.
-// Instant under reduced motion.
-
-private struct StaggerIn: ViewModifier {
-    /// 0 = the lead (icon): pops in from 60% with a bounce.
-    /// 1 = text: rises 14 pt with a hair of scale.
-    /// 2 = controls: rise 10 pt, settle last.
-    let order: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = false
-
-    private var delay: Double { 0.05 + Double(order) * 0.06 }
-    private var startScale: CGFloat { order == 0 ? 0.6 : 0.94 }
-    private var startOffset: CGFloat { order == 0 ? 0 : (order == 1 ? 14 : 10) }
-    private var spring: Animation {
-        order == 0 ? .spring(duration: 0.5, bounce: 0.35) : .spring(duration: 0.45, bounce: 0.18)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .scaleEffect(shown ? 1 : startScale)
-            .offset(y: shown ? 0 : startOffset)
-            .blur(radius: shown ? 0 : 6)
-            .onAppear {
-                if reduceMotion {
-                    shown = true
-                } else {
-                    withAnimation(spring.delay(delay)) { shown = true }
-                }
-            }
-    }
-}
-
-private extension View {
-    func staggerIn(_ order: Int) -> some View {
-        modifier(StaggerIn(order: order))
-    }
-}
-
 // MARK: - IslandEntrance
 // Entrance/exit geometry of the shell. Scale anchored at the TOP so the top
 // edge never leaves the screen edge: all the overshoot lands on the bottom
@@ -916,20 +921,22 @@ private struct IslandEntrance: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // Arrival ~0.3 s, height a beat behind width for the give; leaving
+            // is shorter and flat (the user has moved on).
             .scaleEffect(x: 1.0, y: presented ? 1.0 : hiddenScaleY, anchor: .top)
             .animation(
-                presented ? .spring(duration: 0.62, bounce: 0.38)
-                    : (exiting ? .spring(duration: 0.42, bounce: 0) : .spring(duration: 0.3, bounce: 0)),
+                presented ? .spring(duration: 0.3, bounce: 0.22)
+                    : (exiting ? .spring(duration: 0.24, bounce: 0) : .spring(duration: 0.2, bounce: 0)),
                 value: presented
             )
             .scaleEffect(x: presented ? 1.0 : hiddenScaleX, y: 1.0, anchor: .top)
             .animation(
-                presented ? .spring(duration: 0.5, bounce: 0.22)
-                    : (exiting ? .spring(duration: 0.32, bounce: 0) : .spring(duration: 0.3, bounce: 0)),
+                presented ? .spring(duration: 0.28, bounce: 0.12)
+                    : (exiting ? .spring(duration: 0.18, bounce: 0) : .spring(duration: 0.2, bounce: 0)),
                 value: presented
             )
             .blur(radius: presented ? 0 : (exiting ? 14 : 10))
-            .animation(presented ? .easeOut(duration: 0.22) : .easeIn(duration: 0.3), value: presented)
+            .animation(presented ? .easeOut(duration: 0.15) : .easeIn(duration: 0.2), value: presented)
     }
 }
 
@@ -1060,24 +1067,28 @@ private struct TransferStateEffects: View {
             animTertiary = palette.tertiary
             animIntensity = intensity
             animTP = transferProgress
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.78).delay(0.08)) {
+            // Rises with the shell, not after it: same moment, same length.
+            withAnimation(.easeOut(duration: 0.3)) {
                 revealed = true
             }
         }
+        // The light changes colour on the shell's beat (TransferPopupView.stateSpring),
+        // so a state change ends everywhere at once.
         .onChange(of: palette.primary) { _, new in
-            withAnimation(.easeInOut(duration: 0.7)) { animPrimary = new }
+            withAnimation(.easeInOut(duration: 0.3)) { animPrimary = new }
         }
         .onChange(of: palette.secondary) { _, new in
-            withAnimation(.easeInOut(duration: 0.7)) { animSecondary = new }
+            withAnimation(.easeInOut(duration: 0.3)) { animSecondary = new }
         }
         .onChange(of: palette.tertiary) { _, new in
-            withAnimation(.easeInOut(duration: 0.7)) { animTertiary = new }
+            withAnimation(.easeInOut(duration: 0.3)) { animTertiary = new }
         }
         .onChange(of: intensity) { _, new in
-            withAnimation(.easeInOut(duration: 0.6)) { animIntensity = new }
+            withAnimation(.easeInOut(duration: 0.3)) { animIntensity = new }
         }
+        // Progress follows the data closely; a long ease made the light lag the bar.
         .onChange(of: transferProgress) { _, new in
-            withAnimation(.easeInOut(duration: 0.5)) { animTP = new }
+            withAnimation(.easeOut(duration: 0.2)) { animTP = new }
         }
     }
 
@@ -1091,12 +1102,21 @@ private struct TransferStateEffects: View {
             stops: [.init(color: .clear, location: 0.35), .init(color: .black, location: 0.8)],
             startPoint: .top, endPoint: .bottom
         )
+        // The rim belongs to the part of the shell below the screen edge: it
+        // fades out toward the top, so no line runs along the screen edge or
+        // around the ears where the shell flows out of it.
+        let topCut = min(0.6, max(0.04, notchInset / max(h, 1)))
+        let belowScreenEdge = LinearGradient(
+            stops: [.init(color: .clear, location: 0), .init(color: .clear, location: topCut),
+                    .init(color: .black, location: min(1, topCut + 0.3))],
+            startPoint: .top, endPoint: .bottom
+        )
         return ZStack {
             // Hairline: the shell has an edge even with the light off.
-            shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            shape.stroke(Color.white.opacity(0.10), lineWidth: 2)
 
             // Colour picked up from the light below.
-            shape.strokeBorder(
+            shape.stroke(
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0.15),
@@ -1105,11 +1125,11 @@ private struct TransferStateEffects: View {
                     ],
                     startPoint: .top, endPoint: .bottom
                 ),
-                lineWidth: 1.5
+                lineWidth: 3
             )
 
             // Bloom of that edge, bottom only.
-            shape.strokeBorder(animPrimary.opacity(0.7 * glow), lineWidth: 3)
+            shape.stroke(animPrimary.opacity(0.7 * glow), lineWidth: 6)
                 .blur(radius: 7)
                 .mask(bottomHalf)
 
@@ -1125,14 +1145,18 @@ private struct TransferStateEffects: View {
                     ],
                     startPoint: .leading, endPoint: .trailing
                 )
-                shape.strokeBorder(comet, lineWidth: 2.5)
+                shape.stroke(comet, lineWidth: 5)
                     .mask(bottomHalf)
-                shape.strokeBorder(comet, lineWidth: 6)
+                shape.stroke(comet, lineWidth: 12)
                     .blur(radius: 6)
                     .mask(bottomHalf)
             }
         }
+        // Strokes are centred on the outline (doubled widths above); clipping
+        // to the shell keeps the inner half, i.e. a border drawn inside.
         .frame(width: w, height: h)
+        .clipShape(shape)
+        .mask(belowScreenEdge)
     }
 
     private func blob(
@@ -1321,7 +1345,7 @@ final class TransferPopup {
             // Genie: the modifiers read `isExiting` to pick the into-the-notch
             // geometry and their own timings; this transaction just flips it.
             self.presentation.isExiting = true
-            withAnimation(.spring(duration: 0.42, bounce: 0)) {
+            withAnimation(.spring(duration: 0.24, bounce: 0)) {
                 self.presentation.isPresented = false
             } completion: {
                 panel.orderOut(nil)
