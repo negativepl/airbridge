@@ -361,7 +361,7 @@ fun MacFilesScreen(viewModel: MainViewModel, bottomClearance: Dp = 0.dp, topInse
     }
 }
 
-private fun folderDepth(path: String): Int =
+internal fun folderDepth(path: String): Int =
     if (path.isEmpty()) 0 else path.split('/').count { it.isNotEmpty() }
 
 

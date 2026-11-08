@@ -3,6 +3,7 @@ package com.airbridge.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,10 +22,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -168,14 +167,13 @@ private fun TransferRow(item: ActivityItem) {
             Text(stringResource(if (sent) R.string.activity_sent else R.string.activity_received))
         },
         leadingContent = {
-            val container = if (sent) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.tertiaryContainer
-            val onContainer = if (sent) MaterialTheme.colorScheme.onPrimaryContainer
-                              else MaterialTheme.colorScheme.onTertiaryContainer
+            // One tonal family across Home; the arrow alone tells the direction.
+            val container = MaterialTheme.colorScheme.secondaryContainer
+            val onContainer = MaterialTheme.colorScheme.onSecondaryContainer
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(MaterialShapes.Cookie7Sided.toShape())
+                    .clip(CircleShape)
                     .background(container),
                 contentAlignment = Alignment.Center
             ) {

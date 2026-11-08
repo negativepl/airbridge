@@ -10,6 +10,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.material3.MotionScheme
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -348,43 +357,79 @@ fun TabsScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit, onScanQr: (
             // bar takes the folder's name as its title, the path above it as the
             // subtitle and an up arrow, the way Google's file browsers do; the
             // settings action stays put throughout.
-            val titleFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-            val navScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
             val folderSegments = remember(macFilesPath) { macFilesPath.split('/').filter { it.isNotEmpty() } }
             val inFolder = selectedTab == 2 && folderSegments.isNotEmpty()
-            val barTitle = if (inFolder) folderSegments.last() else stringResource(pageTitles[selectedTab])
-            val barSubtitle: String? = if (inFolder) {
-                (listOf(stringResource(R.string.mac_files_root)) + folderSegments.dropLast(1)).joinToString(" / ")
-            } else null
+            val header = BarHeader(
+                tab = selectedTab,
+                path = if (selectedTab == 2) macFilesPath else "",
+                title = if (inFolder) folderSegments.last() else stringResource(pageTitles[selectedTab]),
+                subtitle = if (inFolder) {
+                    (listOf(stringResource(R.string.mac_files_root)) + folderSegments.dropLast(1)).joinToString(" / ")
+                } else null
+            )
+            // The header moves with the page under it, using the same M3 transition
+            // pattern and the same specs, so bar and page read as one motion:
+            // - another tab: fade through, like the tab content;
+            // - another Mac folder: shared axis X in the direction of the folder
+            //   pane (deeper enters from the right, up from the left), on the same
+            //   spatial spring as the listing.
+            // Title and path are one block, so they never change on separate beats.
+            val folderSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+            val folderEffects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            // The arrow's width uses the standard (non-bouncy) spring: an overshoot
+            // would push the title past its resting place and back.
+            val arrowWidth = MotionScheme.standard().defaultSpatialSpec<IntSize>()
             TopAppBar(
                 title = {
                     AnimatedContent(
-                        targetState = barTitle,
-                        transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
-                        label = "pageTitle"
-                    ) { title ->
-                        Text(
-                            title,
-                            color = MaterialTheme.colorScheme.pageTitleColor,
-                            fontWeight = FontWeight(450),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        targetState = header,
+                        transitionSpec = {
+                            if (initialState.tab != targetState.tab) {
+                                (fadeIn(tabEnterFade) + scaleIn(
+                                    initialScale = 0.92f,
+                                    transformOrigin = TransformOrigin(0f, 0.5f),
+                                    animationSpec = tabEnterScale
+                                )) togetherWith fadeOut(tabExitFade) using SizeTransform(clip = false)
+                            } else {
+                                val deeper = folderDepth(targetState.path) >= folderDepth(initialState.path)
+                                val sign = if (deeper) 1 else -1
+                                (slideInHorizontally(folderSpatial) { sign * it / 4 } + fadeIn(folderEffects)) togetherWith
+                                    (slideOutHorizontally(folderSpatial) { -sign * it / 4 } + fadeOut(tabExitFade)) using
+                                    SizeTransform(clip = false)
+                            }
+                        },
+                        contentAlignment = Alignment.CenterStart,
+                        label = "pageHeader"
+                    ) { h ->
+                        Column {
+                            Text(
+                                h.title,
+                                color = MaterialTheme.colorScheme.pageTitleColor,
+                                fontWeight = FontWeight(450),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (h.subtitle != null) {
+                                Text(
+                                    h.subtitle,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 },
-                subtitle = {
-                    AnimatedContent(
-                        targetState = barSubtitle,
-                        transitionSpec = { fadeIn(titleFade) togetherWith fadeOut(titleExit) },
-                        label = "pageSubtitle"
-                    ) { subtitle -> if (subtitle != null) Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                },
+                // The path is part of the title block above; the overload that takes
+                // titleHorizontalAlignment also requires this slot.
+                subtitle = {},
                 navigationIcon = {
+                    // Grows from the start edge so the title glides aside instead of jumping.
                     AnimatedVisibility(
                         visible = inFolder,
-                        enter = fadeIn(titleFade) + scaleIn(initialScale = 0.8f, animationSpec = navScale),
-                        exit = fadeOut(titleExit)
+                        enter = expandHorizontally(arrowWidth, expandFrom = Alignment.Start) + fadeIn(folderEffects),
+                        exit = shrinkHorizontally(arrowWidth, shrinkTowards = Alignment.Start) + fadeOut(tabExitFade)
                     ) {
                         IconButton(onClick = { viewModel.openMacFolder(macFilesPath.substringBeforeLast('/', "")) }) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.nav_back))
@@ -575,3 +620,6 @@ private fun SendConfirmationSheet(
         Spacer(modifier = Modifier.height(32.dp))
     }
 }
+
+/** What the shared top bar shows: the tab, the Mac folder on the Files tab, and their labels. */
+private data class BarHeader(val tab: Int, val path: String, val title: String, val subtitle: String?)

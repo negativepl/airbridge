@@ -2,6 +2,7 @@ package com.airbridge.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,9 +30,17 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material.icons.automirrored.rounded.AddToHomeScreen
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
@@ -56,14 +65,10 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.Canvas
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.infiniteRepeatable
@@ -199,7 +204,7 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
                 trailingContent = {
                     // An icon instead of a label, so the row never fights the
                     // button for width; the label stays as the description.
-                    FilledIconButton(
+                    FilledTonalIconButton(
                         onClick = onSendClipboard,
                         enabled = enabled,
                         modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
@@ -219,123 +224,175 @@ fun ClipboardCard(items: List<ActivityItem>, onSendClipboard: () -> Unit, modifi
 private enum class TakeoverState { IDLE, IN_PROGRESS, SUCCESS }
 
 /**
- * Shown only while the Mac reports the selected headphones on its side: which
+ * Shown while the Mac reports the selected headphones on its side: which
  * headphones, where they play, and one button to bring them to this phone.
+ *
+ * Choreography, one event at a time:
+ * - Appear / disappear: the card's height and opacity move together on the
+ *   standard (non-bouncy) spatial spring; the content rides along with it.
+ * - Tap: the button morphs to its checked shape and colour while its glyph
+ *   crossfades to the loader; the status line changes in the same frame.
+ * - Done: the loader becomes a check, the status says where the headphones
+ *   went, the card holds for a beat and then collapses.
+ * The card stays on screen from the tap until that collapse, even though the
+ * Mac stops reporting the headphones as soon as it releases them.
  */
+@OptIn(ExperimentalMaterial3Api::class) // TooltipBox and its position provider
 @Composable
 fun HeadphonesCard(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val macHeadphoneState by viewModel.macHeadphoneState.collectAsState()
     val handoffPhase by viewModel.headphoneHandoffPhase.collectAsState()
-    var lastHandoffPhase by remember { mutableStateOf(handoffPhase) }
+    var previousPhase by remember { mutableStateOf(handoffPhase) }
     var showSuccess by remember { mutableStateOf(false) }
     LaunchedEffect(handoffPhase) {
-        if (lastHandoffPhase == HandoffPhase.IN_PROGRESS && handoffPhase == HandoffPhase.IDLE) {
+        val finishedMove = previousPhase == HandoffPhase.IN_PROGRESS && handoffPhase == HandoffPhase.IDLE
+        previousPhase = handoffPhase
+        // A lost connection also resets the phase to IDLE, but clears the Mac's
+        // report first: that is not a success.
+        if (finishedMove && viewModel.macHeadphoneState.value != null) {
             showSuccess = true
-            delay(1600)
-            // Hold the checkmark until the Mac's own report catches up, so the card
-            // collapses straight from the success state. Capped so it can never hang.
-            withTimeoutOrNull(3_400) { viewModel.macHeadphoneState.first { it?.connected != true } }
-            showSuccess = false
+            try {
+                delay(1_400)
+                // Collapse straight from the check once the Mac's report agrees;
+                // capped so the card can never hang on.
+                withTimeoutOrNull(3_000) { viewModel.macHeadphoneState.first { it?.connected != true } }
+            } finally {
+                showSuccess = false
+            }
         }
-        lastHandoffPhase = handoffPhase
     }
-    val enterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val enterSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val exitFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val enterScale = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val enterSizeInt = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    // The last name the Mac sent, so the title does not fall back to the
+    // generic label while the card is collapsing after the move.
+    var lastName by remember { mutableStateOf<String?>(null) }
+    macHeadphoneState?.name?.ifBlank { null }?.let { lastName = it }
+
     val state = when {
         showSuccess -> TakeoverState.SUCCESS
         handoffPhase == HandoffPhase.IN_PROGRESS -> TakeoverState.IN_PROGRESS
         else -> TakeoverState.IDLE
     }
+    val visible = macHeadphoneState?.connected == true || handoffPhase != HandoffPhase.IDLE || showSuccess
+
+    // Size changes use the standard scheme: an expressive spring overshoots the
+    // card's height, clipping its content and bouncing everything below it.
+    val standard = MotionScheme.standard()
+    val cardSize = standard.defaultSpatialSpec<IntSize>()
+    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    // Small glyphs may bounce: at 20 dp a little overshoot reads as alive.
+    val glyphScale = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
 
     AnimatedVisibility(
-        visible = macHeadphoneState?.connected == true || showSuccess,
-        enter = fadeIn(enterFade) + expandVertically(enterSize),
-        exit = fadeOut(exitFade) + shrinkVertically(enterSize),
+        visible = visible,
+        enter = fadeIn(fadeInSpec) + expandVertically(cardSize, expandFrom = Alignment.Top),
+        exit = fadeOut(fadeOutSpec) + shrinkVertically(cardSize, shrinkTowards = Alignment.Top),
         modifier = modifier
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
             PageCard(modifier = Modifier.fillMaxWidth()) {
                 CardHeader(stringResource(R.string.home_section_headphones))
                 // Sound playing on the Mac: the headphone glyph gives way to a live
-                // wave; back to the glyph when it goes quiet.
+                // wave; back to the glyph when it goes quiet or the move starts.
                 val playing = macHeadphoneState?.audioActive == true && state == TakeoverState.IDLE
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         AnimatedContent(
                             targetState = playing,
                             transitionSpec = {
-                                (fadeIn(enterFade) + scaleIn(initialScale = 0.7f, animationSpec = enterScale)) togetherWith
-                                    (fadeOut(exitFade) + scaleOut(targetScale = 0.7f, animationSpec = exitFade))
+                                (fadeIn(fadeInSpec) + scaleIn(glyphScale, initialScale = 0.7f)) togetherWith
+                                    fadeOut(fadeOutSpec) using SizeTransform(clip = false)
                             },
+                            contentAlignment = Alignment.Center,
                             label = "headphoneGlyph"
                         ) { isPlaying ->
                             if (isPlaying) {
-                                SoundWave(color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(width = 22.dp, height = 16.dp))
+                                SoundWave(color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(width = 22.dp, height = 16.dp))
                             } else {
-                                Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            macHeadphoneState?.name?.ifBlank { null } ?: stringResource(R.string.settings_headphone_device),
+                            lastName ?: stringResource(R.string.settings_headphone_device),
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        // Status line: playing / connected but quiet / moved here. Swapped
-                        // with a short fade and vertical slide instead of a hard cut.
+                        // Status line crossfades in place: same slot, same height,
+                        // changing together with the button.
                         val statusRes = when {
                             state == TakeoverState.SUCCESS -> R.string.headphones_moved
+                            state == TakeoverState.IN_PROGRESS -> R.string.headphones_moving
                             macHeadphoneState?.audioActive == true -> R.string.headphones_on_mac
                             else -> R.string.headphones_connected_mac
                         }
                         AnimatedContent(
                             targetState = statusRes,
-                            transitionSpec = {
-                                (fadeIn(enterFade) + slideInVertically(enterSizeInt) { it / 2 }) togetherWith
-                                    (fadeOut(exitFade) + slideOutVertically(enterSizeInt) { -it / 2 })
-                            },
+                            transitionSpec = { fadeIn(fadeInSpec) togetherWith fadeOut(fadeOutSpec) using SizeTransform(clip = false) },
                             label = "headphoneStatus"
                         ) { res ->
-                            Text(stringResource(res), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                stringResource(res),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                     Spacer(Modifier.width(16.dp))
-                    Button(
-                        onClick = { viewModel.takeoverHeadphones() },
-                        enabled = state == TakeoverState.IDLE,
-                        shapes = ButtonDefaults.shapes()
+                    // Icon-only, like the clipboard's send button; the label lives in
+                    // the tooltip and the content description. A toggle button, so
+                    // the move itself is the native Expressive "checked" morph:
+                    // round -> rounded square and tonal -> filled, on the tap.
+                    // It never turns disabled, which would flash it grey mid-move.
+                    val switchLabel = stringResource(R.string.headphones_switch_here)
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                        tooltip = { PlainTooltip { Text(switchLabel) } },
+                        state = rememberTooltipState()
                     ) {
-                        AnimatedContent(
-                            targetState = state,
-                            transitionSpec = {
-                                (fadeIn(enterFade) + scaleIn(initialScale = 0.9f, animationSpec = enterScale)) togetherWith fadeOut(exitFade)
-                            },
-                            label = "headphoneTakeover"
-                        ) { s ->
-                            when (s) {
-                                TakeoverState.SUCCESS -> Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(18.dp), color = LocalContentColor.current)
-                                TakeoverState.IDLE -> Text(stringResource(R.string.headphones_switch_here))
+                        FilledTonalIconToggleButton(
+                            checked = state != TakeoverState.IDLE,
+                            onCheckedChange = { if (state == TakeoverState.IDLE) viewModel.takeoverHeadphones() },
+                            shapes = IconButtonDefaults.toggleableShapes(),
+                            modifier = Modifier
+                                .size(IconButtonDefaults.mediumContainerSize())
+                                .semantics { contentDescription = switchLabel }
+                        ) {
+                            // Glyph -> loader -> check, in the button's own slot.
+                            // The loader arrives with the morph; the check pops in
+                            // with a small overshoot as the move lands.
+                            AnimatedContent(
+                                targetState = state,
+                                transitionSpec = {
+                                    (fadeIn(fadeInSpec) + scaleIn(glyphScale, initialScale = 0.6f)) togetherWith
+                                        fadeOut(fadeOutSpec) using SizeTransform(clip = false)
+                                },
+                                contentAlignment = Alignment.Center,
+                                label = "headphoneTakeover"
+                            ) { s ->
+                                when (s) {
+                                    TakeoverState.SUCCESS -> Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(IconButtonDefaults.mediumIconSize))
+                                    TakeoverState.IN_PROGRESS -> LoadingIndicator(modifier = Modifier.size(32.dp), color = LocalContentColor.current)
+                                    TakeoverState.IDLE -> Icon(Icons.AutoMirrored.Rounded.AddToHomeScreen, contentDescription = null, modifier = Modifier.size(IconButtonDefaults.mediumIconSize))
+                                }
                             }
                         }
                     }
                 }
                 AnimatedVisibility(
                     visible = handoffPhase == HandoffPhase.FAILED,
-                    enter = fadeIn(enterFade) + expandVertically(enterSize),
-                    exit = fadeOut(exitFade) + shrinkVertically(enterSize)
+                    enter = fadeIn(fadeInSpec) + expandVertically(cardSize),
+                    exit = fadeOut(fadeOutSpec) + shrinkVertically(cardSize)
                 ) {
                     Text(
                         text = stringResource(R.string.headphone_takeover_failed),

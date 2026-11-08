@@ -267,6 +267,7 @@
     <string name="clipboard_send_now">Send</string>
     <string name="home_section_headphones">Headphones</string>
     <string name="headphones_on_mac">Playing on the Mac</string>
+    <string name="headphones_moving">Moving…</string>
     <string name="headphones_moved">Moved to this phone</string>
     <string name="headphones_switch_here">Switch here</string>
     <string name="time_ago_now">just now</string>
