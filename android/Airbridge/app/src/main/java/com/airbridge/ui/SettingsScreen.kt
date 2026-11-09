@@ -50,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import android.widget.Toast
 import com.airbridge.diagnostics.DiagnosticReportExporter
@@ -336,6 +337,8 @@ private fun SettingsContent(
                         )
                     },
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                CallsOnMacRow()
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ListItem(
                     verticalAlignment = Alignment.CenterVertically,
@@ -702,3 +705,53 @@ private fun PairMacRow(modifier: Modifier = Modifier) {
 }
 
 const val DIAGNOSTICS_UNLOCKED_KEY = "diagnostics_unlocked"
+
+/**
+ * The Phone permission for incoming calls on the Mac. Asks in place; once the
+ * system stops asking (denied twice), opens the app's settings instead.
+ */
+@Composable
+private fun CallsOnMacRow() {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    var granted by remember { mutableStateOf(callPermissionsGranted(context)) }
+    // Granted from the system settings while away: read it again on return.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        granted = callPermissionsGranted(context)
+        onPauseOrDispose { }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        granted = callPermissionsGranted(context)
+        val canAskAgain = activity != null && CALL_PERMISSIONS.any { p -> activity.shouldShowRequestPermissionRationale(p) }
+        if (!granted && !canAskAgain) {
+            context.startActivity(
+                android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", context.packageName, null)
+                )
+            )
+        }
+    }
+    ListItem(
+        verticalAlignment = Alignment.CenterVertically,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = if (granted) Modifier else Modifier.clickable { launcher.launch(CALL_PERMISSIONS) },
+        content = { Text(stringResource(R.string.onboarding_perm_calls_desc)) },
+        supportingContent = { Text(stringResource(R.string.onboarding_perm_calls_why)) },
+        trailingContent = {
+            if (granted) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.success
+                )
+            } else {
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+    )
+}

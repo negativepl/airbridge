@@ -935,7 +935,15 @@ sealed class Message {
         }.toString()
     }
 
-    /** Phone → Mac: the call stopped ringing (answered on the phone, declined, or the caller hung up). */
+    /** Phone → Mac: the ringing call was answered and is in progress on the phone. */
+    data class CallActive(val callId: String) : Message() {
+        override fun toJson(): String = JSONObject().apply {
+            put("type", "call_active")
+            put("call_id", callId)
+        }.toString()
+    }
+
+    /** Phone → Mac: the call is over: declined, the caller hung up, or a call in progress ended. */
     data class CallEnded(val callId: String) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "call_ended")
@@ -1304,6 +1312,7 @@ sealed class Message {
                     canAnswer = obj.optBoolean("can_answer", false),
                     canDecline = obj.optBoolean("can_decline", false)
                 )
+                "call_active" -> CallActive(callId = obj.getString("call_id"))
                 "call_ended" -> CallEnded(callId = obj.getString("call_id"))
                 "capture_request" -> CaptureRequest(
                     requestId = obj.getString("request_id"),

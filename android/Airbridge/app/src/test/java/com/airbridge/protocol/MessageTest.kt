@@ -60,6 +60,8 @@ class MessageTest {
     fun `call messages round-trip`() {
         val incoming = Message.CallIncoming("0|com.samsung|1|null|10", "Jan Kowalski", canAnswer = true, canDecline = false)
         assertEquals(incoming, Message.fromJson(incoming.toJson()))
+        val active = Message.CallActive("k")
+        assertEquals(active, Message.fromJson(active.toJson()))
         val ended = Message.CallEnded("k")
         assertEquals(ended, Message.fromJson(ended.toJson()))
         val action = Message.CallAction("k", answer = true, moveHeadphones = true)

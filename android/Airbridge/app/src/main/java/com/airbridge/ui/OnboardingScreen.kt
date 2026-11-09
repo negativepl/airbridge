@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Contacts
@@ -381,6 +382,12 @@ private fun PermissionsPage() {
         notifListenerGranted = isNotificationListenerEnabled(context)
     }
 
+    // Phone: optional (incoming calls on the Mac). Not part of `allGranted`.
+    var callsGranted by remember { mutableStateOf(callPermissionsGranted(context)) }
+    val callsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        callsGranted = callPermissionsGranted(context)
+    }
+
     // Accessibility: optional (control phone from Mac during mirroring). Not part of `allGranted`.
     var accessibilityGranted by remember { mutableStateOf(isMirrorAccessibilityEnabled(context)) }
     val accessibilityLauncher = rememberLauncherForActivityResult(
@@ -526,6 +533,14 @@ private fun PermissionsPage() {
             onRequest = {
                 notifListenerLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             }
+        )
+
+        PermissionRow(
+            icon = Icons.Rounded.Call,
+            description = stringResource(R.string.onboarding_perm_calls_desc),
+            why = stringResource(R.string.onboarding_perm_calls_why),
+            granted = callsGranted,
+            onRequest = { callsLauncher.launch(CALL_PERMISSIONS) }
         )
 
         PermissionRow(
@@ -779,4 +794,14 @@ fun isMirrorAccessibilityEnabled(context: android.content.Context): Boolean {
     )
     val comp = "${context.packageName}/${context.packageName}.mirror.MirrorAccessibilityService"
     return com.airbridge.mirror.accessibilityServiceEnabled(flat, comp)
+}
+
+/** The Phone group: tell a ringing call from an ongoing one, and answer it from the Mac. */
+internal val CALL_PERMISSIONS = arrayOf(
+    android.Manifest.permission.READ_PHONE_STATE,
+    android.Manifest.permission.ANSWER_PHONE_CALLS,
+)
+
+internal fun callPermissionsGranted(context: android.content.Context): Boolean = CALL_PERMISSIONS.all {
+    context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
 }

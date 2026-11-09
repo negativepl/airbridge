@@ -288,6 +288,12 @@ class AirbridgeService : Service() {
             svc.webSocketClient.send(Message.CallIncoming(callId, caller, canAnswer, canDecline))
         }
 
+        fun sendCallActive(callId: String) {
+            val svc = instance ?: return
+            if (!svc.webSocketClient.isConnected) return
+            svc.webSocketClient.send(Message.CallActive(callId))
+        }
+
         fun sendCallEnded(callId: String) {
             val svc = instance ?: return
             if (!svc.webSocketClient.isConnected) return

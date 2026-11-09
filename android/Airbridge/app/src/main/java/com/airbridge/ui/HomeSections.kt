@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.FilledTonalIconToggleButton
@@ -121,11 +122,12 @@ fun CardHeader(text: String) {
 
 // ── Quick actions ──────────────────────────────────────────────────────────
 
-/** Four tiles for what the app is for: send a file, a photo, the clipboard, open the Mac screen. */
+/** Five tiles for what the app is for: send a file, a photo, a scanned document, the clipboard, open the Mac screen. */
 @Composable
 fun QuickActionsRow(
     onSendFile: () -> Unit,
     onSendPhoto: () -> Unit,
+    onScanDocument: () -> Unit,
     onSendClipboard: () -> Unit,
     onMacScreen: () -> Unit,
     macScreenEnabled: Boolean,
@@ -134,8 +136,8 @@ fun QuickActionsRow(
     enabled: Boolean = true
 ) {
     // One card like "Appearance" in Settings: the title at the top, the four
-    // actions as tonal icon buttons underneath. Icons only: labels did not
-    // fit four buttons on the cover screen.
+    // actions as tonal icon buttons underneath. Icons only: labels do not
+    // fit the row on the cover screen.
     PageCard(modifier = modifier.fillMaxWidth().padding(top = 16.dp)) {
         CardHeader(stringResource(R.string.home_section_quick_actions))
         Row(
@@ -144,6 +146,7 @@ fun QuickActionsRow(
         ) {
             QuickAction(Icons.AutoMirrored.Rounded.InsertDriveFile, stringResource(R.string.quick_file), onSendFile, enabled = enabled)
             QuickAction(Icons.Rounded.Photo, stringResource(R.string.quick_photo), onSendPhoto, enabled = enabled)
+            QuickAction(Icons.Rounded.DocumentScanner, stringResource(R.string.quick_scan), onScanDocument, enabled = enabled)
             QuickAction(Icons.Rounded.ContentPaste, stringResource(R.string.quick_clipboard), onSendClipboard, enabled = enabled)
             QuickAction(Icons.AutoMirrored.Rounded.ScreenShare, stringResource(R.string.quick_mac_screen), onMacScreen, enabled = enabled && macScreenEnabled)
         }

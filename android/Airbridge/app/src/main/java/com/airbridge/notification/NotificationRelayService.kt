@@ -1,16 +1,21 @@
 package com.airbridge.notification
 
+import android.Manifest
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.telephony.TelephonyCallback
+import android.telephony.TelephonyManager
 import android.util.Base64
 import android.util.Log
 import androidx.core.graphics.createBitmap
@@ -31,14 +36,61 @@ class NotificationRelayService : NotificationListenerService() {
     // (worst case przy wyścigu: podwójne zakodowanie ikony — akceptowalne).
     private val iconCache = ConcurrentHashMap<String, String>()
 
+    /** Re-reads the call notifications when a ringing call is answered or ends; one per SIM. API 31+, needs READ_PHONE_STATE. */
+    private val callStateCallbacks = mutableListOf<Pair<TelephonyManager, TelephonyCallback>>()
+
     override fun onListenerConnected() {
         instance = this
+        ensureCallStateListener()
+    }
+
+    override fun onListenerDisconnected() {
+        removeCallStateListener()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         if (instance === this) instance = null
         replyActions.clear()
+        removeCallStateListener()
+    }
+
+    /**
+     * Registered once the Phone permission is there: on connect, and again on
+     * each call notification, since the permission can be granted later.
+     * Before Android 12 the only listener is the deprecated PhoneStateListener;
+     * there the notification updates alone drive the Mac.
+     */
+    private fun ensureCallStateListener() {
+        if (callStateCallbacks.isNotEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return
+        val telephony = getSystemService(TelephonyManager::class.java) ?: return
+        CallNotifications.activeSubscriptionIds(this).forEach { subId ->
+            val perSim = telephony.createForSubscriptionId(subId)
+            val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                override fun onCallStateChanged(state: Int) {
+                    val active = try {
+                        activeNotifications
+                    } catch (e: SecurityException) {
+                        return // listener unbound meanwhile
+                    } ?: return
+                    CallNotifications.onCallStateChanged(this@NotificationRelayService, active)
+                }
+            }
+            try {
+                perSim.registerTelephonyCallback(mainExecutor, callback)
+                callStateCallbacks += perSim to callback
+            } catch (e: SecurityException) {
+                Log.w("NotificationRelay", "Call state listener refused", e)
+            }
+        }
+    }
+
+    private fun removeCallStateListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            callStateCallbacks.forEach { (telephony, callback) -> telephony.unregisterTelephonyCallback(callback) }
+        }
+        callStateCallbacks.clear()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -51,7 +103,10 @@ class NotificationRelayService : NotificationListenerService() {
         // notifications. Our own notifications are skipped, except the fake
         // call of a debug build.
         val ownDebugCall = com.airbridge.BuildConfig.DEBUG && sbn.packageName == packageName && sbn.tag == DebugCall.TAG
-        if ((sbn.packageName != packageName || ownDebugCall) && CallNotifications.onPosted(sbn)) return
+        if ((sbn.packageName != packageName || ownDebugCall) && CallNotifications.onPosted(this, sbn)) {
+            ensureCallStateListener()
+            return
+        }
         val n = sbn.notification ?: return
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()

@@ -28,6 +28,8 @@
     <string name="onboarding_perm_contacts_why">To show contact names instead of phone numbers in the SMS view</string>
     <string name="onboarding_perm_files_desc">Files</string>
     <string name="onboarding_perm_files_why">To browse and transfer files from your Mac. Files are sent directly over your local network — nothing is uploaded to the cloud</string>
+    <string name="onboarding_perm_calls_desc">Calls on the Mac</string>
+    <string name="onboarding_perm_calls_why">To show incoming calls on your Mac and answer or decline them there. Without it your Mac shows only calls the phone announces as incoming</string>
     <string name="onboarding_perm_overlay_desc">Display over other apps</string>
     <string name="onboarding_perm_overlay_why">So screen mirroring can start when you request it from your Mac, even while the app is in the background. Without it you have to open the app first</string>
     <string name="onboarding_perm_notiflistener_desc">Notifications on your Mac</string>
@@ -258,6 +260,7 @@
     <string name="home_section_quick_actions">Quick actions</string>
     <string name="quick_file">File</string>
     <string name="quick_photo">Photo</string>
+    <string name="quick_scan">Scan document</string>
     <string name="quick_clipboard">Clipboard</string>
     <string name="quick_mac_screen">Mac screen</string>
     <string name="home_section_clipboard">Clipboard</string>

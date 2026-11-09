@@ -138,6 +138,10 @@ final class MessageTests: XCTestCase {
         XCTAssertEqual(try decode(["type": "call_ended", "call_id": "k"]), .callEnded(callId: "k"))
     }
 
+    func testDecodeCallActive() throws {
+        XCTAssertEqual(try decode(["type": "call_active", "call_id": "k"]), .callActive(callId: "k"))
+    }
+
     func testEncodeCallAction() throws {
         let answer = try encode(.callAction(callId: "k", answer: true, moveHeadphones: true))
         XCTAssertEqual(answer["type"] as? String, "call_action")

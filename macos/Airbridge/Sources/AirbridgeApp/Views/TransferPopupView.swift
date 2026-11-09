@@ -203,8 +203,8 @@ struct TransferPopupView: View {
             return CGSize(width: w * 0.94, height: h)
         case .incomingCall:
             return CGSize(width: w, height: h)
-        case .callAnswered:
-            return CGSize(width: w * 0.88, height: h * 0.90)
+        case .callInProgress:
+            return CGSize(width: w * 0.94, height: h * 0.90)
         case .captureWaiting:
             return CGSize(width: w * 0.88, height: h * 0.90)
         }
@@ -215,8 +215,8 @@ struct TransferPopupView: View {
         if let call = connectionService.incomingCall {
             return .incomingCall(caller: call.caller, canAnswer: call.canAnswer, canDecline: call.canDecline)
         }
-        if let notice = connectionService.callNotice {
-            return .callAnswered(caller: notice.caller, headphonesMoved: notice.headphonesMoved)
+        if let call = connectionService.activeCall {
+            return .callInProgress(caller: call.caller, startedAt: call.startedAt, headphonesMoved: call.headphonesMoved)
         }
         if fileTransferService.hasIncomingOffer {
             return .incoming(
@@ -284,7 +284,7 @@ struct TransferPopupView: View {
         case .idle: return .accentColor
         case .incoming, .waiting, .transferring, .headphonePrompt, .captureWaiting: return .accentColor
         case .clipboardReceived: return .accentColor
-        case .complete, .incomingCall, .callAnswered: return .green
+        case .complete, .incomingCall, .callInProgress: return .green
         case .rejected, .failed: return .red
         }
     }
@@ -298,7 +298,7 @@ struct TransferPopupView: View {
             return GradientPalette(primary: .blue, secondary: .cyan, tertiary: .purple)
         case .clipboardReceived:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
-        case .complete, .incomingCall, .callAnswered:
+        case .complete, .incomingCall, .callInProgress:
             return GradientPalette(primary: .green, secondary: .mint, tertiary: .teal)
         case .rejected, .failed:
             return GradientPalette(primary: .red, secondary: .orange, tertiary: .pink)
@@ -317,7 +317,7 @@ struct TransferPopupView: View {
         case .headphonePrompt: return 0.9
         case .clipboardReceived: return 0.9
         case .incomingCall: return 1.0
-        case .callAnswered: return 0.9
+        case .callInProgress: return 0.9
         case .captureWaiting: return 0.8
         }
     }
@@ -349,7 +349,7 @@ struct TransferPopupView: View {
         case .failed: return 7
         case .clipboardReceived: return 8
         case .incomingCall: return 9
-        case .callAnswered: return 10
+        case .callInProgress: return 10
         case .captureWaiting: return 11
         }
     }
@@ -381,8 +381,8 @@ struct TransferPopupView: View {
             clipboardReceivedView(preview: preview, isLink: isLink)
         case .incomingCall(let caller, let canAnswer, let canDecline):
             incomingCallView(caller: caller, canAnswer: canAnswer, canDecline: canDecline)
-        case .callAnswered(let caller, let headphonesMoved):
-            callAnsweredView(caller: caller, headphonesMoved: headphonesMoved)
+        case .callInProgress(let caller, let startedAt, let headphonesMoved):
+            callInProgressView(caller: caller, startedAt: startedAt, headphonesMoved: headphonesMoved)
         case .captureWaiting(let isScan):
             captureWaitingView(isScan: isScan)
         }
@@ -870,20 +870,32 @@ struct TransferPopupView: View {
         }
     }
 
-    /// Answered here: says where the call went (and the headphones, if they moved).
-    private func callAnsweredView(caller: String, headphonesMoved: Bool) -> some View {
+    /// Answered here: a live voice waveform, who is on the line and for how
+    /// long, and End on the right where Answer was. The headphone note (if
+    /// they moved) gives way to the timer after a few seconds of the call.
+    private func callInProgressView(caller: String, startedAt: Date, headphonesMoved: Bool) -> some View {
         islandRow {
-            glyph("iphone.gen3.radiowaves.left.and.right").symbolEffect(.bounce, value: caller)
+            glyph("waveform", color: .green)
+                .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeating,
+                              isActive: !reduceMotion)
         } texts: {
             VStack(alignment: .leading, spacing: 3) {
-                caption(L10n.callOnPhone)
                 headline(caller.isEmpty ? L10n.callUnknownCaller : caller)
-                if headphonesMoved {
-                    Text(L10n.callHeadphonesMoved).font(.ab(.footnote)).foregroundStyle(.secondary).lineLimit(1)
+                TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                    let showHeadphones = headphonesMoved && context.date.timeIntervalSince(startedAt) < 4
+                    Text("\(showHeadphones ? L10n.callHeadphonesMoved : L10n.callOnPhone)  \(startedAt, style: .timer)")
+                        .monospacedDigit()
+                        .font(.ab(.footnote, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .contentTransition(.opacity)
+                        .animation(.smooth(duration: 0.25), value: showHeadphones)
                 }
             }
         } controls: {
-            EmptyView()
+            IslandIconButton(systemName: "phone.down.fill", label: L10n.callEnd, tint: .red) {
+                connectionService.endCall()
+            }
         }
     }
 
@@ -1441,6 +1453,10 @@ final class TransferPopup {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, let panel = self.panel else { return }
+            // A ringing call or one in progress keeps the island: a transfer
+            // finishing underneath must not take its buttons away. The call
+            // clears its own state before asking to hide.
+            if let calls = self.connectionService, calls.incomingCall != nil || calls.activeCall != nil { return }
             // Hide animation runs entirely in SwiftUI: scale + opacity reverse
             // back to 0 with a spring (slight anticipation via the spring's
             // overshoot in the opposite direction). On completion the window

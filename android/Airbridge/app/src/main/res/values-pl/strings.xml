@@ -28,6 +28,8 @@
     <string name="onboarding_perm_contacts_why">Aby wyświetlać nazwy kontaktów zamiast numerów telefonów w widoku SMS</string>
     <string name="onboarding_perm_files_desc">Pliki</string>
     <string name="onboarding_perm_files_why">Aby przeglądać i przesyłać pliki telefonu z komputera Mac. Pliki przesyłane są bezpośrednio przez sieć lokalną — nic nie trafia do chmury</string>
+    <string name="onboarding_perm_calls_desc">Połączenia na Macu</string>
+    <string name="onboarding_perm_calls_why">Aby Mac wyświetlał połączenia przychodzące i umożliwiał ich odebranie lub odrzucenie. Bez tego Mac pokaże tylko połączenia, które telefon zgłasza jako przychodzące</string>
     <string name="onboarding_perm_overlay_desc">Wyświetlanie nad aplikacjami</string>
     <string name="onboarding_perm_overlay_why">Aby mirror ekranu mógł wystartować zdalnie z Maca, nawet gdy aplikacja jest w tle. Bez tego trzeba najpierw otworzyć aplikację</string>
     <string name="onboarding_perm_notiflistener_desc">Powiadomienia na Macu</string>
@@ -267,6 +269,7 @@
     <string name="home_section_quick_actions">Szybkie akcje</string>
     <string name="quick_file">Plik</string>
     <string name="quick_photo">Zdjęcie</string>
+    <string name="quick_scan">Skanuj dokument</string>
     <string name="quick_clipboard">Schowek</string>
     <string name="quick_mac_screen">Ekran Maca</string>
     <string name="home_section_clipboard">Schowek</string>

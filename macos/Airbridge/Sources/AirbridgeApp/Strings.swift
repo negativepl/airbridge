@@ -61,6 +61,7 @@ enum L10n {
     static var callUnknownCaller: String { isPL ? "Nieznany numer" : "Unknown caller" }
     static var callAnswer: String { isPL ? "Odbierz" : "Answer" }
     static var callDecline: String { isPL ? "Odrzuć" : "Decline" }
+    static var callEnd: String { isPL ? "Zakończ" : "End" }
     static var callOnPhone: String { isPL ? "Rozmowa na telefonie" : "Call continues on the phone" }
     static var callHeadphonesMoved: String { isPL ? "Słuchawki przełączone na telefon" : "Headphones moved to the phone" }
     static var captureScan: String { isPL ? "Zeskanuj dokument telefonem" : "Scan Document with Phone" }

@@ -20,6 +20,7 @@ struct SettingsView: View {
     @AppStorage("clipboardReceipt") private var clipboardReceipt = true
     @AppStorage(BrowserPicker.preferenceKey) private var linkBrowser = BrowserPicker.inUse
     @AppStorage("showInDock") private var showInDock = false
+    @AppStorage(ConnectionService.showIncomingCallsKey) private var showIncomingCalls = true
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
     @State private var isRecordingShortcut = false
@@ -147,6 +148,11 @@ struct SettingsView: View {
                 get: { notificationService.enabled },
                 set: { notificationService.setEnabled($0) }
             ))
+            Toggle(isOn: $showIncomingCalls) {
+                Text(L10n.isPL ? "Pokazuj połączenia przychodzące" : "Show incoming calls")
+                Text(L10n.isPL ? "Wyspa z rozmówcą oraz przyciskami Odbierz i Odrzuć, gdy telefon dzwoni."
+                               : "An island with the caller and Answer and Decline buttons while the phone rings.")
+            }
             if !notificationService.knownApps.isEmpty {
                 Text(L10n.isPL ? "Aplikacje:" : "Apps:")
                 ForEach(notificationService.knownApps.sorted { $0.value < $1.value }, id: \.key) { pkg, name in

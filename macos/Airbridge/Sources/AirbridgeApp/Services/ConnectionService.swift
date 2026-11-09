@@ -175,14 +175,17 @@ final class ConnectionService {
         let canDecline: Bool
         let connectionId: String
     }
-    /// Short confirmation after answering here: where the call continues.
-    struct CallNotice: Equatable {
+    /// Answered from this Mac: the call goes on on the phone, and the island
+    /// keeps it (time and End) until the phone reports it over.
+    struct ActiveCall: Equatable {
+        let callId: String
         let caller: String
+        let connectionId: String
+        let startedAt: Date
         let headphonesMoved: Bool
     }
     var incomingCall: IncomingCall?
-    var callNotice: CallNotice?
-    @ObservationIgnored private var callNoticeTask: Task<Void, Never>?
+    var activeCall: ActiveCall?
     @ObservationIgnored private var handoffTimeoutTask: Task<Void, Never>?
     /// Auto-clears a `.failed` handoff back to `.idle` (see `markHandoffFailed`).
     @ObservationIgnored private var handoffFailedResetTask: Task<Void, Never>?
@@ -608,38 +611,61 @@ final class ConnectionService {
 
     // MARK: - Calls
 
+    /// UserDefaults key of the Settings switch for the incoming-call island (on by default).
+    static let showIncomingCallsKey = "showIncomingCalls"
+
     private func handleIncomingCall(_ call: IncomingCall) {
+        guard UserDefaults.standard.object(forKey: Self.showIncomingCallsKey) as? Bool ?? true else {
+            Diag.log("Call", "ringing, island turned off in Settings")
+            return
+        }
         let isNew = incomingCall?.callId != call.callId
         Diag.log("Call", "ringing (answer=\(call.canAnswer), decline=\(call.canDecline), new=\(isNew))")
         incomingCall = call
-        clearCallNotice()
         TransferPopup.shared.show()
         if isNew { playCallSound() }
     }
 
+    /// The phone reports the call over (declined, missed, or a call in progress hung up).
     private func handleCallEnded(callId: String) {
-        guard incomingCall?.callId == callId else { return }
-        Diag.log("Call", "stopped ringing")
-        incomingCall = nil
-        // An answer confirmation keeps the island until its own timer ends.
-        if callNotice == nil { hideIslandUnlessBusy() }
+        if incomingCall?.callId == callId {
+            Diag.log("Call", "stopped ringing")
+            incomingCall = nil
+        } else if activeCall?.callId == callId {
+            Diag.log("Call", "ended")
+            activeCall = nil
+        } else {
+            return
+        }
+        hideIslandUnlessBusy()
     }
 
-    /// Island "Answer": the phone presses its own Answer button, so the call
-    /// continues on the phone. Headphones on this Mac move to the phone with it.
+    /// The phone reports the ringing call answered. Answered on the phone
+    /// itself, the island just goes away: the call is in the user's hand.
+    private func handleCallActive(callId: String) {
+        guard incomingCall?.callId == callId else { return }
+        Diag.log("Call", "answered on the phone")
+        incomingCall = nil
+        hideIslandUnlessBusy()
+    }
+
+    /// Island "Answer": the phone answers, so the call continues on the
+    /// phone. Headphones on this Mac move to the phone with it.
     func answerCall() {
         guard let call = incomingCall else { return }
         let moveHeadphones = bluetoothAudio?.enabled == true && bluetoothAudio?.selectedConnected == true
         send(.callAction(callId: call.callId, answer: true, moveHeadphones: moveHeadphones), to: call.connectionId)
         incomingCall = nil
-        callNotice = CallNotice(caller: call.caller, headphonesMoved: moveHeadphones)
-        callNoticeTask?.cancel()
-        callNoticeTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard let self, !Task.isCancelled else { return }
-            self.callNotice = nil
-            if self.incomingCall == nil { self.hideIslandUnlessBusy() }
-        }
+        activeCall = ActiveCall(callId: call.callId, caller: call.caller, connectionId: call.connectionId,
+                                startedAt: Date(), headphonesMoved: moveHeadphones)
+    }
+
+    /// Island "End" on a call answered here: the phone hangs it up.
+    func endCall() {
+        guard let call = activeCall else { return }
+        send(.callAction(callId: call.callId, answer: false, moveHeadphones: false), to: call.connectionId)
+        activeCall = nil
+        hideIslandUnlessBusy()
     }
 
     /// Island "Decline": the phone presses its own Decline button.
@@ -648,12 +674,6 @@ final class ConnectionService {
         send(.callAction(callId: call.callId, answer: false, moveHeadphones: false), to: call.connectionId)
         incomingCall = nil
         hideIslandUnlessBusy()
-    }
-
-    private func clearCallNotice() {
-        callNoticeTask?.cancel()
-        callNoticeTask = nil
-        callNotice = nil
     }
 
     private func send(_ message: Message, to connectionId: String) {
@@ -983,6 +1003,8 @@ final class ConnectionService {
         case let .callIncoming(callId, caller, canAnswer, canDecline):
             handleIncomingCall(IncomingCall(callId: callId, caller: caller, canAnswer: canAnswer,
                                             canDecline: canDecline, connectionId: connectionId))
+        case let .callActive(callId):
+            handleCallActive(callId: callId)
         case let .callEnded(callId):
             handleCallEnded(callId: callId)
         case .phoneRingStop:
@@ -1030,9 +1052,9 @@ final class ConnectionService {
             // that just dropped — dismiss it rather than leaving it dangling.
             dismissHeadphonePrompt()
             // So does a ringing call: nothing could answer it any more.
-            if incomingCall != nil || callNotice != nil {
+            if incomingCall != nil || activeCall != nil {
                 incomingCall = nil
-                clearCallNotice()
+                activeCall = nil
                 hideIslandUnlessBusy()
             }
             if !manuallyDisconnected {

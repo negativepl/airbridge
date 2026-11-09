@@ -21,8 +21,9 @@ enum TransferPopupState: Equatable {
     /// A call is ringing on the phone: who is calling, and which of Answer /
     /// Decline the phone's call notification offers.
     case incomingCall(caller: String, canAnswer: Bool, canDecline: Bool)
-    /// Answered from this Mac: the call goes on on the phone.
-    case callAnswered(caller: String, headphonesMoved: Bool)
+    /// Answered from this Mac: the call goes on on the phone; the island
+    /// shows how long it has lasted and can end it.
+    case callInProgress(caller: String, startedAt: Date, headphonesMoved: Bool)
     /// This Mac asked the phone for a scan (`isScan`) or a photo and waits for it.
     case captureWaiting(isScan: Bool)
 
@@ -38,7 +39,7 @@ enum TransferPopupState: Equatable {
 
     var filename: String {
         switch self {
-        case .idle, .headphonePrompt, .clipboardReceived, .incomingCall, .callAnswered, .captureWaiting:
+        case .idle, .headphonePrompt, .clipboardReceived, .incomingCall, .callInProgress, .captureWaiting:
             return ""
         case .incoming(let f, _),
              .waiting(let f),

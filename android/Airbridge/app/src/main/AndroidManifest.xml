@@ -21,6 +21,11 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Incoming calls on the Mac (optional "Phone" group): tell a ringing call
+         from an ongoing one when the dialer posts both as an ongoing CallStyle
+         (Samsung while its full-screen call UI is up), and answer it. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Headphone handoff: connect/disconnect the user-selected Bluetooth
          headphones when moving them between the phone and the Mac. -->

@@ -22,9 +22,10 @@ import java.util.Locale
 
 /**
  * Opened at the Mac's request ("Scan Document with Phone" / "Take Photo with
- * Phone"). Has no UI of its own: it goes straight into Google's document
- * scanner or the camera app, and the result goes to the Mac as a file offer
- * tagged with the request, which the Mac accepts without asking.
+ * Phone"), or from the Scan tile on Home with no request id. Has no UI of its
+ * own: it goes straight into Google's document scanner or the camera app, and
+ * the result goes to the Mac as a file offer. Tagged with the Mac's request,
+ * the Mac accepts it without asking; untagged, it is an ordinary offer.
  */
 class CaptureActivity : ComponentActivity() {
 
@@ -111,7 +112,7 @@ class CaptureActivity : ComponentActivity() {
             Intent(this, AirbridgeService::class.java).apply {
                 action = AirbridgeService.ACTION_SEND_FILE
                 data = FileProvider.getUriForFile(this@CaptureActivity, "$packageName.fileprovider", target)
-                putExtra(AirbridgeService.EXTRA_CAPTURE_ID, requestId)
+                if (requestId.isNotEmpty()) putExtra(AirbridgeService.EXTRA_CAPTURE_ID, requestId)
             }
         )
         finish()

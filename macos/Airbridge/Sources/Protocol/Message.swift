@@ -117,9 +117,12 @@ public enum Message: Equatable, Sendable {
     case notificationReply(notificationKey: String, text: String)
     /// Phone → Mac: a call is ringing. `callId` is the phone's notification key.
     case callIncoming(callId: String, caller: String, canAnswer: Bool, canDecline: Bool)
-    /// Phone → Mac: the call stopped ringing (answered on the phone, declined, caller hung up).
+    /// Phone → Mac: the ringing call was answered and is in progress on the phone.
+    case callActive(callId: String)
+    /// Phone → Mac: the call is over: declined, the caller hung up, or a call in progress ended.
     case callEnded(callId: String)
-    /// Mac → phone: press Answer (`answer` true) or Decline on the ringing call;
+    /// Mac → phone: press Answer (`answer` true) or Decline on the ringing call
+    /// (Decline on a call in progress hangs it up);
     /// `moveHeadphones` asks the phone to take the headphones from this Mac.
     case callAction(callId: String, answer: Bool, moveHeadphones: Bool)
     /// Mac → phone: open the document scanner (`mode` "scan") or the camera
@@ -484,6 +487,7 @@ extension Message: Codable {
         case notificationPosted       = "notification_posted"
         case notificationReply        = "notification_reply"
         case callIncoming             = "call_incoming"
+        case callActive               = "call_active"
         case callEnded                = "call_ended"
         case callAction               = "call_action"
         case captureRequest           = "capture_request"
@@ -893,6 +897,10 @@ extension Message: Codable {
             try container.encode(caller, forKey: .caller)
             try container.encode(canAnswer, forKey: .canAnswer)
             try container.encode(canDecline, forKey: .canDecline)
+
+        case .callActive(let callId):
+            try container.encode(TypeKey.callActive.rawValue, forKey: .type)
+            try container.encode(callId, forKey: .callId)
 
         case .callEnded(let callId):
             try container.encode(TypeKey.callEnded.rawValue, forKey: .type)
@@ -1304,6 +1312,9 @@ extension Message: Codable {
                 canAnswer: try container.decodeIfPresent(Bool.self, forKey: .canAnswer) ?? false,
                 canDecline: try container.decodeIfPresent(Bool.self, forKey: .canDecline) ?? false
             )
+
+        case .callActive:
+            self = .callActive(callId: try container.decode(String.self, forKey: .callId))
 
         case .callEnded:
             self = .callEnded(callId: try container.decode(String.self, forKey: .callId))

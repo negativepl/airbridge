@@ -236,6 +236,8 @@ fun MainScreen(
         QuickActionsRow(
             onSendFile = onSendFile,
             onSendPhoto = onSendPhoto,
+            // Google's scanner; the PDF goes to the Mac as an ordinary file offer.
+            onScanDocument = { context.startActivity(com.airbridge.capture.CaptureActivity.intent(context, requestId = "", scan = true)) },
             onSendClipboard = onSendClipboard,
             onMacScreen = { mirror.launch(0) },
             macScreenEnabled = mirror.ready,

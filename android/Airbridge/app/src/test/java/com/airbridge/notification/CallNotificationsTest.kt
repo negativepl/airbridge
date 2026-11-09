@@ -8,6 +8,11 @@ import org.junit.Test
 class CallNotificationsTest {
     @Test fun callStyleIncomingRings() = assertTrue(CallNotifications.isRingingCall(callType = 1, hasAnswerAction = false))
     @Test fun callStyleOngoingDoesNotRing() = assertFalse(CallNotifications.isRingingCall(callType = 2, hasAnswerAction = true))
+    // Samsung's full-screen call UI: an ongoing CallStyle while the phone still rings.
+    @Test fun callStyleOngoingRingsWhileTelecomRings() =
+        assertTrue(CallNotifications.isRingingCall(callType = 2, hasAnswerAction = false, phoneRinging = true))
+    @Test fun callStyleScreeningIgnoresTelecomRinging() =
+        assertFalse(CallNotifications.isRingingCall(callType = 3, hasAnswerAction = false, phoneRinging = true))
     @Test fun callStyleScreeningDoesNotRing() = assertFalse(CallNotifications.isRingingCall(callType = 3, hasAnswerAction = false))
     @Test fun legacyRingsWithAnswerAction() = assertTrue(CallNotifications.isRingingCall(callType = null, hasAnswerAction = true))
     @Test fun legacyOngoingHasNoAnswer() = assertFalse(CallNotifications.isRingingCall(callType = null, hasAnswerAction = false))
