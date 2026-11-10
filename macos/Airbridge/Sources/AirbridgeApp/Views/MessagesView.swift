@@ -31,6 +31,18 @@ struct MessagesView: View {
                 } description: {
                     Text(L10n.isPL ? "Połącz się z telefonem, aby przeglądać wiadomości." : "Connect to your phone to browse messages.")
                 }
+            } else if smsService.conversationsLoaded && smsService.conversations.isEmpty {
+                // The phone answered with nothing. An empty list beside
+                // "Select a Conversation" read as messages that never loaded.
+                ContentUnavailableView {
+                    Label(L10n.isPL ? "Brak wiadomości" : "No Messages", systemImage: "message")
+                } description: {
+                    Text(L10n.isPL
+                        ? "Telefon nie udostępnił żadnych wiadomości SMS. Android może ukrywać przed innymi aplikacjami wiadomości z kodami jednorazowymi."
+                        : "The phone shared no SMS messages. Android may hide messages with one-time codes from other apps.")
+                } actions: {
+                    Button(L10n.isPL ? "Odśwież" : "Refresh") { smsService.loadConversations() }
+                }
             } else {
                 // Fixed list width: a split view sized itself to the selected
                 // conversation, and long bubbles pushed the list narrower.

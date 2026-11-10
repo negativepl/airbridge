@@ -117,6 +117,23 @@ The latest builds are on the [Releases](https://github.com/negativepl/airbridge/
 
 AirBridge is not on Google Play because it relies on persistent foreground services that do not fit Google Play's foreground service policy.
 
+### If Google Play Protect blocks the installation
+
+On some phones, opening the downloaded APK ends with a Google Play Protect dialog that says **"App blocked to protect your device"** and offers only an **OK** button. This is Play Protect's enhanced fraud protection. It blocks apps downloaded through a browser, messaging app or file manager when they declare sensitive permissions. AirBridge declares SMS access, notification access and an accessibility service, because the features listed under [Android permissions](#android-permissions) need them.
+
+Installing over ADB from a computer is not affected by this check:
+
+1. Install the Android platform tools on the computer. On macOS: `brew install android-platform-tools`. For other systems, download them from [developer.android.com](https://developer.android.com/tools/releases/platform-tools).
+2. On the phone, open **Settings > About phone** and tap **Build number** seven times to unlock developer options. Then turn on **USB debugging** in **Developer options** (under **Settings > System** on Pixel, directly in **Settings** on Samsung).
+3. Connect the phone with a USB cable and accept the **Allow USB debugging** prompt on the phone.
+4. Download `AirBridge.apk` to the computer and install it:
+
+   ```bash
+   adb install -r AirBridge.apk
+   ```
+
+The command prints `Success` when the app is installed. Use the same command to install later versions; `-r` keeps the app's data and pairing. USB debugging can be turned off again afterwards.
+
 ---
 
 ## Tested On
@@ -124,6 +141,7 @@ AirBridge is not on Google Play because it relies on persistent foreground servi
 | Device | OS |
 |---|---|
 | Samsung Galaxy Z Fold7 | One UI 9 (Android 17), One UI 8.5 (Android 16) |
+| Google Pixel 11 Pro | Android 17 |
 | OPPO Find X9 Ultra | ColorOS 16 (Android 16) |
 | OPPO Find N6 | ColorOS 16 (Android 16) |
 | MacBook Pro 16″ (M1 Max) | macOS 26 (Tahoe), macOS 27 (beta) |

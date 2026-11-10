@@ -223,13 +223,15 @@ sealed class Message {
     data class PairResponse(
         val deviceName: String,
         val publicKey: String,
-        val accepted: Boolean
+        val accepted: Boolean,
+        val mirrorPort: Int? = null
     ) : Message() {
         override fun toJson(): String = JSONObject().apply {
             put("type", "pair_response")
             put("device_name", deviceName)
             put("public_key", publicKey)
             put("accepted", accepted)
+            if (mirrorPort != null) put("mirror_port", mirrorPort)
         }.toString()
     }
 
@@ -1041,7 +1043,8 @@ sealed class Message {
                 "pair_response" -> PairResponse(
                     deviceName = obj.getString("device_name"),
                     publicKey = obj.getString("public_key"),
-                    accepted = obj.getBoolean("accepted")
+                    accepted = obj.getBoolean("accepted"),
+                    mirrorPort = if (obj.has("mirror_port")) obj.getInt("mirror_port") else null
                 )
                 "ping" -> Ping(timestamp = obj.getLong("timestamp"))
                 "pong" -> Pong(timestamp = obj.getLong("timestamp"))

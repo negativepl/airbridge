@@ -12,6 +12,9 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
     private(set) var totalConversations: Int = 0
     private(set) var totalMessages: Int = 0
     private(set) var isLoadingConversations: Bool = false
+    /// The phone has answered a conversations request for this device. Tells
+    /// "the phone has no messages to show" from "nothing was asked yet".
+    private(set) var conversationsLoaded: Bool = false
     private(set) var isLoadingMessages: Bool = false
     /// The last conversations request received no response within `requestTimeout`.
     /// Views show a retryable failure state instead of spinning forever.
@@ -132,6 +135,7 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
         messagesWatchdogTask?.cancel()
         isLoadingConversations = false
         isLoadingMessages = false
+        conversationsLoaded = false
         conversationsLoadFailed = false
         messagesLoadFailed = false
         // Conversations and messages belong to the previous phone — clear
@@ -156,6 +160,7 @@ final class SmsService: MessageHandler, ActiveDeviceObserver {
             }
             totalConversations = total
             isLoadingConversations = false
+            conversationsLoaded = true
             Diag.log("SMS", "conversations page \(page): \(convos.count) in \(Self.elapsedMillis(since: conversationsRequestedAt)) ms")
 
         case .smsMessagesResponse(let threadId, let msgs, let total, let page):

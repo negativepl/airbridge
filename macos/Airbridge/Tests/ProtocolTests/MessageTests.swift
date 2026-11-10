@@ -353,7 +353,8 @@ final class MessageTests: XCTestCase {
         let original = Message.pairResponse(
             deviceName: "MacBook",
             publicKey: "mackey==",
-            accepted: true
+            accepted: true,
+            mirrorPort: 8767
         )
         let data1 = try encoder.encode(original)
         let decoded = try decoder.decode(Message.self, from: data1)
@@ -476,13 +477,25 @@ final class MessageTests: XCTestCase {
             "accepted": false
         ]
         let msg = try decode(dict)
-        guard case .pairResponse(let deviceName, let publicKey, let accepted) = msg else {
+        guard case .pairResponse(let deviceName, let publicKey, let accepted, let mirrorPort) = msg else {
             XCTFail("Expected pairResponse, got \(msg)")
             return
         }
         XCTAssertEqual(deviceName, "iMac")
         XCTAssertEqual(publicKey, "key123==")
         XCTAssertFalse(accepted)
+        // A phone or Mac from before the field existed sends none.
+        XCTAssertNil(mirrorPort)
+    }
+
+    /// The mirror port travels with the pairing answer, so the phone can share
+    /// its screen right after pairing instead of after the next reconnect.
+    func testPairResponseCarriesMirrorPort() throws {
+        let msg = Message.pairResponse(deviceName: "MacBook", publicKey: "mackey==", accepted: true, mirrorPort: 8767)
+        let data = try encoder.encode(msg)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["mirror_port"] as? Int, 8767)
+        XCTAssertEqual(try decoder.decode(Message.self, from: data), msg)
     }
 
     func testDecodePing() throws {

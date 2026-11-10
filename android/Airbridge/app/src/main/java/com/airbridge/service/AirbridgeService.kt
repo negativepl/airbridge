@@ -1542,6 +1542,14 @@ class AirbridgeService : Service() {
                             certFingerprint = pairCertFingerprint ?: ""
                         )
                     )
+                    // The pairing connection skips NSD and the auth handshake,
+                    // the two places the mirror port otherwise comes from.
+                    // Without it screen sharing stayed on "connect to your Mac"
+                    // until the next reconnect.
+                    message.mirrorPort?.let { port ->
+                        currentMirrorPort = port
+                        mirrorPortFlow.value = port
+                    }
                     isConnected.value = true
                     connectedSince.value = System.currentTimeMillis()
                     pairingIssue.value = null

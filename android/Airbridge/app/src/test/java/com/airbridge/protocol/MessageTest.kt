@@ -263,6 +263,22 @@ class MessageTest {
         assertEquals(true, decoded.accepted)
     }
 
+    // pair_response mirror_port — screen sharing right after pairing, before any reconnect.
+
+    @Test fun pairResponseRoundTripWithMirrorPort() {
+        val msg = Message.PairResponse("My Mac", "pubkeyB64", accepted = true, mirrorPort = 8767)
+        assertEquals(8767, JSONObject(msg.toJson()).getInt("mirror_port"))
+        val decoded = Message.fromJson(msg.toJson()) as Message.PairResponse
+        assertEquals(8767, decoded.mirrorPort)
+    }
+
+    @Test fun pairResponseLegacyWithoutMirrorPort() {
+        val legacy = """{"type":"pair_response","device_name":"My Mac","public_key":"pubkeyB64","accepted":true}"""
+        val decoded = Message.fromJson(legacy) as Message.PairResponse
+        assertNull(decoded.mirrorPort)
+        assertEquals(true, decoded.accepted)
+    }
+
     // protocol_version in the auth handshake — missing field means a v1 peer.
 
     @Test fun authRequestEncodesProtocolVersion() {

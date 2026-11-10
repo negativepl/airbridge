@@ -58,6 +58,8 @@ object DebugCall {
         context.getSystemService(NotificationManager::class.java).cancel(TAG, ID)
     }
 
+    // Both callers return below Android 12, where CallStyle does not exist.
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.S)
     private fun post(context: Context, caller: String, style: Notification.CallStyle) {
         val nm = context.getSystemService(NotificationManager::class.java)
         // Silent: the point is the Mac side, not a ringing phone on the desk.

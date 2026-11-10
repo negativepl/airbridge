@@ -861,10 +861,13 @@ final class ConnectionService {
             do {
                 let identity = try keyManager.getOrCreateIdentity()
                 let macName = Host.current().localizedName ?? "Mac"
+                // The mirror port goes with the answer, as in authResponse:
+                // a phone that has just paired has no other source for it.
                 let response = Message.pairResponse(
                     deviceName: macName,
                     publicKey: identity.publicKeyBase64,
-                    accepted: true
+                    accepted: true,
+                    mirrorPort: mirrorService?.actualPort.map { Int($0) }
                 )
                 try await server.sendTo(response, connectionId: connectionId)
             } catch {

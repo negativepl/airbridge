@@ -3,8 +3,10 @@ import Protocol
 
 /// Home: the connected phone, laid out like a device page in System Settings —
 /// a grouped `Form` with the device at the top, its details as labeled rows and
-/// the connection action under the group. Only system components: no custom
-/// cards, bars or indicators.
+/// the connection action under the group. With several phones connected the
+/// page is the active one, the phone the toolbar switcher names, and the rest
+/// are rows underneath. Only system components: no custom cards, bars or
+/// indicators.
 struct HomeView: View {
     let connectionService: ConnectionService
     let fileTransferService: FileTransferService
@@ -60,21 +62,39 @@ struct HomeView: View {
     // MARK: - Connected
 
     private func devicesForm(_ vm: HomeViewModel) -> some View {
-        let switchable = vm.connectedDevices.count > 1
+        // The page follows the active phone, so choosing another one, here or
+        // in the toolbar, visibly swaps the whole page instead of moving a
+        // checkmark between two identical stacks.
+        let active = connectionService.activeDevice
+        let others = vm.connectedDevices.filter { $0.connectionId != active?.connectionId }
         return Form {
-            ForEach(vm.connectedDevices) { device in
+            if let active {
                 Section {
-                    deviceHeader(device, isActive: switchable && device.connectionId == connectionService.activeDeviceId)
+                    deviceHeader(active)
                 }
                 Section {
-                    deviceDetails(device)
-                    if switchable, device.connectionId != connectionService.activeDeviceId {
-                        LabeledContent(L10n.isPL ? "Urządzenie docelowe" : "Target device") {
+                    deviceDetails(active)
+                }
+            }
+
+            if !others.isEmpty {
+                Section {
+                    ForEach(others) { device in
+                        LabeledContent {
                             Button(L10n.isPL ? "Używaj tego telefonu" : "Use This Phone") {
                                 connectionService.setActiveDevice(device.connectionId)
                             }
+                        } label: {
+                            Text(displayName(device))
+                            Text(statusText(device))
                         }
                     }
+                } header: {
+                    Text(L10n.isPL ? "Pozostałe urządzenia" : "Other Devices")
+                } footer: {
+                    Text(L10n.isPL
+                        ? "Galeria, Pliki, Wiadomości i wysyłanie plików dotyczą wybranego telefonu."
+                        : "Gallery, Files, Messages and sending files use the selected phone.")
                 }
             }
 
@@ -106,11 +126,12 @@ struct HomeView: View {
             }
         }
         .formStyle(.grouped)
+        .animation(.default, value: active?.connectionId)
     }
 
     /// The phone itself: its wallpaper as a square tile, the
     /// name as the page title and one line of status underneath.
-    private func deviceHeader(_ device: ConnectedDevice, isActive: Bool) -> some View {
+    private func deviceHeader(_ device: ConnectedDevice) -> some View {
         VStack(spacing: 10) {
             if let data = device.wallpaper, let image = NSImage(data: data) {
                 // Square tile: the wallpaper fills it and is cropped, so the
@@ -144,25 +165,23 @@ struct HomeView: View {
                             .contentTransition(.numericText())
                     }
                 }
-                if isActive {
-                    HStack(spacing: 5) {
-                        Image(systemName: "checkmark")
-                        Text(L10n.isPL ? "Urządzenie docelowe" : "Target device")
-                    }
-                }
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+        // A different phone is a different header: it cross-fades as a whole
+        // instead of morphing one wallpaper and name into the other.
+        .id(device.connectionId)
+        .transition(.opacity)
     }
 
     @ViewBuilder
     private func deviceDetails(_ device: ConnectedDevice) -> some View {
         if let info = device.deviceInfo {
             LabeledContent(L10n.isPL ? "Model" : "Model", value: "\(info.manufacturer) \(info.model)")
-            LabeledContent("Android", value: androidVersionText(info.androidVersion))
+            LabeledContent("Android", value: info.androidVersion)
             LabeledContent(L10n.isPL ? "Bateria" : "Battery", value: batteryText(info))
             if info.totalStorageBytes > 0 {
                 // Text only, like System Settings › General › About.
@@ -248,19 +267,11 @@ struct HomeView: View {
         return device.name
     }
 
-    /// "16 (Baklava)". The phone reports only the number (Build.VERSION.CODENAME
-    /// is "REL" on release builds) and since Android 10 the dessert names are
-    /// Google's internal codenames rather than public branding, so they are
-    /// listed here; an unknown version shows the number alone.
-    private func androidVersionText(_ version: String) -> String {
-        let codenames = [
-            "10": "Quince Tart", "11": "Red Velvet Cake", "12": "Snow Cone",
-            "13": "Tiramisu", "14": "Upside Down Cake", "15": "Vanilla Ice Cream",
-            "16": "Baklava", "17": "Cinnamon Bun",
-        ]
-        let major = version.split(separator: ".").first.map(String.init) ?? version
-        guard let name = codenames[major] else { return version }
-        return "\(version) (\(name))"
+    /// "Połączono · 61%": the one line under a phone that is not the active one.
+    private func statusText(_ device: ConnectedDevice) -> String {
+        let connected = L10n.isPL ? "Połączono" : "Connected"
+        guard let info = device.deviceInfo else { return connected }
+        return "\(connected) · \(info.batteryPercent)%"
     }
 
     /// "78% (Na baterii)" or "78% (Ładowanie, do pełna za 33 min)".

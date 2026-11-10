@@ -42,7 +42,7 @@ public enum Message: Equatable, Sendable {
     case fileChunkAck(transferId: String, chunkIndex: Int)
     case fileTransferComplete(transferId: String, checksumSHA256: String)
     case pairRequest(deviceName: String, publicKey: String, pairingToken: String)
-    case pairResponse(deviceName: String, publicKey: String, accepted: Bool)
+    case pairResponse(deviceName: String, publicKey: String, accepted: Bool, mirrorPort: Int?)
     case ping(timestamp: Int)
     case pong(timestamp: Int)
     case authRequest(publicKey: String, signature: String, timestamp: Int64, protocolVersion: Int)
@@ -614,11 +614,12 @@ extension Message: Codable {
             try container.encode(publicKey, forKey: .publicKey)
             try container.encode(pairingToken, forKey: .pairingToken)
 
-        case .pairResponse(let deviceName, let publicKey, let accepted):
+        case .pairResponse(let deviceName, let publicKey, let accepted, let mirrorPort):
             try container.encode(TypeKey.pairResponse.rawValue, forKey: .type)
             try container.encode(deviceName, forKey: .deviceName)
             try container.encode(publicKey, forKey: .publicKey)
             try container.encode(accepted, forKey: .accepted)
+            try container.encodeIfPresent(mirrorPort, forKey: .mirrorPort)
 
         case .ping(let timestamp):
             try container.encode(TypeKey.ping.rawValue, forKey: .type)
@@ -1029,7 +1030,8 @@ extension Message: Codable {
             let deviceName = try container.decode(String.self, forKey: .deviceName)
             let publicKey  = try container.decode(String.self, forKey: .publicKey)
             let accepted   = try container.decode(Bool.self, forKey: .accepted)
-            self = .pairResponse(deviceName: deviceName, publicKey: publicKey, accepted: accepted)
+            let mirrorPort = try container.decodeIfPresent(Int.self, forKey: .mirrorPort)
+            self = .pairResponse(deviceName: deviceName, publicKey: publicKey, accepted: accepted, mirrorPort: mirrorPort)
 
         case .ping:
             let timestamp = try container.decode(Int.self, forKey: .timestamp)

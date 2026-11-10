@@ -23,6 +23,7 @@ struct SettingsView: View {
     @AppStorage(ConnectionService.showIncomingCallsKey) private var showIncomingCalls = true
     @AppStorage("downloadFolder") private var downloadFolder = "~/Downloads/AirBridge"
     @State private var showPairing = false
+    @State private var showNotificationApps = false
     @State private var isRecordingShortcut = false
     @State private var shortcutDisplay: String = GlobalHotkeyService.currentShortcutDisplay()
     @State private var shortcutMonitor: Any?
@@ -92,6 +93,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showPairing) {
             PairingView(pairingService: pairingService, connectionService: connectionService, isPresented: $showPairing)
         }
+        .sheet(isPresented: $showNotificationApps) {
+            NotificationAppsSheet(notificationService: notificationService)
+        }
     }
 
     private func startAccessibilityPolling() {
@@ -107,9 +111,6 @@ struct SettingsView: View {
             }
         }
     }
-
-    /// Indent of the options under a "Heading:" row, as System Settings.
-    private static let subIndent: CGFloat = 20
 
     private func pairedDevicesSection(_ vm: SettingsViewModel) -> some View {
         Section {
@@ -154,15 +155,15 @@ struct SettingsView: View {
                                : "An island with the caller and Answer and Decline buttons while the phone rings.")
             }
             if !notificationService.knownApps.isEmpty {
-                Text(L10n.isPL ? "Aplikacje:" : "Apps:")
-                ForEach(notificationService.knownApps.sorted { $0.value < $1.value }, id: \.key) { pkg, name in
-                    Toggle(isOn: Binding(
-                        get: { !notificationService.disabledApps.contains(pkg) },
-                        set: { notificationService.setAppEnabled(pkg, $0) }
-                    )) {
-                        Text(name).padding(.leading, Self.subIndent)
-                    }
-                    .disabled(!notificationService.enabled)
+                // The apps live in their own sheet. As rows of this form, which
+                // is not lazy, some eighty switches were laid out again on
+                // every step of a scroll, and the whole page scrolled slowly.
+                LabeledContent {
+                    Button(L10n.isPL ? "Wybierz…" : "Choose…") { showNotificationApps = true }
+                        .disabled(!notificationService.enabled)
+                } label: {
+                    Text(L10n.isPL ? "Aplikacje" : "Apps")
+                    Text(notificationAppsSummary)
                 }
             }
         } header: {
@@ -175,6 +176,13 @@ struct SettingsView: View {
                               : "Notifications appear live, as the phone receives them."))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// "Włączone: 62 z 80", counted over the apps the phones have reported.
+    private var notificationAppsSummary: String {
+        let known = notificationService.knownApps.keys
+        let on = known.filter { !notificationService.disabledApps.contains($0) }.count
+        return L10n.isPL ? "Włączone: \(on) z \(known.count)" : "\(on) of \(known.count) on"
     }
 
     /// An app icon at menu size; NSWorkspace hands it out at 32 pt.
@@ -399,6 +407,102 @@ struct SettingsView: View {
         if let monitor = shortcutMonitor {
             NSEvent.removeMonitor(monitor)
             shortcutMonitor = nil
+        }
+    }
+}
+
+/// The apps whose notifications the phones have sent, each with its switch,
+/// laid out like an app list in System Settings › Privacy & Security: a title
+/// and explanation, a search field, a bordered list with the switch at the
+/// trailing edge and Done underneath. A `List`, so rows are created as they
+/// scroll into view.
+private struct NotificationAppsSheet: View {
+    let notificationService: NotificationService
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var apps: [(package: String, name: String)] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        return notificationService.knownApps
+            .map { (package: $0.key, name: $0.value) }
+            .filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.isPL ? "Powiadomienia aplikacji" : "App Notifications")
+                    .font(.headline)
+                Text(L10n.isPL ? "Wybierz aplikacje, których powiadomienia z telefonu mają być pokazywane na tym Macu."
+                               : "Choose the apps whose notifications from the phone are shown on this Mac.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            SearchField(text: $searchText, prompt: L10n.isPL ? "Szukaj" : "Search")
+
+            List(apps, id: \.package) { app in
+                LabeledContent(app.name) {
+                    Toggle(app.name, isOn: Binding(
+                        get: { !notificationService.disabledApps.contains(app.package) },
+                        set: { notificationService.setAppEnabled(app.package, $0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                }
+            }
+            // The box of a grouped form section, as on the Settings page
+            // behind the sheet: the system's fill, rounded, rows parted by
+            // separators. The bordered list style is a square-cornered table.
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10, style: .continuous))
+            .clipShape(.rect(cornerRadius: 10, style: .continuous))
+            .overlay {
+                if apps.isEmpty { ContentUnavailableView.search(text: searchText) }
+            }
+
+            HStack {
+                Spacer()
+                Button(L10n.isPL ? "Gotowe" : "Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 460, height: 560)
+    }
+}
+
+/// AppKit's search field. `.searchable` needs a toolbar to live in, and in a
+/// sheet that toolbar is a bar of its own with the field alone in a corner.
+private struct SearchField: NSViewRepresentable {
+    @Binding var text: String
+    let prompt: String
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = prompt
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        if field.stringValue != text { field.stringValue = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        private let text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            text.wrappedValue = field.stringValue
         }
     }
 }

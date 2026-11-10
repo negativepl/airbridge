@@ -31,8 +31,8 @@ private const val ONBOARDING_DONE = "onboarding_completed"
 
 /**
  * The app's screen graph. Pushed screens slide in a quarter of the width with a
- * fade on the theme's springs; predictive back is NavDisplay's default, which
- * follows the finger and can be cancelled.
+ * fade on the theme's springs; the back gesture plays the same transition in
+ * reverse, following the finger, and can be cancelled.
  */
 @Composable
 fun AppNavHost(
@@ -66,6 +66,13 @@ fun AppNavHost(
                 (slideOutHorizontally(spatial) { -it / 4 } + fadeOut(effects))
         },
         popTransitionSpec = {
+            (slideInHorizontally(spatial) { -it / 4 } + fadeIn(effects)) togetherWith
+                (slideOutHorizontally(spatial) { it / 4 } + fadeOut(effects))
+        },
+        // The back gesture scrubs the same transition the back arrow plays.
+        // NavDisplay's own default only shrinks the leaving screen to 70 % and
+        // then drops it at that size, with no fade or slide to finish on.
+        predictivePopTransitionSpec = {
             (slideInHorizontally(spatial) { -it / 4 } + fadeIn(effects)) togetherWith
                 (slideOutHorizontally(spatial) { it / 4 } + fadeOut(effects))
         },
