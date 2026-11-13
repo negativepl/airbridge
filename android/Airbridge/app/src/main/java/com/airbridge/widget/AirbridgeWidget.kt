@@ -10,6 +10,8 @@ import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.currentState
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
@@ -27,6 +29,8 @@ import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import com.airbridge.R
 
+private val Transparent = androidx.glance.color.ColorProvider(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Transparent)
+
 /*
  * AirBridge's home screen widgets. All three run their buttons in
  * WidgetActionActivity (no app opens) and sit in Glance's Scaffold, the
@@ -34,7 +38,10 @@ import com.airbridge.R
  * animates cleanly to its edge.
  */
 
-/** Base for the widgets: Material You colours, one layout for the exact size on screen. */
+/**
+ * Base for the widgets: one layout for the exact size on screen, in the
+ * colours, theme and background opacity set for that widget (WidgetSettings).
+ */
 abstract class AirbridgeGlanceWidget(previewSize: DpSize) : GlanceAppWidget() {
     // Exact: one layout for the size on screen, and no per-size copies held by
     // the launcher (as Responsive would).
@@ -44,36 +51,42 @@ abstract class AirbridgeGlanceWidget(previewSize: DpSize) : GlanceAppWidget() {
     override val previewSizeMode = SizeMode.Responsive(setOf(previewSize))
 
     @Composable
-    protected abstract fun Content(context: Context)
+    protected abstract fun Content(context: Context, settings: WidgetSettings)
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent { GlanceTheme { Content(context) } }
+        provideContent {
+            val settings = WidgetSettings.from(currentState<Preferences>())
+            WidgetTheme(context, settings) { Content(context, settings) }
+        }
     }
 
     override suspend fun providePreview(context: Context, widgetCategory: Int) {
-        provideContent { GlanceTheme { Content(context) } }
+        val settings = WidgetSettings()
+        provideContent { WidgetTheme(context, settings) { Content(context, settings) } }
     }
 }
 
 /** 1x1: the clipboard alone, the whole widget one filled tertiary button. */
 class ClipboardWidget : AirbridgeGlanceWidget(DpSize(64.dp, 64.dp)) {
     @Composable
-    override fun Content(context: Context) {
+    override fun Content(context: Context, settings: WidgetSettings) {
         val button = clipboardButton(context)
-        Scaffold(backgroundColor = GlanceTheme.colors.tertiary, horizontalPadding = 0.dp) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .semantics { contentDescription = button.contentDescription }
-                    .clickable(button.onClick),
-            ) {
-                Image(
-                    provider = ImageProvider(button.iconRes),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary),
-                    modifier = GlanceModifier.size(28.dp),
-                )
+        WidgetBackground(GlanceTheme.colors.tertiary, settings.backgroundOpacity) {
+            Scaffold(backgroundColor = Transparent, horizontalPadding = 0.dp) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .semantics { contentDescription = button.contentDescription }
+                        .clickable(button.onClick),
+                ) {
+                    Image(
+                        provider = ImageProvider(button.iconRes),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary),
+                        modifier = GlanceModifier.size(28.dp),
+                    )
+                }
             }
         }
     }
@@ -86,13 +99,13 @@ class ClipboardWidget : AirbridgeGlanceWidget(DpSize(64.dp, 64.dp)) {
  */
 class AirbridgeWidget : AirbridgeGlanceWidget(DpSize(190.dp, 190.dp)) {
     @Composable
-    override fun Content(context: Context) = QuickActionsToolbar(context)
+    override fun Content(context: Context, settings: WidgetSettings) = QuickActionsToolbar(context, settings)
 }
 
 /** 4x1: the same toolbar as one row. */
 class ToolbarWidget : AirbridgeGlanceWidget(DpSize(300.dp, 72.dp)) {
     @Composable
-    override fun Content(context: Context) = QuickActionsToolbar(context)
+    override fun Content(context: Context, settings: WidgetSettings) = QuickActionsToolbar(context, settings)
 }
 
 class ClipboardWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -108,7 +121,7 @@ class ToolbarWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun QuickActionsToolbar(context: Context) {
+private fun QuickActionsToolbar(context: Context, settings: WidgetSettings) {
     ToolbarLayout(
         appName = context.getString(R.string.app_name),
         appIconRes = R.drawable.ic_notification,
@@ -119,6 +132,7 @@ private fun QuickActionsToolbar(context: Context) {
             widgetButton(context, R.drawable.ic_widget_scan, R.string.quick_scan, WidgetActionActivity.ACTION_SCAN),
             widgetButton(context, R.drawable.ic_widget_mac_screen, R.string.quick_mac_screen, WidgetActionActivity.ACTION_MAC_SCREEN),
         ),
+        backgroundOpacity = settings.backgroundOpacity,
     )
 }
 

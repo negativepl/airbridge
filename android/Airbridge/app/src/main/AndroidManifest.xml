@@ -161,6 +161,18 @@
                 android:resource="@xml/widget_toolbar_info" />
         </receiver>
 
+        <!-- "Widget settings" from the launcher (long press on a widget). -->
+        <activity
+            android:name=".widget.WidgetSettingsActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Airbridge.WidgetSettings"
+            android:excludeFromRecents="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".widget.WidgetActionActivity"
             android:exported="false"

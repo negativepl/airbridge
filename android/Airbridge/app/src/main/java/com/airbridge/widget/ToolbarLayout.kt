@@ -64,6 +64,19 @@ fun ToolbarLayout(
     @DrawableRes appIconRes: Int,
     featured: WidgetButton,
     buttons: List<WidgetButton>,
+    backgroundOpacity: Float,
+) {
+    WidgetBackground(GlanceTheme.colors.widgetBackground, backgroundOpacity) {
+        ToolbarContent(appName, appIconRes, featured, buttons)
+    }
+}
+
+@Composable
+private fun ToolbarContent(
+    appName: String,
+    @DrawableRes appIconRes: Int,
+    featured: WidgetButton,
+    buttons: List<WidgetButton>,
 ) {
     val size = LocalSize.current
     val filled = size.height >= 72.dp && size.width >= 72.dp
@@ -74,7 +87,7 @@ fun ToolbarLayout(
     when {
         size.height < 128.dp || size.width < 128.dp -> {
             val horizontal = size.height < 128.dp
-            Scaffold(modifier = GlanceModifier.padding(vertical = WidgetPadding), horizontalPadding = WidgetPadding) {
+            Scaffold(modifier = GlanceModifier.padding(vertical = WidgetPadding), backgroundColor = Transparent, horizontalPadding = WidgetPadding) {
                 val length = if (horizontal) size.width else size.height
                 // n items have n - 1 gaps: add one gap to the length to divide evenly.
                 val fit = ((length + ItemSpacing) / (MinButtonSize + ItemSpacing)).toInt()
@@ -86,6 +99,7 @@ fun ToolbarLayout(
         size.height >= HeaderGridMinHeight -> {
             Scaffold(
                 modifier = GlanceModifier.padding(bottom = WidgetPadding),
+                backgroundColor = Transparent,
                 horizontalPadding = WidgetPadding,
                 titleBar = {
                     TitleBar(
@@ -102,7 +116,7 @@ fun ToolbarLayout(
             }
         }
         else -> {
-            Scaffold(modifier = GlanceModifier.padding(vertical = WidgetPadding), horizontalPadding = WidgetPadding) {
+            Scaffold(modifier = GlanceModifier.padding(vertical = WidgetPadding), backgroundColor = Transparent, horizontalPadding = WidgetPadding) {
                 val regular = buttonItems.take(if (size.width >= 240.dp) 4 else 2)
                 TwoRowGrid(listOf(appIcon, featuredItem) + regular, GlanceModifier.fillMaxSize())
             }

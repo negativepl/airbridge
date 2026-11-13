@@ -11,6 +11,8 @@
     android:maxResizeHeight="422dp"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
+    android:configure="com.airbridge.widget.WidgetSettingsActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

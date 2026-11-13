@@ -45,4 +45,13 @@
     <style name="Theme.Airbridge.WidgetAction" parent="Theme.Airbridge.TransparentDialog">
         <item name="android:windowAnimationStyle">@null</item>
     </style>
+
+    <!-- Widget settings: the real wallpaper behind the window, so the preview of
+         the widget (and its transparency) shows on what it will sit on. -->
+    <style name="Theme.Airbridge.WidgetSettings" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

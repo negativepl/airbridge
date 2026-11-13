@@ -318,4 +318,11 @@
     <string name="shortcut_mac_screen_short">Mac screen</string>
     <string name="shortcut_disabled">This shortcut is no longer available</string>
     <string name="share_shortcut_long">Send to %1$s</string>
+    <string name="widget_settings_title">Widget settings</string>
+    <string name="widget_settings_colors">Colours</string>
+    <string name="widget_colors_wallpaper">From wallpaper</string>
+    <string name="widget_colors_monochrome">Monochrome</string>
+    <string name="widget_settings_theme">Theme</string>
+    <string name="widget_settings_transparency">Background transparency: %1$d%%</string>
+    <string name="widget_settings_done">Done</string>
 </resources>

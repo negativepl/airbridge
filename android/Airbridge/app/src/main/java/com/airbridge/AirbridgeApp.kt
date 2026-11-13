@@ -4,7 +4,11 @@ import android.app.Application
 import android.os.Build
 import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import com.airbridge.widget.AirbridgeWidget
 import com.airbridge.widget.AirbridgeWidgetReceiver
+import com.airbridge.widget.ClipboardWidget
+import com.airbridge.widget.ToolbarWidget
+import androidx.glance.appwidget.updateAll
 import com.airbridge.widget.ClipboardWidgetReceiver
 import com.airbridge.widget.ToolbarWidgetReceiver
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +21,21 @@ class AirbridgeApp : Application() {
     override fun onCreate() {
         super.onCreate()
         publishWidgetPreview()
+        refreshWidgets()
+    }
+
+    /**
+     * Redraws the placed widgets. A widget with wallpaper colours and a fixed
+     * light or dark theme holds a snapshot of the wallpaper's scheme, so this
+     * brings it up to date after a wallpaper change.
+     */
+    private fun refreshWidgets() {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            for (widget in listOf(ClipboardWidget(), AirbridgeWidget(), ToolbarWidget())) {
+                runCatching { widget.updateAll(this@AirbridgeApp) }
+                    .onFailure { Log.w("AirbridgeApp", "Widgets not refreshed", it) }
+            }
+        }
     }
 
     /**

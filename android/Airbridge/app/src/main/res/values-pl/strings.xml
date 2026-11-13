@@ -335,4 +335,11 @@
     <string name="shortcut_mac_screen_short">Ekran Maca</string>
     <string name="shortcut_disabled">Ten skrót nie jest już dostępny</string>
     <string name="share_shortcut_long">Wyślij na %1$s</string>
+    <string name="widget_settings_title">Ustawienia widżetu</string>
+    <string name="widget_settings_colors">Kolory</string>
+    <string name="widget_colors_wallpaper">Z tapety</string>
+    <string name="widget_colors_monochrome">Monochromatyczne</string>
+    <string name="widget_settings_theme">Motyw</string>
+    <string name="widget_settings_transparency">Przezroczystość tła: %1$d%%</string>
+    <string name="widget_settings_done">Gotowe</string>
 </resources>
