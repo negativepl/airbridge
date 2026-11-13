@@ -1415,29 +1415,12 @@ class AirbridgeService : Service() {
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Tapping the notification body opens FileOfferDialogActivity (a
-        // transparent activity hosting a Material3 AlertDialog with the same
-        // Accept/Reject choices). This gives the user a focused confirmation
-        // surface instead of dumping them into the main app where the offer
-        // isn't even visible. The dialog reuses the same service actions as
-        // the notification's action buttons, so both paths stay in sync.
-        val dialogIntent = Intent(this, com.airbridge.ui.FileOfferDialogActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_TRANSFER_ID, offer.transferId)
-            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_FILENAME, offer.filename)
-            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_FILE_SIZE, offer.fileSize)
-            putExtra(com.airbridge.ui.FileOfferDialogActivity.EXTRA_SENDER, sender)
-        }
-        val dialogPendingIntent = android.app.PendingIntent.getActivity(
-            this, notifId + 100000, dialogIntent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-        )
-
+        // Answered with the notification's own buttons only; the body has no
+        // tap action (the app has no screen for a pending offer).
         val notif = Notification.Builder(this, CHANNEL_FILES_ID)
             .setContentTitle(getString(com.airbridge.R.string.notification_accept_file, sender))
             .setContentText(getString(com.airbridge.R.string.notification_accept_file_detail, offer.filename, sizeText))
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-            .setContentIntent(dialogPendingIntent)
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_reject), rejectIntent).build())
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_accept), acceptIntent).build())
             .setAutoCancel(false)
