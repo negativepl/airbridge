@@ -84,6 +84,8 @@ class AirbridgeService : Service() {
         /** The fake call's own Answer button (debug builds). */
         const val ACTION_DEBUG_FAKE_CALL_ANSWERED = "com.airbridge.action.DEBUG_FAKE_CALL_ANSWERED"
         const val ACTION_CANCEL_TRANSFER = "com.airbridge.action.CANCEL_TRANSFER"
+        /** How long an incoming offer stays answerable; matches the Mac's offerAcceptTimeout. */
+        private const val INCOMING_OFFER_TIMEOUT_MS = 60_000L
         private const val RING_NOTIFICATION_ID = 7
         private const val TRANSFER_NOTIFICATION_ID = 2
         /** Files-tab downloads: one notification per file, ids above every other notification. */
@@ -1440,6 +1442,10 @@ class AirbridgeService : Service() {
             .addAction(Notification.Action.Builder(null, getString(com.airbridge.R.string.notification_accept), acceptIntent).build())
             .setAutoCancel(false)
             .setOngoing(true)
+            // The Mac withdraws an unanswered offer after the same time and
+            // sends file_transfer_cancel; this covers the case where that
+            // message cannot reach the phone (connection down at the time).
+            .setTimeoutAfter(INCOMING_OFFER_TIMEOUT_MS)
             .build()
         manager.notify(notifId, notif)
     }

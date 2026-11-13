@@ -512,6 +512,14 @@ final class FileTransferService: MessageHandler {
             let offerTimeout = Task { @MainActor in
                 try? await Task.sleep(nanoseconds: UInt64(self.offerAcceptTimeout * 1_000_000_000))
                 guard !Task.isCancelled else { return }
+                // The file stops being served below, so withdraw the offer on
+                // the phone too: its notification would otherwise stay up and
+                // an Accept would only reach a 404.
+                if let phone = self.pendingOutgoingConnectionId {
+                    try? await connectionService.sendTo(
+                        Message.fileTransferCancel(transferId: transferId), connectionId: phone
+                    )
+                }
                 self.failPendingOutgoingWait()
             }
             // Stream finishing without a value (defensive) counts as failure.

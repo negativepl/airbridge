@@ -179,8 +179,9 @@ final class FileTransferServiceStabilityTests: XCTestCase {
         XCTAssertTrue(reset, "abort before the first byte must reset the receive state")
     }
 
-    /// No accept/reject within the timeout must fail the wait (mirrors the
-    /// phone's own 60 s offer timeout).
+    /// No accept/reject within the timeout must fail the wait (the Mac then
+    /// withdraws the offer on the phone; the phone's notification also
+    /// expires on its own after the same 60 s).
     func testOfferAcceptTimeoutFailsWait() async {
         service.offerAcceptTimeout = 0.2
         service.sendFile(url: tempFile)
