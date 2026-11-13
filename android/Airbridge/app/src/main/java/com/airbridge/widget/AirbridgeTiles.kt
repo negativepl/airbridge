@@ -1,14 +1,9 @@
 package com.airbridge.widget
 
 import android.app.PendingIntent
-import android.content.ComponentName
-import android.content.Context
-import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import com.airbridge.R
 import com.airbridge.service.AirbridgeService
 import com.airbridge.ui.currentMirrorIntent
@@ -69,27 +64,6 @@ abstract class QuickActionTileService(private val action: String) : TileService(
             )
         }
     }
-
-    companion object {
-        /** The tiles, for offering them in the app's settings (StatusBarManager.requestAddTileService). */
-        val all: List<QuickActionTile> = listOf(
-            QuickActionTile(ClipboardTileService::class.java, R.string.action_send_clipboard, R.drawable.ic_widget_clipboard),
-            QuickActionTile(FileTileService::class.java, R.string.action_send_file, R.drawable.ic_widget_file),
-            QuickActionTile(PhotoTileService::class.java, R.string.action_send_photo, R.drawable.ic_widget_photo),
-            QuickActionTile(ScanTileService::class.java, R.string.quick_scan, R.drawable.ic_widget_scan),
-            QuickActionTile(MacScreenTileService::class.java, R.string.quick_mac_screen, R.drawable.ic_widget_mac_screen),
-        )
-    }
-}
-
-/** One tile as the app's settings offer it. */
-data class QuickActionTile(
-    val service: Class<out TileService>,
-    @StringRes val label: Int,
-    @DrawableRes val icon: Int,
-) {
-    fun component(context: Context) = ComponentName(context, service)
-    fun icon(context: Context): Icon = Icon.createWithResource(context, icon)
 }
 
 class ClipboardTileService : QuickActionTileService(WidgetActionActivity.ACTION_CLIPBOARD)

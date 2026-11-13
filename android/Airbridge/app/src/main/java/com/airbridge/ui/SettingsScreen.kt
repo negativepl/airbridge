@@ -4,10 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.compose.ui.res.painterResource
-import androidx.compose.material.icons.rounded.Add
-import androidx.annotation.RequiresApi
-import android.app.StatusBarManager
 import android.content.SharedPreferences
 import com.airbridge.service.AirbridgeService
 import android.graphics.BitmapFactory
@@ -364,25 +360,6 @@ private fun SettingsContent(
             }
 
 
-            // Quick Settings tiles (Android 14+, where the tiles are enabled)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                Spacer(modifier = Modifier.height(16.dp))
-                PageCard(modifier = Modifier.fillMaxWidth()) {
-                    CardHeader(stringResource(R.string.settings_tiles))
-                    Text(
-                        stringResource(R.string.settings_tiles_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                    com.airbridge.widget.QuickActionTileService.all.forEachIndexed { index, tile ->
-                        if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        QuickSettingsTileRow(tile)
-                    }
-                }
-            }
-
-
             // Connection section
             Spacer(modifier = Modifier.height(16.dp))
             PageCard(modifier = Modifier.fillMaxWidth()) {
@@ -708,44 +685,6 @@ private fun PairedDeviceCard(
             }
         )
     }
-}
-
-/**
- * One quick action tile; a tap asks the system to add it to Quick Settings
- * (the system's own confirmation dialog, no editing of the panel needed).
- */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-@Composable
-private fun QuickSettingsTileRow(tile: com.airbridge.widget.QuickActionTile) {
-    val context = LocalContext.current
-    val label = stringResource(tile.label)
-    val added = stringResource(R.string.settings_tile_added)
-    val already = stringResource(R.string.settings_tile_already)
-    ListItem(
-        verticalAlignment = Alignment.CenterVertically,
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = { Icon(painterResource(tile.icon), contentDescription = null) },
-        content = { Text(label) },
-        trailingContent = {
-            Icon(
-                Icons.Rounded.Add,
-                contentDescription = stringResource(R.string.settings_tile_add),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        modifier = Modifier.clickable {
-            context.getSystemService(StatusBarManager::class.java)?.requestAddTileService(
-                tile.component(context), label, tile.icon(context), context.mainExecutor,
-            ) { result ->
-                val message = when (result) {
-                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> added
-                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> already
-                    else -> null
-                }
-                message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
-            }
-        },
-    )
 }
 
 @Composable
