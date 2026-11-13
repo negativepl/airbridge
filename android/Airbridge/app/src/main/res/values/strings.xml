@@ -325,4 +325,9 @@
     <string name="widget_settings_theme">Theme</string>
     <string name="widget_settings_transparency">Background transparency: %1$d%%</string>
     <string name="widget_settings_done">Done</string>
+    <string name="settings_tiles">Quick Settings tiles</string>
+    <string name="settings_tiles_desc">Add an action to the panel you pull down from the top of the screen</string>
+    <string name="settings_tile_add">Add tile</string>
+    <string name="settings_tile_added">Tile added</string>
+    <string name="settings_tile_already">This tile is already in Quick Settings</string>
 </resources>

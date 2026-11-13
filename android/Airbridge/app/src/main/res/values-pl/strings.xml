@@ -342,4 +342,9 @@
     <string name="widget_settings_theme">Motyw</string>
     <string name="widget_settings_transparency">Przezroczystość tła: %1$d%%</string>
     <string name="widget_settings_done">Gotowe</string>
+    <string name="settings_tiles">Kafelki szybkich ustawień</string>
+    <string name="settings_tiles_desc">Dodaj akcję do panelu rozwijanego z góry ekranu</string>
+    <string name="settings_tile_add">Dodaj kafelek</string>
+    <string name="settings_tile_added">Dodano kafelek</string>
+    <string name="settings_tile_already">Ten kafelek jest już w szybkich ustawieniach</string>
 </resources>

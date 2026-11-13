@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Quick Settings tiles: from Android 14 (values-v34), where a tile opens an
+         activity through a PendingIntent. -->
+    <bool name="quick_settings_tiles">false</bool>
+</resources>

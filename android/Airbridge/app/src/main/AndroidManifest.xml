@@ -161,6 +161,67 @@
                 android:resource="@xml/widget_toolbar_info" />
         </receiver>
 
+        <!-- Quick Settings tiles for the quick actions (Android 14+). -->
+        <service
+            android:name=".widget.ClipboardTileService"
+            android:enabled="@bool/quick_settings_tiles"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_clipboard"
+            android:label="@string/action_send_clipboard"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".widget.FileTileService"
+            android:enabled="@bool/quick_settings_tiles"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_file"
+            android:label="@string/action_send_file"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".widget.PhotoTileService"
+            android:enabled="@bool/quick_settings_tiles"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_photo"
+            android:label="@string/action_send_photo"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".widget.ScanTileService"
+            android:enabled="@bool/quick_settings_tiles"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_scan"
+            android:label="@string/quick_scan"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".widget.MacScreenTileService"
+            android:enabled="@bool/quick_settings_tiles"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_mac_screen"
+            android:label="@string/quick_mac_screen"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- "Widget settings" from the launcher (long press on a widget). -->
         <activity
             android:name=".widget.WidgetSettingsActivity"
