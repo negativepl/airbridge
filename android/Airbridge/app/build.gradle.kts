@@ -85,6 +85,11 @@ dependencies {
     // Home screen widget (quick actions in the Expressive Toolbar layout).
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.glance:glance-material3:1.2.0")
+    // Glance only asks for WorkManager 2.7 (Room 2.2), whose R8 rules predate
+    // full mode: release builds lost WorkDatabase_Impl's constructor and the
+    // app crashed at start-up. A current WorkManager brings Room with rules
+    // that keep it.
+    implementation("androidx.work:work-runtime:2.12.0")
     // Window metrics without the deprecated Display APIs (mirror stream sizing).
     implementation("androidx.window:window:1.5.1")
     // Testing
