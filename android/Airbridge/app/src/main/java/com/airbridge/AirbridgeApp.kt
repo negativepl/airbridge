@@ -3,14 +3,11 @@ package com.airbridge
 import android.app.Application
 import android.os.Build
 import android.util.Log
-import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.updateAll
 import com.airbridge.widget.AirbridgeWidget
-import com.airbridge.widget.AirbridgeWidgetReceiver
 import com.airbridge.widget.ClipboardWidget
 import com.airbridge.widget.ToolbarWidget
-import androidx.glance.appwidget.updateAll
-import com.airbridge.widget.ClipboardWidgetReceiver
-import com.airbridge.widget.ToolbarWidgetReceiver
+import com.airbridge.widget.WidgetPreviewWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,8 +17,19 @@ class AirbridgeApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        publishWidgetPreview()
+        publishWidgetPreviews()
         refreshWidgets()
+    }
+
+    /**
+     * Android 15+ shows generated previews of the widgets in the picker. They
+     * are published by a worker, only where missing and with backoff, as the
+     * system rate-limits the calls.
+     */
+    private fun publishWidgetPreviews() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            WidgetPreviewWorker.enqueue(this)
+        }
     }
 
     /**
@@ -34,22 +42,6 @@ class AirbridgeApp : Application() {
             for (widget in listOf(ClipboardWidget(), AirbridgeWidget(), ToolbarWidget())) {
                 runCatching { widget.updateAll(this@AirbridgeApp) }
                     .onFailure { Log.w("AirbridgeApp", "Widgets not refreshed", it) }
-            }
-        }
-    }
-
-    /**
-     * Android 15+ shows generated previews of the widgets in the picker instead
-     * of a static image. The system rate-limits these calls, so a refused one
-     * just keeps the preview it already has.
-     */
-    private fun publishWidgetPreview() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            val manager = GlanceAppWidgetManager(this@AirbridgeApp)
-            for (receiver in listOf(ClipboardWidgetReceiver::class, AirbridgeWidgetReceiver::class, ToolbarWidgetReceiver::class)) {
-                runCatching { manager.setWidgetPreviews(receiver) }
-                    .onFailure { Log.w("AirbridgeApp", "Widget preview not published: ${receiver.simpleName}", it) }
             }
         }
     }
