@@ -24,6 +24,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -590,31 +591,18 @@ private fun SendConfirmationSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Buttons
-        Button(
-            onClick = onConfirm,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
+        // Dismiss at the start, the confirming action at the end, side by side
+        // as in Android's own confirmations; the title already names the Mac.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                Icons.Rounded.FileUpload,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.send_confirm_button))
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-        ) {
-            Text(stringResource(R.string.send_confirm_cancel))
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.send_confirm_cancel))
+            }
+            Button(onClick = onConfirm, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.send_confirm_button))
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))

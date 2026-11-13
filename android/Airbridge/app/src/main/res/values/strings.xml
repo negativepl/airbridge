@@ -70,7 +70,7 @@
 
     <!-- Send confirmation -->
     <string name="send_confirm_title">Ready to send</string>
-    <string name="send_confirm_button">Send to Mac</string>
+    <string name="send_confirm_button">Send</string>
     <string name="send_confirm_cancel">Cancel</string>
     <string name="send_confirm_size">Size: %s</string>
 
