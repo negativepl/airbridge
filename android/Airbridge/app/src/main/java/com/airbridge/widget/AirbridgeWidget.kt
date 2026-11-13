@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.ColorFilter
@@ -21,6 +24,7 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.components.Scaffold
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.updateAll
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
@@ -28,6 +32,7 @@ import androidx.glance.layout.size
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import com.airbridge.R
+import com.airbridge.service.AirbridgeService
 
 private val Transparent = androidx.glance.color.ColorProvider(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Transparent)
 
@@ -56,7 +61,10 @@ abstract class AirbridgeGlanceWidget(previewSize: DpSize) : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val settings = WidgetSettings.from(currentState<Preferences>())
-            WidgetTheme(context, settings) { Content(context, settings) }
+            val connected by AirbridgeService.isConnected.collectAsState()
+            CompositionLocalProvider(LocalMacConnected provides connected) {
+                WidgetTheme(context, settings) { Content(context, settings) }
+            }
         }
     }
 
@@ -71,7 +79,8 @@ class ClipboardWidget : AirbridgeGlanceWidget(DpSize(64.dp, 64.dp)) {
     @Composable
     override fun Content(context: Context, settings: WidgetSettings) {
         val button = clipboardButton(context)
-        WidgetBackground(GlanceTheme.colors.tertiary, settings.backgroundOpacity) {
+        val alpha = if (LocalMacConnected.current) 1f else DisabledAlpha
+        WidgetBackground(GlanceTheme.colors.tertiary, settings.backgroundOpacity * alpha) {
             Scaffold(backgroundColor = Transparent, horizontalPadding = 0.dp) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -83,6 +92,7 @@ class ClipboardWidget : AirbridgeGlanceWidget(DpSize(64.dp, 64.dp)) {
                     Image(
                         provider = ImageProvider(button.iconRes),
                         contentDescription = null,
+                        alpha = alpha,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary),
                         modifier = GlanceModifier.size(28.dp),
                     )
@@ -106,6 +116,14 @@ class AirbridgeWidget : AirbridgeGlanceWidget(DpSize(190.dp, 190.dp)) {
 class ToolbarWidget : AirbridgeGlanceWidget(DpSize(300.dp, 72.dp)) {
     @Composable
     override fun Content(context: Context, settings: WidgetSettings) = QuickActionsToolbar(context, settings)
+}
+
+/** Redraws every placed AirBridge widget (connection changes, wallpaper colours held for a fixed theme). */
+suspend fun refreshAllWidgets(context: Context) {
+    for (widget in listOf(ClipboardWidget(), AirbridgeWidget(), ToolbarWidget())) {
+        runCatching { widget.updateAll(context) }
+            .onFailure { android.util.Log.w("AirbridgeWidget", "Widgets not refreshed", it) }
+    }
 }
 
 class ClipboardWidgetReceiver : GlanceAppWidgetReceiver() {

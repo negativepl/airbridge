@@ -32,6 +32,7 @@ import androidx.glance.layout.width
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import androidx.glance.unit.ColorProvider
+import com.airbridge.R
 
 /*
  * Android's canonical "Toolbar" widget layout (Material 3), adapted from
@@ -160,14 +161,20 @@ private fun ToolbarContent(
     }
 }
 
+/**
+ * The brand icon doubles as the connection light: in the accent colour while
+ * the Mac is connected, dimmed like the rest of the widget while it is not.
+ */
 @Composable
 private fun FluidAppIcon(@DrawableRes iconRes: Int) {
+    val connected = LocalMacConnected.current
     Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Image(
             provider = ImageProvider(iconRes),
             contentDescription = null,
+            alpha = if (connected) 1f else DisabledAlpha,
             modifier = GlanceModifier.size(IconSize),
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurface),
+            colorFilter = ColorFilter.tint(if (connected) GlanceTheme.colors.primary else GlanceTheme.colors.onSurface),
         )
     }
 }
@@ -176,7 +183,7 @@ private fun FluidAppIcon(@DrawableRes iconRes: Int) {
 private fun FluidFeaturedButton(button: WidgetButton, filled: Boolean) {
     IconButton(
         button = button,
-        containerColor = if (filled) GlanceTheme.colors.tertiary else Transparent,
+        containerColor = if (filled) GlanceTheme.colors.tertiary else null,
         contentColor = if (filled) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer,
         cornerRadius = CornerFull,
         modifier = GlanceModifier.fillMaxSize(),
@@ -187,7 +194,7 @@ private fun FluidFeaturedButton(button: WidgetButton, filled: Boolean) {
 private fun FluidButton(button: WidgetButton, filled: Boolean) {
     IconButton(
         button = button,
-        containerColor = if (filled) GlanceTheme.colors.secondaryContainer else Transparent,
+        containerColor = if (filled) GlanceTheme.colors.secondaryContainer else null,
         contentColor = GlanceTheme.colors.onSecondaryContainer,
         cornerRadius = CornerMedium,
         modifier = GlanceModifier.fillMaxSize(),
@@ -197,6 +204,7 @@ private fun FluidButton(button: WidgetButton, filled: Boolean) {
 /** The featured action in the title bar: a 52x32 dp pill in a 48 dp tall tap target. */
 @Composable
 private fun PillButton(button: WidgetButton, filled: Boolean, modifier: GlanceModifier) {
+    val alpha = if (LocalMacConnected.current) 1f else DisabledAlpha
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -209,12 +217,13 @@ private fun PillButton(button: WidgetButton, filled: Boolean, modifier: GlanceMo
             modifier = GlanceModifier
                 .width(52.dp)
                 .height(32.dp)
-                .background(if (filled) GlanceTheme.colors.tertiary else Transparent)
+                .then(if (filled) GlanceModifier.container(GlanceTheme.colors.tertiary, alpha) else GlanceModifier)
                 .cornerRadius(CornerFull),
         ) {
             Image(
                 provider = ImageProvider(button.iconRes),
                 contentDescription = null,
+                alpha = alpha,
                 colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary),
                 modifier = GlanceModifier.size(IconSize),
             )
@@ -222,18 +231,20 @@ private fun PillButton(button: WidgetButton, filled: Boolean, modifier: GlanceMo
     }
 }
 
+/** An action button; [containerColor] null for a bare icon. Dimmed while the Mac is not connected. */
 @Composable
 private fun IconButton(
     button: WidgetButton,
-    containerColor: ColorProvider,
+    containerColor: ColorProvider?,
     contentColor: ColorProvider,
     cornerRadius: Dp,
     modifier: GlanceModifier,
 ) {
+    val alpha = if (LocalMacConnected.current) 1f else DisabledAlpha
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .background(containerColor)
+            .then(if (containerColor != null) GlanceModifier.container(containerColor, alpha) else GlanceModifier)
             .cornerRadius(cornerRadius)
             .semantics { contentDescription = button.contentDescription }
             .clickable(button.onClick),
@@ -241,11 +252,19 @@ private fun IconButton(
         Image(
             provider = ImageProvider(button.iconRes),
             contentDescription = null,
+            alpha = alpha,
             colorFilter = ColorFilter.tint(contentColor),
             modifier = GlanceModifier.size(IconSize),
         )
     }
 }
+
+/**
+ * A button's container in [color] at [alpha]: drawn as a tinted shape, so a
+ * dynamic colour stays dynamic and can still be dimmed.
+ */
+private fun GlanceModifier.container(color: ColorProvider, alpha: Float): GlanceModifier =
+    background(ImageProvider(R.drawable.widget_background), alpha = alpha, colorFilter = ColorFilter.tint(color))
 
 /** Items in one row, equally wide, [ItemSpacing] apart. */
 @Composable

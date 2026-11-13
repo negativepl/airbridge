@@ -471,6 +471,11 @@ class AirbridgeService : Service() {
         createNotificationChannel()
         startForegroundWithNotification("AirBridge", getString(com.airbridge.R.string.notification_running_background))
 
+        // Widgets show whether the Mac is connected: redraw them when that changes.
+        serviceScope.launch {
+            isConnected.collect { com.airbridge.widget.refreshAllWidgets(this@AirbridgeService) }
+        }
+
         // Direct Share: keep the paired Macs in the share sheet in step with
         // pairing and unpairing (the revision bumps on every change).
         serviceScope.launch {

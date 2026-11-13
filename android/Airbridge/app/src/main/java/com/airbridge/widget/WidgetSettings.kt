@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.floatPreferencesKey
@@ -24,6 +25,15 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.material3.ColorProviders
 import androidx.glance.unit.ColorProvider
 import com.airbridge.R
+
+/**
+ * Whether the Mac is connected, for the widgets: actions and the brand icon
+ * are dimmed to Material's disabled emphasis while it is not.
+ */
+val LocalMacConnected = compositionLocalOf { true }
+
+/** Material's emphasis for disabled content. */
+const val DisabledAlpha = 0.38f
 
 /** Where a widget takes its colours from. */
 enum class WidgetColors { WALLPAPER, MONOCHROME }

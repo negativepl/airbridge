@@ -2,12 +2,8 @@ package com.airbridge
 
 import android.app.Application
 import android.os.Build
-import android.util.Log
-import androidx.glance.appwidget.updateAll
-import com.airbridge.widget.AirbridgeWidget
-import com.airbridge.widget.ClipboardWidget
-import com.airbridge.widget.ToolbarWidget
 import com.airbridge.widget.WidgetPreviewWorker
+import com.airbridge.widget.refreshAllWidgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,10 +35,7 @@ class AirbridgeApp : Application() {
      */
     private fun refreshWidgets() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            for (widget in listOf(ClipboardWidget(), AirbridgeWidget(), ToolbarWidget())) {
-                runCatching { widget.updateAll(this@AirbridgeApp) }
-                    .onFailure { Log.w("AirbridgeApp", "Widgets not refreshed", it) }
-            }
+            refreshAllWidgets(this@AirbridgeApp)
         }
     }
 }
