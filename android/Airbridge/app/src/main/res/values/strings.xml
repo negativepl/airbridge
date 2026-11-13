@@ -305,4 +305,6 @@
     <string name="capture_prompt_scan">Scan a document for the Mac</string>
     <string name="capture_prompt_photo">Take a photo for the Mac</string>
     <string name="capture_prompt_text">Tap to open</string>
+    <string name="widget_description">Send your clipboard, a file, a photo or a scan to the Mac, or open its screen</string>
+    <string name="widget_mac_not_connected">Not connected to the Mac</string>
 </resources>

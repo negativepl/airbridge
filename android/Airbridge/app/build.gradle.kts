@@ -82,6 +82,9 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     // Launch splash held until the Mac is connected and its info has arrived.
     implementation("androidx.core:core-splashscreen:1.2.0")
+    // Home screen widget (quick actions in the Expressive Toolbar layout).
+    implementation("androidx.glance:glance-appwidget:1.2.0")
+    implementation("androidx.glance:glance-material3:1.2.0")
     // Window metrics without the deprecated Display APIs (mirror stream sizing).
     implementation("androidx.window:window:1.5.1")
     // Testing

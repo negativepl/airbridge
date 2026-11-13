@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: with the resize limits and target cells. Sizes from Android's canonical Expressive Toolbar widget: dropped at 2x2,
+     resizable down to the centre button alone. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="120dp"
+    android:minHeight="115dp"
+    android:minResizeWidth="56dp"
+    android:minResizeHeight="56dp"
+    android:maxResizeWidth="624dp"
+    android:maxResizeHeight="200dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

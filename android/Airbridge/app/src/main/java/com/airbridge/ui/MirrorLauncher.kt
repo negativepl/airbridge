@@ -1,5 +1,6 @@
 package com.airbridge.ui
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,22 +27,38 @@ fun rememberMirrorLauncher(): MirrorLauncher {
     val isConnected by AirbridgeService.isConnected.collectAsState()
     val host by AirbridgeService.connectedHost.collectAsState()
     val mirrorPort by AirbridgeService.mirrorPortFlow.collectAsState()
-    val token = remember {
-        runCatching { KeyManager(context).getRawPublicKeyBytes().copyOf(16) }.getOrNull()
-    }
+    val token = remember { mirrorToken(context) }
     val ready = isConnected && host != null && mirrorPort != null && token != null
     return MirrorLauncher(ready) { mode ->
         val h = host ?: return@MirrorLauncher
         val p = mirrorPort ?: return@MirrorLauncher
         val t = token ?: return@MirrorLauncher
-        val intent = Intent(context, ReverseMirrorActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(ReverseMirrorActivity.EXTRA_HOST, h)
-            putExtra(ReverseMirrorActivity.EXTRA_PORT, p)
-            putExtra(ReverseMirrorActivity.EXTRA_TOKEN, t)
-            putExtra(ReverseMirrorActivity.EXTRA_MODE, mode)
-            putExtra(ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, AirbridgeService.certFingerprintInUse())
-        }
-        context.startActivity(intent)
+        context.startActivity(mirrorIntent(context, h, p, t, mode))
     }
 }
+
+/**
+ * The mirror intent from the service's current connection, for callers outside
+ * Compose (the home screen widget); null while the Mac or its mirror port is
+ * not known.
+ */
+fun currentMirrorIntent(context: Context, mode: Int): Intent? {
+    if (!AirbridgeService.isConnected.value) return null
+    val host = AirbridgeService.connectedHost.value ?: return null
+    val port = AirbridgeService.mirrorPortFlow.value ?: return null
+    val token = mirrorToken(context) ?: return null
+    return mirrorIntent(context, host, port, token, mode)
+}
+
+private fun mirrorToken(context: Context): ByteArray? =
+    runCatching { KeyManager(context).getRawPublicKeyBytes().copyOf(16) }.getOrNull()
+
+private fun mirrorIntent(context: Context, host: String, port: Int, token: ByteArray, mode: Int): Intent =
+    Intent(context, ReverseMirrorActivity::class.java).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        putExtra(ReverseMirrorActivity.EXTRA_HOST, host)
+        putExtra(ReverseMirrorActivity.EXTRA_PORT, port)
+        putExtra(ReverseMirrorActivity.EXTRA_TOKEN, token)
+        putExtra(ReverseMirrorActivity.EXTRA_MODE, mode)
+        putExtra(ReverseMirrorActivity.EXTRA_CERT_FINGERPRINT, AirbridgeService.certFingerprintInUse())
+    }

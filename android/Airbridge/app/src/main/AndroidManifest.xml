@@ -119,6 +119,27 @@
             android:launchMode="singleTask"
             android:taskAffinity="" />
 
+        <!-- Home screen widget with the quick actions; its buttons run in
+             WidgetActionActivity, an invisible activity in its own task. -->
+        <receiver
+            android:name=".widget.AirbridgeWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/airbridge_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.WidgetActionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Airbridge.TransparentDialog"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+
         <activity
             android:name=".ui.GalleryDeleteActivity"
             android:exported="false"

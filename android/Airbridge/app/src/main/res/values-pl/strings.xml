@@ -322,4 +322,6 @@
     <string name="capture_prompt_scan">Zeskanuj dokument dla Maca</string>
     <string name="capture_prompt_photo">Zrób zdjęcie dla Maca</string>
     <string name="capture_prompt_text">Dotknij, aby otworzyć</string>
+    <string name="widget_description">Wysyłaj na Maca schowek, plik, zdjęcie lub skan albo otwórz jego ekran</string>
+    <string name="widget_mac_not_connected">Brak połączenia z komputerem Mac</string>
 </resources>

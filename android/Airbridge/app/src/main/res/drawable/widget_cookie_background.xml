@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Four-sided cookie, the Material 3 Expressive shape of Android's canonical
+     "Expressive Toolbar" widget layout. Path from android/platform-samples
+     (appwidgets, four_side_cookie_background.xml), Apache License 2.0,
+     Copyright 2025 The Android Open Source Project. Tinted by the widget. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="182dp"
+    android:height="182dp"
+    android:viewportWidth="182"
+    android:viewportHeight="182">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4.035,65.826C-12.944,26.733 26.733,-12.944 65.826,4.035L72.289,6.842C84.225,12.025 97.775,12.025 109.711,6.842L116.174,4.035C155.267,-12.944 194.944,26.733 177.965,65.826L175.158,72.289C169.975,84.225 169.975,97.775 175.158,109.711L177.965,116.174C194.944,155.267 155.267,194.944 116.174,177.965L109.711,175.158C97.775,169.975 84.225,169.975 72.289,175.158L65.826,177.965C26.733,194.944 -12.944,155.267 4.035,116.174L6.842,109.711C12.025,97.775 12.025,84.225 6.842,72.289L4.035,65.826Z" />
+</vector>
