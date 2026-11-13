@@ -322,6 +322,11 @@
     <string name="capture_prompt_scan">Zeskanuj dokument dla Maca</string>
     <string name="capture_prompt_photo">Zrób zdjęcie dla Maca</string>
     <string name="capture_prompt_text">Dotknij, aby otworzyć</string>
-    <string name="widget_description">Wysyłaj na Maca schowek, plik, zdjęcie lub skan albo otwórz jego ekran</string>
+    <string name="widget_description">Schowek, plik, zdjęcie, skan lub ekran Maca jednym stuknięciem</string>
     <string name="widget_mac_not_connected">Brak połączenia z komputerem Mac</string>
+    <string name="widget_clipboard_label">Wyślij schowek</string>
+    <string name="widget_clipboard_description">Wysyła schowek na Maca jednym stuknięciem</string>
+    <string name="widget_quick_actions_label">Szybkie akcje</string>
+    <string name="widget_toolbar_label">Pasek szybkich akcji</string>
+    <string name="widget_toolbar_description">Szybkie akcje w jednym rzędzie</string>
 </resources>

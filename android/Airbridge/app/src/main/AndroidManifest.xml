@@ -119,12 +119,25 @@
             android:launchMode="singleTask"
             android:taskAffinity="" />
 
-        <!-- Home screen widget with the quick actions; its buttons run in
-             WidgetActionActivity, an invisible activity in its own task. -->
+        <!-- Home screen widgets: clipboard (1x1), quick actions (2x2) and the
+             quick actions bar (4x1). Their buttons run in WidgetActionActivity,
+             an invisible activity in its own task. -->
+        <receiver
+            android:name=".widget.ClipboardWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_clipboard_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_clipboard_info" />
+        </receiver>
+
         <receiver
             android:name=".widget.AirbridgeWidgetReceiver"
             android:exported="true"
-            android:label="@string/app_name">
+            android:label="@string/widget_quick_actions_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -133,10 +146,22 @@
                 android:resource="@xml/airbridge_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.ToolbarWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_toolbar_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_toolbar_info" />
+        </receiver>
+
         <activity
             android:name=".widget.WidgetActionActivity"
             android:exported="false"
-            android:theme="@style/Theme.Airbridge.TransparentDialog"
+            android:theme="@style/Theme.Airbridge.WidgetAction"
             android:excludeFromRecents="true"
             android:taskAffinity="" />
 

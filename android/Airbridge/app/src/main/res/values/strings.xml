@@ -305,6 +305,11 @@
     <string name="capture_prompt_scan">Scan a document for the Mac</string>
     <string name="capture_prompt_photo">Take a photo for the Mac</string>
     <string name="capture_prompt_text">Tap to open</string>
-    <string name="widget_description">Send your clipboard, a file, a photo or a scan to the Mac, or open its screen</string>
+    <string name="widget_description">Your clipboard, a file, a photo, a scan or the Mac screen in one tap</string>
     <string name="widget_mac_not_connected">Not connected to the Mac</string>
+    <string name="widget_clipboard_label">Send clipboard</string>
+    <string name="widget_clipboard_description">Sends your clipboard to the Mac in one tap</string>
+    <string name="widget_quick_actions_label">Quick actions</string>
+    <string name="widget_toolbar_label">Quick actions bar</string>
+    <string name="widget_toolbar_description">The quick actions in one row</string>
 </resources>

@@ -39,4 +39,10 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- Widget buttons: an invisible window that should not animate at all, so
+         the launcher's own widget transition is the only motion. -->
+    <style name="Theme.Airbridge.WidgetAction" parent="Theme.Airbridge.TransparentDialog">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
