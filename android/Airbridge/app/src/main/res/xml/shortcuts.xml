@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcuts (long press on the app icon; each can be pinned to the home
+     screen) and the share target that puts a paired Mac in the share sheet.
+     The shortcuts run in WidgetActionActivity, like the widget buttons. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="send_clipboard"
+        android:icon="@drawable/ic_shortcut_clipboard"
+        android:shortcutShortLabel="@string/shortcut_clipboard_short"
+        android:shortcutLongLabel="@string/action_send_clipboard"
+        android:shortcutDisabledMessage="@string/shortcut_disabled">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="airbridge-widget://clipboard"
+            android:targetClass="com.airbridge.widget.WidgetActionActivity"
+            android:targetPackage="com.airbridge" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="send_file"
+        android:icon="@drawable/ic_shortcut_file"
+        android:shortcutShortLabel="@string/shortcut_file_short"
+        android:shortcutLongLabel="@string/action_send_file"
+        android:shortcutDisabledMessage="@string/shortcut_disabled">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="airbridge-widget://file"
+            android:targetClass="com.airbridge.widget.WidgetActionActivity"
+            android:targetPackage="com.airbridge" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="send_photo"
+        android:icon="@drawable/ic_shortcut_photo"
+        android:shortcutShortLabel="@string/shortcut_photo_short"
+        android:shortcutLongLabel="@string/action_send_photo"
+        android:shortcutDisabledMessage="@string/shortcut_disabled">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="airbridge-widget://photo"
+            android:targetClass="com.airbridge.widget.WidgetActionActivity"
+            android:targetPackage="com.airbridge" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="mac_screen"
+        android:icon="@drawable/ic_shortcut_mac_screen"
+        android:shortcutShortLabel="@string/shortcut_mac_screen_short"
+        android:shortcutLongLabel="@string/quick_mac_screen"
+        android:shortcutDisabledMessage="@string/shortcut_disabled">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="airbridge-widget://mac_screen"
+            android:targetClass="com.airbridge.widget.WidgetActionActivity"
+            android:targetPackage="com.airbridge" />
+    </shortcut>
+
+    <!-- Direct Share: each paired Mac is published as a sharing shortcut of
+         this category (MacShareShortcuts), so it shows in the share sheet's
+         top row and sends straight to that Mac. -->
+    <share-target android:targetClass="com.airbridge.share.ShareReceiverActivity">
+        <data android:mimeType="*/*" />
+        <category android:name="com.airbridge.category.SEND_TO_MAC" />
+    </share-target>
+</shortcuts>

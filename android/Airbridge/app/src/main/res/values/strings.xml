@@ -312,4 +312,10 @@
     <string name="widget_quick_actions_label">Quick actions</string>
     <string name="widget_toolbar_label">Quick actions bar</string>
     <string name="widget_toolbar_description">The quick actions in one row</string>
+    <string name="shortcut_clipboard_short">Clipboard</string>
+    <string name="shortcut_file_short">File</string>
+    <string name="shortcut_photo_short">Photo</string>
+    <string name="shortcut_mac_screen_short">Mac screen</string>
+    <string name="shortcut_disabled">This shortcut is no longer available</string>
+    <string name="share_shortcut_long">Send to %1$s</string>
 </resources>

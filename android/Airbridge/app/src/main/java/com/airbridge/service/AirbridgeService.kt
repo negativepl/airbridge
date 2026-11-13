@@ -471,6 +471,14 @@ class AirbridgeService : Service() {
         createNotificationChannel()
         startForegroundWithNotification("AirBridge", getString(com.airbridge.R.string.notification_running_background))
 
+        // Direct Share: keep the paired Macs in the share sheet in step with
+        // pairing and unpairing (the revision bumps on every change).
+        serviceScope.launch {
+            com.airbridge.security.PairedDeviceStore.revision.collect {
+                com.airbridge.share.MacShareShortcuts.update(this@AirbridgeService)
+            }
+        }
+
         webSocketClient = WebSocketClient()
         clipboardSync = ClipboardSync(this)
         nsdDiscovery = NsdDiscovery(this)

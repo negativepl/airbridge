@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcut icon: a Material Symbol on the shortcut background, masked by the launcher. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/shortcut_icon_background" />
+    <foreground>
+        <inset
+            android:drawable="@drawable/ic_shortcut_glyph_file"
+            android:inset="34%" />
+    </foreground>
+    <monochrome>
+        <inset
+            android:drawable="@drawable/ic_shortcut_glyph_file"
+            android:inset="34%" />
+    </monochrome>
+</adaptive-icon>

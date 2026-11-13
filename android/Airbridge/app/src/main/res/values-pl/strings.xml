@@ -329,4 +329,10 @@
     <string name="widget_quick_actions_label">Szybkie akcje</string>
     <string name="widget_toolbar_label">Pasek szybkich akcji</string>
     <string name="widget_toolbar_description">Szybkie akcje w jednym rzędzie</string>
+    <string name="shortcut_clipboard_short">Schowek</string>
+    <string name="shortcut_file_short">Plik</string>
+    <string name="shortcut_photo_short">Zdjęcie</string>
+    <string name="shortcut_mac_screen_short">Ekran Maca</string>
+    <string name="shortcut_disabled">Ten skrót nie jest już dostępny</string>
+    <string name="share_shortcut_long">Wyślij na %1$s</string>
 </resources>

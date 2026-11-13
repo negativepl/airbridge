@@ -17,7 +17,7 @@ import com.airbridge.service.AirbridgeService
 import com.airbridge.ui.currentMirrorIntent
 
 /**
- * Invisible host for the home screen widget's buttons: it runs one action and
+ * Invisible host for the home screen widgets' buttons and the app shortcuts: it runs one action and
  * finishes, so the user stays where they were instead of landing in the app.
  *
  * Reading the clipboard is why it exists at all: since Android 10 only the app
@@ -39,7 +39,8 @@ class WidgetActionActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        action = intent.getStringExtra(EXTRA_ACTION)
+        // airbridge-widget://<action>, from a widget button or an app shortcut.
+        action = intent.data?.host
         // A picker already on screen after a configuration change: wait for its result.
         if (savedInstanceState != null) return
 
@@ -101,17 +102,17 @@ class WidgetActionActivity : ComponentActivity() {
     private fun toast(message: Int) = Toast.makeText(this, getString(message), Toast.LENGTH_SHORT).show()
 
     companion object {
-        private const val EXTRA_ACTION = "com.airbridge.widget.ACTION"
         const val ACTION_CLIPBOARD = "clipboard"
         const val ACTION_FILE = "file"
         const val ACTION_PHOTO = "photo"
         const val ACTION_SCAN = "scan"
         const val ACTION_MAC_SCREEN = "mac_screen"
 
+        /** The same airbridge-widget://<action> address the app shortcuts in res/xml/shortcuts.xml use. */
         fun intent(context: Context, action: String): Intent =
             Intent(context, WidgetActionActivity::class.java)
-                .putExtra(EXTRA_ACTION, action)
-                // One activity per action, so a pending picker never swallows another tap.
+                // The action is in the address, so each one is its own pending
+                // intent and a picker left open never swallows another tap.
                 .setData("airbridge-widget://$action".toUri())
     }
 }

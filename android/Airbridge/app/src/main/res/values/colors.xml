@@ -5,4 +5,7 @@
          ShareReceiverActivity window background is identical to the Compose
          surface it renders (dark by default) — no flash during launch. -->
     <color name="share_bg">#141318</color>
+    <!-- App shortcut icons (Android 10-11; Material You tones from Android 12, see values-v31). -->
+    <color name="shortcut_icon_background">#FFFFFF</color>
+    <color name="shortcut_icon_glyph">#1F1F1F</color>
 </resources>

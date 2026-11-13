@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.IntentCompat
+import androidx.core.net.toUri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -122,6 +123,19 @@ class ShareReceiverActivity : ComponentActivity() {
 
         val pairedDevices = PairedDeviceStore(this).getAll()
 
+        // Direct Share: the Mac chosen in the share sheet's top row. When it is
+        // the connected one there is nothing left to ask, so the share goes out
+        // at once; otherwise the sheet opens with that Mac selected.
+        val shortcutMac = MacShareShortcuts.fingerprintOf(intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID))
+            ?.let { fp -> pairedDevices.firstOrNull { it.publicKeyFingerprint == fp } }
+        if (savedInstanceState == null && shortcutMac != null &&
+            AirbridgeService.isConnected.value && shortcutMac.deviceName == AirbridgeService.connectedDeviceName.value
+        ) {
+            send(parsed, shortcutMac.publicKeyFingerprint)
+            finish()
+            return
+        }
+
         val prefs = getSharedPreferences("airbridge_prefs", Context.MODE_PRIVATE)
         val themeMode = prefs.getString("theme_mode", "system") ?: "system"
 
@@ -136,8 +150,9 @@ class ShareReceiverActivity : ComponentActivity() {
                 // would be cleaner once the service tracks that.
                 var selectedFingerprint by remember(connectedDeviceName) {
                     mutableStateOf(
-                        pairedDevices.firstOrNull { isConnected && it.deviceName == connectedDeviceName }
-                            ?.publicKeyFingerprint
+                        shortcutMac?.publicKeyFingerprint
+                            ?: pairedDevices.firstOrNull { isConnected && it.deviceName == connectedDeviceName }
+                                ?.publicKeyFingerprint
                             ?: pairedDevices.firstOrNull()?.publicKeyFingerprint
                     )
                 }
@@ -174,14 +189,7 @@ class ShareReceiverActivity : ComponentActivity() {
                             isLink = parsed.link != null,
                             onCancel = { finish() },
                             onSend = {
-                                if (selectedIsOnline) {
-                                    dispatchSend(parsed)
-                                    Toast.makeText(
-                                        this@ShareReceiverActivity,
-                                        if (parsed.link != null) R.string.share_opening_on_mac else R.string.share_sending,
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                if (selectedIsOnline) send(parsed, selectedDevice.publicKeyFingerprint)
                                 finish()
                             }
                         )
@@ -254,6 +262,17 @@ class ShareReceiverActivity : ComponentActivity() {
             }
             else -> null
         }
+    }
+
+    /** Sends the share, says so, and ranks this Mac higher in the share sheet. */
+    private fun send(parsed: ParsedShare, fingerprint: String) {
+        dispatchSend(parsed)
+        MacShareShortcuts.reportUsed(this, fingerprint)
+        Toast.makeText(
+            this,
+            if (parsed.link != null) R.string.share_opening_on_mac else R.string.share_sending,
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun dispatchSend(parsed: ParsedShare) {
@@ -390,7 +409,7 @@ private fun SharePreview(parsed: ParsedShare) {
     // Link share: the domain leads (it says where the link goes), the full
     // address underneath.
     if (parsed.link != null) {
-        val host = remember(parsed.link) { Uri.parse(parsed.link).host?.removePrefix("www.") ?: parsed.link }
+        val host = remember(parsed.link) { parsed.link.toUri().host?.removePrefix("www.") ?: parsed.link }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
