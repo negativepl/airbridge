@@ -27,6 +27,8 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -193,6 +198,7 @@ class WidgetSettingsActivity : ComponentActivity() {
                             onValueChange = { setTransparency(snapToStop(it, StopPull)) },
                             // ...and a quick drag released close to one lands on it.
                             onValueChangeFinished = { setTransparency(snapToStop(transparency.value, StopLanding)) },
+                            track = { state -> TransparencyTrack(state) },
                         )
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -201,6 +207,35 @@ class WidgetSettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * The standard slider track with the suggested values marked on it, the
+     * way a stepped slider marks its steps: same dot, same colours, placed with
+     * the track's own geometry, and left out next to the thumb. The end of the
+     * track already has its stop indicator.
+     */
+    @Composable
+    private fun TransparencyTrack(state: SliderState) {
+        val colors = SliderDefaults.colors()
+        SliderDefaults.Track(
+            sliderState = state,
+            trackCornerSize = TrackCornerSize,
+            colors = colors,
+            modifier = Modifier.drawWithContent {
+                drawContent()
+                val corner = TrackCornerSize.toPx()
+                val thumb = size.width * state.coercedFraction()
+                val clearance = ThumbClearance.toPx()
+                TransparencyStops.dropLast(1).forEach { stop ->
+                    val x = corner + (size.width - 2 * corner) * stop
+                    if (abs(x - thumb) < clearance) return@forEach
+                    val color = if (x < thumb) colors.activeTickColor else colors.inactiveTickColor
+                    val drawnX = if (layoutDirection == LayoutDirection.Rtl) size.width - x else x
+                    with(SliderDefaults) { drawStopIndicator(Offset(drawnX, center.y), SliderDefaults.TickSize, color) }
+                }
+            },
+        )
     }
 
     @Composable
@@ -266,6 +301,14 @@ class WidgetSettingsActivity : ComponentActivity() {
 
         /** How close a release must be for the thumb to settle on a stop. */
         const val StopLanding = 0.07f
+
+        /** Half the standard 16 dp track: its rounded ends. */
+        val TrackCornerSize = 8.dp
+
+        /** Room the thumb keeps clear around itself: its gap to the track plus half its width. */
+        val ThumbClearance = 8.dp
+
+        fun SliderState.coercedFraction() = value.coerceIn(0f, 1f)
 
         fun snapToStop(value: Float, within: Float): Float =
             TransparencyStops.firstOrNull { abs(it - value) <= within } ?: value
