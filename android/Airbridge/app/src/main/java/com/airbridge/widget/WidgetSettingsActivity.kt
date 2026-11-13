@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,7 @@ import com.airbridge.R
 import com.airbridge.ui.AirbridgeTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -173,13 +176,23 @@ class WidgetSettingsActivity : ComponentActivity() {
                         )
                     }
                     val transparency = rememberSliderState(value = 1f - initial.backgroundOpacity)
+                    val haptics = LocalHapticFeedback.current
+                    // Sets the transparency, ticking when it lands on a suggested value.
+                    fun setTransparency(value: Float) {
+                        if (value != transparency.value && value in TransparencyStops) {
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        }
+                        transparency.value = value
+                        settings = settings.copy(backgroundOpacity = 1f - value)
+                    }
                     Section(stringResource(R.string.widget_settings_transparency, (transparency.value * 100).roundToInt())) {
                         Slider(
                             state = transparency,
-                            onValueChange = {
-                                transparency.value = it
-                                settings = settings.copy(backgroundOpacity = 1f - it)
-                            },
+                            // Continuous, but the suggested values pull the thumb in
+                            // while dragging nearby...
+                            onValueChange = { setTransparency(snapToStop(it, StopPull)) },
+                            // ...and a quick drag released close to one lands on it.
+                            onValueChangeFinished = { setTransparency(snapToStop(transparency.value, StopLanding)) },
                         )
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -244,6 +257,18 @@ class WidgetSettingsActivity : ComponentActivity() {
 
     private companion object {
         const val SAVE_DELAY_MS = 250L
+
+        /** Suggested transparencies: 0, 25, 50, 75 and 100 %. */
+        val TransparencyStops = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
+
+        /** How close (of the full range) a stop pulls the thumb while dragging. */
+        const val StopPull = 0.03f
+
+        /** How close a release must be for the thumb to settle on a stop. */
+        const val StopLanding = 0.07f
+
+        fun snapToStop(value: Float, within: Float): Float =
+            TransparencyStops.firstOrNull { abs(it - value) <= within } ?: value
     }
 }
 
