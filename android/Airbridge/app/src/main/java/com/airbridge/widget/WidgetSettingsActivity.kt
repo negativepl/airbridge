@@ -45,6 +45,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -119,9 +121,17 @@ class WidgetSettingsActivity : ComponentActivity() {
         var preview by remember { mutableStateOf<RemoteViews?>(null) }
         val context = this
 
-        LaunchedEffect(settings) {
+        // Some launchers (One UI) report a widget as wide as the screen, with no
+        // margins of their own; the preview keeps the home screen's side margins.
+        val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+        val fittedSize = DpSize(
+            width = previewSize.width.coerceAtMost(windowWidth - PreviewSideMargin * 2),
+            height = previewSize.height,
+        )
+
+        LaunchedEffect(settings, fittedSize) {
             val state = mutablePreferencesOf().also { settings.writeTo(it) }
-            preview = widget.compose(context, glanceId, size = previewSize, state = state)
+            preview = widget.compose(context, glanceId, size = fittedSize, state = state)
             // Let a slider drag settle before writing the widget itself.
             delay(SAVE_DELAY_MS)
             updateAppWidgetState(context, glanceId) { settings.writeTo(it) }
@@ -136,7 +146,7 @@ class WidgetSettingsActivity : ComponentActivity() {
             ) {
                 preview?.let { views ->
                     AndroidView(
-                        modifier = Modifier.size(previewSize.width, previewSize.height),
+                        modifier = Modifier.size(fittedSize.width, fittedSize.height),
                         factory = { TouchlessFrame(it) },
                         update = { frame ->
                             frame.removeAllViews()
@@ -292,6 +302,9 @@ class WidgetSettingsActivity : ComponentActivity() {
 
     private companion object {
         const val SAVE_DELAY_MS = 250L
+
+        /** Space kept on each side of the preview, as on a home screen. */
+        val PreviewSideMargin = 16.dp
 
         /** Suggested transparencies: 0, 25, 50, 75 and 100 %. */
         val TransparencyStops = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
