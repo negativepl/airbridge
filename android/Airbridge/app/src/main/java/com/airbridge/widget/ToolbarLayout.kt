@@ -66,8 +66,44 @@ fun ToolbarLayout(
     buttons: List<WidgetButton>,
     backgroundOpacity: Float,
 ) {
+    val size = LocalSize.current
+    if (size.height < 128.dp && size.height > CompactBarHeight) {
+        // One row: the launcher sizes widgets in whole cells, so the bar keeps
+        // the M3 toolbar height and sits centred in its cell, as the search
+        // bar does, instead of filling the whole row.
+        Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = GlanceModifier.fillMaxWidth().height(CompactBarHeight)) {
+                WidgetBackground(GlanceTheme.colors.widgetBackground, backgroundOpacity) {
+                    CompactBar(appIconRes, featured, buttons, size.width)
+                }
+            }
+        }
+        return
+    }
     WidgetBackground(GlanceTheme.colors.widgetBackground, backgroundOpacity) {
         ToolbarContent(appName, appIconRes, featured, buttons)
+    }
+}
+
+/** The one-row bar: icon, featured action and as many actions as fit, each a 48 dp target. */
+@Composable
+private fun CompactBar(
+    @DrawableRes appIconRes: Int,
+    featured: WidgetButton,
+    buttons: List<WidgetButton>,
+    width: Dp,
+) {
+    Scaffold(
+        modifier = GlanceModifier.padding(vertical = CompactBarPadding),
+        backgroundColor = Transparent,
+        horizontalPadding = CompactBarPadding,
+    ) {
+        val items: List<@Composable () -> Unit> =
+            listOf<@Composable () -> Unit>({ FluidAppIcon(appIconRes) }, { FluidFeaturedButton(featured, filled = true) }) +
+                buttons.map { button -> { FluidButton(button, filled = true) } }
+        // n items have n - 1 gaps: add one gap to the length to divide evenly.
+        val fit = ((width - CompactBarPadding * 2 + ItemSpacing) / (MinButtonSize + ItemSpacing)).toInt()
+        SpacedRow(items.take(fit), GlanceModifier.fillMaxSize())
     }
 }
 
@@ -245,6 +281,10 @@ private fun TwoRowGrid(items: List<@Composable () -> Unit>, modifier: GlanceModi
         SpacedRow(items.subList(middle, items.size), GlanceModifier.fillMaxWidth().defaultWeight())
     }
 }
+
+/** The one-row bar's height: Material 3's toolbar height, 48 dp targets and 8 dp around them. */
+private val CompactBarHeight = 64.dp
+private val CompactBarPadding = 8.dp
 
 /** Accessible tap target. */
 private val MinButtonSize = 48.dp
