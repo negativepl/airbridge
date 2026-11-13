@@ -10,7 +10,6 @@ import android.content.pm.ServiceInfo
 import android.net.Uri
 import androidx.core.content.IntentCompat
 import androidx.core.content.edit
-import androidx.core.graphics.toColorInt
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -1162,25 +1161,12 @@ class AirbridgeService : Service() {
                 else -> "$totalBytes B"
             }
             val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
-            val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
-                .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, sender))
-                .setContentText("$filename · $sizeText · $progressPercent%")
-                .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                .setContentIntent(openAppPendingIntent())
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                val accentColor = "#4285F4".toColorInt()
-                val grayColor = "#444444".toColorInt()
-                notifBuilder.style = Notification.ProgressStyle().apply {
-                    this.progress = progressPercent
-                    this.progressSegments = listOf(
-                        Notification.ProgressStyle.Segment(progressPercent).setColor(accentColor),
-                        Notification.ProgressStyle.Segment(100 - progressPercent).setColor(grayColor)
-                    )
-                }
-            }
-            manager.notify(4, notifBuilder.build())
+            val notification = buildTransferProgressNotification(
+                title = getString(com.airbridge.R.string.notification_title_receiving, sender),
+                text = "$filename · $sizeText · $progressPercent%",
+                percent = progressPercent
+            )
+            manager.notify(4, notification)
         }
     }
 
@@ -2068,25 +2054,13 @@ class AirbridgeService : Service() {
         )
         val targetName = connectedDeviceName.value ?: "Mac"
         fun updateTransferNotification(progress: Int, speed: String) {
-            val notifBuilder = Notification.Builder(this, CHANNEL_FILES_ID)
-                .setContentTitle(getString(com.airbridge.R.string.notification_title_sending, targetName))
-                .setContentText(if (speed.isNotEmpty()) "$filename · $speed" else filename)
-                .setSmallIcon(com.airbridge.R.drawable.ic_notification)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(openIntent)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                val accentColor = "#4285F4".toColorInt()
-                val grayColor = "#444444".toColorInt()
-                notifBuilder.style = Notification.ProgressStyle().apply {
-                    this.progress = progress
-                    this.progressSegments = listOf(
-                        Notification.ProgressStyle.Segment(maxOf(progress, 1)).setColor(accentColor),
-                        Notification.ProgressStyle.Segment(maxOf(100 - progress, 1)).setColor(grayColor)
-                    )
-                }
-            }
-            manager.notify(transferNotifId, notifBuilder.build())
+            val notification = buildTransferProgressNotification(
+                title = getString(com.airbridge.R.string.notification_title_sending, targetName),
+                text = if (speed.isNotEmpty()) "$filename · $speed" else filename,
+                percent = progress,
+                contentIntent = openIntent
+            )
+            manager.notify(transferNotifId, notification)
         }
         updateTransferNotification(0, "")
 
@@ -2552,34 +2526,60 @@ class AirbridgeService : Service() {
 
     /** Ongoing progress notification for one file fetched from the Files tab. */
     private fun postMacDownloadNotification(notifId: Int, name: String, percent: Int) {
-        val openIntent = android.app.PendingIntent.getActivity(
-            this, 0,
-            android.content.Intent(this, com.airbridge.ui.MainActivity::class.java).apply {
-                flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
-            },
-            android.app.PendingIntent.FLAG_IMMUTABLE
+        val notification = buildTransferProgressNotification(
+            title = getString(com.airbridge.R.string.notification_title_receiving, connectedDeviceName.value ?: "Mac"),
+            text = "$name · $percent%",
+            percent = percent
         )
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notifId, notification)
+    }
+
+    /**
+     * A file transfer in progress, as a Live Update (Android 16+): promoted to
+     * the top of the shade and the lock screen, with the percentage in a status
+     * bar chip. A transfer is user-started, ongoing and has a clear end, which
+     * is what Live Updates are for; once it ends, the finished or failed state
+     * is posted as an ordinary notification in its place.
+     *
+     * The progress takes the system's colours: the app's accent on Android 16,
+     * the semantic "informational" colour on Android 17, which also keeps it
+     * readable in light and dark themes alike.
+     */
+    private fun buildTransferProgressNotification(
+        title: String,
+        text: String,
+        percent: Int,
+        contentIntent: android.app.PendingIntent = openAppPendingIntent(),
+    ): Notification {
+        val clamped = percent.coerceIn(0, 100)
         val builder = Notification.Builder(this, CHANNEL_FILES_ID)
-            .setContentTitle(getString(com.airbridge.R.string.notification_title_receiving, connectedDeviceName.value ?: "Mac"))
-            .setContentText("$name · $percent%")
+            .setContentTitle(title)
+            .setContentText(text)
             .setSmallIcon(com.airbridge.R.drawable.ic_notification)
+            .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(openIntent)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            val accentColor = "#4285F4".toColorInt()
-            val grayColor = "#444444".toColorInt()
+            // Live Updates arrived in Android 16 QPR1 (36.1).
+            if (Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
+                builder
+                    .setRequestPromotedOngoing(true)
+                    // The chip shows text only when it fits whole; "100%" does.
+                    .setShortCriticalText("$clamped%")
+            }
             builder.style = Notification.ProgressStyle().apply {
-                this.progress = percent
-                this.progressSegments = listOf(
-                    Notification.ProgressStyle.Segment(maxOf(percent, 1)).setColor(accentColor),
-                    Notification.ProgressStyle.Segment(maxOf(100 - percent, 1)).setColor(grayColor)
-                )
+                progress = clamped
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+                    progressSegments = listOf(
+                        Notification.ProgressStyle.Segment(100)
+                            .setSemanticStyle(Notification.SEMANTIC_STYLE_INFO)
+                    )
+                }
             }
         } else {
-            builder.setProgress(100, percent, false)
+            builder.setProgress(100, clamped, false)
         }
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notifId, builder.build())
+        return builder.build()
     }
 
     private fun buildNotification(title: String, text: String): Notification =
